@@ -109,6 +109,154 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/running/run-detail.component').then((m) => m.RunDetailComponent),
       },
+      {
+        path: 'calendar',
+        loadComponent: () =>
+          import('./features/calendar/calendar-list.component').then((m) => m.CalendarListComponent),
+      },
+      {
+        path: 'calendar/new',
+        loadComponent: () =>
+          import('./features/calendar/event-form.component').then((m) => m.EventFormComponent),
+      },
+      {
+        path: 'calendar/:id/edit',
+        loadComponent: () =>
+          import('./features/calendar/event-form.component').then((m) => m.EventFormComponent),
+      },
+      {
+        path: 'calendar/:id',
+        loadComponent: () =>
+          import('./features/calendar/event-detail.component').then((m) => m.EventDetailComponent),
+      },
+      {
+        path: 'journal',
+        loadComponent: () =>
+          import('./features/journal/journal-list.component').then((m) => m.JournalListComponent),
+      },
+      {
+        path: 'journal/new',
+        loadComponent: () =>
+          import('./features/journal/journal-form.component').then((m) => m.JournalFormComponent),
+      },
+      {
+        path: 'journal/:id/edit',
+        loadComponent: () =>
+          import('./features/journal/journal-form.component').then((m) => m.JournalFormComponent),
+      },
+      {
+        path: 'journal/:id',
+        loadComponent: () =>
+          import('./features/journal/journal-detail.component').then((m) => m.JournalDetailComponent),
+      },
+      {
+        path: 'mood',
+        loadComponent: () =>
+          import('./features/mood/mood-page.component').then((m) => m.MoodPageComponent),
+      },
+      {
+        path: 'communication',
+        loadComponent: () =>
+          import('./features/communication/communication-hub.component').then((m) => m.CommunicationHubComponent),
+      },
+      {
+        path: 'communication/vocabulary/new',
+        loadComponent: () =>
+          import('./features/communication/vocabulary-form.component').then((m) => m.VocabularyFormComponent),
+      },
+      {
+        path: 'communication/vocabulary/:id/edit',
+        loadComponent: () =>
+          import('./features/communication/vocabulary-form.component').then((m) => m.VocabularyFormComponent),
+      },
+      {
+        path: 'communication/vocabulary/:id',
+        loadComponent: () =>
+          import('./features/communication/vocabulary-detail.component').then((m) => m.VocabularyDetailComponent),
+      },
+      {
+        path: 'communication/writing/new',
+        loadComponent: () =>
+          import('./features/communication/writing-form.component').then((m) => m.WritingFormComponent),
+      },
+      {
+        path: 'communication/writing/:id/edit',
+        loadComponent: () =>
+          import('./features/communication/writing-form.component').then((m) => m.WritingFormComponent),
+      },
+      {
+        path: 'communication/writing/:id',
+        loadComponent: () =>
+          import('./features/communication/writing-detail.component').then((m) => m.WritingDetailComponent),
+      },
+      {
+        path: 'communication/speaking/new',
+        loadComponent: () =>
+          import('./features/communication/speaking-form.component').then((m) => m.SpeakingFormComponent),
+      },
+      {
+        path: 'communication/speaking/:id/edit',
+        loadComponent: () =>
+          import('./features/communication/speaking-form.component').then((m) => m.SpeakingFormComponent),
+      },
+      {
+        path: 'communication/speaking/:id',
+        loadComponent: () =>
+          import('./features/communication/speaking-detail.component').then((m) => m.SpeakingDetailComponent),
+      },
+      {
+        path: 'qa',
+        loadComponent: () => import('./features/qa/qa-list.component').then((m) => m.QAListComponent),
+      },
+      {
+        path: 'qa/new',
+        loadComponent: () => import('./features/qa/qa-form.component').then((m) => m.QAFormComponent),
+      },
+      {
+        path: 'qa/:id/edit',
+        loadComponent: () => import('./features/qa/qa-form.component').then((m) => m.QAFormComponent),
+      },
+      {
+        path: 'qa/:id',
+        loadComponent: () => import('./features/qa/qa-detail.component').then((m) => m.QADetailComponent),
+      },
+      {
+        path: 'wishlist',
+        loadComponent: () =>
+          import('./features/wishlist/wishlist-list.component').then((m) => m.WishlistListComponent),
+      },
+      {
+        path: 'wishlist/new',
+        loadComponent: () =>
+          import('./features/wishlist/wishlist-form.component').then((m) => m.WishlistFormComponent),
+      },
+      {
+        path: 'wishlist/:id/edit',
+        loadComponent: () =>
+          import('./features/wishlist/wishlist-form.component').then((m) => m.WishlistFormComponent),
+      },
+      {
+        path: 'wishlist/:id',
+        loadComponent: () =>
+          import('./features/wishlist/wishlist-detail.component').then((m) => m.WishlistDetailComponent),
+      },
+      {
+        path: 'search',
+        loadComponent: () =>
+          import('./features/search/search-page.component').then((m) => m.SearchPageComponent),
+      },
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./features/notifications/notifications-page.component').then(
+            (m) => m.NotificationsPageComponent,
+          ),
+      },
+      {
+        path: 'export',
+        loadComponent: () =>
+          import('./features/export/export-page.component').then((m) => m.ExportPageComponent),
+      },
     ],
   },
   { path: '**', redirectTo: 'dashboard' },

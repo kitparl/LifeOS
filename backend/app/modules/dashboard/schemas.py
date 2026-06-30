@@ -40,6 +40,8 @@ class CalendarPreviewItem(BaseModel):
 class NotificationItem(BaseModel):
     id: str
     message: str
+    route: str | None = None
+    is_read: bool = False
     created_at: datetime
 
 

@@ -54,6 +54,54 @@ import { CommandPaletteService } from '../command-palette/command-palette.servic
             >Running</a
           >
           <a
+            routerLink="/calendar"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Calendar</a
+          >
+          <a
+            routerLink="/journal"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Journal</a
+          >
+          <a
+            routerLink="/mood"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Mood</a
+          >
+          <a
+            routerLink="/communication"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Communication</a
+          >
+          <a
+            routerLink="/qa"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Q&A</a
+          >
+          <a
+            routerLink="/wishlist"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Wishlist</a
+          >
+          <a
+            routerLink="/notifications"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Notifications</a
+          >
+          <a
+            routerLink="/export"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Export</a
+          >
+          <a
             routerLink="/profile"
             routerLinkActive="bg-[var(--xp-blue)] text-white"
             class="rounded px-3 py-2 hover:bg-white/60"

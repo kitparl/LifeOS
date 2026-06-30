@@ -34,6 +34,8 @@ export interface CalendarPreviewItem {
 export interface NotificationItem {
   id: string;
   message: string;
+  route: string | null;
+  is_read: boolean;
   created_at: string;
 }
 

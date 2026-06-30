@@ -1,7 +1,8 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { SearchService } from '../../features/search/services/search.service';
 import { CommandPaletteItem } from './command-palette.models';
 import { CommandPaletteService } from './command-palette.service';
 
@@ -29,12 +30,12 @@ import { CommandPaletteService } from './command-palette.service';
               type="text"
               placeholder="Type a command or search…"
               [ngModel]="palette.query()"
-              (ngModelChange)="palette.setQuery($event)"
+              (ngModelChange)="onQueryChange($event)"
               (keydown)="onInputKeydown($event)"
             />
           </div>
           <ul class="max-h-72 overflow-y-auto text-sm">
-            @for (item of filtered; track item.id; let i = $index) {
+            @for (item of displayItems; track item.id; let i = $index) {
               <li>
                 <button
                   type="button"
@@ -58,13 +59,29 @@ import { CommandPaletteService } from './command-palette.service';
     }
   `,
 })
-export class CommandPaletteComponent implements OnInit {
+export class CommandPaletteComponent implements OnInit, OnDestroy {
   readonly palette = inject(CommandPaletteService);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly searchService = inject(SearchService);
 
-  get filtered(): CommandPaletteItem[] {
-    return this.palette.filteredItems();
+  searchItems: CommandPaletteItem[] = [];
+  private searchTimer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    effect(() => {
+      if (!this.palette.isOpen()) {
+        this.searchItems = [];
+      }
+    });
+  }
+
+  get displayItems(): CommandPaletteItem[] {
+    const commands = this.palette.filteredItems();
+    if (this.searchItems.length === 0) {
+      return commands;
+    }
+    return [...commands, ...this.searchItems];
   }
 
   ngOnInit(): void {
@@ -78,20 +95,75 @@ export class CommandPaletteComponent implements OnInit {
       { id: 'new-habit', label: 'New Habit', group: 'Actions', route: '/habits/new' },
       { id: 'running', label: 'Running', group: 'Modules', route: '/running' },
       { id: 'log-run', label: 'Log Run', group: 'Actions', route: '/running/new' },
+      { id: 'calendar', label: 'Calendar', group: 'Modules', route: '/calendar' },
+      { id: 'journal', label: 'Journal', group: 'Modules', route: '/journal' },
+      { id: 'mood', label: 'Mood', group: 'Modules', route: '/mood' },
+      { id: 'new-event', label: 'New Event', group: 'Actions', route: '/calendar/new' },
+      { id: 'new-journal', label: 'New Journal', group: 'Actions', route: '/journal/new' },
+      { id: 'communication', label: 'Communication', group: 'Modules', route: '/communication' },
+      { id: 'qa', label: 'Personal Q&A', group: 'Modules', route: '/qa' },
+      { id: 'wishlist', label: 'Wishlist', group: 'Modules', route: '/wishlist' },
+      { id: 'add-word', label: 'Add Word', group: 'Actions', route: '/communication/vocabulary/new' },
+      { id: 'add-qa', label: 'New Q&A', group: 'Actions', route: '/qa/new' },
+      { id: 'add-wishlist', label: 'New Wishlist', group: 'Actions', route: '/wishlist/new' },
+      { id: 'search-page', label: 'Search', group: 'Tools', route: '/search' },
+      { id: 'notifications', label: 'Notifications', group: 'Tools', route: '/notifications' },
+      { id: 'export', label: 'Export Data', group: 'Tools', route: '/export' },
     ]);
   }
 
+  ngOnDestroy(): void {
+    clearTimeout(this.searchTimer);
+  }
+
+  onQueryChange(value: string): void {
+    this.palette.setQuery(value);
+    clearTimeout(this.searchTimer);
+    const q = value.trim();
+    if (q.length < 2) {
+      this.searchItems = [];
+      return;
+    }
+    this.searchTimer = setTimeout(() => {
+      this.searchService.search(q, 8).subscribe({
+        next: (res) => {
+          const items: CommandPaletteItem[] = res.results.map((r) => ({
+            id: `search-${r.module}-${r.id}`,
+            label: r.title,
+            group: 'Search',
+            hint: r.subtitle ?? r.module,
+            route: r.route,
+          }));
+          if (res.total > res.results.length) {
+            items.push({
+              id: 'search-all',
+              label: `View all ${res.total} results`,
+              group: 'Search',
+              route: `/search?q=${encodeURIComponent(q)}`,
+            });
+          }
+          this.searchItems = items;
+        },
+      });
+    }, 300);
+  }
+
   onInputKeydown(event: KeyboardEvent): void {
+    const list = this.displayItems;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      this.palette.moveActive(1);
+      if (list.length === 0) return;
+      const next = (this.palette.activeIndex() + 1 + list.length) % list.length;
+      this.palette.activeIndex.set(next);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      this.palette.moveActive(-1);
+      if (list.length === 0) return;
+      const next = (this.palette.activeIndex() - 1 + list.length) % list.length;
+      this.palette.activeIndex.set(next);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      const item = this.palette.selectActive();
-      if (item) {
+      const item = list[this.palette.activeIndex()];
+      if (item && !item.disabled) {
         this.run(item);
       }
     }
@@ -102,6 +174,7 @@ export class CommandPaletteComponent implements OnInit {
       return;
     }
     this.palette.close();
+    this.searchItems = [];
     if (item.action) {
       item.action();
     } else if (item.route) {
