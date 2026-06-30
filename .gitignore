@@ -1,0 +1,5 @@
+# AI-DLC workflow artifacts (generated during development)
+aidlc-docs/
+
+# Local-only agent settings
+.claude/settings.local.json
