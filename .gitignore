@@ -10,6 +10,7 @@ frontend/dist/
 backend/.venv/
 backend/*.db
 backend/.env
+backend/static/
 frontend/.env
 
 # Python

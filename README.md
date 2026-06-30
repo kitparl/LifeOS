@@ -1,12 +1,103 @@
-# 🧠 Personal AI Operating System (AI OS)
+# 🧠 Personal AI Operating System (LifeOS)
 
-> **Version:** 1.0
->
-> Author: Pranshu Bisht
->
-> Status: Product Planning
->
-> Architecture: Offline First • AI Powered • Mobile Friendly • Personal Knowledge System
+> **Version:** 1.0 (Personal Alpha)  
+> **Author:** Pranshu Bisht  
+> **Status:** Phase 3 Complete — ready for personal use & private Heroku deploy  
+> **Architecture:** Offline First • AI Powered • Mobile Friendly • Personal Knowledge System
+
+---
+
+## Quick links
+
+| Document | Purpose |
+|----------|---------|
+| [PHASE-1.md](docs/PHASE-1.md) | Foundation MVP (auth, goals, tasks, habits, PWA, …) |
+| [PHASE-2.md](docs/PHASE-2.md) | Intelligence (AI RAG, learning, finance, analytics, …) |
+| [PHASE-3.md](docs/PHASE-3.md) | Full AI OS (memory, coaches, OCR, voice, …) |
+| [improvements/v1.md](improvements/v1.md) | Release readiness & what to improve before public v1.0 |
+| [DEPLOY_HEROKU.md](docs/DEPLOY_HEROKU.md) | Deploy to Heroku (~$13/mo, GitHub Student) |
+| [ROADMAP.md](docs/ROADMAP.md) | Original product roadmap |
+| [runProject.md](runProject.md) | Run locally (dev) |
+
+---
+
+## Project status (June 2026)
+
+**All 27 units delivered** (Phase 1: 0–11, Phase 2: 12–18, Phase 3: 19–26).
+
+| Area | Status |
+|------|--------|
+| Feature roadmap | ✅ Complete |
+| Personal / private use | ✅ Ready |
+| Tests | ✅ 39 backend + 18 frontend |
+| Public production release | ⚠️ See [improvements/v1.md](improvements/v1.md) |
+
+**Not production-complete yet:** Alembic migrations, CI/CD, rate limiting, Playwright e2e, live integration OAuth, full OCR for images/PDF. Fine for personal alpha.
+
+---
+
+## Run locally (development)
+
+**Backend** (port 8000):
+
+```bash
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt email-validator
+cp .env.example .env   # edit SECRET_KEY, OPENAI_API_KEY optional
+uvicorn app.main:app --reload --port 8000
+```
+
+**Frontend** (port 4200):
+
+```bash
+cd frontend
+npm install --legacy-peer-deps
+npm start
+```
+
+Open http://localhost:4200 — API at http://localhost:8000/api/v1.
+
+---
+
+## Deploy to Heroku
+
+Single-app deploy: FastAPI serves the Angular build + API. Uses Heroku Postgres.
+
+**Full guide:** [docs/DEPLOY_HEROKU.md](docs/DEPLOY_HEROKU.md)
+
+```bash
+heroku create lifeos-yourname
+heroku addons:create heroku-postgresql:essential-0
+heroku config:set SECRET_KEY="$(openssl rand -hex 32)" COOKIE_SECURE=true
+heroku buildpacks:add --index 1 heroku/nodejs
+heroku buildpacks:add --index 2 heroku/python
+git push heroku main
+```
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | Angular 19 (standalone), Tailwind, Dexie, PWA service worker |
+| Backend | FastAPI, SQLAlchemy 2 async, Pydantic |
+| Database (dev) | SQLite |
+| Database (prod) | PostgreSQL (Heroku Postgres) |
+| Auth | JWT + HttpOnly refresh cookie |
+| AI | OpenAI (optional), local RAG index |
+| Tests | pytest, Karma/Jasmine |
+
+---
+
+## Modules (API `/api/v1`)
+
+**Phase 1:** auth, dashboard, goals, tasks, habits, running, calendar, journal, mood, communication, qa, wishlist, search, notifications, export, files  
+
+**Phase 2:** ai, learning, career, finance, analytics, timeline, reports  
+
+**Phase 3:** memory, coaches, ocr, voice, integrations, automations, predictions, life-timeline
 
 ---
 

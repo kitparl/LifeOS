@@ -1,0 +1,11 @@
+{
+  "name": "lifeos",
+  "private": true,
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
+  },
+  "scripts": {
+    "heroku-postbuild": "cd frontend && npm ci --legacy-peer-deps && npm run build && mkdir -p ../backend/static && cp -r dist/frontend/browser/* ../backend/static/"
+  }
+}

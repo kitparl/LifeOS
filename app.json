@@ -1,0 +1,39 @@
+{
+  "name": "LifeOS",
+  "description": "Personal AI Operating System",
+  "repository": "https://github.com/YOUR_USERNAME/LifeOS",
+  "keywords": ["fastapi", "angular", "productivity", "ai"],
+  "buildpacks": [
+    { "url": "heroku/nodejs" },
+    { "url": "heroku/python" }
+  ],
+  "env": {
+    "ENV": {
+      "description": "App environment: production (default) or dev",
+      "value": "production"
+    },
+    "SECRET_KEY": {
+      "description": "JWT signing secret (generate with: openssl rand -hex 32)",
+      "generator": "secret"
+    },
+    "COOKIE_SECURE": {
+      "description": "Set secure flag on refresh cookie (true for Heroku HTTPS)",
+      "value": "true"
+    },
+    "CORS_ORIGINS": {
+      "description": "Allowed CORS origins (set to your Heroku app URL)",
+      "required": false
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key for AI features (optional)",
+      "required": false
+    }
+  },
+  "addons": ["heroku-postgresql:essential-0"],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  }
+}
