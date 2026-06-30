@@ -302,6 +302,46 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/reports/reports-page.component').then((m) => m.ReportsPageComponent),
       },
+      {
+        path: 'memory',
+        loadComponent: () =>
+          import('./features/memory/memory-page.component').then((m) => m.MemoryPageComponent),
+      },
+      {
+        path: 'coaches',
+        loadComponent: () =>
+          import('./features/coaches/coaches-page.component').then((m) => m.CoachesPageComponent),
+      },
+      {
+        path: 'ocr',
+        loadComponent: () =>
+          import('./features/ocr/ocr-page.component').then((m) => m.OcrPageComponent),
+      },
+      {
+        path: 'voice',
+        loadComponent: () =>
+          import('./features/voice/voice-page.component').then((m) => m.VoicePageComponent),
+      },
+      {
+        path: 'integrations',
+        loadComponent: () =>
+          import('./features/integrations/integrations-page.component').then((m) => m.IntegrationsPageComponent),
+      },
+      {
+        path: 'automations',
+        loadComponent: () =>
+          import('./features/automations/automations-page.component').then((m) => m.AutomationsPageComponent),
+      },
+      {
+        path: 'predictions',
+        loadComponent: () =>
+          import('./features/predictions/predictions-page.component').then((m) => m.PredictionsPageComponent),
+      },
+      {
+        path: 'life-timeline',
+        loadComponent: () =>
+          import('./features/life-timeline/life-timeline-page.component').then((m) => m.LifeTimelinePageComponent),
+      },
     ],
   },
   { path: '**', redirectTo: 'dashboard' },

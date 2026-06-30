@@ -24,6 +24,14 @@ from app.modules.reports.api import router as reports_router
 from app.modules.running.api import router as running_router
 from app.modules.search.api import router as search_router
 from app.modules.tasks.api import router as tasks_router
+from app.modules.life_timeline.api import router as life_timeline_router
+from app.modules.memory.api import router as memory_router
+from app.modules.coaches.api import router as coaches_router
+from app.modules.ocr.api import router as ocr_router
+from app.modules.voice.api import router as voice_router
+from app.modules.integrations.api import router as integrations_router
+from app.modules.automations.api import router as automations_router
+from app.modules.predictions.api import router as predictions_router
 from app.modules.timeline.api import router as timeline_router
 from app.modules.wishlist.api import router as wishlist_router
 
@@ -66,6 +74,14 @@ app.include_router(finance_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(timeline_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(memory_router, prefix="/api/v1")
+app.include_router(coaches_router, prefix="/api/v1")
+app.include_router(ocr_router, prefix="/api/v1")
+app.include_router(voice_router, prefix="/api/v1")
+app.include_router(integrations_router, prefix="/api/v1")
+app.include_router(automations_router, prefix="/api/v1")
+app.include_router(predictions_router, prefix="/api/v1")
+app.include_router(life_timeline_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health():

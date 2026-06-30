@@ -145,6 +145,54 @@ import { CommandPaletteService } from '../command-palette/command-palette.servic
             >Reports</a
           >
           <a
+            routerLink="/memory"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Memory</a
+          >
+          <a
+            routerLink="/coaches"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Coaches</a
+          >
+          <a
+            routerLink="/ocr"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >OCR</a
+          >
+          <a
+            routerLink="/voice"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Voice</a
+          >
+          <a
+            routerLink="/integrations"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Integrations</a
+          >
+          <a
+            routerLink="/automations"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Automations</a
+          >
+          <a
+            routerLink="/predictions"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Predictions</a
+          >
+          <a
+            routerLink="/life-timeline"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Life Timeline</a
+          >
+          <a
             routerLink="/profile"
             routerLinkActive="bg-[var(--xp-blue)] text-white"
             class="rounded px-3 py-2 hover:bg-white/60"

@@ -116,6 +116,14 @@ export class CommandPaletteComponent implements OnInit, OnDestroy {
       { id: 'analytics', label: 'Analytics', group: 'Phase 2', route: '/analytics' },
       { id: 'timeline', label: 'Timeline', group: 'Phase 2', route: '/timeline' },
       { id: 'reports', label: 'Reports', group: 'Phase 2', route: '/reports' },
+      { id: 'memory', label: 'AI Memory', group: 'Phase 3', route: '/memory' },
+      { id: 'coaches', label: 'AI Coaches', group: 'Phase 3', route: '/coaches' },
+      { id: 'ocr', label: 'OCR', group: 'Phase 3', route: '/ocr' },
+      { id: 'voice', label: 'Voice', group: 'Phase 3', route: '/voice' },
+      { id: 'integrations', label: 'Integrations', group: 'Phase 3', route: '/integrations' },
+      { id: 'automations', label: 'Automations', group: 'Phase 3', route: '/automations' },
+      { id: 'predictions', label: 'Predictions', group: 'Phase 3', route: '/predictions' },
+      { id: 'life-timeline', label: 'Life Timeline', group: 'Phase 3', route: '/life-timeline' },
     ]);
   }
 
