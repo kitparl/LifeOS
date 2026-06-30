@@ -48,6 +48,12 @@ import { CommandPaletteService } from '../command-palette/command-palette.servic
             >Habits</a
           >
           <a
+            routerLink="/running"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Running</a
+          >
+          <a
             routerLink="/profile"
             routerLinkActive="bg-[var(--xp-blue)] text-white"
             class="rounded px-3 py-2 hover:bg-white/60"

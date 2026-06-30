@@ -76,7 +76,8 @@ export class CommandPaletteComponent implements OnInit {
       { id: 'tasks', label: 'Tasks', group: 'Modules', route: '/tasks' },
       { id: 'habits', label: 'Habits', group: 'Modules', route: '/habits' },
       { id: 'new-habit', label: 'New Habit', group: 'Actions', route: '/habits/new' },
-      { id: 'running', label: 'Running', group: 'Modules', disabled: true, hint: 'Coming soon' },
+      { id: 'running', label: 'Running', group: 'Modules', route: '/running' },
+      { id: 'log-run', label: 'Log Run', group: 'Actions', route: '/running/new' },
     ]);
   }
 

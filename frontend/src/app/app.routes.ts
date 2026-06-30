@@ -89,6 +89,26 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/habits/habit-detail.component').then((m) => m.HabitDetailComponent),
       },
+      {
+        path: 'running',
+        loadComponent: () =>
+          import('./features/running/running-list.component').then((m) => m.RunningListComponent),
+      },
+      {
+        path: 'running/new',
+        loadComponent: () =>
+          import('./features/running/run-form.component').then((m) => m.RunFormComponent),
+      },
+      {
+        path: 'running/:id/edit',
+        loadComponent: () =>
+          import('./features/running/run-form.component').then((m) => m.RunFormComponent),
+      },
+      {
+        path: 'running/:id',
+        loadComponent: () =>
+          import('./features/running/run-detail.component').then((m) => m.RunDetailComponent),
+      },
     ],
   },
   { path: '**', redirectTo: 'dashboard' },
