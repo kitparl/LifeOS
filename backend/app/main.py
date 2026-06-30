@@ -4,6 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import Base, engine
 from app.modules.auth.api import router as auth_router
+from app.modules.dashboard.api import router as dashboard_router
+from app.modules.goals.api import router as goals_router
+from app.modules.habits.api import router as habits_router
+from app.modules.tasks.api import router as tasks_router
 
 settings = get_settings()
 
@@ -22,6 +26,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(goals_router, prefix="/api/v1")
+app.include_router(tasks_router, prefix="/api/v1")
+app.include_router(habits_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health():

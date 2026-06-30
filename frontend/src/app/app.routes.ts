@@ -29,6 +29,66 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/profile/profile.component').then((m) => m.ProfileComponent),
       },
+      {
+        path: 'goals',
+        loadComponent: () =>
+          import('./features/goals/goals-list.component').then((m) => m.GoalsListComponent),
+      },
+      {
+        path: 'goals/new',
+        loadComponent: () =>
+          import('./features/goals/goal-form.component').then((m) => m.GoalFormComponent),
+      },
+      {
+        path: 'goals/:id/edit',
+        loadComponent: () =>
+          import('./features/goals/goal-form.component').then((m) => m.GoalFormComponent),
+      },
+      {
+        path: 'goals/:id',
+        loadComponent: () =>
+          import('./features/goals/goal-detail.component').then((m) => m.GoalDetailComponent),
+      },
+      {
+        path: 'tasks',
+        loadComponent: () =>
+          import('./features/tasks/tasks-list.component').then((m) => m.TasksListComponent),
+      },
+      {
+        path: 'tasks/new',
+        loadComponent: () =>
+          import('./features/tasks/task-form.component').then((m) => m.TaskFormComponent),
+      },
+      {
+        path: 'tasks/:id/edit',
+        loadComponent: () =>
+          import('./features/tasks/task-form.component').then((m) => m.TaskFormComponent),
+      },
+      {
+        path: 'tasks/:id',
+        loadComponent: () =>
+          import('./features/tasks/task-detail.component').then((m) => m.TaskDetailComponent),
+      },
+      {
+        path: 'habits',
+        loadComponent: () =>
+          import('./features/habits/habits-list.component').then((m) => m.HabitsListComponent),
+      },
+      {
+        path: 'habits/new',
+        loadComponent: () =>
+          import('./features/habits/habit-form.component').then((m) => m.HabitFormComponent),
+      },
+      {
+        path: 'habits/:id/edit',
+        loadComponent: () =>
+          import('./features/habits/habit-form.component').then((m) => m.HabitFormComponent),
+      },
+      {
+        path: 'habits/:id',
+        loadComponent: () =>
+          import('./features/habits/habit-detail.component').then((m) => m.HabitDetailComponent),
+      },
     ],
   },
   { path: '**', redirectTo: 'dashboard' },
