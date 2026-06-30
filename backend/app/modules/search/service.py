@@ -8,6 +8,7 @@ from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
 from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
+from app.modules.ai.service import AiService
 from app.modules.search.schemas import SearchResponse, SearchResultItem
 from app.modules.tasks.models import Task
 from app.modules.wishlist.models import WishlistItem
@@ -247,4 +248,29 @@ class SearchService:
         await add_wishlist_rows()
 
         results = results[:limit]
+        return SearchResponse(query=q, total=len(results), results=results)
+
+    async def semantic_search(self, user_id: str, query: str, limit: int = 20) -> SearchResponse:
+        q = query.strip()
+        if not q:
+            return SearchResponse(query=q, total=0, results=[])
+        ai = AiService(self.db)
+        rows = await ai.repo.list_for_user(user_id)
+        if not rows:
+            await ai.index(user_id)
+            rows = await ai.repo.list_for_user(user_id)
+        sources = await ai._retrieve(user_id, q, rows)
+        results = [
+            SearchResultItem(
+                module=s.source_type,
+                entity_type=s.source_type,
+                id=s.source_id,
+                title=s.title,
+                subtitle=s.snippet[:80] if s.snippet else None,
+                route=s.route,
+            )
+            for s in sources[:limit]
+        ]
+        if not results:
+            return await self.search(user_id, q, limit=limit)
         return SearchResponse(query=q, total=len(results), results=results)

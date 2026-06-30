@@ -109,6 +109,42 @@ import { CommandPaletteService } from '../command-palette/command-palette.servic
             >Files</a
           >
           <a
+            routerLink="/learning"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Learning</a
+          >
+          <a
+            routerLink="/career"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Career</a
+          >
+          <a
+            routerLink="/finance"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Finance</a
+          >
+          <a
+            routerLink="/analytics"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Analytics</a
+          >
+          <a
+            routerLink="/timeline"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Timeline</a
+          >
+          <a
+            routerLink="/reports"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Reports</a
+          >
+          <a
             routerLink="/profile"
             routerLinkActive="bg-[var(--xp-blue)] text-white"
             class="rounded px-3 py-2 hover:bg-white/60"

@@ -11,8 +11,12 @@ import { SearchService } from './services/search.service';
   template: `
     <div class="space-y-3">
       <h1 class="text-lg font-semibold">Search</h1>
-      <form class="flex gap-2 text-sm" [formGroup]="form" (ngSubmit)="search()">
-        <input class="input-field flex-1" formControlName="q" placeholder="Search across all modules…" />
+      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="form" (ngSubmit)="search()">
+        <input class="input-field flex-1 min-w-[12rem]" formControlName="q" placeholder="Search across all modules…" />
+        <label class="flex items-center gap-1 text-xs">
+          <input type="checkbox" formControlName="semantic" />
+          Semantic
+        </label>
         <button type="submit" class="btn-primary text-xs">Search</button>
       </form>
 
@@ -46,7 +50,7 @@ export class SearchPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly fb = inject(FormBuilder);
 
-  form = this.fb.nonNullable.group({ q: '' });
+  form = this.fb.nonNullable.group({ q: '', semantic: false });
   results: SearchResultItem[] = [];
   loading = false;
   searched = false;
@@ -67,7 +71,10 @@ export class SearchPageComponent implements OnInit {
     if (!q) return;
     this.loading = true;
     this.lastQuery = q;
-    this.searchService.search(q).subscribe({
+    const req = this.form.getRawValue().semantic
+      ? this.searchService.semanticSearch(q)
+      : this.searchService.search(q);
+    req.subscribe({
       next: (res) => {
         this.results = res.results;
         this.searched = true;

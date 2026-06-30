@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = ""
     upload_dir: str = "./uploads"
     max_upload_bytes: int = 10 * 1024 * 1024
+    openai_api_key: str = ""
+    ai_chat_model: str = "gpt-4o-mini"
+    ai_embedding_model: str = "text-embedding-3-small"
 
     @property
     def cors_origin_list(self) -> list[str]:

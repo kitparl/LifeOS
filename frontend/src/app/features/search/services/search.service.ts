@@ -13,4 +13,9 @@ export class SearchService {
     const params = new HttpParams().set('q', q).set('limit', String(limit));
     return this.http.get<SearchResponse>(this.api, { params });
   }
+
+  semanticSearch(q: string, limit = 20): Observable<SearchResponse> {
+    const params = new HttpParams().set('q', q).set('limit', String(limit));
+    return this.http.get<SearchResponse>(`${this.api}/semantic`, { params });
+  }
 }

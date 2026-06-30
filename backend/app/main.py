@@ -3,21 +3,28 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import Base, engine
+from app.modules.ai.api import router as ai_router
+from app.modules.analytics.api import router as analytics_router
 from app.modules.auth.api import router as auth_router
 from app.modules.calendar.api import router as calendar_router
+from app.modules.career.api import router as career_router
 from app.modules.communication.api import router as communication_router
 from app.modules.dashboard.api import router as dashboard_router
 from app.modules.export.api import router as export_router
 from app.modules.files.api import router as files_router
+from app.modules.finance.api import router as finance_router
 from app.modules.goals.api import router as goals_router
 from app.modules.habits.api import router as habits_router
 from app.modules.journal.api import router as journal_router
+from app.modules.learning.api import router as learning_router
 from app.modules.mood.api import router as mood_router
 from app.modules.notifications.api import router as notifications_router
 from app.modules.qa.api import router as qa_router
+from app.modules.reports.api import router as reports_router
 from app.modules.running.api import router as running_router
 from app.modules.search.api import router as search_router
 from app.modules.tasks.api import router as tasks_router
+from app.modules.timeline.api import router as timeline_router
 from app.modules.wishlist.api import router as wishlist_router
 
 settings = get_settings()
@@ -52,6 +59,13 @@ app.include_router(search_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(export_router, prefix="/api/v1")
 app.include_router(files_router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
+app.include_router(learning_router, prefix="/api/v1")
+app.include_router(career_router, prefix="/api/v1")
+app.include_router(finance_router, prefix="/api/v1")
+app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(timeline_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health():

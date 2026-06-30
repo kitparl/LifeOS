@@ -262,6 +262,46 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/files/files-page.component').then((m) => m.FilesPageComponent),
       },
+      {
+        path: 'learning',
+        loadComponent: () =>
+          import('./features/learning/learning-page.component').then((m) => m.LearningListComponent),
+      },
+      {
+        path: 'learning/new',
+        loadComponent: () =>
+          import('./features/learning/learning-page.component').then((m) => m.LearningFormComponent),
+      },
+      {
+        path: 'learning/:id/edit',
+        loadComponent: () =>
+          import('./features/learning/learning-page.component').then((m) => m.LearningFormComponent),
+      },
+      {
+        path: 'career',
+        loadComponent: () =>
+          import('./features/career/career-page.component').then((m) => m.CareerPageComponent),
+      },
+      {
+        path: 'finance',
+        loadComponent: () =>
+          import('./features/finance/finance-page.component').then((m) => m.FinancePageComponent),
+      },
+      {
+        path: 'analytics',
+        loadComponent: () =>
+          import('./features/analytics/analytics-page.component').then((m) => m.AnalyticsPageComponent),
+      },
+      {
+        path: 'timeline',
+        loadComponent: () =>
+          import('./features/timeline/timeline-page.component').then((m) => m.TimelinePageComponent),
+      },
+      {
+        path: 'reports',
+        loadComponent: () =>
+          import('./features/reports/reports-page.component').then((m) => m.ReportsPageComponent),
+      },
     ],
   },
   { path: '**', redirectTo: 'dashboard' },
