@@ -1,0 +1,17 @@
+{
+  "name": "LifeOS — Personal AI Operating System",
+  "short_name": "LifeOS",
+  "theme_color": "#0054E3",
+  "background_color": "#ece9d8",
+  "display": "standalone",
+  "scope": "./",
+  "start_url": "./",
+  "icons": [
+    {
+      "src": "icons/lifeos.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

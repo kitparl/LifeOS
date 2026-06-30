@@ -8,6 +8,7 @@ from app.modules.calendar.api import router as calendar_router
 from app.modules.communication.api import router as communication_router
 from app.modules.dashboard.api import router as dashboard_router
 from app.modules.export.api import router as export_router
+from app.modules.files.api import router as files_router
 from app.modules.goals.api import router as goals_router
 from app.modules.habits.api import router as habits_router
 from app.modules.journal.api import router as journal_router
@@ -50,6 +51,7 @@ app.include_router(wishlist_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(export_router, prefix="/api/v1")
+app.include_router(files_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health():

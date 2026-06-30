@@ -89,5 +89,6 @@ class DashboardService:
                 QuickActionItem(id="add_qa", label="New Q&A", route="/qa/new", enabled=True),
                 QuickActionItem(id="add_wishlist", label="New Wishlist", route="/wishlist/new", enabled=True),
                 QuickActionItem(id="export_data", label="Export Data", route="/export", enabled=True),
+                QuickActionItem(id="upload_file", label="Upload File", route="/files", enabled=True),
             ],
         )

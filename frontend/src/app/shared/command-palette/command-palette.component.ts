@@ -109,6 +109,7 @@ export class CommandPaletteComponent implements OnInit, OnDestroy {
       { id: 'search-page', label: 'Search', group: 'Tools', route: '/search' },
       { id: 'notifications', label: 'Notifications', group: 'Tools', route: '/notifications' },
       { id: 'export', label: 'Export Data', group: 'Tools', route: '/export' },
+      { id: 'files', label: 'Files', group: 'Tools', route: '/files' },
     ]);
   }
 

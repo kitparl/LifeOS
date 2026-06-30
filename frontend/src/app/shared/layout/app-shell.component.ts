@@ -3,6 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { DashboardService } from '../../features/dashboard/services/dashboard.service';
+import { SyncService } from '../../sync/sync.service';
 import { AiChatPanelComponent } from '../../features/dashboard/widgets/ai-chat-panel.component';
 import { CommandPaletteComponent } from '../command-palette/command-palette.component';
 import { CommandPaletteService } from '../command-palette/command-palette.service';
@@ -102,6 +103,12 @@ import { CommandPaletteService } from '../command-palette/command-palette.servic
             >Export</a
           >
           <a
+            routerLink="/files"
+            routerLinkActive="bg-[var(--xp-blue)] text-white"
+            class="rounded px-3 py-2 hover:bg-white/60"
+            >Files</a
+          >
+          <a
             routerLink="/profile"
             routerLinkActive="bg-[var(--xp-blue)] text-white"
             class="rounded px-3 py-2 hover:bg-white/60"
@@ -159,6 +166,7 @@ export class AppShellComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly palette = inject(CommandPaletteService);
   private readonly dashboard = inject(DashboardService);
+  readonly sync = inject(SyncService);
 
   readonly aiPanelOpen = signal(true);
   readonly showAiPanel = signal(false);
@@ -175,18 +183,15 @@ export class AppShellComponent implements OnInit {
   }
 
   syncLabel(): string | null {
-    const s = this.dashboard.summary();
-    if (!s) {
-      return null;
-    }
-    if (s.pending_sync_count > 0) {
-      return `${s.pending_sync_count} pending`;
-    }
-    return s.sync_status === 'synced' ? 'Synced' : s.sync_status;
+    const status = this.sync.status();
+    if (status === 'offline') return 'Offline';
+    const pending = this.sync.pendingCount();
+    if (pending > 0) return `${pending} pending`;
+    return status === 'syncing' ? 'Syncing' : 'Synced';
   }
 
   syncDotClass(): string {
-    const status = this.dashboard.summary()?.sync_status ?? 'synced';
+    const status = this.sync.status();
     if (status === 'syncing') return 'bg-orange-500';
     if (status === 'offline') return 'bg-gray-500';
     return 'bg-green-600';

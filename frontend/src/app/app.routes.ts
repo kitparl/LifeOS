@@ -257,6 +257,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/export/export-page.component').then((m) => m.ExportPageComponent),
       },
+      {
+        path: 'files',
+        loadComponent: () =>
+          import('./features/files/files-page.component').then((m) => m.FilesPageComponent),
+      },
     ],
   },
   { path: '**', redirectTo: 'dashboard' },

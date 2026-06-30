@@ -1,13 +1,14 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FileUploadComponent } from '../../shared/file-upload/file-upload.component';
 import { WISHLIST_CATEGORIES, WishlistCategory } from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
 
 @Component({
   selector: 'app-wishlist-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, FileUploadComponent],
   template: `
     <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
@@ -40,8 +41,9 @@ import { WishlistService } from './services/wishlist.service';
             </div>
           </div>
           <div>
-            <label class="mb-1 block">Image URL (optional)</label>
-            <input class="input-field" formControlName="image_url" placeholder="https://…" />
+            <label class="mb-1 block">Image</label>
+            <app-file-upload module="wishlist" [entityId]="itemId" (uploaded)="onImageUploaded($event)" />
+            <input class="input-field mt-2" formControlName="image_url" placeholder="Or paste image URL…" />
           </div>
           <div>
             <label class="mb-1 block">Notes</label>
@@ -100,6 +102,10 @@ export class WishlistFormComponent implements OnInit {
           }),
       });
     }
+  }
+
+  onImageUploaded(url: string): void {
+    this.form.patchValue({ image_url: url });
   }
 
   submit(): void {

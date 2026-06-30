@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:4200"
     google_client_id: str = ""
     github_client_id: str = ""
+    s3_bucket: str = ""
+    s3_region: str = "us-east-1"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    upload_dir: str = "./uploads"
+    max_upload_bytes: int = 10 * 1024 * 1024
 
     @property
     def cors_origin_list(self) -> list[str]:
