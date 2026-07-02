@@ -1,65 +1,158 @@
 @import "tailwindcss";
 
 :root {
-  --xp-blue: #0054e3;
-  --xp-blue-dark: #0039a6;
-  --xp-blue-light: #3a6ea5;
-  --xp-silver: #ece9d8;
-  --xp-panel: #f0f0f0;
-  --xp-border: #7a96df;
-  --xp-title-start: #0a246a;
-  --xp-title-end: #a6caf0;
-  --xp-text: #1a1a1a;
-  --xp-shadow: rgba(0, 0, 0, 0.25);
+  color-scheme: light dark;
+
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #eef2f7;
+  --border: #d7e0eb;
+  --text: #0f172a;
+  --text-muted: #5b6675;
+  --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --primary-soft: #dbeafe;
+  --primary-contrast: #ffffff;
+  --ring: rgba(37, 99, 235, 0.35);
+  --shadow: rgba(15, 23, 42, 0.12);
+  --page-bg: linear-gradient(180deg, #f4f7fb 0%, #e8eef5 100%);
+
+  --xp-blue: var(--primary);
+  --xp-blue-dark: var(--primary-strong);
+  --xp-blue-light: #60a5fa;
+  --xp-silver: var(--surface-3);
+  --xp-panel: var(--surface-2);
+  --xp-border: var(--border);
+  --xp-title-start: var(--primary-strong);
+  --xp-title-end: var(--primary);
+  --xp-text: var(--text);
+  --xp-shadow: var(--shadow);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --surface: #111827;
+    --surface-2: #172132;
+    --surface-3: #0d1727;
+    --border: #243246;
+    --text: #e5edf8;
+    --text-muted: #9eb0c8;
+    --primary: #60a5fa;
+    --primary-strong: #3b82f6;
+    --primary-soft: #15253d;
+    --primary-contrast: #08111f;
+    --ring: rgba(96, 165, 250, 0.4);
+    --shadow: rgba(0, 0, 0, 0.45);
+    --page-bg: linear-gradient(180deg, #08111f 0%, #0f172a 100%);
+  }
+}
+
+html.light {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+  --surface: #111827;
+  --surface-2: #172132;
+  --surface-3: #0d1727;
+  --border: #243246;
+  --text: #e5edf8;
+  --text-muted: #9eb0c8;
+  --primary: #60a5fa;
+  --primary-strong: #3b82f6;
+  --primary-soft: #15253d;
+  --primary-contrast: #08111f;
+  --ring: rgba(96, 165, 250, 0.4);
+  --shadow: rgba(0, 0, 0, 0.45);
+  --page-bg: linear-gradient(180deg, #08111f 0%, #0f172a 100%);
+}
+
+html,
+body {
+  min-height: 100dvh;
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
-  background: linear-gradient(180deg, var(--xp-silver) 0%, #d4d0c8 100%);
+  background: var(--page-bg);
   color: var(--xp-text);
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
 }
 
 .title-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.35rem 0.75rem;
-  background: linear-gradient(180deg, var(--xp-title-end) 0%, var(--xp-title-start) 8%, var(--xp-title-start) 100%);
+  padding: 0.65rem 0.9rem;
+  background: linear-gradient(135deg, var(--xp-title-end) 0%, var(--xp-title-start) 100%);
   color: #fff;
-  font-weight: 600;
-  font-size: 0.875rem;
-  border: 1px solid var(--xp-border);
-  border-radius: 6px 6px 0 0;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .panel {
-  background: var(--xp-panel);
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
   border: 1px solid var(--xp-border);
-  border-radius: 0 0 6px 6px;
-  box-shadow: 2px 2px 6px var(--xp-shadow);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px -20px var(--xp-shadow), 0 2px 6px -3px var(--xp-shadow);
   padding: 1rem;
+  backdrop-filter: blur(10px);
 }
 
 .btn-primary {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
-  padding: 0.4rem 1rem;
+  gap: 0.45rem;
+  padding: 0.6rem 1rem;
   font-size: 0.875rem;
   font-weight: 600;
   color: #fff;
-  background: linear-gradient(180deg, #6b9ef5 0%, var(--xp-blue) 45%, var(--xp-blue-dark) 100%);
-  border: 1px solid var(--xp-blue-dark);
-  border-radius: 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--xp-blue) 80%, white) 0%, var(--xp-blue) 45%, var(--xp-blue-dark) 100%);
+  border: 1px solid color-mix(in srgb, var(--xp-blue-dark) 78%, black);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset;
+  transition: filter 120ms ease, transform 120ms ease, box-shadow 120ms ease;
 }
 
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  filter: brightness(1.06);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-primary:focus-visible,
+.input-field:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .btn-primary:disabled {
@@ -70,15 +163,43 @@ body {
 .input-field {
   display: block;
   width: 100%;
-  padding: 0.4rem 0.5rem;
-  font-size: 0.875rem;
-  border: 1px solid #7f9db9;
-  border-radius: 3px;
-  background: #fff;
-  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.08);
+  min-height: 44px;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.95rem;
+  color: var(--xp-text);
+  border: 1px solid color-mix(in srgb, var(--xp-border) 88%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
 }
 
 .input-field:focus {
-  outline: 2px solid var(--xp-blue-light);
-  outline-offset: 0;
+  border-color: var(--xp-blue);
+  box-shadow: 0 0 0 4px var(--ring);
+  outline: 0;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+@media (max-width: 640px) {
+  .input-field,
+  select.input-field,
+  textarea.input-field {
+    font-size: 16px;
+  }
 }
