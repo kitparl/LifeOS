@@ -9,15 +9,15 @@ import { TasksService } from './services/tasks.service';
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink],
   template: `
-    <div class="max-w-lg">
+    <div class="mx-auto max-w-2xl">
       <div class="panel !p-0 overflow-hidden">
         <div class="title-bar rounded-none border-x-0 border-t-0">{{ isEdit ? 'Edit Task' : 'New Task' }}</div>
-        <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
+        <form class="space-y-4 p-4 text-sm sm:p-5" [formGroup]="form" (ngSubmit)="submit()">
           <div>
             <label class="mb-1 block">Title</label>
             <input class="input-field" formControlName="title" />
           </div>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label class="mb-1 block">Priority</label>
               <select class="input-field" formControlName="priority">
@@ -54,11 +54,15 @@ import { TasksService } from './services/tasks.service';
           @if (error) {
             <p class="text-xs text-red-700">{{ error }}</p>
           }
-          <div class="flex gap-2">
-            <button type="submit" class="btn-primary" [disabled]="form.invalid || saving">
+          <div class="sticky bottom-2 flex flex-col gap-2 rounded-2xl border border-[var(--xp-border)] bg-[var(--surface)] p-3 backdrop-blur sm:static sm:flex-row sm:border-0 sm:bg-transparent sm:p-0">
+            <button type="submit" class="btn-primary w-full sm:w-auto" [disabled]="form.invalid || saving">
               {{ saving ? 'Saving…' : 'Save' }}
             </button>
-            <a routerLink="/tasks" class="input-field !w-auto inline-flex items-center no-underline text-gray-700">Cancel</a>
+            <a
+              routerLink="/tasks"
+              class="input-field inline-flex w-full items-center justify-center no-underline text-gray-700 sm:!w-auto"
+              >Cancel</a
+            >
           </div>
         </form>
       </div>

@@ -26,26 +26,26 @@ import { TasksWidgetComponent } from './widgets/tasks-widget.component';
     QuickActionsWidgetComponent,
   ],
   template: `
-    <div class="space-y-3">
-      <header class="flex flex-wrap items-center justify-between gap-2">
+    <div class="space-y-4">
+      <header class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 class="text-lg font-semibold">
+          <h1 class="text-xl font-semibold sm:text-2xl">
             @if (auth.user(); as user) {
               Welcome, {{ user.display_name }}
             } @else {
               Dashboard
             }
           </h1>
-          <p class="text-xs text-gray-600">What should you focus on today?</p>
+          <p class="text-sm text-[var(--text-muted)]">What should you focus on today?</p>
         </div>
         @if (dashboard.error()) {
-          <p class="text-xs text-red-700">{{ dashboard.error() }}</p>
+          <p class="max-w-xl rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {{ dashboard.error() }}
+          </p>
         }
       </header>
 
-      <div
-        class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 auto-rows-fr"
-      >
+      <div class="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <app-quick-actions-widget
           class="md:col-span-2 xl:col-span-3"
           [loading]="dashboard.loading()"
@@ -81,7 +81,7 @@ import { TasksWidgetComponent } from './widgets/tasks-widget.component';
           [notifications]="dashboard.summary()?.notifications ?? []"
         />
         <app-activity-widget
-          class="md:col-span-2"
+          class="md:col-span-2 xl:col-span-2"
           [loading]="dashboard.loading()"
           [activities]="dashboard.summary()?.recent_activity ?? []"
         />

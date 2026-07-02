@@ -11,21 +11,21 @@ import { TasksService } from './services/tasks.service';
   imports: [ReactiveFormsModule, RouterLink, DatePipe],
   template: `
     @if (task; as t) {
-      <div class="space-y-3">
-        <div class="flex flex-wrap items-start justify-between gap-2">
+      <div class="space-y-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 class="text-lg font-semibold" [class.line-through]="t.status === 'completed'">{{ t.title }}</h1>
-            <p class="text-xs capitalize text-gray-600">
+            <h1 class="text-xl font-semibold sm:text-2xl" [class.line-through]="t.status === 'completed'">{{ t.title }}</h1>
+            <p class="text-sm capitalize text-[var(--text-muted)]">
               {{ t.priority }} priority · {{ t.status.replace('_', ' ') }}
               @if (t.category) { · {{ t.category }} }
             </p>
           </div>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
             @if (t.status !== 'completed') {
-              <button type="button" class="btn-primary text-xs" (click)="complete()">Mark done</button>
+              <button type="button" class="btn-primary w-full text-xs sm:w-auto" (click)="complete()">Mark done</button>
             }
-            <a [routerLink]="['/tasks', t.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
-            <button type="button" class="input-field !w-auto text-xs text-red-700" (click)="remove()">Delete</button>
+            <a [routerLink]="['/tasks', t.id, 'edit']" class="btn-primary w-full text-center text-xs no-underline sm:w-auto">Edit</a>
+            <button type="button" class="input-field w-full text-xs text-red-700 sm:!w-auto" (click)="remove()">Delete</button>
           </div>
         </div>
 
@@ -44,7 +44,7 @@ import { TasksService } from './services/tasks.service';
           @if (t.description) {
             <div class="panel text-sm">
               <p class="font-medium mb-1">Description</p>
-              <p class="whitespace-pre-wrap text-gray-700">{{ t.description }}</p>
+              <p class="whitespace-pre-wrap text-[var(--text-muted)]">{{ t.description }}</p>
             </div>
           }
         </div>
@@ -52,16 +52,16 @@ import { TasksService } from './services/tasks.service';
         <div class="panel !p-0 overflow-hidden">
           <div class="title-bar rounded-none border-x-0 border-t-0">Subtasks</div>
           <div class="p-3 space-y-2">
-            <form class="flex gap-2" [formGroup]="subtaskForm" (ngSubmit)="addSubtask()">
+            <form class="flex flex-col gap-2 sm:flex-row" [formGroup]="subtaskForm" (ngSubmit)="addSubtask()">
               <input class="input-field flex-1" formControlName="title" placeholder="New subtask…" />
-              <button type="submit" class="btn-primary text-xs" [disabled]="subtaskForm.invalid">Add</button>
+              <button type="submit" class="btn-primary text-xs sm:w-auto" [disabled]="subtaskForm.invalid">Add</button>
             </form>
             @if (t.subtasks.length === 0) {
-              <p class="text-sm text-gray-600">No subtasks yet.</p>
+              <p class="text-sm text-[var(--text-muted)]">No subtasks yet.</p>
             } @else {
               <ul class="divide-y divide-[var(--xp-border)] text-sm">
                 @for (s of t.subtasks; track s.id) {
-                  <li class="flex items-center justify-between gap-2 py-2">
+                  <li class="flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between">
                     <span [class.line-through]="s.status === 'completed'">{{ s.title }}</span>
                     <div class="flex gap-2">
                       @if (s.status !== 'completed') {

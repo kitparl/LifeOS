@@ -3,6 +3,11 @@ import { authGuard, guestGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   {
+    path: 'offline',
+    loadComponent: () =>
+      import('./features/offline/offline-page.component').then((m) => m.OfflinePageComponent),
+  },
+  {
     path: 'login',
     loadComponent: () => import('./features/auth/login.component').then((m) => m.LoginComponent),
     canActivate: [guestGuard],
