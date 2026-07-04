@@ -11,3 +11,7 @@ cd frontend && npm install --legacy-peer-deps && npm start
 
 # Heroku: heroku config:set ENV=production COOKIE_SECURE=true
 # Deploy guide: docs/DEPLOY_HEROKU.md
+
+cd /Users/pranshu.bisht/Documents/personal-work/LifeOS/backend
+source .venv/bin/activate
+python -m uvicorn app.main:app --app-dir . --reload --port 8000
