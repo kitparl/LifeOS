@@ -1,5 +1,5 @@
 import pytest
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 
 async def _auth_token(client, email="unit7@example.com"):
@@ -14,7 +14,7 @@ async def _auth_token(client, email="unit7@example.com"):
 async def test_calendar_event_crud(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
-    starts = datetime.now(UTC) + timedelta(days=1)
+    starts = datetime.now(timezone.utc) + timedelta(days=1)
 
     create = await client.post(
         "/api/v1/calendar/events",
@@ -80,7 +80,7 @@ async def test_mood_upsert_and_stats(client):
 async def test_dashboard_calendar_preview(client):
     token = await _auth_token(client, "dash7@example.com")
     headers = {"Authorization": f"Bearer {token}"}
-    starts = datetime.now(UTC) + timedelta(hours=2)
+    starts = datetime.now(timezone.utc) + timedelta(hours=2)
 
     await client.post(
         "/api/v1/calendar/events",

@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,7 @@ class MoodRepository:
         self.db = db
 
     async def list_entries(self, user_id: str, days: int = 30) -> list[MoodEntry]:
-        since = datetime.now(UTC).date() - timedelta(days=days - 1)
+        since = datetime.now(timezone.utc).date() - timedelta(days=days - 1)
         result = await self.db.execute(
             select(MoodEntry)
             .where(MoodEntry.user_id == user_id, MoodEntry.log_date >= since)
@@ -27,7 +27,7 @@ class MoodRepository:
         return result.scalar_one_or_none()
 
     async def upsert_today(self, user_id: str, data: MoodUpsert) -> MoodEntry:
-        today = datetime.now(UTC).date()
+        today = datetime.now(timezone.utc).date()
         entry = await self.get_by_date(user_id, today)
         if entry is None:
             entry = MoodEntry(

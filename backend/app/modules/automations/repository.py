@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,5 +45,5 @@ class AutomationRepository:
         await self.db.delete(rule)
 
     async def mark_run(self, rule: AutomationRule) -> None:
-        rule.last_run_at = datetime.now(UTC)
+        rule.last_run_at = datetime.now(timezone.utc)
         await self.db.flush()

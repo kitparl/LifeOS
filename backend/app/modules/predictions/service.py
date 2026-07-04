@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +27,7 @@ class PredictionsService:
 
     async def summary(self, user_id: str) -> PredictionsSummary:
         since = date.today() - timedelta(days=14)
-        since_dt = datetime.now(UTC) - timedelta(days=14)
+        since_dt = datetime.now(timezone.utc) - timedelta(days=14)
 
         runs = await self.db.execute(
             select(func.coalesce(func.sum(Run.distance_km), 0), func.count()).where(

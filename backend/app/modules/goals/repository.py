@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,7 +71,7 @@ class GoalRepository:
 
     async def archive(self, goal: Goal) -> Goal:
         goal.status = "archived"
-        goal.archived_at = datetime.now(UTC)
+        goal.archived_at = datetime.now(timezone.utc)
         await self.db.flush()
         await self.db.refresh(goal, ["milestones"])
         return goal
@@ -94,7 +94,7 @@ class GoalRepository:
             milestone.title = data.title
         if data.completed is not None:
             milestone.completed = data.completed
-            milestone.completed_at = datetime.now(UTC) if data.completed else None
+            milestone.completed_at = datetime.now(timezone.utc) if data.completed else None
         goal = await self.get_by_id_raw(milestone.goal_id)
         if goal:
             await self._recalculate_progress(goal)

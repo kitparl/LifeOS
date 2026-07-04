@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from app.modules.running.models import Run
 
@@ -22,7 +22,7 @@ def _week_start(d: date) -> date:
 
 
 def weekly_km(runs: list[Run], ref: date | None = None) -> float:
-    ref = ref or datetime.now(UTC).date()
+    ref = ref or datetime.now(timezone.utc).date()
     ws = _week_start(ref)
     we = ws + timedelta(days=6)
     total = sum(r.distance_km for r in runs if ws <= r.run_date <= we)
