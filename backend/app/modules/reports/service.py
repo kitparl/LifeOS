@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,7 +64,7 @@ class ReportsService:
             ai_summary = None
         return ReportResponse(
             period=period,
-            generated_at=datetime.now(UTC),
+            generated_at=datetime.now(timezone.utc),
             sections=sections,
             ai_summary=ai_summary,
         )
@@ -79,6 +79,6 @@ class ReportsService:
         chat = await self.ai.chat(user_id, prompt)
         return ReviewResponse(
             review_type=review_type,
-            generated_at=datetime.now(UTC),
+            generated_at=datetime.now(timezone.utc),
             content=chat.reply,
         )

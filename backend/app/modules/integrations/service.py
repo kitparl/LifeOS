@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,7 +71,7 @@ class IntegrationService:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
         if not conn.enabled:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Integration is disabled")
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         conn.last_sync_at = now
         conn.status = "synced"
         await self.repo.update(conn, IntegrationUpdate())

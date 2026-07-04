@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -92,7 +92,7 @@ class AutomationService:
 
         if rule.trigger_type == "no_journal_days":
             days = int(cond.get("days", 3))
-            since = datetime.now(UTC) - timedelta(days=days)
+            since = datetime.now(timezone.utc) - timedelta(days=days)
             count = await self.db.execute(
                 select(func.count()).select_from(JournalEntry).where(
                     JournalEntry.user_id == user_id, JournalEntry.created_at >= since

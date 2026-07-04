@@ -1,10 +1,10 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from app.modules.habits.models import Habit
 
 
 def _today() -> date:
-    return datetime.now(UTC).date()
+    return datetime.now(timezone.utc).date()
 
 
 def _week_start(d: date) -> date:

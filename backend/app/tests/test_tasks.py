@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -76,7 +76,7 @@ async def test_dashboard_tasks_today(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    due = datetime.now(UTC).replace(hour=14, minute=0, second=0, microsecond=0)
+    due = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
     await client.post(
         "/api/v1/tasks",
         headers=headers,

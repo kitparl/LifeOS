@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, time
+from datetime import datetime, time, timezone
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,7 +97,7 @@ class TaskRepository:
         if tags is not None:
             task.tags = tags
         if data.status == "completed":
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = datetime.now(timezone.utc)
         elif data.status in ("pending", "in_progress") and task.completed_at:
             task.completed_at = None
         await self.db.flush()
@@ -106,7 +106,7 @@ class TaskRepository:
 
     async def complete(self, task: Task) -> Task:
         task.status = "completed"
-        task.completed_at = datetime.now(UTC)
+        task.completed_at = datetime.now(timezone.utc)
         await self.db.flush()
         await self.db.refresh(task, ["subtasks"])
         return task
@@ -116,7 +116,7 @@ class TaskRepository:
         await self.db.flush()
 
     def _today_bounds(self) -> tuple[datetime, datetime]:
-        now = datetime.now(UTC)
-        start = datetime.combine(now.date(), time.min, tzinfo=UTC)
-        end = datetime.combine(now.date(), time.max, tzinfo=UTC)
+        now = datetime.now(timezone.utc)
+        start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
+        end = datetime.combine(now.date(), time.max, tzinfo=timezone.utc)
         return start, end

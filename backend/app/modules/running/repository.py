@@ -48,9 +48,9 @@ class RunningRepository:
     async def list_races(self, user_id: str, upcoming_only: bool = False) -> list[RaceEvent]:
         q = select(RaceEvent).where(RaceEvent.user_id == user_id)
         if upcoming_only:
-            from datetime import UTC, datetime
+            from datetime import datetime, timezone
 
-            today = datetime.now(UTC).date()
+            today = datetime.now(timezone.utc).date()
             q = q.where(RaceEvent.race_date >= today)
         q = q.order_by(RaceEvent.race_date.asc())
         result = await self.db.execute(q)

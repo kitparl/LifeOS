@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +20,7 @@ class AnalyticsService:
         self.db = db
 
     async def summary(self, user_id: str) -> AnalyticsSummary:
-        since = datetime.now(UTC) - timedelta(days=30)
+        since = datetime.now(timezone.utc) - timedelta(days=30)
         since_date = date.today() - timedelta(days=30)
 
         async def count(model, user_col):
