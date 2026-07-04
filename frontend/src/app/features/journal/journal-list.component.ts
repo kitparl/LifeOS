@@ -2,13 +2,14 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { JOURNAL_TYPES, JournalListItem } from './models/journal.models';
 import { JournalService } from './services/journal.service';
 
 @Component({
   selector: 'app-journal-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -16,7 +17,7 @@ import { JournalService } from './services/journal.service';
         <a routerLink="/journal/new" class="btn-primary text-xs no-underline">New Entry</a>
       </div>
 
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="load()">
+      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
         <select class="input-field !w-auto" formControlName="entry_type">
           <option value="">All types</option>
           @for (t of types; track t.value) {
@@ -35,9 +36,32 @@ import { JournalService } from './services/journal.service';
           <a routerLink="/journal/new" class="btn-primary mt-2 inline-block text-xs no-underline">Write entry</a>
         </div>
       } @else {
-        <div class="panel !p-0 overflow-hidden">
+        <div class="space-y-3 md:hidden">
+          @for (entry of pagedEntries; track entry.id) {
+            <article class="panel space-y-2">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <a [routerLink]="['/journal', entry.id]" class="block truncate text-sm font-semibold text-[var(--xp-blue)] underline">
+                    {{ entry.title || entry.content || 'Untitled entry' }}
+                  </a>
+                  <p class="mt-1 text-xs capitalize text-[var(--text-muted)]">
+                    {{ entry.entry_type }} · {{ entry.entry_date | date: 'mediumDate' }}
+                  </p>
+                </div>
+                <a [routerLink]="['/journal', entry.id, 'edit']" class="text-xs underline">Edit</a>
+              </div>
+            </article>
+          }
+          <app-list-paginator
+            [total]="entries.length"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
+        </div>
+        <div class="panel hidden !p-0 overflow-hidden md:block">
           <table class="w-full text-sm">
-            <thead class="border-b border-[var(--xp-border)] bg-[#e8e8e8] text-left">
+            <thead class="border-b border-[var(--xp-border)] bg-[var(--xp-silver)] text-left">
               <tr>
                 <th class="px-3 py-2">Date</th>
                 <th class="px-3 py-2">Type</th>
@@ -46,8 +70,8 @@ import { JournalService } from './services/journal.service';
               </tr>
             </thead>
             <tbody>
-              @for (entry of entries; track entry.id) {
-                <tr class="border-b border-[var(--xp-border)] hover:bg-[#d6e4f7]">
+              @for (entry of pagedEntries; track entry.id) {
+                <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
                   <td class="px-3 py-2">{{ entry.entry_date | date: 'mediumDate' }}</td>
                   <td class="px-3 py-2 capitalize">{{ entry.entry_type }}</td>
                   <td class="px-3 py-2 max-w-xs truncate">
@@ -62,6 +86,12 @@ import { JournalService } from './services/journal.service';
               }
             </tbody>
           </table>
+          <app-list-paginator
+            [total]="entries.length"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
         </div>
       }
     </div>
@@ -74,10 +104,22 @@ export class JournalListComponent implements OnInit {
   types = JOURNAL_TYPES;
   entries: JournalListItem[] = [];
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 12;
 
   filters = this.fb.nonNullable.group({ entry_type: '', search: '' });
 
   ngOnInit(): void {
+    this.load();
+  }
+
+  get pagedEntries(): JournalListItem[] {
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.entries.slice(start, start + this.pageSize);
+  }
+
+  applyFilters(): void {
+    this.currentPage = 1;
     this.load();
   }
 
@@ -89,9 +131,19 @@ export class JournalListComponent implements OnInit {
       .subscribe({
         next: (data) => {
           this.entries = data;
+          this.clampPage();
           this.loading = false;
         },
         error: () => (this.loading = false),
       });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.entries.length / this.pageSize));
+    this.currentPage = Math.min(this.currentPage, totalPages);
   }
 }

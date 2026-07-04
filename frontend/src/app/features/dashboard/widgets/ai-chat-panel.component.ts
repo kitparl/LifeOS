@@ -15,7 +15,7 @@ interface ChatMessage {
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
-    <div class="panel !p-0 h-full flex flex-col">
+    <div class="panel !p-0 flex h-full min-h-0 flex-col overflow-hidden">
       <div class="title-bar rounded-none border-x-0 border-t-0 shrink-0 flex items-center justify-between pr-2">
         <span>AI Assistant</span>
         @if (statusLabel) {
@@ -23,17 +23,19 @@ interface ChatMessage {
         }
       </div>
 
-      <div class="flex-1 overflow-y-auto p-2 space-y-2 text-sm min-h-0">
+      <div class="min-h-0 flex-1 space-y-2 overflow-y-auto p-2 text-sm">
         @if (messages.length === 0) {
-          <p class="text-xs text-gray-600 text-center py-4">
+          <p class="py-4 text-center text-xs text-[var(--text-muted)]">
             Ask about your goals, tasks, journal, runs, or Q&A. Answers use your LifeOS data.
           </p>
         }
         @for (m of messages; track $index) {
           <div
-            class="rounded px-2 py-1.5"
-            [class.bg-[#d6e4f7]]="m.role === 'user'"
-            [class.bg-[#f5f5f0]]="m.role === 'assistant'"
+            class="rounded-lg border px-2 py-1.5"
+            [class.border-transparent]="m.role === 'user'"
+            [class.border-[var(--xp-border)]]="m.role === 'assistant'"
+            [class.bg-[var(--primary-soft)]]="m.role === 'user'"
+            [class.bg-[var(--surface)]]="m.role === 'assistant'"
           >
             <p class="whitespace-pre-wrap">{{ m.text }}</p>
             @if (m.sources && m.sources.length > 0) {
@@ -48,7 +50,7 @@ interface ChatMessage {
           </div>
         }
         @if (loading) {
-          <p class="text-xs text-gray-500">Thinking…</p>
+          <p class="text-xs text-[var(--text-muted)]">Thinking...</p>
         }
         @if (error) {
           <p class="text-xs text-red-700">{{ error }}</p>

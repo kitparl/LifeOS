@@ -2,13 +2,14 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { TASK_PRIORITIES, TASK_STATUSES, TaskListItem } from './models/task.models';
 import { TasksService } from './services/tasks.service';
 
 @Component({
   selector: 'app-tasks-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -19,7 +20,7 @@ import { TasksService } from './services/tasks.service';
         <a routerLink="/tasks/new" class="btn-primary text-xs no-underline sm:text-sm">New Task</a>
       </div>
 
-      <form class="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]" [formGroup]="filters" (ngSubmit)="load()">
+      <form class="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]" [formGroup]="filters" (ngSubmit)="applyFilters()">
         <input class="input-field min-w-0" formControlName="search" placeholder="Search…" />
         <select class="input-field min-w-0" formControlName="status">
           <option value="">All statuses</option>
@@ -49,7 +50,7 @@ import { TasksService } from './services/tasks.service';
         </div>
       } @else {
         <div class="space-y-3 md:hidden">
-          @for (task of tasks; track task.id) {
+          @for (task of pagedTasks; track task.id) {
             <article class="panel space-y-3">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
@@ -76,6 +77,12 @@ import { TasksService } from './services/tasks.service';
               </div>
             </article>
           }
+          <app-list-paginator
+            [total]="tasks.length"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
         </div>
         <div class="panel hidden !p-0 overflow-hidden md:block">
           <table class="w-full text-sm">
@@ -90,7 +97,7 @@ import { TasksService } from './services/tasks.service';
               </tr>
             </thead>
             <tbody>
-              @for (task of tasks; track task.id) {
+              @for (task of pagedTasks; track task.id) {
                 <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
                   <td class="px-3 py-2">
                     <a [routerLink]="['/tasks', task.id]" class="text-[var(--xp-blue)] underline">{{ task.title }}</a>
@@ -110,6 +117,12 @@ import { TasksService } from './services/tasks.service';
               }
             </tbody>
           </table>
+          <app-list-paginator
+            [total]="tasks.length"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
         </div>
       }
     </div>
@@ -123,6 +136,8 @@ export class TasksListComponent implements OnInit {
   statuses = TASK_STATUSES;
   tasks: TaskListItem[] = [];
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 12;
 
   filters = this.fb.nonNullable.group({
     search: '',
@@ -132,6 +147,16 @@ export class TasksListComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.load();
+  }
+
+  get pagedTasks(): TaskListItem[] {
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.tasks.slice(start, start + this.pageSize);
+  }
+
+  applyFilters(): void {
+    this.currentPage = 1;
     this.load();
   }
 
@@ -148,6 +173,7 @@ export class TasksListComponent implements OnInit {
       .subscribe({
         next: (data) => {
           this.tasks = data;
+          this.clampPage();
           this.loading = false;
         },
         error: () => (this.loading = false),
@@ -156,5 +182,14 @@ export class TasksListComponent implements OnInit {
 
   complete(id: string): void {
     this.tasksService.complete(id).subscribe({ next: () => this.load() });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.tasks.length / this.pageSize));
+    this.currentPage = Math.min(this.currentPage, totalPages);
   }
 }

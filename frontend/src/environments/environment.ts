@@ -4,6 +4,6 @@
  * Production build: replaced by environment.production.ts
  */
 export const environment = {
-  production: true,
+  production: false,
   apiUrl: 'http://localhost:8000/api/v1',
 };
