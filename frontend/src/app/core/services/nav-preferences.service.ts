@@ -23,6 +23,12 @@ export class NavPreferencesService {
     return NAV_DESTINATIONS.filter((d) => !pinned.has(d.id) && !d.hidden);
   });
 
+  /** Pinned first (in order), then unpinned — for settings UI */
+  readonly settingsDestinations = computed(() => [
+    ...this.pinnedDestinations(),
+    ...this.unpinnedDestinations(),
+  ]);
+
   init(): void {
     this.pinnedIds.set(this.readStored());
   }
@@ -58,6 +64,12 @@ export class NavPreferencesService {
     const [moved] = ids.splice(fromIndex, 1);
     ids.splice(toIndex, 0, moved);
     this.persist(ids);
+  }
+
+  setPinnedOrder(ids: string[]): void {
+    const valid = ids.filter((id) => getDestinationById(id) !== undefined && this.isPinned(id));
+    const remaining = this.pinnedIds().filter((id) => !valid.includes(id));
+    this.persist([...valid, ...remaining]);
   }
 
   moveUp(id: string): void {

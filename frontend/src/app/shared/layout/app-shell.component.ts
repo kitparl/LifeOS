@@ -16,10 +16,12 @@ import { AiChatPanelComponent } from '../../features/dashboard/widgets/ai-chat-p
 import { CommandPaletteComponent } from '../command-palette/command-palette.component';
 import { CommandPaletteService } from '../command-palette/command-palette.service';
 import { NavPreferencesService } from '../../core/services/nav-preferences.service';
+import { AssistantShellService } from '../../core/services/assistant-shell.service';
 import { resolvePageTitle } from './nav-registry';
 
 const STORAGE_AI_OPEN    = 'lifeos-ai-panel-open';
 const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
+const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
 
 @Component({
   selector: 'app-shell',
@@ -35,7 +37,7 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
     <app-command-palette />
 
     <!-- Mobile overlays backdrop -->
-    @if (drawerOpen() || mobileAiOpen()) {
+    @if (drawerOpen() || assistantShell.mobileOpen()) {
       <button
         type="button"
         aria-label="Close overlay"
@@ -49,6 +51,7 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
     <div class="flex overflow-hidden" style="height: 100dvh; background: var(--page-bg)">
 
       <!-- ====== LEFT SIDEBAR (desktop only) ====== -->
+      @if (!sidebarHidden()) {
       <aside
         class="hidden shrink-0 flex-col overflow-hidden lg:flex"
         style="background: var(--sidebar-bg); border-right: 1px solid var(--border);"
@@ -128,6 +131,7 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
           }
         </div>
       </aside>
+      }
 
       <!-- ====== CENTER COLUMN ====== -->
       <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -138,6 +142,8 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
           <!-- Left: Mobile menu + title -->
           <div class="flex items-center gap-2 min-w-0">
             <button type="button" class="btn-ghost !px-2 lg:hidden" (click)="toggleDrawer()">☰</button>
+            <!-- Desktop sidebar toggle: matches mobile open/close behaviour -->
+            <button type="button" class="btn-ghost !px-2 hidden lg:inline-flex" (click)="toggleSidebarHidden()" [title]="sidebarHidden() ? 'Show sidebar' : 'Hide sidebar'">☰</button>
             <div class="min-w-0">
               <p class="truncate text-sm font-semibold" style="color: var(--text)">{{ currentTitle() }}</p>
             </div>
@@ -165,8 +171,6 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
             >
               {{ aiPanelOpen() ? 'Hide Assistant' : 'Assistant' }}
             </button>
-            <!-- Mobile AI button -->
-            <button type="button" class="btn-primary !px-2 text-xs lg:hidden" (click)="openMobileAi()">AI</button>
           </div>
         </header>
 
@@ -204,7 +208,8 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
         <!-- Mobile bottom nav -->
         <nav class="safe-x safe-bottom shrink-0 lg:hidden"
              style="border-top: 1px solid var(--border); background: var(--sidebar-bg); padding: 0.375rem 0.5rem">
-          <div class="grid gap-1" [style.grid-template-columns]="'repeat(' + (mobileNav().length + 2) + ', 1fr)'">
+          <!-- 3 pinned + AI (always) + More = 5 columns -->
+          <div class="grid gap-1" style="grid-template-columns: repeat(5, 1fr)">
             @for (item of mobileNav(); track item.id) {
               <a
                 [routerLink]="item.route"
@@ -214,7 +219,15 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
                 {{ item.shortLabel ?? item.label }}
               </a>
             }
-            <a routerLink="/assistant" routerLinkActive="mobile-nav--active" class="mobile-nav-item no-underline">AI</a>
+            <!-- Dedicated AI button — always visible, independent of pin order -->
+            <button
+              type="button"
+              class="mobile-nav-item"
+              [class.mobile-nav--active]="assistantShell.mobileOpen()"
+              (click)="openMobileAi()"
+            >
+              AI
+            </button>
             <button type="button" class="mobile-nav-item" (click)="toggleDrawer()">More</button>
           </div>
         </nav>
@@ -244,14 +257,25 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
         @for (group of navGroups(); track group.category) {
           <p class="section-heading" style="padding: 0.5rem 0.375rem 0.25rem">{{ group.category }}</p>
           @for (item of group.items; track item.id) {
-            <a
-              [routerLink]="item.route"
-              routerLinkActive="nav-item--active"
-              class="nav-item"
-              (click)="closeDrawer()"
-            >
-              {{ item.label }}
-            </a>
+            @if (item.route === '/assistant') {
+              <button
+                type="button"
+                class="nav-item w-full text-left"
+                [class.nav-item--active]="assistantShell.mobileOpen()"
+                (click)="openAssistantFromNav()"
+              >
+                {{ item.label }}
+              </button>
+            } @else {
+              <a
+                [routerLink]="item.route"
+                routerLinkActive="nav-item--active"
+                class="nav-item"
+                (click)="closeDrawer()"
+              >
+                {{ item.label }}
+              </a>
+            }
           }
         }
       </nav>
@@ -262,10 +286,10 @@ const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
     </aside>
 
     <!-- ====== MOBILE AI BOTTOM SHEET ====== -->
-    @if (mobileAiOpen()) {
+    @if (assistantShell.mobileOpen()) {
       <section
         class="safe-bottom fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden lg:hidden"
-        style="max-height: 82dvh; background: var(--surface); border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0; box-shadow: var(--shadow-lg)"
+        style="height: min(82dvh, calc(100dvh - 56px)); background: var(--surface); border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0; box-shadow: var(--shadow-lg)"
         role="dialog"
         aria-modal="true"
         aria-label="AI assistant"
@@ -345,13 +369,17 @@ export class AppShellComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly palette = inject(CommandPaletteService);
-  private readonly navPrefs = inject(NavPreferencesService);
+  private   readonly navPrefs = inject(NavPreferencesService);
+  readonly assistantShell = inject(AssistantShellService);
   readonly sync = inject(SyncService);
   readonly theme = inject(ThemeService);
   readonly pwa = inject(PwaService);
 
   readonly pinnedNav = this.navPrefs.pinnedDestinations;
-  readonly mobileNav = computed(() => this.pinnedNav().slice(0, 3));
+  // Exclude assistant from the pinned slice — it always gets its own dedicated button
+  readonly mobileNav = computed(() =>
+    this.pinnedNav().filter((d) => d.id !== 'assistant').slice(0, 3),
+  );
 
   readonly navGroups = computed(() => {
     const items = this.pinnedNav();
@@ -365,9 +393,9 @@ export class AppShellComponent implements OnInit, OnDestroy {
   });
 
   readonly aiPanelOpen = signal(this.readStorage(STORAGE_AI_OPEN, true));
-  readonly mobileAiOpen = signal(false);
   readonly drawerOpen = signal(false);
   readonly sidebarCollapsed = signal(this.readStorage(STORAGE_COLLAPSED, false));
+  readonly sidebarHidden = signal(this.readStorage(STORAGE_HIDDEN, false));
   readonly currentTitle = signal('Dashboard');
 
   ngOnInit(): void {
@@ -405,7 +433,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   toggleDrawer(): void {
     const next = !this.drawerOpen();
     this.drawerOpen.set(next);
-    if (next) this.mobileAiOpen.set(false);
+    if (next) this.assistantShell.closeMobile();
     this.updateBodyScrollLock();
   }
 
@@ -416,18 +444,23 @@ export class AppShellComponent implements OnInit, OnDestroy {
 
   openMobileAi(): void {
     this.drawerOpen.set(false);
-    this.mobileAiOpen.set(true);
+    this.assistantShell.openMobile();
     this.updateBodyScrollLock();
   }
 
+  openAssistantFromNav(): void {
+    this.closeDrawer();
+    this.openMobileAi();
+  }
+
   closeMobileAi(): void {
-    this.mobileAiOpen.set(false);
+    this.assistantShell.closeMobile();
     this.updateBodyScrollLock();
   }
 
   closeOverlays(): void {
     this.drawerOpen.set(false);
-    this.mobileAiOpen.set(false);
+    this.assistantShell.closeMobile();
     this.updateBodyScrollLock();
   }
 
@@ -435,6 +468,12 @@ export class AppShellComponent implements OnInit, OnDestroy {
     const next = !this.sidebarCollapsed();
     this.sidebarCollapsed.set(next);
     localStorage.setItem(STORAGE_COLLAPSED, String(next));
+  }
+
+  toggleSidebarHidden(): void {
+    const next = !this.sidebarHidden();
+    this.sidebarHidden.set(next);
+    localStorage.setItem(STORAGE_HIDDEN, String(next));
   }
 
   toggleAiPanel(): void {
@@ -464,7 +503,8 @@ export class AppShellComponent implements OnInit, OnDestroy {
   }
 
   private updateBodyScrollLock(): void {
-    this.document.body.style.overflow = this.drawerOpen() || this.mobileAiOpen() ? 'hidden' : '';
+    this.document.body.style.overflow =
+      this.drawerOpen() || this.assistantShell.mobileOpen() ? 'hidden' : '';
   }
 
   private readStorage(key: string, defaultValue: boolean): boolean {

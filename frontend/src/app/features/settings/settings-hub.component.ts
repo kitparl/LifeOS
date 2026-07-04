@@ -24,7 +24,8 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
 
       <nav class="flex flex-wrap gap-2 text-sm">
         @for (s of sections; track s.id) {
-          <a class="rounded-lg border border-[var(--xp-border)] px-3 py-1.5 no-underline hover:bg-[var(--surface-3)]" [href]="'#' + s.id">
+          <a class="rounded-lg border border-[var(--xp-border)] px-3 py-1.5 no-underline hover:bg-[var(--surface-3)]"
+             routerLink="/settings" [fragment]="s.id">
             {{ s.label }}
           </a>
         }

@@ -70,6 +70,12 @@ import { RunningService } from './services/running.service';
               <a [href]="r.certificate_url" target="_blank" rel="noopener noreferrer" class="link text-sm mt-0.5 block">View certificate</a>
             </div>
           }
+          @if (r.event_url) {
+            <div class="panel">
+              <p class="text-xs" style="color: var(--text-muted)">Event source</p>
+              <a [href]="r.event_url" target="_blank" rel="noopener noreferrer" class="link text-sm mt-0.5 block">View event page</a>
+            </div>
+          }
         </div>
 
         @if (r.notes) {

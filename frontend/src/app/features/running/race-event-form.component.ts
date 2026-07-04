@@ -14,8 +14,8 @@ import { RunningService } from './services/running.service';
         <div class="title-bar">{{ isEdit ? 'Edit Event' : 'Add Race / Competition' }}</div>
         <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
 
-          <div class="grid grid-cols-2 gap-3">
-            <div class="col-span-2 sm:col-span-1">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div class="sm:col-span-2">
               <label class="form-label" for="name">Event Name</label>
               <input id="name" class="input-field mt-1" formControlName="name" placeholder="e.g. TCS World 10K 2026" />
             </div>
@@ -23,9 +23,6 @@ import { RunningService } from './services/running.service';
               <label class="form-label" for="race_date">Date</label>
               <input id="race_date" class="input-field mt-1" type="date" formControlName="race_date" />
             </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="form-label" for="distance_type">Distance</label>
               <select id="distance_type" class="input-field mt-1" formControlName="distance_type">
@@ -34,50 +31,92 @@ import { RunningService } from './services/running.service';
                 }
               </select>
             </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label class="form-label" for="organizer">Organizer</label>
               <input id="organizer" class="input-field mt-1" formControlName="organizer" placeholder="Event organizer" />
             </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="form-label" for="location">Location / City</label>
               <input id="location" class="input-field mt-1" formControlName="location" placeholder="Bengaluru, India" />
             </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label class="form-label" for="bib_number">Bib Number</label>
               <input id="bib_number" class="input-field mt-1" formControlName="bib_number" placeholder="e.g. 4521" />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <label class="form-label">Finish Time (h:m:s)</label>
-              <div class="grid grid-cols-3 gap-1 mt-1">
-                <input class="input-field" type="number" min="0" formControlName="finish_hours" placeholder="h" />
-                <input class="input-field" type="number" min="0" max="59" formControlName="finish_minutes" placeholder="m" />
-                <input class="input-field" type="number" min="0" max="59" formControlName="finish_seconds" placeholder="s" />
-              </div>
             </div>
             <div>
               <label class="form-label" for="position">Position / Rank</label>
               <input id="position" class="input-field mt-1" type="number" min="1" formControlName="position" placeholder="e.g. 142" />
             </div>
-            <div class="flex items-end gap-3 pb-0.5">
-              <label class="flex items-center gap-2 cursor-pointer mt-1">
-                <input type="checkbox" formControlName="registered" class="w-4 h-4" />
-                <span class="form-label" style="margin: 0">Registered</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" formControlName="medal" class="w-4 h-4" />
-                <span class="form-label" style="margin: 0">Medal</span>
-              </label>
+          </div>
+
+          <!-- Finish time: full-width on mobile with larger inputs -->
+          <div class="finish-time-block">
+            <label class="form-label">Finish Time</label>
+            <div class="finish-time-row">
+              <div class="finish-time-field">
+                <span class="finish-time-label">Hours</span>
+                <input
+                  class="input-field finish-time-input"
+                  type="number"
+                  min="0"
+                  inputmode="numeric"
+                  formControlName="finish_hours"
+                  placeholder="0"
+                />
+              </div>
+              <span class="finish-time-sep">:</span>
+              <div class="finish-time-field">
+                <span class="finish-time-label">Minutes</span>
+                <input
+                  class="input-field finish-time-input"
+                  type="number"
+                  min="0"
+                  max="59"
+                  inputmode="numeric"
+                  formControlName="finish_minutes"
+                  placeholder="00"
+                />
+              </div>
+              <span class="finish-time-sep">:</span>
+              <div class="finish-time-field">
+                <span class="finish-time-label">Seconds</span>
+                <input
+                  class="input-field finish-time-input"
+                  type="number"
+                  min="0"
+                  max="59"
+                  inputmode="numeric"
+                  formControlName="finish_seconds"
+                  placeholder="00"
+                />
+              </div>
             </div>
           </div>
 
+          <div class="flex flex-wrap gap-4">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" formControlName="registered" class="w-4 h-4" />
+              <span class="form-label" style="margin: 0">Registered</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" formControlName="medal" class="w-4 h-4" />
+              <span class="form-label" style="margin: 0">Medal</span>
+            </label>
+          </div>
+
           <div>
-            <label class="form-label" for="certificate_url">Certificate URL</label>
+            <label class="form-label" for="event_url">Event Source Link</label>
+            <input id="event_url" class="input-field mt-1" type="url" formControlName="event_url" placeholder="https://event-website.com/…" />
+          </div>
+
+          <div>
+            <label class="form-label" for="certificate_url">Certificate Link</label>
             <input id="certificate_url" class="input-field mt-1" type="url" formControlName="certificate_url" placeholder="https://…" />
           </div>
 
@@ -99,6 +138,46 @@ import { RunningService } from './services/running.service';
         </form>
       </div>
     </div>
+
+    <style>
+      .finish-time-block {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .finish-time-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.5rem;
+      }
+      .finish-time-field {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .finish-time-label {
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .finish-time-input {
+        min-height: 44px;
+        font-size: 1rem;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+      .finish-time-sep {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        padding-bottom: 0.65rem;
+        flex-shrink: 0;
+      }
+    </style>
   `,
 })
 export class RaceEventFormComponent implements OnInit {
@@ -120,12 +199,13 @@ export class RaceEventFormComponent implements OnInit {
     organizer: [''],
     location: [''],
     bib_number: [''],
-    finish_hours: [0, [Validators.min(0)]],
-    finish_minutes: [0, [Validators.min(0), Validators.max(59)]],
-    finish_seconds: [0, [Validators.min(0), Validators.max(59)]],
+    finish_hours: [null as number | null, [Validators.min(0)]],
+    finish_minutes: [null as number | null, [Validators.min(0), Validators.max(59)]],
+    finish_seconds: [null as number | null, [Validators.min(0), Validators.max(59)]],
     position: [null as number | null],
     registered: [false],
     medal: [false],
+    event_url: [''],
     certificate_url: [''],
     notes: [''],
   });
@@ -138,7 +218,9 @@ export class RaceEventFormComponent implements OnInit {
       this.raceId = id;
       this.runningService.getRace(id).subscribe({
         next: (r: RaceEvent) => {
-          let fh = 0, fm = 0, fs = 0;
+          let fh: number | null = null;
+          let fm: number | null = null;
+          let fs: number | null = null;
           if (r.finish_time_seconds) {
             fh = Math.floor(r.finish_time_seconds / 3600);
             fm = Math.floor((r.finish_time_seconds % 3600) / 60);
@@ -157,6 +239,7 @@ export class RaceEventFormComponent implements OnInit {
             position: r.position ?? null,
             registered: r.registered,
             medal: r.medal,
+            event_url: r.event_url ?? '',
             certificate_url: r.certificate_url ?? '',
             notes: r.notes ?? '',
           });
@@ -174,7 +257,7 @@ export class RaceEventFormComponent implements OnInit {
     const fh = raw.finish_hours ?? 0;
     const fm = raw.finish_minutes ?? 0;
     const fs = raw.finish_seconds ?? 0;
-    const finish_time_seconds = fh * 3600 + fm * 60 + fs || null;
+    const finish_time_seconds = fh || fm || fs ? fh * 3600 + fm * 60 + fs : null;
 
     const payload = {
       name: raw.name,
@@ -187,6 +270,7 @@ export class RaceEventFormComponent implements OnInit {
       position: raw.position ?? null,
       registered: raw.registered,
       medal: raw.medal,
+      event_url: raw.event_url || null,
       certificate_url: raw.certificate_url || null,
       notes: raw.notes || null,
       photos: [],
