@@ -49,11 +49,11 @@ import { CommunicationService } from './services/communication.service';
           <button type="submit" class="btn-primary text-xs">Search</button>
         </form>
         @if (vocabulary.length === 0) {
-          <p class="text-sm text-gray-600">No vocabulary yet.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No vocabulary yet.</p>
         } @else {
           <div class="panel !p-0 overflow-hidden">
             <table class="w-full text-sm">
-              <thead class="border-b border-[var(--xp-border)] bg-[#e8e8e8] text-left">
+              <thead class="border-b border-[var(--xp-border)] bg-[var(--surface-2)] text-left">
                 <tr>
                   <th class="px-3 py-2">Word</th>
                   <th class="px-3 py-2">Meaning</th>
@@ -63,9 +63,9 @@ import { CommunicationService } from './services/communication.service';
               </thead>
               <tbody>
                 @for (w of vocabulary; track w.id) {
-                  <tr class="border-b border-[var(--xp-border)] hover:bg-[#d6e4f7]">
+                  <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--surface-2)]">
                     <td class="px-3 py-2">
-                      <a [routerLink]="['/communication/vocabulary', w.id]" class="text-[var(--xp-blue)] underline">{{ w.word }}</a>
+                      <a [routerLink]="['/communication/vocabulary', w.id]" class="link">{{ w.word }}</a>
                     </td>
                     <td class="px-3 py-2 max-w-xs truncate">{{ w.meaning }}</td>
                     <td class="px-3 py-2">{{ w.mastery }}/5</td>
@@ -82,13 +82,13 @@ import { CommunicationService } from './services/communication.service';
 
       @if (tab() === 'writing') {
         @if (writing.length === 0) {
-          <p class="text-sm text-gray-600">No writing practice yet.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No writing practice yet.</p>
         } @else {
           <ul class="divide-y divide-[var(--xp-border)] panel !p-0 text-sm">
             @for (w of writing; track w.id) {
-              <li class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[#d6e4f7]">
+              <li class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[var(--surface-2)]">
                 <div>
-                  <a [routerLink]="['/communication/writing', w.id]" class="text-[var(--xp-blue)] underline">{{ w.title }}</a>
+                  <a [routerLink]="['/communication/writing', w.id]" class="link">{{ w.title }}</a>
                   <p class="text-xs text-gray-600 capitalize">{{ w.category }}</p>
                 </div>
                 <a [routerLink]="['/communication/writing', w.id, 'edit']" class="text-xs underline">Edit</a>
@@ -100,13 +100,13 @@ import { CommunicationService } from './services/communication.service';
 
       @if (tab() === 'speaking') {
         @if (speaking.length === 0) {
-          <p class="text-sm text-gray-600">No speaking practice yet.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No speaking practice yet.</p>
         } @else {
           <ul class="divide-y divide-[var(--xp-border)] panel !p-0 text-sm">
             @for (s of speaking; track s.id) {
-              <li class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[#d6e4f7]">
+              <li class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[var(--surface-2)]">
                 <div>
-                  <a [routerLink]="['/communication/speaking', s.id]" class="text-[var(--xp-blue)] underline">{{ s.title }}</a>
+                  <a [routerLink]="['/communication/speaking', s.id]" class="link">{{ s.title }}</a>
                   <p class="text-xs text-gray-600 capitalize">{{ s.category.replace('_', ' ') }}</p>
                 </div>
                 <a [routerLink]="['/communication/speaking', s.id, 'edit']" class="text-xs underline">Edit</a>

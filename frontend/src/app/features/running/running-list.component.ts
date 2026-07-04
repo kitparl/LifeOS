@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
@@ -17,73 +17,165 @@ import { RunningService } from './services/running.service';
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink, DatePipe],
   template: `
-    <div class="space-y-3">
+    <div class="space-y-4">
+      <!-- Page header -->
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Running</h1>
-        <a routerLink="/running/new" class="btn-primary text-xs no-underline">Log Run</a>
+        <h1 class="text-lg font-semibold" style="color: var(--text)">Running</h1>
+        <div class="flex gap-2">
+          <a routerLink="/running/races/new" class="btn-secondary text-xs no-underline">Add Event</a>
+          <a routerLink="/running/new" class="btn-primary text-xs no-underline">Log Run</a>
+        </div>
       </div>
 
+      <!-- Stats row -->
       @if (stats) {
-        <div class="grid gap-3 md:grid-cols-3">
-          <div class="panel text-sm">
-            <p class="text-xs text-gray-600">This week</p>
-            <p class="text-lg font-semibold">{{ stats.weekly_km }} / {{ stats.weekly_goal_km }} km</p>
-            <div class="mt-1 h-2 bg-gray-200 border border-[var(--xp-border)]">
-              <div
-                class="h-full bg-[var(--xp-blue)]"
-                [style.width.%]="Math.min((stats.weekly_km / stats.weekly_goal_km) * 100, 100)"
-              ></div>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="panel">
+            <p class="text-xs" style="color: var(--text-muted)">This week</p>
+            <p class="text-xl font-semibold mt-0.5">{{ stats.weekly_km }} <span class="text-sm font-normal" style="color: var(--text-muted)">/ {{ stats.weekly_goal_km }} km</span></p>
+            <div class="progress-bar mt-2">
+              <div class="progress-bar__fill" [style.width.%]="Math.min((stats.weekly_km / stats.weekly_goal_km) * 100, 100)"></div>
             </div>
           </div>
-          <div class="panel text-sm">
-            <p class="text-xs text-gray-600">Total runs</p>
-            <p class="text-lg font-semibold">{{ stats.total_runs }} ({{ stats.total_km }} km)</p>
+          <div class="panel">
+            <p class="text-xs" style="color: var(--text-muted)">Total runs</p>
+            <p class="text-xl font-semibold mt-0.5">{{ stats.total_runs }} <span class="text-sm font-normal" style="color: var(--text-muted)">runs</span></p>
+            <p class="text-xs mt-0.5" style="color: var(--text-muted)">{{ stats.total_km }} km lifetime</p>
           </div>
-          <div class="panel text-sm">
-            <p class="text-xs text-gray-600">Last run</p>
-            <p class="text-lg font-semibold">
+          <div class="panel">
+            <p class="text-xs" style="color: var(--text-muted)">Last run</p>
+            <p class="text-xl font-semibold mt-0.5">
               {{ stats.last_run_date ? (stats.last_run_date | date: 'mediumDate') : '—' }}
             </p>
           </div>
         </div>
       }
 
-      <div class="grid gap-3 lg:grid-cols-3">
-        <div class="panel !p-0 overflow-hidden lg:col-span-2">
-          <div class="title-bar rounded-none border-x-0 border-t-0">Practice Log</div>
+      <!-- Tabs -->
+      <div class="flex gap-0" style="border-bottom: 1px solid var(--border)">
+        @for (tab of tabs; track tab.id) {
+          <button
+            type="button"
+            class="tab-btn"
+            [class.tab-btn--active]="activeTab() === tab.id"
+            (click)="activeTab.set(tab.id)"
+          >{{ tab.label }}</button>
+        }
+      </div>
+
+      <!-- ===== Tab: Previous Runs ===== -->
+      @if (activeTab() === 'runs') {
+        <div class="panel !p-0 overflow-hidden">
           @if (loading) {
-            <p class="p-3 text-sm text-gray-600">Loading runs…</p>
+            <div class="empty-state">
+              <div class="skeleton" style="width: 160px; height: 14px"></div>
+            </div>
           } @else if (runs.length === 0) {
-            <p class="p-3 text-sm text-gray-600">
-              No runs logged.
-              <a routerLink="/running/new" class="text-[var(--xp-blue)] underline">Log your first run</a>
-            </p>
+            <div class="empty-state">
+              <div class="empty-state__icon">🏃</div>
+              <p class="empty-state__title">No runs yet</p>
+              <p class="empty-state__desc">Log your first run to start tracking your progress.</p>
+              <a routerLink="/running/new" class="btn-primary text-xs no-underline mt-2">Log first run</a>
+            </div>
           } @else {
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm" style="min-width: 520px">
+                <thead>
+                  <tr>
+                    <th class="px-3 py-2 text-left">Date</th>
+                    <th class="px-3 py-2 text-left">Distance</th>
+                    <th class="px-3 py-2 text-left">Duration</th>
+                    <th class="px-3 py-2 text-left">Pace</th>
+                    <th class="px-3 py-2 text-left">Location</th>
+                    <th class="px-3 py-2 text-left">Weather</th>
+                    <th class="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (run of runs; track run.id) {
+                    <tr style="border-bottom: 1px solid var(--border)">
+                      <td class="px-3 py-2">
+                        <a [routerLink]="['/running', run.id]" class="link font-medium">
+                          {{ run.run_date | date: 'mediumDate' }}
+                        </a>
+                      </td>
+                      <td class="px-3 py-2">{{ run.distance_km }} km</td>
+                      <td class="px-3 py-2">{{ formatDuration(run.duration_seconds) }}</td>
+                      <td class="px-3 py-2">{{ formatPace(run.pace_min_per_km) }}</td>
+                      <td class="px-3 py-2" style="color: var(--text-muted)">{{ run.location || '—' }}</td>
+                      <td class="px-3 py-2 capitalize" style="color: var(--text-muted)">{{ run.weather ?? '—' }}</td>
+                      <td class="px-3 py-2">
+                        <a [routerLink]="['/running', run.id, 'edit']" class="link text-xs">Edit</a>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===== Tab: Events & Competitions ===== -->
+      @if (activeTab() === 'events') {
+        <div class="space-y-2">
+          @if (races.length === 0) {
+            <div class="panel">
+              <div class="empty-state" style="padding: 2rem 1rem">
+                <div class="empty-state__icon">🏅</div>
+                <p class="empty-state__title">No race events yet</p>
+                <p class="empty-state__desc">Record your races, marathons, and competitions.</p>
+                <a routerLink="/running/races/new" class="btn-primary text-xs no-underline mt-2">Add first event</a>
+              </div>
+            </div>
+          } @else {
+            @for (race of races; track race.id) {
+              <div class="panel" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <a [routerLink]="['/running/races', race.id]" class="link font-semibold text-sm">{{ race.name }}</a>
+                    <span class="badge badge--default">{{ raceLabel(race) }}</span>
+                    @if (race.medal) { <span class="badge badge--warning">🏅 Medal</span> }
+                    @if (race.registered) { <span class="badge badge--success">Registered</span> }
+                  </div>
+                  <p class="text-xs" style="color: var(--text-muted)">
+                    {{ race.race_date | date: 'mediumDate' }}
+                    @if (race.location) { · {{ race.location }} }
+                    @if (race.finish_time_seconds) { · Finish: {{ formatDuration(race.finish_time_seconds) }} }
+                    @if (race.position) { · #{{ race.position }} }
+                  </p>
+                </div>
+                <div class="shrink-0 flex gap-2">
+                  <a [routerLink]="['/running/races', race.id, 'edit']" class="btn-ghost text-xs no-underline">Edit</a>
+                  <button type="button" class="btn-ghost text-xs" style="color: var(--danger)" (click)="removeRace(race.id)">Delete</button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- ===== Tab: Personal Bests ===== -->
+      @if (activeTab() === 'bests') {
+        <div class="panel !p-0 overflow-hidden">
+          @if (stats) {
             <table class="w-full text-sm">
-              <thead class="border-b border-[var(--xp-border)] bg-[#e8e8e8] text-left">
+              <thead>
                 <tr>
-                  <th class="px-3 py-2">Date</th>
-                  <th class="px-3 py-2">Distance</th>
-                  <th class="px-3 py-2">Duration</th>
-                  <th class="px-3 py-2">Pace</th>
-                  <th class="px-3 py-2">Weather</th>
-                  <th class="px-3 py-2"></th>
+                  <th class="px-3 py-2 text-left">Distance</th>
+                  <th class="px-3 py-2 text-left">Pace</th>
+                  <th class="px-3 py-2 text-left">Time</th>
+                  <th class="px-3 py-2 text-left">Date</th>
                 </tr>
               </thead>
               <tbody>
-                @for (run of runs; track run.id) {
-                  <tr class="border-b border-[var(--xp-border)] hover:bg-[#d6e4f7]">
-                    <td class="px-3 py-2">
-                      <a [routerLink]="['/running', run.id]" class="text-[var(--xp-blue)] underline">
-                        {{ run.run_date | date: 'mediumDate' }}
-                      </a>
-                    </td>
-                    <td class="px-3 py-2">{{ run.distance_km }} km</td>
-                    <td class="px-3 py-2">{{ formatDuration(run.duration_seconds) }}</td>
-                    <td class="px-3 py-2">{{ formatPace(run.pace_min_per_km) }}</td>
-                    <td class="px-3 py-2 capitalize">{{ run.weather ?? '—' }}</td>
-                    <td class="px-3 py-2">
-                      <a [routerLink]="['/running', run.id, 'edit']" class="text-xs underline">Edit</a>
+                @for (pb of stats.personal_bests; track pb.distance_type) {
+                  <tr style="border-bottom: 1px solid var(--border)">
+                    <td class="px-3 py-2 font-medium">{{ pb.label }}</td>
+                    <td class="px-3 py-2">{{ pb.pace_min_per_km ? formatPace(pb.pace_min_per_km) : '—' }}</td>
+                    <td class="px-3 py-2">{{ pb.duration_seconds ? formatDuration(pb.duration_seconds) : '—' }}</td>
+                    <td class="px-3 py-2" style="color: var(--text-muted)">
+                      {{ pb.run_date ? (pb.run_date | date: 'mediumDate') : '—' }}
                     </td>
                   </tr>
                 }
@@ -91,93 +183,62 @@ import { RunningService } from './services/running.service';
             </table>
           }
         </div>
+      }
 
-        <div class="space-y-3">
-          <div class="panel !p-0 overflow-hidden">
-            <div class="title-bar rounded-none border-x-0 border-t-0">Personal Bests</div>
-            @if (stats) {
-              <ul class="divide-y divide-[var(--xp-border)] text-sm">
-                @for (pb of stats.personal_bests; track pb.distance_type) {
-                  <li class="flex items-center justify-between px-3 py-2">
-                    <span>{{ pb.label }}</span>
-                    <span class="text-xs text-gray-600">
-                      @if (pb.pace_min_per_km) {
-                        {{ formatPace(pb.pace_min_per_km) }}
-                      } @else {
-                        —
-                      }
-                    </span>
-                  </li>
-                }
-              </ul>
-            }
-          </div>
-
-          <div class="panel !p-0 overflow-hidden">
-            <div class="title-bar rounded-none border-x-0 border-t-0">Goals</div>
-            <form class="space-y-2 p-3 text-sm" [formGroup]="settingsForm" (ngSubmit)="saveSettings()">
-              <div>
-                <label class="mb-1 block text-xs">Weekly goal (km)</label>
-                <input class="input-field" type="number" step="0.1" formControlName="weekly_goal_km" />
-              </div>
-              <div>
-                <label class="mb-1 block text-xs">Target marathon</label>
-                <input class="input-field" formControlName="target_marathon_name" placeholder="Race name" />
-              </div>
-              <div>
-                <label class="mb-1 block text-xs">Marathon date</label>
-                <input class="input-field" type="date" formControlName="target_marathon_date" />
-              </div>
-              <div>
-                <label class="mb-1 block text-xs">Half marathon date</label>
-                <input class="input-field" type="date" formControlName="target_half_marathon_date" />
-              </div>
-              <button type="submit" class="btn-primary text-xs w-full" [disabled]="settingsForm.invalid">Save goals</button>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel !p-0 overflow-hidden">
-        <div class="title-bar rounded-none border-x-0 border-t-0">Upcoming Races</div>
-        <div class="p-3 space-y-3">
-          <form class="flex flex-wrap gap-2 text-sm" [formGroup]="raceForm" (ngSubmit)="addRace()">
-            <input class="input-field flex-1 min-w-[120px]" formControlName="name" placeholder="Race name" />
-            <input class="input-field !w-auto" type="date" formControlName="race_date" />
-            <select class="input-field !w-auto" formControlName="distance_type">
-              @for (d of raceDistances; track d.value) {
-                <option [value]="d.value">{{ d.label }}</option>
-              }
-            </select>
-            <label class="flex items-center gap-1 text-xs">
-              <input type="checkbox" formControlName="registered" />
-              Registered
-            </label>
-            <button type="submit" class="btn-primary text-xs" [disabled]="raceForm.invalid">Add</button>
+      <!-- ===== Tab: Goals ===== -->
+      @if (activeTab() === 'goals') {
+        <div class="panel !p-0 overflow-hidden" style="max-width: 400px">
+          <div class="title-bar">Running Goals</div>
+          <form class="space-y-3 p-4 text-sm" [formGroup]="settingsForm" (ngSubmit)="saveSettings()">
+            <div>
+              <label class="form-label">Weekly goal (km)</label>
+              <input class="input-field mt-1" type="number" step="0.1" formControlName="weekly_goal_km" />
+            </div>
+            <div>
+              <label class="form-label">Target marathon</label>
+              <input class="input-field mt-1" formControlName="target_marathon_name" placeholder="Race name" />
+            </div>
+            <div>
+              <label class="form-label">Marathon date</label>
+              <input class="input-field mt-1" type="date" formControlName="target_marathon_date" />
+            </div>
+            <div>
+              <label class="form-label">Half marathon date</label>
+              <input class="input-field mt-1" type="date" formControlName="target_half_marathon_date" />
+            </div>
+            <button type="submit" class="btn-primary text-xs w-full" [disabled]="settingsForm.invalid">Save goals</button>
           </form>
-          @if (races.length === 0) {
-            <p class="text-sm text-gray-600">No upcoming races.</p>
-          } @else {
-            <ul class="divide-y divide-[var(--xp-border)] text-sm">
-              @for (race of races; track race.id) {
-                <li class="flex items-center justify-between gap-2 py-2">
-                  <div>
-                    <p class="font-medium">{{ race.name }}</p>
-                    <p class="text-xs text-gray-600">
-                      {{ race.race_date | date: 'mediumDate' }} · {{ raceLabel(race) }}
-                      @if (race.registered) {
-                        · Registered
-                      }
-                    </p>
-                  </div>
-                  <button type="button" class="text-xs text-red-700" (click)="removeRace(race.id)">Remove</button>
-                </li>
-              }
-            </ul>
-          }
         </div>
-      </div>
+      }
     </div>
+
+    <style>
+      .form-label {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text);
+      }
+      .tab-btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: color 120ms ease, border-color 120ms ease;
+        margin-bottom: -1px;
+      }
+      .tab-btn:hover {
+        color: var(--text);
+      }
+      .tab-btn--active {
+        color: var(--primary) !important;
+        border-bottom-color: var(--primary) !important;
+        font-weight: 600;
+      }
+    </style>
   `,
 })
 export class RunningListComponent implements OnInit {
@@ -189,6 +250,15 @@ export class RunningListComponent implements OnInit {
   readonly formatPace = formatPace;
   raceDistances = RACE_DISTANCES;
 
+  activeTab = signal<'runs' | 'events' | 'bests' | 'goals'>('runs');
+
+  tabs = [
+    { id: 'runs', label: 'Previous Runs' },
+    { id: 'events', label: 'Events & Competitions' },
+    { id: 'bests', label: 'Personal Bests' },
+    { id: 'goals', label: 'Goals' },
+  ] as const;
+
   runs: RunListItem[] = [];
   races: RaceEvent[] = [];
   stats: RunningStats | null = null;
@@ -199,13 +269,6 @@ export class RunningListComponent implements OnInit {
     target_marathon_name: [''],
     target_marathon_date: [''],
     target_half_marathon_date: [''],
-  });
-
-  raceForm = this.fb.nonNullable.group({
-    name: ['', Validators.required],
-    race_date: ['', Validators.required],
-    distance_type: ['marathon' as const, Validators.required],
-    registered: [false],
   });
 
   ngOnInit(): void {
@@ -232,7 +295,7 @@ export class RunningListComponent implements OnInit {
         });
       },
     });
-    this.runningService.listRaces(true).subscribe({ next: (r) => (this.races = r) });
+    this.runningService.listRaces().subscribe({ next: (r) => (this.races = r) });
   }
 
   saveSettings(): void {
@@ -248,25 +311,8 @@ export class RunningListComponent implements OnInit {
       .subscribe({ next: () => this.load() });
   }
 
-  addRace(): void {
-    if (this.raceForm.invalid) return;
-    const raw = this.raceForm.getRawValue();
-    this.runningService
-      .createRace({
-        name: raw.name,
-        race_date: raw.race_date,
-        distance_type: raw.distance_type,
-        registered: raw.registered,
-      })
-      .subscribe({
-        next: () => {
-          this.raceForm.reset({ name: '', race_date: '', distance_type: 'marathon', registered: false });
-          this.load();
-        },
-      });
-  }
-
   removeRace(id: string): void {
+    if (!confirm('Delete this race event?')) return;
     this.runningService.deleteRace(id).subscribe({ next: () => this.load() });
   }
 

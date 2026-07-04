@@ -27,10 +27,10 @@ import { WishlistService } from './services/wishlist.service';
       </form>
 
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
       } @else if (items.length === 0) {
         <div class="panel">
-          <p class="text-sm text-gray-600">Your bucket list is empty.</p>
+          <p class="text-sm" style="color: var(--text-muted)">Your bucket list is empty.</p>
           <a routerLink="/wishlist/new" class="btn-primary mt-2 inline-block text-xs no-underline">Add dream</a>
         </div>
       } @else {
@@ -45,7 +45,7 @@ import { WishlistService } from './services/wishlist.service';
               <div class="h-2 bg-gray-200 border border-[var(--xp-border)]">
                 <div class="h-full bg-[var(--xp-blue)]" [style.width.%]="item.progress"></div>
               </div>
-              <p class="text-xs text-gray-600">{{ item.progress }}% progress</p>
+              <p class="text-xs" style="color: var(--text-muted)">{{ item.progress }}% progress</p>
             </div>
           }
         </div>

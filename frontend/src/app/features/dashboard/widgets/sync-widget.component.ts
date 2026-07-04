@@ -20,7 +20,7 @@ import { WidgetSkeletonComponent } from './widget-skeleton.component';
           @if (pendingCount > 0) {
             <p class="text-xs text-orange-700">{{ pendingCount }} pending change(s)</p>
           } @else {
-            <p class="text-xs text-gray-600">Everything is up to date</p>
+            <p class="text-xs" style="color: var(--text-muted)">Everything is up to date</p>
           }
         </div>
       }

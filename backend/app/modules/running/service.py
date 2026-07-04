@@ -30,6 +30,7 @@ class RunningService:
             duration_seconds=run.duration_seconds,
             pace_min_per_km=compute_pace(run.distance_km, run.duration_seconds),
             weather=run.weather,
+            location=getattr(run, 'location', None),
             updated_at=run.updated_at,
         )
 
@@ -41,6 +42,7 @@ class RunningService:
             duration_seconds=run.duration_seconds,
             pace_min_per_km=compute_pace(run.distance_km, run.duration_seconds),
             weather=run.weather,
+            location=getattr(run, 'location', None),
             notes=run.notes,
             created_at=run.created_at,
             updated_at=run.updated_at,

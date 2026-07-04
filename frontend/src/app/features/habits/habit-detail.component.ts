@@ -43,15 +43,15 @@ interface HeatmapDay {
 
         <div class="grid gap-3 md:grid-cols-3">
           <div class="panel text-sm">
-            <p class="text-xs text-gray-600">Current streak</p>
+            <p class="text-xs" style="color: var(--text-muted)">Current streak</p>
             <p class="text-2xl font-semibold">{{ h.streak }}</p>
           </div>
           <div class="panel text-sm">
-            <p class="text-xs text-gray-600">30-day completion</p>
+            <p class="text-xs" style="color: var(--text-muted)">30-day completion</p>
             <p class="text-2xl font-semibold">{{ h.completion_rate }}%</p>
           </div>
           <div class="panel text-sm">
-            <p class="text-xs text-gray-600">Total logs</p>
+            <p class="text-xs" style="color: var(--text-muted)">Total logs</p>
             <p class="text-2xl font-semibold">{{ h.stats.total_logs }}</p>
           </div>
         </div>
@@ -76,7 +76,7 @@ interface HeatmapDay {
         <div class="panel !p-0 overflow-hidden">
           <div class="title-bar rounded-none border-x-0 border-t-0">Recent logs</div>
           @if (h.logs.length === 0) {
-            <p class="p-3 text-sm text-gray-600">No logs yet.</p>
+            <p class="p-3 text-sm" style="color: var(--text-muted)">No logs yet.</p>
           } @else {
             <ul class="divide-y divide-[var(--xp-border)] text-sm">
               @for (log of h.logs; track log.id) {

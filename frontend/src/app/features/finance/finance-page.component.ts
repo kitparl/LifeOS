@@ -43,7 +43,7 @@ import { FinanceService } from './services/finance.service';
             </div>
             <div class="flex items-center gap-2">
               <span [class.text-green-700]="$any(t).txn_type === 'income'" [class.text-red-700]="$any(t).txn_type === 'expense'">{{ $any(t).amount }}</span>
-              <button type="button" class="text-xs text-red-700" (click)="removeTxn($any(t).id)">Delete</button>
+              <button type="button" class="text-xs" style="color: var(--danger)" (click)="removeTxn($any(t).id)">Delete</button>
             </div>
           </li>
         }

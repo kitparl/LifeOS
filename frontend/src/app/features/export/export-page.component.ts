@@ -9,7 +9,7 @@ import { ExportService } from './services/export.service';
   template: `
     <div class="max-w-lg space-y-3">
       <h1 class="text-lg font-semibold">Export Data</h1>
-      <p class="text-sm text-gray-600">Download your LifeOS data as JSON or CSV (CSV opens in Excel).</p>
+      <p class="text-sm" style="color: var(--text-muted)">Download your LifeOS data as JSON or CSV (CSV opens in Excel).</p>
 
       <div class="panel !p-0 overflow-hidden">
         <div class="title-bar rounded-none border-x-0 border-t-0">Export</div>
@@ -33,7 +33,7 @@ import { ExportService } from './services/export.service';
             <p class="text-xs text-green-700">{{ message }}</p>
           }
           @if (error) {
-            <p class="text-xs text-red-700">{{ error }}</p>
+            <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
           }
           <button type="submit" class="btn-primary" [disabled]="downloading">
             {{ downloading ? 'Downloading…' : 'Download' }}

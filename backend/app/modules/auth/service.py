@@ -25,3 +25,11 @@ class AuthService:
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         return await self.repo.update(user, display_name=data.display_name, timezone=data.timezone)
+
+    async def change_password(self, user_id: str, current_password: str, new_password: str) -> None:
+        user = await self.repo.get_by_id(user_id)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        if not verify_password(current_password, user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+        await self.repo.update(user, hashed_password=hash_password(new_password))

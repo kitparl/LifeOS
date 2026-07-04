@@ -20,7 +20,7 @@ import {
               <p class="text-xs text-green-700 mt-2">Connected</p>
               <div class="flex gap-2 mt-2">
                 <button type="button" class="btn-primary text-xs" (click)="sync(p.provider)">Sync</button>
-                <button type="button" class="text-xs text-red-700" (click)="disconnect(p.provider)">Remove</button>
+                <button type="button" class="text-xs" style="color: var(--danger)" (click)="disconnect(p.provider)">Remove</button>
               </div>
             } @else {
               <button type="button" class="btn-primary text-xs mt-2" (click)="connect(p.provider)">Connect</button>
@@ -29,7 +29,7 @@ import {
         }
       </div>
       @if (lastSyncMsg) {
-        <p class="text-sm text-gray-600">{{ lastSyncMsg }}</p>
+        <p class="text-sm" style="color: var(--text-muted)">{{ lastSyncMsg }}</p>
       }
     </div>
   `,

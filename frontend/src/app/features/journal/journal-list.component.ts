@@ -29,10 +29,10 @@ import { JournalService } from './services/journal.service';
       </form>
 
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading entries…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading entries…</p>
       } @else if (entries.length === 0) {
         <div class="panel">
-          <p class="text-sm text-gray-600">No journal entries yet.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No journal entries yet.</p>
           <a routerLink="/journal/new" class="btn-primary mt-2 inline-block text-xs no-underline">Write entry</a>
         </div>
       } @else {
@@ -75,7 +75,7 @@ import { JournalService } from './services/journal.service';
                   <td class="px-3 py-2">{{ entry.entry_date | date: 'mediumDate' }}</td>
                   <td class="px-3 py-2 capitalize">{{ entry.entry_type }}</td>
                   <td class="px-3 py-2 max-w-xs truncate">
-                    <a [routerLink]="['/journal', entry.id]" class="text-[var(--xp-blue)] underline">
+                    <a [routerLink]="['/journal', entry.id]" class="link">
                       {{ entry.title || entry.content || '—' }}
                     </a>
                   </td>

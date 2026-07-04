@@ -7,6 +7,7 @@ export interface Run {
   duration_seconds: number;
   pace_min_per_km: number;
   weather: string | null;
+  location: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -19,6 +20,7 @@ export interface RunListItem {
   duration_seconds: number;
   pace_min_per_km: number;
   weather: string | null;
+  location: string | null;
   updated_at: string;
 }
 
@@ -27,6 +29,7 @@ export interface RunCreate {
   distance_km: number;
   duration_seconds: number;
   weather?: string | null;
+  location?: string | null;
   notes?: string | null;
 }
 
@@ -35,6 +38,7 @@ export interface RunUpdate {
   distance_km?: number;
   duration_seconds?: number;
   weather?: string | null;
+  location?: string | null;
   notes?: string | null;
 }
 
@@ -45,6 +49,13 @@ export interface RaceEvent {
   distance_type: RaceDistanceType;
   distance_km: number | null;
   location: string | null;
+  organizer: string | null;
+  bib_number: string | null;
+  finish_time_seconds: number | null;
+  position: number | null;
+  medal: boolean;
+  certificate_url: string | null;
+  photos: string[];
   registered: boolean;
   notes: string | null;
   created_at: string;
@@ -57,9 +68,18 @@ export interface RaceCreate {
   distance_type?: RaceDistanceType;
   distance_km?: number | null;
   location?: string | null;
+  organizer?: string | null;
+  bib_number?: string | null;
+  finish_time_seconds?: number | null;
+  position?: number | null;
+  medal?: boolean;
+  certificate_url?: string | null;
+  photos?: string[];
   registered?: boolean;
   notes?: string | null;
 }
+
+export interface RaceUpdate extends Partial<RaceCreate> {}
 
 export interface RunningSettings {
   weekly_goal_km: number;

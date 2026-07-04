@@ -15,7 +15,7 @@ import { RunningService } from './services/running.service';
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h1 class="text-lg font-semibold">{{ r.run_date | date: 'fullDate' }}</h1>
-            <p class="text-xs text-gray-600">{{ r.distance_km }} km · {{ formatDuration(r.duration_seconds) }}</p>
+            <p class="text-xs" style="color: var(--text-muted)">{{ r.distance_km }} km · {{ formatDuration(r.duration_seconds) }}</p>
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/running', r.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
@@ -25,15 +25,15 @@ import { RunningService } from './services/running.service';
 
         <div class="grid gap-3 md:grid-cols-3">
           <div class="panel text-sm">
-            <p class="text-xs text-gray-600">Distance</p>
+            <p class="text-xs" style="color: var(--text-muted)">Distance</p>
             <p class="text-xl font-semibold">{{ r.distance_km }} km</p>
           </div>
           <div class="panel text-sm">
-            <p class="text-xs text-gray-600">Duration</p>
+            <p class="text-xs" style="color: var(--text-muted)">Duration</p>
             <p class="text-xl font-semibold">{{ formatDuration(r.duration_seconds) }}</p>
           </div>
           <div class="panel text-sm">
-            <p class="text-xs text-gray-600">Pace</p>
+            <p class="text-xs" style="color: var(--text-muted)">Pace</p>
             <p class="text-xl font-semibold">{{ formatPace(r.pace_min_per_km) }}</p>
           </div>
         </div>

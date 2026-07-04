@@ -17,7 +17,7 @@ import { WidgetSkeletonComponent } from './widget-skeleton.component';
       @if (loading) {
         <app-widget-skeleton />
       } @else if (tasks.length === 0) {
-        <div class="p-3 text-sm text-gray-600">
+        <div class="p-3 text-sm" style="color: var(--text-muted)">
           <p>No tasks today</p>
           <a routerLink="/tasks/new" class="btn-primary mt-2 inline-block text-xs no-underline">Add task</a>
         </div>

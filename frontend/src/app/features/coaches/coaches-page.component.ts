@@ -21,7 +21,7 @@ import { CoachesService } from './services/coaches.service';
       @if (reply) {
         <div class="panel text-sm whitespace-pre-wrap">{{ reply }}</div>
         @if (context) {
-          <p class="text-xs text-gray-600">Context: {{ context }}</p>
+          <p class="text-xs" style="color: var(--text-muted)">Context: {{ context }}</p>
         }
       }
     </div>

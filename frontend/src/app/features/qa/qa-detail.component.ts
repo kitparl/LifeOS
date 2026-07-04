@@ -21,7 +21,7 @@ import { QAService } from './services/qa.service';
         </div>
 
         @if (e.tags.length) {
-          <p class="text-xs text-gray-600">Tags: {{ e.tags.join(', ') }}</p>
+          <p class="text-xs" style="color: var(--text-muted)">Tags: {{ e.tags.join(', ') }}</p>
         }
 
         <div class="panel text-sm">

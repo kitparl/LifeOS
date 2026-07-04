@@ -8,7 +8,7 @@ import { FilesService } from '../../features/files/services/files.service';
     <div class="space-y-2 text-sm">
       <input type="file" [accept]="accept" (change)="onSelect($event)" />
       @if (uploading) {
-        <p class="text-xs text-gray-600">Uploading…</p>
+        <p class="text-xs" style="color: var(--text-muted)">Uploading…</p>
       }
       @if (previewUrl) {
         <img [src]="previewUrl" alt="Preview" class="max-h-32 rounded border border-[var(--xp-border)]" />

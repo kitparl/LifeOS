@@ -19,7 +19,7 @@ import { environment } from '../../../environments/environment';
         <button type="button" class="input-field !w-auto text-xs" (click)="loadReview('monthly')">Monthly review</button>
       </div>
       @if (loading) {
-        <p class="text-sm text-gray-600">Generating…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Generating…</p>
       }
       @if (content) {
         <div class="panel text-sm whitespace-pre-wrap">{{ content }}</div>

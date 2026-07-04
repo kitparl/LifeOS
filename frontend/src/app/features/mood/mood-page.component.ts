@@ -50,19 +50,19 @@ import { MoodService } from './services/mood.service';
           @if (stats) {
             <div class="grid grid-cols-2 gap-2 p-3 text-sm">
               <div class="panel !p-2">
-                <p class="text-xs text-gray-600">Stress</p>
+                <p class="text-xs" style="color: var(--text-muted)">Stress</p>
                 <p class="text-lg font-semibold">{{ stats.avg_stress }}</p>
               </div>
               <div class="panel !p-2">
-                <p class="text-xs text-gray-600">Confidence</p>
+                <p class="text-xs" style="color: var(--text-muted)">Confidence</p>
                 <p class="text-lg font-semibold">{{ stats.avg_confidence }}</p>
               </div>
               <div class="panel !p-2">
-                <p class="text-xs text-gray-600">Motivation</p>
+                <p class="text-xs" style="color: var(--text-muted)">Motivation</p>
                 <p class="text-lg font-semibold">{{ stats.avg_motivation }}</p>
               </div>
               <div class="panel !p-2">
-                <p class="text-xs text-gray-600">Happiness</p>
+                <p class="text-xs" style="color: var(--text-muted)">Happiness</p>
                 <p class="text-lg font-semibold">{{ stats.avg_happiness }}</p>
               </div>
             </div>
@@ -71,7 +71,7 @@ import { MoodService } from './services/mood.service';
                 @for (entry of stats.recent; track entry.id) {
                   <li class="flex justify-between px-3 py-2">
                     <span>{{ entry.log_date | date: 'mediumDate' }}</span>
-                    <span class="text-xs text-gray-600">
+                    <span class="text-xs" style="color: var(--text-muted)">
                       S{{ entry.stress }} C{{ entry.confidence }} M{{ entry.motivation }} H{{ entry.happiness }}
                     </span>
                   </li>
@@ -79,7 +79,7 @@ import { MoodService } from './services/mood.service';
               </ul>
             }
           } @else {
-            <p class="p-3 text-sm text-gray-600">Log your mood to see trends.</p>
+            <p class="p-3 text-sm" style="color: var(--text-muted)">Log your mood to see trends.</p>
           }
         </div>
       </div>

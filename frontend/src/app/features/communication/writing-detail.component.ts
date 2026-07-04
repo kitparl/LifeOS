@@ -4,30 +4,49 @@ import { ActivatedRoute } from '@angular/router';
 import { WritingPractice } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 
+/** Detect if a string is HTML (from TipTap) or plain text (legacy) */
+function isHtml(content: string): boolean {
+  return content.trimStart().startsWith('<');
+}
+
 @Component({
   selector: 'app-writing-detail',
   standalone: true,
   imports: [RouterLink],
   template: `
     @if (item; as w) {
-      <div class="space-y-3">
+      <div class="space-y-3" style="max-width: 760px">
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h1 class="text-lg font-semibold">{{ w.title }}</h1>
-            <p class="text-xs capitalize text-gray-600">{{ w.category.replace('_', ' ') }}</p>
+            <h1 class="text-lg font-semibold" style="color: var(--text)">{{ w.title }}</h1>
+            <p class="text-xs capitalize" style="color: var(--text-muted)">{{ w.category.replace('_', ' ') }}</p>
           </div>
           <div class="flex gap-2">
-            <a [routerLink]="['/communication/writing', w.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
-            <button type="button" class="input-field !w-auto text-xs text-red-700" (click)="remove()">Delete</button>
+            <a [routerLink]="['/communication/writing', w.id, 'edit']" class="btn-secondary text-xs no-underline">Edit</a>
+            <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
           </div>
         </div>
-        <div class="panel text-sm whitespace-pre-wrap text-gray-700">{{ w.content || 'No content' }}</div>
-        <a routerLink="/communication" class="text-sm text-[var(--xp-blue)] underline">Back</a>
+
+        <div class="panel">
+          @if (!w.content) {
+            <p class="text-sm" style="color: var(--text-muted); font-style: italic">No content.</p>
+          } @else if (contentIsHtml(w.content)) {
+            <!-- TipTap HTML content -->
+            <div class="prose-content ProseMirror" [innerHTML]="w.content"></div>
+          } @else {
+            <!-- Legacy plain-text content -->
+            <div class="text-sm whitespace-pre-wrap" style="color: var(--text)">{{ w.content }}</div>
+          }
+        </div>
+
+        <a routerLink="/communication" class="link text-sm">← Back to Communication</a>
       </div>
     } @else if (loading) {
-      <p class="text-sm">Loading…</p>
+      <div class="empty-state">
+        <div class="skeleton" style="width: 200px; height: 16px"></div>
+      </div>
     } @else {
-      <p class="text-sm text-red-700">Not found.</p>
+      <p class="text-sm" style="color: var(--danger)">Writing not found.</p>
     }
   `,
 })
@@ -38,6 +57,8 @@ export class WritingDetailComponent implements OnInit {
 
   item: WritingPractice | null = null;
   loading = false;
+
+  readonly contentIsHtml = isHtml;
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');

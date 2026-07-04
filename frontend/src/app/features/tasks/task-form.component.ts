@@ -52,7 +52,7 @@ import { TasksService } from './services/tasks.service';
             <input class="input-field" type="datetime-local" formControlName="due_date" />
           </div>
           @if (error) {
-            <p class="text-xs text-red-700">{{ error }}</p>
+            <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
           }
           <div class="sticky bottom-2 flex flex-col gap-2 rounded-2xl border border-[var(--xp-border)] bg-[var(--surface)] p-3 backdrop-blur sm:static sm:flex-row sm:border-0 sm:bg-transparent sm:p-0">
             <button type="submit" class="btn-primary w-full sm:w-auto" [disabled]="form.invalid || saving">

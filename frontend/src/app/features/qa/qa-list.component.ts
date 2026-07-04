@@ -23,10 +23,10 @@ import { QAService } from './services/qa.service';
       </form>
 
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
       } @else if (entries.length === 0) {
         <div class="panel">
-          <p class="text-sm text-gray-600">No Q&A entries yet.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No Q&A entries yet.</p>
           <a routerLink="/qa/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create one</a>
         </div>
       } @else {
@@ -67,7 +67,7 @@ import { QAService } from './services/qa.service';
               @for (entry of pagedEntries; track entry.id) {
                 <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
                   <td class="px-3 py-2 max-w-md">
-                    <a [routerLink]="['/qa', entry.id]" class="text-[var(--xp-blue)] underline">{{ entry.question }}</a>
+                    <a [routerLink]="['/qa', entry.id]" class="link">{{ entry.question }}</a>
                   </td>
                   <td class="px-3 py-2 text-xs text-gray-600">{{ entry.tags.join(', ') || '—' }}</td>
                   <td class="px-3 py-2 text-xs">{{ entry.updated_at | date: 'mediumDate' }}</td>

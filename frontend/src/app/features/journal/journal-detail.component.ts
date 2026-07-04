@@ -14,7 +14,7 @@ import { JournalService } from './services/journal.service';
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h1 class="text-lg font-semibold">{{ e.title || (e.entry_type | titlecase) + ' Journal' }}</h1>
-            <p class="text-xs text-gray-600">{{ e.entry_date | date: 'fullDate' }} · {{ e.entry_type }}</p>
+            <p class="text-xs" style="color: var(--text-muted)">{{ e.entry_date | date: 'fullDate' }} · {{ e.entry_type }}</p>
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/journal', e.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>

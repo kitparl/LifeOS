@@ -17,9 +17,9 @@ import { WidgetSkeletonComponent } from './widget-skeleton.component';
       @if (loading) {
         <app-widget-skeleton />
       } @else if (events.length === 0) {
-        <p class="p-3 text-sm text-gray-600">
+        <p class="p-3 text-sm" style="color: var(--text-muted)">
           No upcoming events.
-          <a routerLink="/calendar/new" class="text-[var(--xp-blue)] underline">Add one</a>
+          <a routerLink="/calendar/new" class="link">Add one</a>
         </p>
       } @else {
         <ul class="divide-y divide-[var(--xp-border)] text-sm">

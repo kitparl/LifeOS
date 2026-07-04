@@ -3,7 +3,7 @@ import { inject } from '@angular/core';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 
-const AUTH_SKIP_REFRESH = ['/auth/login', '/auth/register', '/auth/refresh'];
+const AUTH_SKIP_REFRESH = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'];
 
 function shouldSkipRefresh(url: string): boolean {
   return AUTH_SKIP_REFRESH.some((path) => url.includes(path));
@@ -28,9 +28,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (shouldSkipRefresh(req.url) || req.headers.has('X-Retry')) {
         return throwError(() => err);
       }
+
+      // auth.refresh() is single-flight — concurrent 401s share one refresh call
       return auth.refresh().pipe(
         switchMap((newToken) => {
-          const retry = req.clone({
+          const retry = authReq.clone({
             setHeaders: {
               Authorization: `Bearer ${newToken}`,
               'X-Retry': '1',

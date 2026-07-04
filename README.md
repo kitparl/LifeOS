@@ -620,6 +620,34 @@ All integrations should be modular so they can be enabled or disabled independen
 
 ---
 
+## Creating Users (Manual)
+
+Registration is disabled in the UI. Use the following `curl` command to create a new user directly via the backend API:
+
+```bash
+# Local development
+curl -c cookies.txt -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "yourpassword123",
+    "display_name": "Your Name"
+  }'
+
+# Production (replace YOUR_DOMAIN)
+curl -c cookies.txt -X POST https://YOUR_DOMAIN/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "yourpassword123",
+    "display_name": "Your Name"
+  }'
+```
+
+The response includes an `access_token`. The `cookies.txt` file saves the `refresh_token` HttpOnly cookie for subsequent requests.
+
+---
+
 # Long Term Goal
 
 Five years from now this application should contain

@@ -11,6 +11,7 @@ class RunCreate(BaseModel):
     distance_km: float = Field(gt=0, le=500)
     duration_seconds: int = Field(gt=0, le=86400)
     weather: str | None = Field(default=None, max_length=64)
+    location: str | None = Field(default=None, max_length=200)
     notes: str | None = None
 
 
@@ -19,6 +20,7 @@ class RunUpdate(BaseModel):
     distance_km: float | None = Field(default=None, gt=0, le=500)
     duration_seconds: int | None = Field(default=None, gt=0, le=86400)
     weather: str | None = Field(default=None, max_length=64)
+    location: str | None = Field(default=None, max_length=200)
     notes: str | None = None
 
 
@@ -29,6 +31,7 @@ class RunListItem(BaseModel):
     duration_seconds: int
     pace_min_per_km: float
     weather: str | None
+    location: str | None
     updated_at: datetime
 
     model_config = {"from_attributes": True}
@@ -41,6 +44,7 @@ class RunResponse(BaseModel):
     duration_seconds: int
     pace_min_per_km: float
     weather: str | None
+    location: str | None
     notes: str | None
     created_at: datetime
     updated_at: datetime
@@ -54,6 +58,13 @@ class RaceCreate(BaseModel):
     distance_type: RaceDistanceType = "other"
     distance_km: float | None = Field(default=None, gt=0, le=500)
     location: str | None = Field(default=None, max_length=200)
+    organizer: str | None = Field(default=None, max_length=200)
+    bib_number: str | None = Field(default=None, max_length=50)
+    finish_time_seconds: int | None = Field(default=None, gt=0, le=86400)
+    position: int | None = Field(default=None, gt=0)
+    medal: bool = False
+    certificate_url: str | None = None
+    photos: list[str] = Field(default_factory=list)
     registered: bool = False
     notes: str | None = None
 
@@ -64,6 +75,13 @@ class RaceUpdate(BaseModel):
     distance_type: RaceDistanceType | None = None
     distance_km: float | None = Field(default=None, gt=0, le=500)
     location: str | None = Field(default=None, max_length=200)
+    organizer: str | None = Field(default=None, max_length=200)
+    bib_number: str | None = Field(default=None, max_length=50)
+    finish_time_seconds: int | None = Field(default=None, gt=0, le=86400)
+    position: int | None = Field(default=None, gt=0)
+    medal: bool | None = None
+    certificate_url: str | None = None
+    photos: list[str] | None = None
     registered: bool | None = None
     notes: str | None = None
 
@@ -75,6 +93,13 @@ class RaceResponse(BaseModel):
     distance_type: str
     distance_km: float | None
     location: str | None
+    organizer: str | None
+    bib_number: str | None
+    finish_time_seconds: int | None
+    position: int | None
+    medal: bool
+    certificate_url: str | None
+    photos: list[str]
     registered: bool
     notes: str | None
     created_at: datetime

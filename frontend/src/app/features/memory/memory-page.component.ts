@@ -38,7 +38,7 @@ import { MemoryItem, MemoryService } from './services/memory.service';
           <li class="flex justify-between gap-2 px-3 py-2">
             <div>
               <p class="font-medium">{{ item.memory_key }} <span class="text-xs text-gray-500 capitalize">({{ item.category }})</span></p>
-              <p class="text-gray-700">{{ item.memory_value }}</p>
+              <p class="" style="color: var(--text)">{{ item.memory_value }}</p>
             </div>
             <button type="button" class="text-xs text-red-700 shrink-0" (click)="remove(item.id)">Delete</button>
           </li>

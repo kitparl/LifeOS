@@ -35,9 +35,9 @@ import { AutomationRule, AutomationsService } from './services/automations.servi
           <li class="flex justify-between gap-2 px-3 py-2">
             <div>
               <p class="font-medium">{{ r.name }}</p>
-              <p class="text-xs text-gray-600">{{ r.trigger_type }} → {{ r.action_type }}</p>
+              <p class="text-xs" style="color: var(--text-muted)">{{ r.trigger_type }} → {{ r.action_type }}</p>
             </div>
-            <button type="button" class="text-xs text-red-700" (click)="remove(r.id)">Delete</button>
+            <button type="button" class="text-xs" style="color: var(--danger)" (click)="remove(r.id)">Delete</button>
           </li>
         }
       </ul>

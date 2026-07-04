@@ -20,15 +20,15 @@ interface TimelineItem {
   template: `
     <div class="space-y-3">
       <h1 class="text-lg font-semibold">Life Timeline</h1>
-      <p class="text-sm text-gray-600">Chronological view across all modules.</p>
+      <p class="text-sm" style="color: var(--text-muted)">Chronological view across all modules.</p>
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
       } @else {
         <ul class="panel !p-0 divide-y divide-[var(--xp-border)] text-sm">
           @for (e of events; track e.id + e.module) {
             <li class="flex items-start justify-between gap-2 px-3 py-2">
               <div>
-                <a [routerLink]="e.route" class="text-[var(--xp-blue)] underline">{{ e.title }}</a>
+                <a [routerLink]="e.route" class="link">{{ e.title }}</a>
                 <p class="text-xs capitalize text-gray-500">{{ e.module }} · {{ e.entity_type }}</p>
               </div>
               <time class="shrink-0 text-xs text-gray-500">{{ e.occurred_at | date: 'medium' }}</time>
