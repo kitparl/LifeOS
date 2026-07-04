@@ -55,6 +55,7 @@ export interface RaceEvent {
   position: number | null;
   medal: boolean;
   certificate_url: string | null;
+  event_url: string | null;
   photos: string[];
   registered: boolean;
   notes: string | null;
@@ -74,6 +75,7 @@ export interface RaceCreate {
   position?: number | null;
   medal?: boolean;
   certificate_url?: string | null;
+  event_url?: string | null;
   photos?: string[];
   registered?: boolean;
   notes?: string | null;

@@ -42,6 +42,7 @@ class RaceEvent(Base):
     position: Mapped[int | None] = mapped_column(Integer, nullable=True)
     medal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     certificate_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    event_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     photos: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     registered: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

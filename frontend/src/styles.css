@@ -387,6 +387,63 @@ kbd {
   margin-bottom: 0.25rem;
 }
 
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch__track {
+  display: block;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  transition: background 150ms ease, border-color 150ms ease;
+  position: relative;
+}
+
+.toggle-switch__track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: transform 150ms ease, background 150ms ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.toggle-switch input:checked + .toggle-switch__track {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-switch__track::after {
+  transform: translateX(16px);
+  background: #fff;
+  border-color: transparent;
+}
+
+.toggle-switch input:focus-visible + .toggle-switch__track {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .input-field {
   display: block;
   width: 100%;
@@ -884,3 +941,226 @@ summary::-webkit-details-marker {
   padding: 0 0.25rem;
   margin-bottom: 0.25rem;
 }
+
+/* =========================================================
+   FULLCALENDAR THEME OVERRIDES
+   ========================================================= */
+
+/* Custom FC CSS variables mapped to LifeOS design tokens */
+:root {
+  --fc-border-color: var(--border);
+  --fc-button-bg-color: var(--primary);
+  --fc-button-border-color: var(--primary);
+  --fc-button-hover-bg-color: var(--primary);
+  --fc-button-hover-border-color: var(--primary);
+  --fc-button-active-bg-color: var(--primary);
+  --fc-button-active-border-color: var(--primary);
+  --fc-today-bg-color: var(--primary-soft, rgba(99,102,241,0.08));
+  --fc-neutral-bg-color: var(--surface-2);
+  --fc-page-bg-color: transparent;
+  --fc-highlight-color: var(--primary-soft, rgba(99,102,241,0.15));
+  --fc-non-business-color: var(--surface-2);
+  --fc-bg-event-opacity: 0.3;
+  --fc-list-event-hover-bg-color: var(--surface-2);
+  --fc-small-font-size: 0.78em;
+}
+
+.fc {
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+/* Toolbar */
+.fc .fc-toolbar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Buttons */
+.fc .fc-button {
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.fc .fc-button:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.fc .fc-button-primary:not(:disabled):active,
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  box-shadow: none;
+}
+
+.fc .fc-button-primary:focus {
+  box-shadow: 0 0 0 2px var(--primary-soft, rgba(99,102,241,0.3));
+}
+
+.fc .fc-button-group .fc-button {
+  border-radius: 0;
+}
+
+.fc .fc-button-group .fc-button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.fc .fc-button-group .fc-button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+/* Day/date cells */
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number,
+.fc .fc-list-day-text,
+.fc .fc-list-day-side-text {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.fc .fc-daygrid-day-number {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 4px 6px;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 4px;
+}
+
+.fc .fc-col-header-cell {
+  background: var(--surface-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Events */
+.fc .fc-event {
+  border: none;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 1px 4px;
+}
+
+.fc .fc-event .fc-event-title {
+  font-weight: 500;
+}
+
+.fc .fc-event:hover {
+  filter: brightness(0.92);
+}
+
+/* List view */
+.fc .fc-list-event-title a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.fc .fc-list-event-dot {
+  border-radius: 50%;
+}
+
+.fc .fc-list-empty {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+/* Time grid */
+.fc .fc-timegrid-slot {
+  height: 2rem;
+}
+
+.fc .fc-timegrid-axis-cushion,
+.fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* More popover */
+.fc .fc-more-popover {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.fc .fc-more-popover .fc-popover-header {
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 8px 8px 0 0;
+}
+
+/* Scrollbar */
+.fc .fc-scroller::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* Calendar page container */
+.calendar-page {
+  height: calc(100dvh - 120px);
+  min-height: 400px;
+}
+
+@media (max-width: 767px) {
+  .fc .fc-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 0.9rem;
+  }
+
+  .fc .fc-button {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .calendar-page {
+    height: calc(100dvh - 140px);
+  }
+}
+

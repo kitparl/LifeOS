@@ -144,6 +144,16 @@ import { RunningService } from './services/running.service';
                     @if (race.finish_time_seconds) { · Finish: {{ formatDuration(race.finish_time_seconds) }} }
                     @if (race.position) { · #{{ race.position }} }
                   </p>
+                  @if (race.event_url || race.certificate_url) {
+                    <p class="text-xs mt-1 flex flex-wrap gap-2">
+                      @if (race.event_url) {
+                        <a [href]="race.event_url" target="_blank" rel="noopener noreferrer" class="link">Event page</a>
+                      }
+                      @if (race.certificate_url) {
+                        <a [href]="race.certificate_url" target="_blank" rel="noopener noreferrer" class="link">Certificate</a>
+                      }
+                    </p>
+                  }
                 </div>
                 <div class="shrink-0 flex gap-2">
                   <a [routerLink]="['/running/races', race.id, 'edit']" class="btn-ghost text-xs no-underline">Edit</a>

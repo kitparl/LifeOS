@@ -15,9 +15,15 @@ class CalendarRepository:
         self, user_id: str, start: datetime | None = None, end: datetime | None = None
     ) -> list[CalendarEvent]:
         q = select(CalendarEvent).where(CalendarEvent.user_id == user_id)
-        if start is not None:
+        if start is not None and end is not None:
+            # Overlap query: event starts before range end AND (event ends after range start OR has no end)
+            q = q.where(
+                CalendarEvent.starts_at <= end,
+                (CalendarEvent.ends_at >= start) | (CalendarEvent.ends_at.is_(None)),
+            )
+        elif start is not None:
             q = q.where(CalendarEvent.starts_at >= start)
-        if end is not None:
+        elif end is not None:
             q = q.where(CalendarEvent.starts_at <= end)
         q = q.order_by(CalendarEvent.starts_at.asc())
         result = await self.db.execute(q)

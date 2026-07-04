@@ -5,7 +5,7 @@ import {
   isDevMode,
   provideZoneChangeDetection,
 } from '@angular/core';
-import { provideRouter, Router, withNavigationErrorHandler } from '@angular/router';
+import { provideRouter, Router, withInMemoryScrolling, withNavigationErrorHandler } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
 
@@ -23,6 +23,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(
       routes,
+      withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'top' }),
       withNavigationErrorHandler((error) => {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           void inject(Router).navigateByUrl('/offline');

@@ -13,6 +13,11 @@ export const routes: Routes = [
     canActivate: [guestGuard],
   },
   {
+    path: 'register',
+    loadComponent: () => import('./features/auth/register.component').then((m) => m.RegisterComponent),
+    canActivate: [guestGuard],
+  },
+  {
     path: '',
     loadComponent: () =>
       import('./shared/layout/app-shell.component').then((m) => m.AppShellComponent),
@@ -31,6 +36,22 @@ export const routes: Routes = [
             (m) => m.SettingsFragmentRedirectComponent,
           ),
         data: { fragment: 'profile' },
+      },
+      {
+        path: 'password',
+        loadComponent: () =>
+          import('./features/settings/settings-fragment-redirect.component').then(
+            (m) => m.SettingsFragmentRedirectComponent,
+          ),
+        data: { fragment: 'password' },
+      },
+      {
+        path: 'sidebar',
+        loadComponent: () =>
+          import('./features/settings/settings-fragment-redirect.component').then(
+            (m) => m.SettingsFragmentRedirectComponent,
+          ),
+        data: { fragment: 'sidebar' },
       },
       {
         path: 'goals',

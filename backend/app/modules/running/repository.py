@@ -27,6 +27,7 @@ class RunningRepository:
             distance_km=data.distance_km,
             duration_seconds=data.duration_seconds,
             weather=data.weather,
+            location=data.location,
             notes=data.notes,
         )
         self.db.add(run)
@@ -52,7 +53,7 @@ class RunningRepository:
 
             today = datetime.now(timezone.utc).date()
             q = q.where(RaceEvent.race_date >= today)
-        q = q.order_by(RaceEvent.race_date.asc())
+        q = q.order_by(RaceEvent.race_date.desc())
         result = await self.db.execute(q)
         return list(result.scalars().all())
 
@@ -70,6 +71,14 @@ class RunningRepository:
             distance_type=data.distance_type,
             distance_km=data.distance_km,
             location=data.location,
+            organizer=data.organizer,
+            bib_number=data.bib_number,
+            finish_time_seconds=data.finish_time_seconds,
+            position=data.position,
+            medal=data.medal,
+            certificate_url=data.certificate_url,
+            event_url=data.event_url,
+            photos=data.photos or [],
             registered=data.registered,
             notes=data.notes,
         )

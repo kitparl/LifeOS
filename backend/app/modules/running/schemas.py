@@ -64,6 +64,7 @@ class RaceCreate(BaseModel):
     position: int | None = Field(default=None, gt=0)
     medal: bool = False
     certificate_url: str | None = None
+    event_url: str | None = None
     photos: list[str] = Field(default_factory=list)
     registered: bool = False
     notes: str | None = None
@@ -81,6 +82,7 @@ class RaceUpdate(BaseModel):
     position: int | None = Field(default=None, gt=0)
     medal: bool | None = None
     certificate_url: str | None = None
+    event_url: str | None = None
     photos: list[str] | None = None
     registered: bool | None = None
     notes: str | None = None
@@ -99,6 +101,7 @@ class RaceResponse(BaseModel):
     position: int | None
     medal: bool
     certificate_url: str | None
+    event_url: str | None
     photos: list[str]
     registered: bool
     notes: str | None
