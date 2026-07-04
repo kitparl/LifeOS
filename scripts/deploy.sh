@@ -28,6 +28,7 @@ usage() {
 Usage: $(basename "$0") [OPTIONS]
 
 Deploy LifeOS on the VPS. By default rebuilds backend + frontend, then restarts services.
+Local changes to tracked files are discarded before pull (git restore .).
 If restart or health check fails, automatically rolls back to the previous commit.
 
 Options:
@@ -106,6 +107,15 @@ record_history() {
         "$message" >> "$HISTORY_FILE"
 }
 
+restore_clean_worktree() {
+    cd "$REPO_DIR"
+    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        log "Discarding local changes to tracked files (git restore .)..."
+        git diff --stat 2>/dev/null | tee -a "$LOG_FILE" || true
+        git restore .
+    fi
+}
+
 setup_backend() {
     log "Setting up backend..."
     cd "$BACKEND_DIR"
@@ -125,7 +135,7 @@ setup_backend() {
 setup_frontend() {
     log "Building frontend..."
     cd "$FRONTEND_DIR"
-    npm install --legacy-peer-deps
+    npm ci --legacy-peer-deps
     npm run build
 
     log "Copying frontend build to $STATIC_DIR..."
@@ -261,6 +271,8 @@ log "===== Starting LifeOS deployment ($DEPLOY_SCOPE) ====="
 
 # ---- 1. Pull latest code (save pre-deploy commit for auto-rollback) ----
 cd "$REPO_DIR"
+restore_clean_worktree
+
 PREVIOUS_SHA="$(git rev-parse HEAD)"
 log "Current commit before pull: $(git rev-parse --short HEAD)"
 
@@ -282,6 +294,7 @@ fi
 
 trap - ERR
 echo "$(git -C "$REPO_DIR" rev-parse HEAD)" > "$LAST_GOOD_FILE"
+restore_clean_worktree
 log "===== Deployment complete (commit $COMMIT_SHA) ====="
 record_history "SUCCESS" "commit $COMMIT_SHA"
 print_history_summary
