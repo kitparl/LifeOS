@@ -27,11 +27,7 @@
               }
             ],
             "styles": [
-              "src/styles.css",
-              "node_modules/@fullcalendar/core/index.global.css",
-              "node_modules/@fullcalendar/daygrid/index.global.css",
-              "node_modules/@fullcalendar/timegrid/index.global.css",
-              "node_modules/@fullcalendar/list/index.global.css"
+              "src/styles.css"
             ],
             "scripts": []
           },
