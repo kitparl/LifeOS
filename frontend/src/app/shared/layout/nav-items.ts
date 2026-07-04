@@ -75,6 +75,5 @@ export const navGroups: NavGroup[] = [
 export const primaryMobileNav: NavItem[] = [
   { label: 'Dashboard', route: '/dashboard', shortLabel: 'Home' },
   { label: 'Tasks', route: '/tasks' },
-  { label: 'Calendar', route: '/calendar' },
   { label: 'Search', route: '/search' },
 ];
