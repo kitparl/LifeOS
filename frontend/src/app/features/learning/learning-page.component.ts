@@ -24,15 +24,15 @@ import { LearningService } from './services/learning.service';
         <button type="submit" class="btn-primary text-xs">Filter</button>
       </form>
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
       } @else if (items.length === 0) {
-        <div class="panel"><p class="text-sm text-gray-600">No learning items yet.</p></div>
+        <div class="panel"><p class="text-sm" style="color: var(--text-muted)">No learning items yet.</p></div>
       } @else {
         <ul class="panel !p-0 divide-y divide-[var(--xp-border)] text-sm">
           @for (item of items; track item.id) {
             <li class="flex items-center justify-between gap-2 px-3 py-2">
               <div>
-                <a [routerLink]="['/learning', item.id, 'edit']" class="text-[var(--xp-blue)] underline">{{ item.title }}</a>
+                <a [routerLink]="['/learning', item.id, 'edit']" class="link">{{ item.title }}</a>
                 <p class="text-xs text-gray-600 capitalize">{{ item.item_type }} · {{ item.status }} · {{ item.progress }}%</p>
               </div>
             </li>

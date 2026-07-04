@@ -10,12 +10,12 @@ import { VoiceNote, VoiceService } from './services/voice.service';
   template: `
     <div class="space-y-4 max-w-2xl">
       <h1 class="text-lg font-semibold">Voice</h1>
-      <p class="text-sm text-gray-600">Type transcripts to simulate voice notes and commands (e.g. "go to tasks", "search goals").</p>
+      <p class="text-sm" style="color: var(--text-muted)">Type transcripts to simulate voice notes and commands (e.g. "go to tasks", "search goals").</p>
       <form class="panel space-y-2 text-sm" [formGroup]="commandForm" (ngSubmit)="runCommand()">
         <textarea class="input-field min-h-[60px]" formControlName="transcript" placeholder="Voice command…"></textarea>
         <button type="submit" class="btn-primary text-xs" [disabled]="commandForm.invalid">Run command</button>
         @if (commandResult) {
-          <p class="text-gray-700">{{ commandResult }}</p>
+          <p class="" style="color: var(--text)">{{ commandResult }}</p>
           @if (commandRoute) {
             <button type="button" class="btn-primary text-xs" (click)="navigate()">Go</button>
           }
@@ -32,7 +32,7 @@ import { VoiceNote, VoiceService } from './services/voice.service';
             <div>
               <p class="font-medium">{{ n.title || 'Note' }} <span class="text-xs text-gray-500">({{ n.note_type }})</span></p>
               <p>{{ n.transcript }}</p>
-              @if (n.command_result) { <p class="text-xs text-gray-600">{{ n.command_result }}</p> }
+              @if (n.command_result) { <p class="text-xs" style="color: var(--text-muted)">{{ n.command_result }}</p> }
             </div>
             <button type="button" class="text-xs text-red-700 shrink-0" (click)="remove(n.id)">Delete</button>
           </li>

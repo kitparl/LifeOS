@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import {
   NavigationEnd,
   Router,
@@ -15,7 +15,11 @@ import { SyncService } from '../../sync/sync.service';
 import { AiChatPanelComponent } from '../../features/dashboard/widgets/ai-chat-panel.component';
 import { CommandPaletteComponent } from '../command-palette/command-palette.component';
 import { CommandPaletteService } from '../command-palette/command-palette.service';
-import { navGroups, primaryMobileNav } from './nav-items';
+import { NavPreferencesService } from '../../core/services/nav-preferences.service';
+import { resolvePageTitle } from './nav-registry';
+
+const STORAGE_AI_OPEN    = 'lifeos-ai-panel-open';
+const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
 
 @Component({
   selector: 'app-shell',
@@ -29,243 +33,341 @@ import { navGroups, primaryMobileNav } from './nav-items';
   ],
   template: `
     <app-command-palette />
-    <div class="safe-x safe-top flex min-h-dvh bg-transparent">
-      @if (drawerOpen() || mobileAiOpen()) {
-        <button
-          type="button"
-          aria-label="Close overlay"
-          class="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[2px] lg:hidden"
-          (click)="closeOverlays()"
-        ></button>
-      }
 
+    <!-- Mobile overlays backdrop -->
+    @if (drawerOpen() || mobileAiOpen()) {
+      <button
+        type="button"
+        aria-label="Close overlay"
+        class="fixed inset-0 z-40 lg:hidden"
+        style="background: rgba(0,0,0,0.45)"
+        (click)="closeOverlays()"
+      ></button>
+    }
+
+    <!-- ====== Root: 3-column fixed layout ====== -->
+    <div class="flex overflow-hidden" style="height: 100dvh; background: var(--page-bg)">
+
+      <!-- ====== LEFT SIDEBAR (desktop only) ====== -->
       <aside
-        class="hidden shrink-0 border-r border-[var(--xp-border)] bg-[var(--surface)]/92 backdrop-blur lg:flex lg:flex-col"
-        [class.w-64]="!sidebarCollapsed()"
-        [class.w-20]="sidebarCollapsed()"
+        class="hidden shrink-0 flex-col overflow-hidden lg:flex"
+        style="background: var(--sidebar-bg); border-right: 1px solid var(--border);"
+        [style.width]="sidebarCollapsed() ? '56px' : '220px'"
       >
-        <div class="flex items-center justify-between border-b border-[var(--xp-border)] px-3 py-3">
-          <div class="min-w-0">
-            <p class="truncate text-sm font-semibold">{{ sidebarCollapsed() ? 'LO' : 'LifeOS' }}</p>
-            @if (!sidebarCollapsed()) {
-              <p class="text-[11px] text-[var(--text-muted)]">Focused workspace</p>
-            }
-          </div>
-          <button type="button" class="input-field !min-h-9 !w-auto px-2 text-[11px]" (click)="toggleSidebar()">
-            {{ sidebarCollapsed() ? '>' : '<' }}
-          </button>
-        </div>
-        <div class="px-3 pb-2 pt-3">
+        <!-- Brand header -->
+        <div class="flex shrink-0 items-center justify-between"
+             style="padding: 0.625rem 0.625rem 0.625rem 0.875rem; border-bottom: 1px solid var(--border); min-height: 48px;">
           @if (!sidebarCollapsed()) {
-            <button type="button" class="input-field !min-h-10 !w-full text-left text-xs" (click)="openSearch()">
-              Search workspace
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold" style="color: var(--text)">LifeOS</p>
+              <p class="text-[11px]" style="color: var(--text-faint)">Focused workspace</p>
+            </div>
+          }
+          <button
+            type="button"
+            class="btn-ghost shrink-0 !px-2 !py-1 !min-h-auto text-xs"
+            style="font-size: 0.7rem; color: var(--text-muted)"
+            (click)="toggleSidebar()"
+            [title]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+          >
+            {{ sidebarCollapsed() ? '›' : '‹' }}
+          </button>
+        </div>
+
+        <!-- Search -->
+        @if (!sidebarCollapsed()) {
+          <div style="padding: 0.5rem 0.625rem 0.25rem">
+            <button
+              type="button"
+              class="input-field text-left text-xs w-full"
+              style="color: var(--text-faint); min-height: 28px"
+              (click)="openSearch()"
+            >
+              Search… <kbd style="opacity: 0.6; font-size: 10px">⌘K</kbd>
             </button>
-          }
-        </div>
-        <nav class="flex-1 overflow-y-auto px-2 pb-4 text-sm">
-          @for (group of navGroups; track group.label) {
-            <section class="mb-3">
-              @if (!sidebarCollapsed()) {
-                <p class="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                  {{ group.label }}
-                </p>
-              }
-              <div class="flex flex-col gap-0.5">
-                @for (item of group.items; track item.route) {
-                  <a
-                    [routerLink]="item.route"
-                    routerLinkActive="bg-[var(--xp-blue)] text-white shadow-sm"
-                    class="rounded-lg px-3 py-2 text-[13px] transition hover:bg-[var(--surface-3)]"
-                    [class.text-center]="sidebarCollapsed()"
-                  >
-                    {{ sidebarCollapsed() ? (item.shortLabel ?? item.label).slice(0, 2) : item.label }}
-                  </a>
-                }
-              </div>
-            </section>
-          }
-        </nav>
-        <div class="space-y-2 border-t border-[var(--xp-border)] p-3">
-          <button type="button" class="input-field !min-h-10 !w-full justify-center text-xs" (click)="cycleTheme()">
-            Theme: {{ theme.label() }}
-          </button>
-          @if (pwa.installAvailable()) {
-            <button type="button" class="btn-primary w-full text-xs" (click)="promptInstall()">Install app</button>
-          }
-          @if (pwa.updateAvailable()) {
-            <button type="button" class="btn-primary w-full text-xs" (click)="applyUpdate()">Update ready</button>
-          }
-          <button type="button" class="btn-primary w-full text-xs" (click)="onLogout()">Log out</button>
-        </div>
-      </aside>
-
-      <aside
-        class="fixed inset-y-0 left-0 z-50 flex w-[min(86vw,22rem)] -translate-x-full flex-col border-r border-[var(--xp-border)] bg-[var(--surface-2)] shadow-2xl transition-transform duration-200 lg:hidden"
-        [class.translate-x-0]="drawerOpen()"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Navigation menu"
-      >
-        <div class="flex items-center justify-between border-b border-[var(--xp-border)] px-4 py-3">
-          <div>
-            <p class="text-sm font-semibold">LifeOS</p>
-            <p class="text-xs text-[var(--text-muted)]">Compact navigation</p>
           </div>
-          <button type="button" class="input-field !min-h-9 !w-auto px-3 text-xs" (click)="closeDrawer()">Close</button>
-        </div>
-        <div class="px-3 py-3">
-          <button type="button" class="input-field !min-h-10 !w-full text-left text-xs" (click)="openSearch()">
-            Search everything
-          </button>
-        </div>
-        <nav class="flex-1 overflow-y-auto px-3 pb-4 text-sm">
-          @for (group of navGroups; track group.label) {
-            <section class="mb-4">
-              <p class="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                {{ group.label }}
-              </p>
-              <div class="grid grid-cols-2 gap-2">
-                @for (item of group.items; track item.route) {
-                  <a
-                    [routerLink]="item.route"
-                    routerLinkActive="bg-[var(--xp-blue)] text-white shadow-sm"
-                    class="rounded-lg border border-[var(--xp-border)] bg-[var(--surface)] px-3 py-2.5 text-xs transition hover:bg-[var(--surface-3)]"
-                    (click)="closeDrawer()"
-                  >
-                    {{ item.label }}
-                  </a>
-                }
-              </div>
-            </section>
-          }
-        </nav>
-        <div class="space-y-2 border-t border-[var(--xp-border)] p-3">
-          <button type="button" class="input-field !min-h-10 !w-full justify-center text-xs" (click)="cycleTheme()">
-            Theme: {{ theme.label() }}
-          </button>
-          @if (pwa.installAvailable()) {
-            <button type="button" class="btn-primary w-full text-xs" (click)="promptInstall()">Install app</button>
-          }
-          @if (pwa.updateAvailable()) {
-            <button type="button" class="btn-primary w-full text-xs" (click)="applyUpdate()">Update ready</button>
-          }
-          <button type="button" class="btn-primary w-full text-xs" (click)="onLogout()">Log out</button>
-        </div>
-      </aside>
+        }
 
-      <div class="flex min-w-0 flex-1 flex-col">
-        <header class="sticky top-0 z-30 border-b border-[var(--xp-border)] bg-[var(--surface)]/90 backdrop-blur">
-          <div class="safe-x flex items-center justify-between gap-3 px-4 py-2.5 lg:px-5">
-            <div class="flex min-w-0 items-center gap-2">
-              <button type="button" class="input-field !min-h-9 !w-auto px-3 text-xs lg:hidden" (click)="toggleDrawer()">
-                Menu
-              </button>
-              <div class="min-w-0">
-                <p class="truncate text-base font-semibold">{{ currentTitle() }}</p>
-                <p class="hidden text-xs text-[var(--text-muted)] md:block">Minimal command center</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              @if (syncLabel(); as label) {
-                <span class="hidden items-center gap-1 text-xs text-[var(--text-muted)] sm:flex">
-                  <span class="inline-block h-2.5 w-2.5 rounded-full" [class]="syncDotClass()"></span>
-                  {{ label }}
-                </span>
-              }
-              <button type="button" class="input-field !min-h-9 !w-auto px-3 text-xs" (click)="openSearch()">
-                Search <kbd class="hidden text-[10px] opacity-70 sm:inline">Ctrl+K</kbd>
-              </button>
-              <button type="button" class="input-field !min-h-9 !w-auto px-3 text-xs hidden sm:inline-flex" (click)="cycleTheme()">
-                {{ theme.label() }}
-              </button>
-              <button
-                type="button"
-                class="btn-primary hidden text-xs lg:inline-flex"
-                (click)="aiPanelOpen.set(!aiPanelOpen())"
+        <!-- Nav items -->
+        <nav class="flex-1 overflow-y-auto" style="padding: 0.375rem 0.375rem; min-height: 0">
+          @for (group of navGroups(); track group.category) {
+            @if (!sidebarCollapsed()) {
+              <p class="section-heading" style="padding: 0.5rem 0.5rem 0.25rem">{{ group.category }}</p>
+            }
+            @for (item of group.items; track item.id) {
+              <a
+                [routerLink]="item.route"
+                routerLinkActive="nav-item--active"
+                class="nav-item"
+                [class.nav-item--collapsed]="sidebarCollapsed()"
+                [title]="sidebarCollapsed() ? item.label : ''"
               >
-                {{ aiPanelOpen() ? 'Hide AI' : 'AI' }}
-              </button>
-              <button type="button" class="btn-primary text-xs lg:hidden" (click)="openMobileAi()">AI</button>
+                {{ sidebarCollapsed() ? (item.shortLabel ?? item.label).slice(0, 2) : item.label }}
+              </a>
+            }
+          }
+        </nav>
+
+        <!-- Sidebar footer -->
+        <div class="shrink-0" style="border-top: 1px solid var(--border); padding: 0.5rem 0.5rem">
+          @if (!sidebarCollapsed()) {
+            <button type="button" class="btn-ghost w-full text-xs justify-start" (click)="cycleTheme()">
+              {{ theme.label() }}
+            </button>
+            @if (pwa.installAvailable()) {
+              <button type="button" class="btn-primary w-full text-xs mt-1" (click)="promptInstall()">Install app</button>
+            }
+            @if (pwa.updateAvailable()) {
+              <button type="button" class="btn-primary w-full text-xs mt-1" (click)="applyUpdate()">Update ready</button>
+            }
+            <button type="button" class="btn-ghost w-full text-xs justify-start mt-1" style="color: var(--text-muted)" (click)="onLogout()">
+              Log out
+            </button>
+          } @else {
+            <button type="button" class="btn-ghost w-full !px-0 text-xs" title="Log out" (click)="onLogout()">✕</button>
+          }
+        </div>
+      </aside>
+
+      <!-- ====== CENTER COLUMN ====== -->
+      <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+
+        <!-- Sticky header bar -->
+        <header class="shrink-0 flex items-center justify-between gap-2"
+                style="padding: 0 1rem; min-height: 48px; background: var(--header-bg); border-bottom: 1px solid var(--border);">
+          <!-- Left: Mobile menu + title -->
+          <div class="flex items-center gap-2 min-w-0">
+            <button type="button" class="btn-ghost !px-2 lg:hidden" (click)="toggleDrawer()">☰</button>
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold" style="color: var(--text)">{{ currentTitle() }}</p>
             </div>
           </div>
-          @if (pwa.installAvailable() || pwa.updateAvailable()) {
-            <div class="safe-x flex flex-wrap items-center gap-2 border-t border-[var(--xp-border)] px-4 py-2 text-xs">
-              @if (pwa.installAvailable()) {
-                <button type="button" class="btn-primary text-xs" (click)="promptInstall()">Install app</button>
-              }
-              @if (pwa.updateAvailable()) {
-                <button type="button" class="btn-primary text-xs" (click)="applyUpdate()">Reload update</button>
-              }
-            </div>
-          }
+
+          <!-- Right: actions -->
+          <div class="flex items-center gap-1.5 shrink-0">
+            @if (syncLabel(); as label) {
+              <span class="hidden items-center gap-1 text-xs sm:flex" style="color: var(--text-muted)">
+                <span class="inline-block h-2 w-2 rounded-full" [style.background]="syncDotColor()"></span>
+                {{ label }}
+              </span>
+            }
+            <button type="button" class="btn-ghost !px-2 text-xs hidden sm:inline-flex" (click)="openSearch()">
+              Search <kbd style="font-size: 10px; opacity: 0.7; margin-left: 4px">⌘K</kbd>
+            </button>
+            <button type="button" class="btn-ghost !px-2 text-xs hidden sm:inline-flex" (click)="cycleTheme()" style="color: var(--text-muted)">
+              {{ theme.label() }}
+            </button>
+            <!-- Desktop AI toggle -->
+            <button
+              type="button"
+              class="btn-secondary text-xs hidden lg:inline-flex"
+              (click)="toggleAiPanel()"
+            >
+              {{ aiPanelOpen() ? 'Hide Assistant' : 'Assistant' }}
+            </button>
+            <!-- Mobile AI button -->
+            <button type="button" class="btn-primary !px-2 text-xs lg:hidden" (click)="openMobileAi()">AI</button>
+          </div>
         </header>
 
-        <div class="flex min-h-0 flex-1">
-          <main class="min-w-0 flex-1 overflow-auto px-4 py-4 pb-24 lg:px-6 lg:pb-6">
+        <!-- PWA banner -->
+        @if (pwa.installAvailable() || pwa.updateAvailable()) {
+          <div class="shrink-0 flex flex-wrap items-center gap-2 text-xs"
+               style="padding: 0.4rem 1rem; background: var(--surface-2); border-bottom: 1px solid var(--border)">
+            @if (pwa.installAvailable()) {
+              <button type="button" class="btn-primary text-xs" (click)="promptInstall()">Install app</button>
+            }
+            @if (pwa.updateAvailable()) {
+              <button type="button" class="btn-primary text-xs" (click)="applyUpdate()">Reload update</button>
+            }
+          </div>
+        }
+
+        <!-- Main content + AI panel row -->
+        <div class="flex flex-1 min-h-0 overflow-hidden">
+          <!-- Scrollable main content -->
+          <main class="flex-1 min-w-0 overflow-y-auto" style="padding: 1.25rem 1.5rem 5rem">
             <router-outlet />
           </main>
+
+          <!-- Right AI panel (desktop) -->
           @if (aiPanelOpen()) {
-            <aside class="hidden w-88 shrink-0 border-l border-[var(--xp-border)] bg-[var(--surface)]/70 p-3 lg:block">
+            <aside
+              class="hidden shrink-0 flex-col overflow-hidden lg:flex"
+              style="width: 320px; border-left: 1px solid var(--border); background: var(--surface)"
+            >
               <app-ai-chat-panel />
             </aside>
           }
         </div>
 
-        <nav class="safe-x safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-[var(--xp-border)] bg-[var(--xp-panel)] px-2 py-2 backdrop-blur lg:hidden">
-          <div class="grid grid-cols-5 gap-2">
-            @for (item of mobileNav; track item.route) {
+        <!-- Mobile bottom nav -->
+        <nav class="safe-x safe-bottom shrink-0 lg:hidden"
+             style="border-top: 1px solid var(--border); background: var(--sidebar-bg); padding: 0.375rem 0.5rem">
+          <div class="grid gap-1" [style.grid-template-columns]="'repeat(' + (mobileNav().length + 2) + ', 1fr)'">
+            @for (item of mobileNav(); track item.id) {
               <a
                 [routerLink]="item.route"
-                routerLinkActive="bg-[var(--xp-blue)] text-white"
-                class="rounded-xl px-2 py-2 text-center text-[11px] font-medium"
+                routerLinkActive="mobile-nav--active"
+                class="mobile-nav-item"
               >
                 {{ item.shortLabel ?? item.label }}
               </a>
             }
-            <button type="button" class="btn-primary !min-h-10 !w-full px-2 text-[11px]" (click)="openMobileAi()">AI</button>
-            <button type="button" class="input-field !min-h-10 !w-full px-2 text-[11px]" (click)="toggleDrawer()">More</button>
+            <a routerLink="/assistant" routerLinkActive="mobile-nav--active" class="mobile-nav-item no-underline">AI</a>
+            <button type="button" class="mobile-nav-item" (click)="toggleDrawer()">More</button>
           </div>
         </nav>
       </div>
     </div>
 
+    <!-- ====== MOBILE DRAWER ====== -->
+    <aside
+      class="fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden lg:hidden"
+      style="width: min(85vw, 300px); background: var(--sidebar-bg); border-right: 1px solid var(--border); box-shadow: var(--shadow-lg); transform: translateX(-100%); transition: transform 200ms ease;"
+      [style.transform]="drawerOpen() ? 'translateX(0)' : 'translateX(-100%)'"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Navigation menu"
+    >
+      <div class="flex shrink-0 items-center justify-between"
+           style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); min-height: 48px;">
+        <p class="text-sm font-semibold" style="color: var(--text)">LifeOS</p>
+        <button type="button" class="btn-ghost text-xs !px-2" (click)="closeDrawer()">✕ Close</button>
+      </div>
+      <div style="padding: 0.5rem 0.75rem 0.25rem">
+        <button type="button" class="input-field text-left text-xs w-full" style="color: var(--text-faint); min-height: 34px" (click)="openSearch()">
+          Search workspace
+        </button>
+      </div>
+      <nav class="flex-1 overflow-y-auto" style="padding: 0.375rem 0.5rem; min-height: 0">
+        @for (group of navGroups(); track group.category) {
+          <p class="section-heading" style="padding: 0.5rem 0.375rem 0.25rem">{{ group.category }}</p>
+          @for (item of group.items; track item.id) {
+            <a
+              [routerLink]="item.route"
+              routerLinkActive="nav-item--active"
+              class="nav-item"
+              (click)="closeDrawer()"
+            >
+              {{ item.label }}
+            </a>
+          }
+        }
+      </nav>
+      <div class="shrink-0" style="border-top: 1px solid var(--border); padding: 0.5rem 0.75rem">
+        <button type="button" class="btn-ghost w-full text-xs justify-start" (click)="cycleTheme()">{{ theme.label() }}</button>
+        <button type="button" class="btn-ghost w-full text-xs justify-start mt-1" style="color: var(--text-muted)" (click)="onLogout()">Log out</button>
+      </div>
+    </aside>
+
+    <!-- ====== MOBILE AI BOTTOM SHEET ====== -->
     @if (mobileAiOpen()) {
       <section
-        class="safe-bottom fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] rounded-t-3xl border border-b-0 border-[var(--xp-border)] bg-[var(--surface)] p-3 shadow-2xl lg:hidden"
+        class="safe-bottom fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden lg:hidden"
+        style="max-height: 82dvh; background: var(--surface); border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0; box-shadow: var(--shadow-lg)"
         role="dialog"
         aria-modal="true"
         aria-label="AI assistant"
       >
-        <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--xp-border)]"></div>
-        <div class="mb-2 flex items-center justify-between">
-          <div>
-            <p class="text-sm font-semibold">AI Assistant</p>
-            <p class="text-xs text-[var(--text-muted)]">Ask without leaving this screen</p>
-          </div>
-          <button type="button" class="input-field !min-h-9 !w-auto px-3 text-xs" (click)="closeMobileAi()">Close</button>
+        <div class="shrink-0 flex items-center justify-between"
+             style="padding: 0.625rem 0.875rem; border-bottom: 1px solid var(--border)">
+          <p class="text-sm font-medium" style="color: var(--text)">Assistant</p>
+          <button type="button" class="btn-ghost text-xs !px-2" (click)="closeMobileAi()">✕</button>
         </div>
-        <div class="h-[min(68dvh,34rem)] min-h-0">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;">
           <app-ai-chat-panel />
         </div>
       </section>
     }
+
+    <!-- Nav item + mobile nav styles -->
+    <style>
+      .nav-item {
+        display: flex;
+        align-items: center;
+        padding: 0.375rem 0.625rem;
+        border-radius: 4px;
+        font-size: 0.8125rem;
+        color: var(--text);
+        text-decoration: none;
+        transition: background 100ms ease, color 100ms ease;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 1px;
+        font-weight: 400;
+      }
+      .nav-item:hover {
+        background: var(--sidebar-hover-bg);
+      }
+      .nav-item--active {
+        background: var(--sidebar-active-bg) !important;
+        color: var(--sidebar-active-text) !important;
+        font-weight: 500;
+      }
+      .nav-item--collapsed {
+        justify-content: center;
+        padding: 0.375rem 0;
+      }
+      .mobile-nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.375rem 0.25rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-decoration: none;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: background 100ms ease, color 100ms ease;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mobile-nav-item:hover {
+        background: var(--surface-3);
+        color: var(--text);
+      }
+      .mobile-nav--active {
+        background: var(--primary-soft) !important;
+        color: var(--primary) !important;
+        font-weight: 600;
+      }
+    </style>
   `,
 })
-export class AppShellComponent implements OnInit {
+export class AppShellComponent implements OnInit, OnDestroy {
   private readonly document = inject(DOCUMENT);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly palette = inject(CommandPaletteService);
+  private readonly navPrefs = inject(NavPreferencesService);
   readonly sync = inject(SyncService);
   readonly theme = inject(ThemeService);
   readonly pwa = inject(PwaService);
 
-  readonly navGroups = navGroups;
-  readonly mobileNav = primaryMobileNav;
-  readonly aiPanelOpen = signal(true);
+  readonly pinnedNav = this.navPrefs.pinnedDestinations;
+  readonly mobileNav = computed(() => this.pinnedNav().slice(0, 3));
+
+  readonly navGroups = computed(() => {
+    const items = this.pinnedNav();
+    const groups: Record<string, typeof items> = {};
+    for (const item of items) {
+      const cat = item.category ?? 'Other';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    }
+    return Object.entries(groups).map(([category, items]) => ({ category, items }));
+  });
+
+  readonly aiPanelOpen = signal(this.readStorage(STORAGE_AI_OPEN, true));
   readonly mobileAiOpen = signal(false);
   readonly drawerOpen = signal(false);
-  readonly sidebarCollapsed = signal(false);
+  readonly sidebarCollapsed = signal(this.readStorage(STORAGE_COLLAPSED, false));
   readonly currentTitle = signal('Dashboard');
 
   ngOnInit(): void {
@@ -276,19 +378,23 @@ export class AppShellComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.document.body.style.overflow = '';
+  }
+
   syncLabel(): string | null {
     const status = this.sync.status();
     if (status === 'offline') return 'Offline';
     const pending = this.sync.pendingCount();
     if (pending > 0) return `${pending} pending`;
-    return status === 'syncing' ? 'Syncing' : 'Synced';
+    return status === 'syncing' ? 'Syncing…' : null;
   }
 
-  syncDotClass(): string {
+  syncDotColor(): string {
     const status = this.sync.status();
-    if (status === 'syncing') return 'bg-orange-500';
-    if (status === 'offline') return 'bg-gray-500';
-    return 'bg-green-600';
+    if (status === 'syncing') return 'var(--warning)';
+    if (status === 'offline') return 'var(--text-faint)';
+    return 'var(--success)';
   }
 
   openSearch(): void {
@@ -326,7 +432,15 @@ export class AppShellComponent implements OnInit {
   }
 
   toggleSidebar(): void {
-    this.sidebarCollapsed.set(!this.sidebarCollapsed());
+    const next = !this.sidebarCollapsed();
+    this.sidebarCollapsed.set(next);
+    localStorage.setItem(STORAGE_COLLAPSED, String(next));
+  }
+
+  toggleAiPanel(): void {
+    const next = !this.aiPanelOpen();
+    this.aiPanelOpen.set(next);
+    localStorage.setItem(STORAGE_AI_OPEN, String(next));
   }
 
   cycleTheme(): void {
@@ -346,13 +460,19 @@ export class AppShellComponent implements OnInit {
   }
 
   private updateRoute(url: string): void {
-    const match = [...navGroups.flatMap((group) => group.items), { label: 'Offline', route: '/offline' }].find(
-      (item) => url === item.route || url.startsWith(`${item.route}/`),
-    );
-    this.currentTitle.set(match?.label ?? 'LifeOS');
+    this.currentTitle.set(resolvePageTitle(url));
   }
 
   private updateBodyScrollLock(): void {
     this.document.body.style.overflow = this.drawerOpen() || this.mobileAiOpen() ? 'hidden' : '';
+  }
+
+  private readStorage(key: string, defaultValue: boolean): boolean {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored === null ? defaultValue : stored === 'true';
+    } catch {
+      return defaultValue;
+    }
   }
 }

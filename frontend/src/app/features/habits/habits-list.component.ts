@@ -24,16 +24,16 @@ import { HabitsService } from './services/habits.service';
       </form>
 
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading habits…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading habits…</p>
       } @else if (habits.length === 0) {
         <div class="panel">
-          <p class="text-sm text-gray-600">No habits yet.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No habits yet.</p>
           <a routerLink="/habits/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create habit</a>
         </div>
       } @else {
         <div class="panel !p-0 overflow-hidden">
           <table class="w-full text-sm">
-            <thead class="border-b border-[var(--xp-border)] bg-[#e8e8e8] text-left">
+            <thead class="border-b border-[var(--xp-border)] bg-[var(--surface-2)] text-left">
               <tr>
                 <th class="px-3 py-2 w-10">Today</th>
                 <th class="px-3 py-2">Name</th>
@@ -45,7 +45,7 @@ import { HabitsService } from './services/habits.service';
             </thead>
             <tbody>
               @for (habit of habits; track habit.id) {
-                <tr class="border-b border-[var(--xp-border)] hover:bg-[#d6e4f7]">
+                <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--surface-2)]">
                   <td class="px-3 py-2">
                     <input
                       type="checkbox"
@@ -54,7 +54,7 @@ import { HabitsService } from './services/habits.service';
                     />
                   </td>
                   <td class="px-3 py-2">
-                    <a [routerLink]="['/habits', habit.id]" class="text-[var(--xp-blue)] underline">{{ habit.name }}</a>
+                    <a [routerLink]="['/habits', habit.id]" class="link">{{ habit.name }}</a>
                   </td>
                   <td class="px-3 py-2 capitalize">{{ habit.frequency }}</td>
                   <td class="px-3 py-2">{{ habit.streak }}</td>

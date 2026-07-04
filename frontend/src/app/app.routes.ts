@@ -13,11 +13,6 @@ export const routes: Routes = [
     canActivate: [guestGuard],
   },
   {
-    path: 'register',
-    loadComponent: () => import('./features/auth/register.component').then((m) => m.RegisterComponent),
-    canActivate: [guestGuard],
-  },
-  {
     path: '',
     loadComponent: () =>
       import('./shared/layout/app-shell.component').then((m) => m.AppShellComponent),
@@ -32,7 +27,10 @@ export const routes: Routes = [
       {
         path: 'profile',
         loadComponent: () =>
-          import('./features/profile/profile.component').then((m) => m.ProfileComponent),
+          import('./features/settings/settings-fragment-redirect.component').then(
+            (m) => m.SettingsFragmentRedirectComponent,
+          ),
+        data: { fragment: 'profile' },
       },
       {
         path: 'goals',
@@ -93,6 +91,21 @@ export const routes: Routes = [
         path: 'habits/:id',
         loadComponent: () =>
           import('./features/habits/habit-detail.component').then((m) => m.HabitDetailComponent),
+      },
+      {
+        path: 'running/races/new',
+        loadComponent: () =>
+          import('./features/running/race-event-form.component').then((m) => m.RaceEventFormComponent),
+      },
+      {
+        path: 'running/races/:id/edit',
+        loadComponent: () =>
+          import('./features/running/race-event-form.component').then((m) => m.RaceEventFormComponent),
+      },
+      {
+        path: 'running/races/:id',
+        loadComponent: () =>
+          import('./features/running/race-event-detail.component').then((m) => m.RaceEventDetailComponent),
       },
       {
         path: 'running',
@@ -260,12 +273,30 @@ export const routes: Routes = [
       {
         path: 'export',
         loadComponent: () =>
-          import('./features/export/export-page.component').then((m) => m.ExportPageComponent),
+          import('./features/settings/settings-fragment-redirect.component').then(
+            (m) => m.SettingsFragmentRedirectComponent,
+          ),
+        data: { fragment: 'export' },
+      },
+      {
+        path: 'settings',
+        loadComponent: () =>
+          import('./features/settings/settings-hub.component').then((m) => m.SettingsHubComponent),
+      },
+      {
+        path: 'assistant',
+        loadComponent: () =>
+          import('./features/assistant/assistant-page.component').then((m) => m.AssistantPageComponent),
       },
       {
         path: 'files',
+        redirectTo: 'documents?tab=library',
+        pathMatch: 'full',
+      },
+      {
+        path: 'documents',
         loadComponent: () =>
-          import('./features/files/files-page.component').then((m) => m.FilesPageComponent),
+          import('./features/documents/documents-hub.component').then((m) => m.DocumentsHubComponent),
       },
       {
         path: 'learning',
@@ -294,18 +325,23 @@ export const routes: Routes = [
       },
       {
         path: 'analytics',
+        redirectTo: 'insights',
+        pathMatch: 'full',
+      },
+      {
+        path: 'insights',
         loadComponent: () =>
-          import('./features/analytics/analytics-page.component').then((m) => m.AnalyticsPageComponent),
+          import('./features/insights/insights-hub.component').then((m) => m.InsightsHubComponent),
       },
       {
         path: 'timeline',
         loadComponent: () =>
-          import('./features/timeline/timeline-page.component').then((m) => m.TimelinePageComponent),
+          import('./features/timeline/timeline-hub.component').then((m) => m.TimelineHubComponent),
       },
       {
         path: 'reports',
-        loadComponent: () =>
-          import('./features/reports/reports-page.component').then((m) => m.ReportsPageComponent),
+        redirectTo: 'insights?tab=reports',
+        pathMatch: 'full',
       },
       {
         path: 'memory',
@@ -319,8 +355,8 @@ export const routes: Routes = [
       },
       {
         path: 'ocr',
-        loadComponent: () =>
-          import('./features/ocr/ocr-page.component').then((m) => m.OcrPageComponent),
+        redirectTo: 'documents?tab=scan',
+        pathMatch: 'full',
       },
       {
         path: 'voice',
@@ -339,13 +375,13 @@ export const routes: Routes = [
       },
       {
         path: 'predictions',
-        loadComponent: () =>
-          import('./features/predictions/predictions-page.component').then((m) => m.PredictionsPageComponent),
+        redirectTo: 'insights?tab=predictions',
+        pathMatch: 'full',
       },
       {
         path: 'life-timeline',
-        loadComponent: () =>
-          import('./features/life-timeline/life-timeline-page.component').then((m) => m.LifeTimelinePageComponent),
+        redirectTo: 'timeline?tab=milestones',
+        pathMatch: 'full',
       },
     ],
   },

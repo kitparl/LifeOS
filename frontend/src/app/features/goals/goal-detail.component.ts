@@ -35,7 +35,7 @@ import { GoalsService } from './services/goals.service';
               </div>
               <p>{{ g.progress }}% complete</p>
               @if (g.target_date) {
-                <p class="text-xs text-gray-600">Target: {{ g.target_date | date: 'mediumDate' }}</p>
+                <p class="text-xs" style="color: var(--text-muted)">Target: {{ g.target_date | date: 'mediumDate' }}</p>
               }
             </div>
           </div>
@@ -67,7 +67,7 @@ import { GoalsService } from './services/goals.service';
               <button type="submit" class="btn-primary text-xs" [disabled]="milestoneForm.invalid">Add</button>
             </form>
             @if (g.milestones.length === 0) {
-              <p class="text-sm text-gray-600">No milestones yet. Add one to track progress.</p>
+              <p class="text-sm" style="color: var(--text-muted)">No milestones yet. Add one to track progress.</p>
             } @else {
               <ul class="divide-y divide-[var(--xp-border)] text-sm">
                 @for (m of g.milestones; track m.id) {
@@ -80,7 +80,7 @@ import { GoalsService } from './services/goals.service';
                       />
                       <span [class.line-through]="m.completed">{{ m.title }}</span>
                     </label>
-                    <button type="button" class="text-xs text-red-700" (click)="deleteMilestone(m.id)">Remove</button>
+                    <button type="button" class="text-xs" style="color: var(--danger)" (click)="deleteMilestone(m.id)">Remove</button>
                   </li>
                 }
               </ul>

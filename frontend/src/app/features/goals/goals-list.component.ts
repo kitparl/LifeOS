@@ -34,10 +34,10 @@ import { GoalsService } from './services/goals.service';
       </form>
 
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading goals…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading goals…</p>
       } @else if (goals.length === 0) {
         <div class="panel">
-          <p class="text-sm text-gray-600">No goals yet.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No goals yet.</p>
           <a routerLink="/goals/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create your first goal</a>
         </div>
       } @else {
@@ -82,7 +82,7 @@ import { GoalsService } from './services/goals.service';
               @for (goal of pagedGoals; track goal.id) {
                 <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
                   <td class="px-3 py-2">
-                    <a [routerLink]="['/goals', goal.id]" class="text-[var(--xp-blue)] underline">{{ goal.title }}</a>
+                    <a [routerLink]="['/goals', goal.id]" class="link">{{ goal.title }}</a>
                   </td>
                   <td class="px-3 py-2 capitalize">{{ goal.category }}</td>
                   <td class="px-3 py-2">

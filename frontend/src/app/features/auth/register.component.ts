@@ -38,7 +38,7 @@ import { AuthService } from '../../core/services/auth.service';
         </form>
         <p class="mt-4 text-center text-sm">
           Already have an account?
-          <a routerLink="/login" class="text-[var(--xp-blue)] underline">Log in</a>
+          <a routerLink="/login" class="link">Log in</a>
         </p>
       </div>
     </div>

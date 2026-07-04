@@ -24,3 +24,8 @@ class UserResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=120)
     timezone: str | None = Field(default=None, min_length=1, max_length=64)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)

@@ -19,7 +19,7 @@ import { PredictionItem, PredictionsService } from './services/predictions.servi
           }
         </div>
       } @else {
-        <p class="text-sm text-gray-600">Loading predictions…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading predictions…</p>
       }
     </div>
   `,

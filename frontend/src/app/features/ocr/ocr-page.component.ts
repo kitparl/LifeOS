@@ -37,7 +37,7 @@ import { OcrDocument, OcrService } from './services/ocr.service';
           <li class="px-3 py-2">
             <div class="flex justify-between gap-2">
               <span class="font-medium">{{ doc.filename }} <span class="text-xs text-gray-500">({{ doc.doc_type }})</span></span>
-              <button type="button" class="text-xs text-red-700" (click)="remove(doc.id)">Delete</button>
+              <button type="button" class="text-xs" style="color: var(--danger)" (click)="remove(doc.id)">Delete</button>
             </div>
             <p class="mt-1 text-gray-700 whitespace-pre-wrap">{{ doc.extracted_text }}</p>
           </li>

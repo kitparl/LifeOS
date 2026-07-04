@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SearchService } from '../../features/search/services/search.service';
+import { NAV_DESTINATIONS } from '../layout/nav-registry';
 import { CommandPaletteItem } from './command-palette.models';
 import { CommandPaletteService } from './command-palette.service';
 
@@ -39,19 +40,20 @@ import { CommandPaletteService } from './command-palette.service';
               <li>
                 <button
                   type="button"
-                  class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-[#d6e4f7]"
-                  [class.bg-[#d6e4f7]]="i === palette.activeIndex()"
+                  class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                  style="transition: background 100ms ease"
+                  [style.background]="i === palette.activeIndex() ? 'var(--primary-soft)' : 'transparent'"
                   [class.opacity-50]="item.disabled"
                   [disabled]="item.disabled"
                   (click)="run(item)"
                   (mouseenter)="palette.activeIndex.set(i)"
                 >
                   <span>{{ item.label }}</span>
-                  <span class="text-xs text-gray-500">{{ item.hint ?? item.group }}</span>
+              <span class="text-xs" style="color: var(--text-muted)">{{ item.hint ?? item.group }}</span>
                 </button>
               </li>
             } @empty {
-              <li class="px-3 py-4 text-center text-gray-500">No matches</li>
+              <li class="px-3 py-4 text-center" style="color: var(--text-muted)">No matches</li>
             }
           </ul>
         </div>
@@ -85,45 +87,31 @@ export class CommandPaletteComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    const navigationItems: CommandPaletteItem[] = NAV_DESTINATIONS.filter(d => !d.hidden).map((d) => ({
+      id: d.id,
+      label: d.label,
+      group: d.category ?? 'Navigation',
+      route: d.route,
+    }));
+
     this.palette.registerItems([
-      { id: 'dashboard', label: 'Go to Dashboard', group: 'Navigation', route: '/dashboard' },
-      { id: 'profile', label: 'Go to Profile', group: 'Navigation', route: '/profile' },
+      ...navigationItems,
+      { id: 'settings-profile', label: 'Settings: Profile', group: 'Settings', route: '/settings#profile' },
+      { id: 'settings-export', label: 'Settings: Export', group: 'Settings', route: '/settings#export' },
+      { id: 'settings-sidebar', label: 'Settings: Sidebar', group: 'Settings', route: '/settings#sidebar' },
+      { id: 'insights-reports', label: 'Insights: Reports', group: 'Insights', route: '/insights?tab=reports' },
+      { id: 'insights-predictions', label: 'Insights: Predictions', group: 'Insights', route: '/insights?tab=predictions' },
+      { id: 'timeline-milestones', label: 'Timeline: Milestones', group: 'Timeline', route: '/timeline?tab=milestones' },
+      { id: 'documents-library', label: 'Documents: Library', group: 'Documents', route: '/documents?tab=library' },
+      { id: 'documents-scan', label: 'Documents: Scan / OCR', group: 'Documents', route: '/documents?tab=scan' },
       { id: 'logout', label: 'Log out', group: 'Actions', action: () => this.auth.logout().subscribe() },
-      { id: 'goals', label: 'Goals', group: 'Modules', route: '/goals' },
-      { id: 'tasks', label: 'Tasks', group: 'Modules', route: '/tasks' },
-      { id: 'habits', label: 'Habits', group: 'Modules', route: '/habits' },
       { id: 'new-habit', label: 'New Habit', group: 'Actions', route: '/habits/new' },
-      { id: 'running', label: 'Running', group: 'Modules', route: '/running' },
       { id: 'log-run', label: 'Log Run', group: 'Actions', route: '/running/new' },
-      { id: 'calendar', label: 'Calendar', group: 'Modules', route: '/calendar' },
-      { id: 'journal', label: 'Journal', group: 'Modules', route: '/journal' },
-      { id: 'mood', label: 'Mood', group: 'Modules', route: '/mood' },
       { id: 'new-event', label: 'New Event', group: 'Actions', route: '/calendar/new' },
       { id: 'new-journal', label: 'New Journal', group: 'Actions', route: '/journal/new' },
-      { id: 'communication', label: 'Communication', group: 'Modules', route: '/communication' },
-      { id: 'qa', label: 'Personal Q&A', group: 'Modules', route: '/qa' },
-      { id: 'wishlist', label: 'Wishlist', group: 'Modules', route: '/wishlist' },
       { id: 'add-word', label: 'Add Word', group: 'Actions', route: '/communication/vocabulary/new' },
       { id: 'add-qa', label: 'New Q&A', group: 'Actions', route: '/qa/new' },
       { id: 'add-wishlist', label: 'New Wishlist', group: 'Actions', route: '/wishlist/new' },
-      { id: 'search-page', label: 'Search', group: 'Tools', route: '/search' },
-      { id: 'notifications', label: 'Notifications', group: 'Tools', route: '/notifications' },
-      { id: 'export', label: 'Export Data', group: 'Tools', route: '/export' },
-      { id: 'files', label: 'Files', group: 'Tools', route: '/files' },
-      { id: 'learning', label: 'Learning', group: 'Phase 2', route: '/learning' },
-      { id: 'career', label: 'Career', group: 'Phase 2', route: '/career' },
-      { id: 'finance', label: 'Finance', group: 'Phase 2', route: '/finance' },
-      { id: 'analytics', label: 'Analytics', group: 'Phase 2', route: '/analytics' },
-      { id: 'timeline', label: 'Timeline', group: 'Phase 2', route: '/timeline' },
-      { id: 'reports', label: 'Reports', group: 'Phase 2', route: '/reports' },
-      { id: 'memory', label: 'AI Memory', group: 'Phase 3', route: '/memory' },
-      { id: 'coaches', label: 'AI Coaches', group: 'Phase 3', route: '/coaches' },
-      { id: 'ocr', label: 'OCR', group: 'Phase 3', route: '/ocr' },
-      { id: 'voice', label: 'Voice', group: 'Phase 3', route: '/voice' },
-      { id: 'integrations', label: 'Integrations', group: 'Phase 3', route: '/integrations' },
-      { id: 'automations', label: 'Automations', group: 'Phase 3', route: '/automations' },
-      { id: 'predictions', label: 'Predictions', group: 'Phase 3', route: '/predictions' },
-      { id: 'life-timeline', label: 'Life Timeline', group: 'Phase 3', route: '/life-timeline' },
     ]);
   }
 

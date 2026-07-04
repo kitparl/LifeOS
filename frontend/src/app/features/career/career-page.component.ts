@@ -33,7 +33,7 @@ import { CareerService } from './services/career.service';
             @for (p of projects; track p['id']) {
               <li class="flex justify-between gap-2 px-3 py-2">
                 <span>{{ p['name'] }}</span>
-                <button type="button" class="text-xs text-red-700" (click)="removeProject($any(p).id)">Delete</button>
+                <button type="button" class="text-xs" style="color: var(--danger)" (click)="removeProject($any(p).id)">Delete</button>
               </li>
             }
           </ul>
@@ -56,7 +56,7 @@ import { CareerService } from './services/career.service';
             @for (a of applications; track a['id']) {
               <li class="flex justify-between gap-2 px-3 py-2">
                 <span>{{ a['company'] }} — {{ a['role'] }} <span class="text-gray-500">({{ a['status'] }})</span></span>
-                <button type="button" class="text-xs text-red-700" (click)="removeApplication($any(a).id)">Delete</button>
+                <button type="button" class="text-xs" style="color: var(--danger)" (click)="removeApplication($any(a).id)">Delete</button>
               </li>
             }
           </ul>
@@ -64,7 +64,7 @@ import { CareerService } from './services/career.service';
       </div>
 
       @if (analytics) {
-        <p class="text-sm text-gray-600">
+        <p class="text-sm" style="color: var(--text-muted)">
           {{ analytics['total_projects'] }} projects · {{ analytics['total_applications'] }} applications
         </p>
       }

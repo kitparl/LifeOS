@@ -26,16 +26,16 @@ import { CalendarService } from './services/calendar.service';
       </form>
 
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading events…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading events…</p>
       } @else if (events.length === 0) {
         <div class="panel">
-          <p class="text-sm text-gray-600">No events scheduled.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No events scheduled.</p>
           <a routerLink="/calendar/new" class="btn-primary mt-2 inline-block text-xs no-underline">Add event</a>
         </div>
       } @else {
         <div class="panel !p-0 overflow-hidden">
           <table class="w-full text-sm">
-            <thead class="border-b border-[var(--xp-border)] bg-[#e8e8e8] text-left">
+            <thead class="border-b border-[var(--xp-border)] bg-[var(--surface-2)] text-left">
               <tr>
                 <th class="px-3 py-2">When</th>
                 <th class="px-3 py-2">Title</th>
@@ -46,12 +46,12 @@ import { CalendarService } from './services/calendar.service';
             </thead>
             <tbody>
               @for (event of events; track event.id) {
-                <tr class="border-b border-[var(--xp-border)] hover:bg-[#d6e4f7]">
+                <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--surface-2)]">
                   <td class="px-3 py-2 text-xs">
                     {{ event.starts_at | date: (event.all_day ? 'mediumDate' : 'medium') }}
                   </td>
                   <td class="px-3 py-2">
-                    <a [routerLink]="['/calendar', event.id]" class="text-[var(--xp-blue)] underline">{{ event.title }}</a>
+                    <a [routerLink]="['/calendar', event.id]" class="link">{{ event.title }}</a>
                   </td>
                   <td class="px-3 py-2 capitalize">{{ event.category }}</td>
                   <td class="px-3 py-2 capitalize">{{ event.recurrence === 'none' ? '—' : event.recurrence }}</td>

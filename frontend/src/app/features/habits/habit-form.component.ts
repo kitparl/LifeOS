@@ -36,13 +36,13 @@ import { HabitsService } from './services/habits.service';
             </label>
           }
           @if (error) {
-            <p class="text-xs text-red-700">{{ error }}</p>
+            <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
           }
           <div class="flex gap-2">
             <button type="submit" class="btn-primary" [disabled]="form.invalid || saving">
               {{ saving ? 'Saving…' : 'Save' }}
             </button>
-            <a routerLink="/habits" class="input-field !w-auto inline-flex items-center no-underline text-gray-700">Cancel</a>
+            <a routerLink="/habits" class="btn-secondary no-underline">Cancel</a>
           </div>
         </form>
       </div>

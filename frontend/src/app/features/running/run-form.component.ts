@@ -9,53 +9,65 @@ import { RunningService } from './services/running.service';
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink],
   template: `
-    <div class="max-w-lg">
+    <div style="max-width: 520px">
       <div class="panel !p-0 overflow-hidden">
-        <div class="title-bar rounded-none border-x-0 border-t-0">{{ isEdit ? 'Edit Run' : 'Log Run' }}</div>
+        <div class="title-bar">{{ isEdit ? 'Edit Run' : 'Log Run' }}</div>
         <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
-          <div>
-            <label class="mb-1 block">Date</label>
-            <input class="input-field" type="date" formControlName="run_date" />
-          </div>
-          <div>
-            <label class="mb-1 block">Distance (km)</label>
-            <input class="input-field" type="number" step="0.01" min="0.1" formControlName="distance_km" />
-          </div>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="mb-1 block">Hours</label>
-              <input class="input-field" type="number" min="0" formControlName="hours" />
+              <label class="form-label" for="run_date">Date</label>
+              <input id="run_date" class="input-field mt-1" type="date" formControlName="run_date" />
             </div>
             <div>
-              <label class="mb-1 block">Minutes</label>
-              <input class="input-field" type="number" min="0" max="59" formControlName="minutes" />
+              <label class="form-label" for="distance_km">Distance (km)</label>
+              <input id="distance_km" class="input-field mt-1" type="number" step="0.01" min="0.1" formControlName="distance_km" />
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label">Duration (h / min / sec)</label>
+            <div class="grid grid-cols-3 gap-2 mt-1">
+              <div>
+                <input class="input-field" type="number" min="0" formControlName="hours" placeholder="0h" />
+              </div>
+              <div>
+                <input class="input-field" type="number" min="0" max="59" formControlName="minutes" placeholder="min" />
+              </div>
+              <div>
+                <input class="input-field" type="number" min="0" max="59" formControlName="seconds" placeholder="sec" />
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="weather">Weather</label>
+              <select id="weather" class="input-field mt-1" formControlName="weather">
+                <option value="">—</option>
+                @for (w of weatherOptions; track w) {
+                  <option [value]="w">{{ w }}</option>
+                }
+              </select>
             </div>
             <div>
-              <label class="mb-1 block">Seconds</label>
-              <input class="input-field" type="number" min="0" max="59" formControlName="seconds" />
+              <label class="form-label" for="location">Location</label>
+              <input id="location" class="input-field mt-1" formControlName="location" placeholder="City, park, trail…" />
             </div>
           </div>
+
           <div>
-            <label class="mb-1 block">Weather</label>
-            <select class="input-field" formControlName="weather">
-              <option value="">—</option>
-              @for (w of weatherOptions; track w) {
-                <option [value]="w">{{ w }}</option>
-              }
-            </select>
+            <label class="form-label" for="notes">Notes</label>
+            <textarea id="notes" class="input-field mt-1" style="min-height: 72px; resize: vertical" formControlName="notes" placeholder="How did it feel?"></textarea>
           </div>
-          <div>
-            <label class="mb-1 block">Notes</label>
-            <textarea class="input-field min-h-[80px]" formControlName="notes"></textarea>
-          </div>
+
           @if (error) {
-            <p class="text-xs text-red-700">{{ error }}</p>
+            <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
           }
           <div class="flex gap-2">
             <button type="submit" class="btn-primary" [disabled]="form.invalid || saving">
-              {{ saving ? 'Saving…' : 'Save' }}
+              {{ saving ? 'Saving…' : 'Save Run' }}
             </button>
-            <a routerLink="/running" class="input-field !w-auto inline-flex items-center no-underline text-gray-700">Cancel</a>
+            <a routerLink="/running" class="btn-secondary no-underline">Cancel</a>
           </div>
         </form>
       </div>
@@ -81,6 +93,7 @@ export class RunFormComponent implements OnInit {
     minutes: [25, [Validators.min(0)]],
     seconds: [0, [Validators.min(0), Validators.max(59)]],
     weather: [''],
+    location: [''],
     notes: [''],
   });
 
@@ -100,6 +113,7 @@ export class RunFormComponent implements OnInit {
             minutes: parts.minutes,
             seconds: parts.seconds,
             weather: run.weather ?? '',
+            location: run.location ?? '',
             notes: run.notes ?? '',
           });
         },
@@ -123,6 +137,7 @@ export class RunFormComponent implements OnInit {
       distance_km: raw.distance_km,
       duration_seconds,
       weather: raw.weather || null,
+      location: raw.location || null,
       notes: raw.notes || null,
     };
 

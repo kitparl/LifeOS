@@ -5,6 +5,7 @@ import { environment } from '../../../../environments/environment';
 import {
   RaceCreate,
   RaceEvent,
+  RaceUpdate,
   Run,
   RunCreate,
   RunListItem,
@@ -43,8 +44,16 @@ export class RunningService {
     return this.http.get<RaceEvent[]>(`${this.api}/races`, { params });
   }
 
+  getRace(id: string): Observable<RaceEvent> {
+    return this.http.get<RaceEvent>(`${this.api}/races/${id}`);
+  }
+
   createRace(data: RaceCreate): Observable<RaceEvent> {
     return this.http.post<RaceEvent>(`${this.api}/races`, data);
+  }
+
+  updateRace(id: string, data: RaceUpdate): Observable<RaceEvent> {
+    return this.http.patch<RaceEvent>(`${this.api}/races/${id}`, data);
   }
 
   deleteRace(id: string): Observable<void> {

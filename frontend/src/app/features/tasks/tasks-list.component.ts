@@ -42,10 +42,10 @@ import { TasksService } from './services/tasks.service';
       </form>
 
       @if (loading) {
-        <p class="text-sm text-gray-600">Loading tasks…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Loading tasks…</p>
       } @else if (tasks.length === 0) {
         <div class="panel">
-          <p class="text-sm text-gray-600">No tasks found.</p>
+          <p class="text-sm" style="color: var(--text-muted)">No tasks found.</p>
           <a routerLink="/tasks/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create task</a>
         </div>
       } @else {
@@ -100,7 +100,7 @@ import { TasksService } from './services/tasks.service';
               @for (task of pagedTasks; track task.id) {
                 <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
                   <td class="px-3 py-2">
-                    <a [routerLink]="['/tasks', task.id]" class="text-[var(--xp-blue)] underline">{{ task.title }}</a>
+                    <a [routerLink]="['/tasks', task.id]" class="link">{{ task.title }}</a>
                   </td>
                   <td class="px-3 py-2 capitalize">{{ task.priority }}</td>
                   <td class="px-3 py-2 capitalize">{{ task.status.replace('_', ' ') }}</td>

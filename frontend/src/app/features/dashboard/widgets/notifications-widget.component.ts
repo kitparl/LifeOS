@@ -18,13 +18,13 @@ import { WidgetSkeletonComponent } from './widget-skeleton.component';
       @if (loading) {
         <app-widget-skeleton />
       } @else if (notifications.length === 0) {
-        <p class="p-3 text-sm text-gray-600">All caught up</p>
+        <p class="p-3 text-sm" style="color: var(--text-muted)">All caught up</p>
       } @else {
         <ul class="divide-y divide-[var(--xp-border)] text-sm">
           @for (n of notifications; track n.id) {
             <li class="px-3 py-2" [class.opacity-60]="n.is_read">
               @if (n.route) {
-                <a [routerLink]="n.route" class="text-[var(--xp-blue)] underline">{{ n.message }}</a>
+                <a [routerLink]="n.route" class="link">{{ n.message }}</a>
               } @else {
                 <p>{{ n.message }}</p>
               }

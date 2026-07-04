@@ -18,9 +18,9 @@ import { WidgetSkeletonComponent } from './widget-skeleton.component';
       @if (loading) {
         <app-widget-skeleton />
       } @else if (habits.length === 0) {
-        <p class="p-3 text-sm text-gray-600">
+        <p class="p-3 text-sm" style="color: var(--text-muted)">
           No habits tracked yet.
-          <a routerLink="/habits/new" class="text-[var(--xp-blue)] underline">Add one</a>
+          <a routerLink="/habits/new" class="link">Add one</a>
         </p>
       } @else {
         <ul class="divide-y divide-[var(--xp-border)] text-sm">

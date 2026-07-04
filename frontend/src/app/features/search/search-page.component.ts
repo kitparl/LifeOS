@@ -21,15 +21,15 @@ import { SearchService } from './services/search.service';
       </form>
 
       @if (loading) {
-        <p class="text-sm text-gray-600">Searching…</p>
+        <p class="text-sm" style="color: var(--text-muted)">Searching…</p>
       } @else if (searched && results.length === 0) {
-        <p class="text-sm text-gray-600">No results for "{{ lastQuery }}".</p>
+        <p class="text-sm" style="color: var(--text-muted)">No results for "{{ lastQuery }}".</p>
       } @else if (results.length > 0) {
         <div class="panel !p-0 overflow-hidden">
           <div class="title-bar rounded-none border-x-0 border-t-0">{{ results.length }} results</div>
           <ul class="divide-y divide-[var(--xp-border)] text-sm">
             @for (r of results; track r.id + r.module) {
-              <li class="px-3 py-2 hover:bg-[#d6e4f7]">
+              <li class="px-3 py-2 hover:bg-[var(--surface-2)]">
                 <a [routerLink]="r.route" class="block">
                   <p class="font-medium text-[var(--xp-blue)]">{{ r.title }}</p>
                   <p class="text-xs text-gray-600 capitalize">{{ r.module }} · {{ r.entity_type }}</p>

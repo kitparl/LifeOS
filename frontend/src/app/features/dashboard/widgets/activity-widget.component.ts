@@ -13,7 +13,7 @@ import { WidgetSkeletonComponent } from './widget-skeleton.component';
       @if (loading) {
         <app-widget-skeleton />
       } @else if (activities.length === 0) {
-        <p class="p-3 text-sm text-gray-600">No recent activity</p>
+        <p class="p-3 text-sm" style="color: var(--text-muted)">No recent activity</p>
       } @else {
         <ul class="divide-y divide-[var(--xp-border)] text-sm">
           @for (a of activities; track a.at + a.label) {
