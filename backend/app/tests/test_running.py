@@ -19,7 +19,7 @@ async def test_create_run_and_stats(client):
         "/api/v1/running/runs",
         headers=headers,
         json={
-            "run_date": "2026-06-30",
+            "run_date": str(date.today()),
             "distance_km": 5.0,
             "duration_seconds": 1500,
             "weather": "sunny",
@@ -48,7 +48,7 @@ async def test_list_runs_and_race(client):
     await client.post(
         "/api/v1/running/runs",
         headers=headers,
-        json={"run_date": "2026-06-28", "distance_km": 10.0, "duration_seconds": 3000},
+        json={"run_date": str(date.today()), "distance_km": 10.0, "duration_seconds": 3000},
     )
 
     race = await client.post(

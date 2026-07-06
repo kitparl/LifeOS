@@ -26,8 +26,14 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("race_events", "certificate_url", "TEXT"),
     ("race_events", "event_url", "TEXT"),
     ("race_events", "photos", "TEXT"),  # stored as JSON string
-    ("race_events", "attended", "BOOLEAN DEFAULT 0"),
-    ("race_events", "registered", "BOOLEAN DEFAULT 0"),
+    ("race_events", "attended", "BOOLEAN DEFAULT FALSE"),
+    ("race_events", "registered", "BOOLEAN DEFAULT FALSE"),
+]
+
+_BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
+    ("race_events", "medal"),
+    ("race_events", "registered"),
+    ("race_events", "attended"),
 ]
 
 
@@ -61,3 +67,9 @@ async def ensure_columns(conn: AsyncConnection) -> None:
                 logger.debug("Column %s.%s already exists — skipping", table, column)
             else:
                 logger.warning("Could not add column %s.%s: %s", table, column, exc)
+
+    for table, column in _BOOLEAN_DEFAULTS_TO_BACKFILL:
+        try:
+            await conn.execute(text(f"UPDATE {table} SET {column} = FALSE WHERE {column} IS NULL"))
+        except Exception as exc:
+            logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
