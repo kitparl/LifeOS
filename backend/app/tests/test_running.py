@@ -73,6 +73,32 @@ async def test_list_runs_and_race(client):
 
 
 @pytest.mark.asyncio
+async def test_create_race_get_by_id_past_event(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create = await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "Yesterday Marathon",
+            "race_date": "2026-07-05",
+            "distance_type": "marathon",
+            "attended": True,
+            "finish_time_seconds": 14400,
+        },
+    )
+    assert create.status_code == 201
+    race_id = create.json()["id"]
+    assert create.json()["attended"] is True
+
+    get = await client.get(f"/api/v1/running/races/{race_id}", headers=headers)
+    assert get.status_code == 200
+    assert get.json()["name"] == "Yesterday Marathon"
+    assert get.json()["finish_time_seconds"] == 14400
+
+
+@pytest.mark.asyncio
 async def test_dashboard_running_progress(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}

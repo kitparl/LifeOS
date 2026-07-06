@@ -1,5 +1,7 @@
 export type RaceDistanceType = '5k' | '10k' | '15k' | 'half_marathon' | 'marathon' | 'other';
 
+export type RaceStatus = 'upcoming' | 'registered' | 'completed' | 'missed';
+
 export interface Run {
   id: string;
   run_date: string;
@@ -58,6 +60,7 @@ export interface RaceEvent {
   event_url: string | null;
   photos: string[];
   registered: boolean;
+  attended?: boolean;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -78,6 +81,7 @@ export interface RaceCreate {
   event_url?: string | null;
   photos?: string[];
   registered?: boolean;
+  attended?: boolean;
   notes?: string | null;
 }
 
@@ -134,6 +138,30 @@ export function formatPace(pace: number): string {
   const mins = Math.floor(pace);
   const secs = Math.round((pace - mins) * 60);
   return `${mins}:${secs.toString().padStart(2, '0')} /km`;
+}
+
+export function getRaceStatus(race: RaceEvent): RaceStatus {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const raceDate = new Date(`${race.race_date.slice(0, 10)}T00:00:00`);
+
+  if (race.attended || race.finish_time_seconds) return 'completed';
+  if (raceDate < today) return 'missed';
+  if (race.registered) return 'registered';
+  return 'upcoming';
+}
+
+export function raceStatusLabel(status: RaceStatus): string {
+  switch (status) {
+    case 'completed':
+      return 'Completed';
+    case 'missed':
+      return 'Did not attend';
+    case 'registered':
+      return 'Registered';
+    default:
+      return 'Upcoming';
+  }
 }
 
 export function durationToSeconds(hours: number, minutes: number, seconds: number): number {

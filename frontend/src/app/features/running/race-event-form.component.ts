@@ -4,6 +4,18 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RACE_DISTANCES, RaceEvent } from './models/running.models';
 import { RunningService } from './services/running.service';
 
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isPastDate(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const raceDate = new Date(`${dateStr}T00:00:00`);
+  return raceDate < today;
+}
+
 @Component({
   selector: 'app-race-event-form',
   standalone: true,
@@ -55,60 +67,71 @@ import { RunningService } from './services/running.service';
             </div>
           </div>
 
-          <!-- Finish time: full-width on mobile with larger inputs -->
-          <div class="finish-time-block">
-            <label class="form-label">Finish Time</label>
-            <div class="finish-time-row">
-              <div class="finish-time-field">
-                <span class="finish-time-label">Hours</span>
-                <input
-                  class="input-field finish-time-input"
-                  type="number"
-                  min="0"
-                  inputmode="numeric"
-                  formControlName="finish_hours"
-                  placeholder="0"
-                />
-              </div>
-              <span class="finish-time-sep">:</span>
-              <div class="finish-time-field">
-                <span class="finish-time-label">Minutes</span>
-                <input
-                  class="input-field finish-time-input"
-                  type="number"
-                  min="0"
-                  max="59"
-                  inputmode="numeric"
-                  formControlName="finish_minutes"
-                  placeholder="00"
-                />
-              </div>
-              <span class="finish-time-sep">:</span>
-              <div class="finish-time-field">
-                <span class="finish-time-label">Seconds</span>
-                <input
-                  class="input-field finish-time-input"
-                  type="number"
-                  min="0"
-                  max="59"
-                  inputmode="numeric"
-                  formControlName="finish_seconds"
-                  placeholder="00"
-                />
-              </div>
-            </div>
-          </div>
-
           <div class="flex flex-wrap gap-4">
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" formControlName="registered" class="w-4 h-4" />
-              <span class="form-label" style="margin: 0">Registered</span>
+              <span class="form-label" style="margin: 0">Registered for event</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" formControlName="attended" class="w-4 h-4" />
+              <span class="form-label" style="margin: 0">I attended / completed this race</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" formControlName="medal" class="w-4 h-4" />
               <span class="form-label" style="margin: 0">Medal</span>
             </label>
           </div>
+
+          @if (isPastRaceDate()) {
+            <p class="text-xs" style="color: var(--text-muted)">
+              Past event — check "I attended" and add your finish time to record the result.
+            </p>
+          }
+
+          @if (form.controls.attended.value) {
+            <div class="finish-time-block">
+              <label class="form-label">Finish Time</label>
+              <div class="finish-time-row">
+                <div class="finish-time-field">
+                  <span class="finish-time-label">Hours</span>
+                  <input
+                    class="input-field finish-time-input"
+                    type="number"
+                    min="0"
+                    inputmode="numeric"
+                    formControlName="finish_hours"
+                    placeholder="0"
+                  />
+                </div>
+                <span class="finish-time-sep">:</span>
+                <div class="finish-time-field">
+                  <span class="finish-time-label">Minutes</span>
+                  <input
+                    class="input-field finish-time-input"
+                    type="number"
+                    min="0"
+                    max="59"
+                    inputmode="numeric"
+                    formControlName="finish_minutes"
+                    placeholder="00"
+                  />
+                </div>
+                <span class="finish-time-sep">:</span>
+                <div class="finish-time-field">
+                  <span class="finish-time-label">Seconds</span>
+                  <input
+                    class="input-field finish-time-input"
+                    type="number"
+                    min="0"
+                    max="59"
+                    inputmode="numeric"
+                    formControlName="finish_seconds"
+                    placeholder="00"
+                  />
+                </div>
+              </div>
+            </div>
+          }
 
           <div>
             <label class="form-label" for="event_url">Event Source Link</label>
@@ -194,7 +217,7 @@ export class RaceEventFormComponent implements OnInit {
 
   form = this.fb.nonNullable.group({
     name: ['', Validators.required],
-    race_date: ['', Validators.required],
+    race_date: [todayIsoDate(), Validators.required],
     distance_type: ['marathon' as const, Validators.required],
     organizer: [''],
     location: [''],
@@ -204,6 +227,7 @@ export class RaceEventFormComponent implements OnInit {
     finish_seconds: [null as number | null, [Validators.min(0), Validators.max(59)]],
     position: [null as number | null],
     registered: [false],
+    attended: [false],
     medal: [false],
     event_url: [''],
     certificate_url: [''],
@@ -213,6 +237,9 @@ export class RaceEventFormComponent implements OnInit {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
+    if (id === 'new' || (!id && url.includes('new'))) {
+      return;
+    }
     if (id && url.includes('edit')) {
       this.isEdit = true;
       this.raceId = id;
@@ -238,6 +265,7 @@ export class RaceEventFormComponent implements OnInit {
             finish_seconds: fs,
             position: r.position ?? null,
             registered: r.registered,
+            attended: r.attended,
             medal: r.medal,
             event_url: r.event_url ?? '',
             certificate_url: r.certificate_url ?? '',
@@ -257,7 +285,9 @@ export class RaceEventFormComponent implements OnInit {
     const fh = raw.finish_hours ?? 0;
     const fm = raw.finish_minutes ?? 0;
     const fs = raw.finish_seconds ?? 0;
-    const finish_time_seconds = fh || fm || fs ? fh * 3600 + fm * 60 + fs : null;
+    const finish_time_seconds =
+      raw.attended && (fh || fm || fs) ? fh * 3600 + fm * 60 + fs : null;
+    const attended = raw.attended || !!finish_time_seconds;
 
     const payload = {
       name: raw.name,
@@ -269,6 +299,7 @@ export class RaceEventFormComponent implements OnInit {
       finish_time_seconds,
       position: raw.position ?? null,
       registered: raw.registered,
+      attended,
       medal: raw.medal,
       event_url: raw.event_url || null,
       certificate_url: raw.certificate_url || null,
@@ -282,11 +313,22 @@ export class RaceEventFormComponent implements OnInit {
         : this.runningService.createRace(payload);
 
     req.subscribe({
-      next: (race) => this.router.navigate(['/running/races', race.id]),
+      next: (race) => {
+        if (!race?.id) {
+          this.error = 'Event saved but response was invalid. Check the events list.';
+          this.saving = false;
+          return;
+        }
+        void this.router.navigate(['/running'], { queryParams: { tab: 'events' } });
+      },
       error: (err) => {
         this.error = err?.error?.detail || 'Failed to save event';
         this.saving = false;
       },
     });
+  }
+
+  isPastRaceDate(): boolean {
+    return isPastDate(this.form.controls.race_date.value);
   }
 }

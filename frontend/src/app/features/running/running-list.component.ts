@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   RACE_DISTANCES,
   RaceEvent,
@@ -9,6 +9,8 @@ import {
   RunningStats,
   formatDuration,
   formatPace,
+  getRaceStatus,
+  raceStatusLabel,
 } from './models/running.models';
 import { RunningService } from './services/running.service';
 
@@ -135,8 +137,13 @@ import { RunningService } from './services/running.service';
                   <div class="flex flex-wrap items-center gap-2 mb-1">
                     <a [routerLink]="['/running/races', race.id]" class="link font-semibold text-sm">{{ race.name }}</a>
                     <span class="badge badge--default">{{ raceLabel(race) }}</span>
+                    <span
+                      class="badge"
+                      [class.badge--success]="raceStatus(race) === 'completed'"
+                      [class.badge--warning]="raceStatus(race) === 'registered'"
+                      [class.badge--default]="raceStatus(race) === 'upcoming' || raceStatus(race) === 'missed'"
+                    >{{ raceStatusLabel(raceStatus(race)) }}</span>
                     @if (race.medal) { <span class="badge badge--warning">🏅 Medal</span> }
-                    @if (race.registered) { <span class="badge badge--success">Registered</span> }
                   </div>
                   <p class="text-xs" style="color: var(--text-muted)">
                     {{ race.race_date | date: 'mediumDate' }}
@@ -254,10 +261,12 @@ import { RunningService } from './services/running.service';
 export class RunningListComponent implements OnInit {
   private readonly runningService = inject(RunningService);
   private readonly fb = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
 
   readonly Math = Math;
   readonly formatDuration = formatDuration;
   readonly formatPace = formatPace;
+  readonly raceStatusLabel = raceStatusLabel;
   raceDistances = RACE_DISTANCES;
 
   activeTab = signal<'runs' | 'events' | 'bests' | 'goals'>('runs');
@@ -282,6 +291,10 @@ export class RunningListComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    const tab = this.route.snapshot.queryParamMap.get('tab');
+    if (tab === 'events' || tab === 'runs' || tab === 'bests' || tab === 'goals') {
+      this.activeTab.set(tab);
+    }
     this.load();
   }
 
@@ -328,5 +341,9 @@ export class RunningListComponent implements OnInit {
 
   raceLabel(race: RaceEvent): string {
     return RACE_DISTANCES.find((d) => d.value === race.distance_type)?.label ?? race.distance_type;
+  }
+
+  raceStatus(race: RaceEvent) {
+    return getRaceStatus(race);
   }
 }
