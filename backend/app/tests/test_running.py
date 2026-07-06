@@ -1,5 +1,8 @@
 import pytest
-from datetime import date
+from datetime import date, datetime, timezone
+from types import SimpleNamespace
+
+from app.modules.running.service import RunningService
 
 
 async def _auth_token(client):
@@ -96,6 +99,38 @@ async def test_create_race_get_by_id_past_event(client):
     assert get.status_code == 200
     assert get.json()["name"] == "Yesterday Marathon"
     assert get.json()["finish_time_seconds"] == 14400
+
+
+def test_race_response_handles_legacy_nulls_and_string_photos():
+    now = datetime.now(timezone.utc)
+    race = SimpleNamespace(
+        id="legacy-race",
+        name="Legacy Race",
+        race_date=date(2026, 1, 1),
+        distance_type="10k",
+        distance_km=None,
+        location=None,
+        organizer=None,
+        bib_number=None,
+        finish_time_seconds=None,
+        position=None,
+        medal=None,
+        certificate_url=None,
+        event_url=None,
+        photos='["https://example.com/photo.jpg"]',
+        registered=None,
+        attended=None,
+        notes=None,
+        created_at=now,
+        updated_at=now,
+    )
+
+    response = RunningService._to_race_response(race)
+
+    assert response.registered is False
+    assert response.attended is False
+    assert response.medal is False
+    assert response.photos == ["https://example.com/photo.jpg"]
 
 
 @pytest.mark.asyncio
