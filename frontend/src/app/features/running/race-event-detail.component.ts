@@ -1,7 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { RACE_DISTANCES, RaceEvent, formatDuration } from './models/running.models';
+import {
+  RACE_DISTANCES,
+  RaceEvent,
+  formatDuration,
+  getRaceStatus,
+  raceStatusLabel,
+} from './models/running.models';
 import { RunningService } from './services/running.service';
 
 @Component({
@@ -27,6 +33,9 @@ import { RunningService } from './services/running.service';
 
         <!-- Stat chips row -->
         <div class="flex flex-wrap gap-2">
+          <span class="badge" [class.badge--success]="raceStatus(r) === 'completed'" [class.badge--warning]="raceStatus(r) === 'registered'" [class.badge--default]="raceStatus(r) === 'upcoming' || raceStatus(r) === 'missed'">
+            {{ raceStatusLabel(raceStatus(r)) }}
+          </span>
           @if (r.registered) {
             <span class="badge badge--success">Registered</span>
           }
@@ -102,13 +111,20 @@ export class RaceEventDetailComponent implements OnInit {
   private readonly router = inject(Router);
 
   readonly formatDuration = formatDuration;
+  readonly raceStatusLabel = raceStatusLabel;
 
   race: RaceEvent | null = null;
   loading = true;
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) this.load(id);
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('id');
+      if (!id || id === 'new') {
+        void this.router.navigate(['/running/races/new']);
+        return;
+      }
+      this.load(id);
+    });
   }
 
   load(id: string): void {
@@ -134,5 +150,9 @@ export class RaceEventDetailComponent implements OnInit {
 
   raceLabel(race: RaceEvent): string {
     return RACE_DISTANCES.find((d) => d.value === race.distance_type)?.label ?? race.distance_type;
+  }
+
+  raceStatus(race: RaceEvent) {
+    return getRaceStatus(race);
   }
 }

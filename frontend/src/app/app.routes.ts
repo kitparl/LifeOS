@@ -114,6 +114,11 @@ export const routes: Routes = [
           import('./features/habits/habit-detail.component').then((m) => m.HabitDetailComponent),
       },
       {
+        path: 'running/new',
+        loadComponent: () =>
+          import('./features/running/run-form.component').then((m) => m.RunFormComponent),
+      },
+      {
         path: 'running/races/new',
         loadComponent: () =>
           import('./features/running/race-event-form.component').then((m) => m.RaceEventFormComponent),
@@ -129,16 +134,6 @@ export const routes: Routes = [
           import('./features/running/race-event-detail.component').then((m) => m.RaceEventDetailComponent),
       },
       {
-        path: 'running',
-        loadComponent: () =>
-          import('./features/running/running-list.component').then((m) => m.RunningListComponent),
-      },
-      {
-        path: 'running/new',
-        loadComponent: () =>
-          import('./features/running/run-form.component').then((m) => m.RunFormComponent),
-      },
-      {
         path: 'running/:id/edit',
         loadComponent: () =>
           import('./features/running/run-form.component').then((m) => m.RunFormComponent),
@@ -147,6 +142,12 @@ export const routes: Routes = [
         path: 'running/:id',
         loadComponent: () =>
           import('./features/running/run-detail.component').then((m) => m.RunDetailComponent),
+      },
+      {
+        path: 'running',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./features/running/running-list.component').then((m) => m.RunningListComponent),
       },
       {
         path: 'calendar',

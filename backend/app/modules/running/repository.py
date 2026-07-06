@@ -80,6 +80,7 @@ class RunningRepository:
             event_url=data.event_url,
             photos=data.photos or [],
             registered=data.registered,
+            attended=data.attended or bool(data.finish_time_seconds),
             notes=data.notes,
         )
         self.db.add(race)
@@ -88,7 +89,10 @@ class RunningRepository:
         return race
 
     async def update_race(self, race: RaceEvent, data: RaceUpdate) -> RaceEvent:
-        for key, value in data.model_dump(exclude_unset=True).items():
+        updates = data.model_dump(exclude_unset=True)
+        if updates.get("finish_time_seconds"):
+            updates["attended"] = True
+        for key, value in updates.items():
             setattr(race, key, value)
         await self.db.flush()
         await self.db.refresh(race)

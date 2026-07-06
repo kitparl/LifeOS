@@ -67,6 +67,7 @@ class RaceCreate(BaseModel):
     event_url: str | None = None
     photos: list[str] = Field(default_factory=list)
     registered: bool = False
+    attended: bool = False
     notes: str | None = None
 
 
@@ -85,6 +86,7 @@ class RaceUpdate(BaseModel):
     event_url: str | None = None
     photos: list[str] | None = None
     registered: bool | None = None
+    attended: bool | None = None
     notes: str | None = None
 
 
@@ -104,6 +106,7 @@ class RaceResponse(BaseModel):
     event_url: str | None
     photos: list[str]
     registered: bool
+    attended: bool
     notes: str | None
     created_at: datetime
     updated_at: datetime
