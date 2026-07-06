@@ -1,6 +1,9 @@
+import json
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.running.models import RaceEvent
 from app.modules.running.repository import RunningRepository
 from app.modules.running.schemas import (
     PersonalBest,
@@ -21,6 +24,52 @@ from app.modules.running.stats import compute_pace, compute_personal_bests, week
 class RunningService:
     def __init__(self, db: AsyncSession):
         self.repo = RunningRepository(db)
+
+    @staticmethod
+    def _normalize_photos(photos) -> list[str]:
+        if photos is None:
+            return []
+        if isinstance(photos, list):
+            return [str(p) for p in photos]
+        if isinstance(photos, str):
+            try:
+                parsed = json.loads(photos)
+            except json.JSONDecodeError:
+                return []
+            if isinstance(parsed, list):
+                return [str(p) for p in parsed]
+        return []
+
+    @staticmethod
+    def _bool_field(race: RaceEvent, field: str, default: bool = False) -> bool:
+        value = getattr(race, field, default)
+        if value is None:
+            return default
+        return bool(value)
+
+    @staticmethod
+    def _to_race_response(race: RaceEvent) -> RaceResponse:
+        return RaceResponse(
+            id=race.id,
+            name=race.name,
+            race_date=race.race_date,
+            distance_type=race.distance_type,
+            distance_km=race.distance_km,
+            location=race.location,
+            organizer=race.organizer,
+            bib_number=race.bib_number,
+            finish_time_seconds=race.finish_time_seconds,
+            position=race.position,
+            medal=RunningService._bool_field(race, "medal"),
+            certificate_url=race.certificate_url,
+            event_url=race.event_url,
+            photos=RunningService._normalize_photos(race.photos),
+            registered=RunningService._bool_field(race, "registered"),
+            attended=RunningService._bool_field(race, "attended"),
+            notes=race.notes,
+            created_at=race.created_at,
+            updated_at=race.updated_at,
+        )
 
     def _to_list_item(self, run) -> RunListItem:
         return RunListItem(
@@ -77,24 +126,24 @@ class RunningService:
 
     async def list_races(self, user_id: str, upcoming_only: bool = False) -> list[RaceResponse]:
         races = await self.repo.list_races(user_id, upcoming_only=upcoming_only)
-        return [RaceResponse.model_validate(r) for r in races]
+        return [self._to_race_response(r) for r in races]
 
     async def get_race(self, user_id: str, race_id: str) -> RaceResponse:
         race = await self.repo.get_race(user_id, race_id)
         if race is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Race not found")
-        return RaceResponse.model_validate(race)
+        return self._to_race_response(race)
 
     async def create_race(self, user_id: str, data: RaceCreate) -> RaceResponse:
         race = await self.repo.create_race(user_id, data)
-        return RaceResponse.model_validate(race)
+        return self._to_race_response(race)
 
     async def update_race(self, user_id: str, race_id: str, data: RaceUpdate) -> RaceResponse:
         race = await self.repo.get_race(user_id, race_id)
         if race is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Race not found")
         updated = await self.repo.update_race(race, data)
-        return RaceResponse.model_validate(updated)
+        return self._to_race_response(updated)
 
     async def delete_race(self, user_id: str, race_id: str) -> None:
         race = await self.repo.get_race(user_id, race_id)

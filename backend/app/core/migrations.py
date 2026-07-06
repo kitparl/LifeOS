@@ -22,7 +22,7 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("race_events", "bib_number", "VARCHAR(50)"),
     ("race_events", "finish_time_seconds", "INTEGER"),
     ("race_events", "position", "INTEGER"),
-    ("race_events", "medal", "BOOLEAN DEFAULT 0"),
+    ("race_events", "medal", "BOOLEAN DEFAULT FALSE"),
     ("race_events", "certificate_url", "TEXT"),
     ("race_events", "event_url", "TEXT"),
     ("race_events", "photos", "TEXT"),  # stored as JSON string
