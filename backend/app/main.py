@@ -19,6 +19,7 @@ from app.modules.finance.api import router as finance_router
 from app.modules.goals.api import router as goals_router
 from app.modules.habits.api import router as habits_router
 from app.modules.journal.api import router as journal_router
+from app.modules.knowledge_notes.api import router as knowledge_notes_router
 from app.modules.learning.api import router as learning_router
 from app.modules.mood.api import router as mood_router
 from app.modules.notifications.api import router as notifications_router
@@ -75,6 +76,7 @@ app.include_router(journal_router, prefix="/api/v1")
 app.include_router(mood_router, prefix="/api/v1")
 app.include_router(communication_router, prefix="/api/v1")
 app.include_router(qa_router, prefix="/api/v1")
+app.include_router(knowledge_notes_router, prefix="/api/v1")
 app.include_router(wishlist_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")

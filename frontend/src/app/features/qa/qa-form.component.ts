@@ -1,12 +1,13 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { QAService } from './services/qa.service';
 
 @Component({
   selector: 'app-qa-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TypeSelectComponent],
   template: `
     <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
@@ -19,6 +20,15 @@ import { QAService } from './services/qa.service';
           <div>
             <label class="mb-1 block">Answer</label>
             <textarea class="input-field min-h-[120px]" formControlName="answer"></textarea>
+          </div>
+          <div>
+            <label class="mb-1 block">Type</label>
+            <app-type-select
+              formControlName="type"
+              placeholder="Select or create a type…"
+              [options]="types()"
+              (created)="onTypeCreated($event)"
+            />
           </div>
           <div>
             <label class="mb-1 block">Tags (comma-separated)</label>
@@ -46,14 +56,18 @@ export class QAFormComponent implements OnInit {
   entryId: string | null = null;
   saving = false;
   error = '';
+  readonly types = signal<string[]>([]);
 
   form = this.fb.nonNullable.group({
     question: ['', Validators.required],
     answer: ['', Validators.required],
+    type: [''],
     tags: [''],
   });
 
   ngOnInit(): void {
+    this.qaService.listTypes().subscribe({ next: (t) => this.types.set(t) });
+
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id && url.endsWith('edit')) {
@@ -64,10 +78,17 @@ export class QAFormComponent implements OnInit {
           this.form.patchValue({
             question: e.question,
             answer: e.current_answer,
+            type: e.type ?? '',
             tags: e.tags.join(', '),
           }),
       });
     }
+  }
+
+  onTypeCreated(name: string): void {
+    // Optimistically show it; persist so it becomes reusable everywhere.
+    this.types.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.qaService.createType(name).subscribe({ next: (t) => this.types.set(t) });
   }
 
   submit(): void {
@@ -78,7 +99,12 @@ export class QAFormComponent implements OnInit {
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    const payload = { question: raw.question, answer: raw.answer, tags };
+    const payload = {
+      question: raw.question,
+      answer: raw.answer,
+      type: raw.type || null,
+      tags,
+    };
     const req =
       this.isEdit && this.entryId
         ? this.qaService.update(this.entryId, payload)

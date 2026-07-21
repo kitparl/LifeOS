@@ -11,6 +11,9 @@ export interface CalendarEvent {
   category: EventCategory;
   recurrence: EventRecurrence;
   location: string | null;
+  /** Owning module for synced events (e.g. 'running'); null for user-created. */
+  source_module?: string | null;
+  source_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +27,8 @@ export interface EventListItem {
   category: EventCategory;
   recurrence: EventRecurrence;
   location: string | null;
+  source_module?: string | null;
+  source_id?: string | null;
 }
 
 export interface EventCreate {

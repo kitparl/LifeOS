@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -23,7 +23,17 @@ class CalendarEvent(Base):
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="personal")
     recurrence: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Reusable scheduling linkage: identifies the owning module + entity that this
+    # calendar event mirrors (e.g. ("running", <race_id>)). NULL for user-created
+    # events. Any future module (tasks, study planner, travel) can integrate via
+    # the same (source_module, source_id) contract — see CalendarSyncService.
+    source_module: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        Index("ix_calendar_events_source", "user_id", "source_module", "source_id"),
     )

@@ -15,7 +15,7 @@ import { CommunicationService } from './services/communication.service';
           <h1 class="text-lg font-semibold">{{ w.word }}</h1>
           <div class="flex gap-2">
             <a [routerLink]="['/communication/vocabulary', w.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
-            <button type="button" class="input-field !w-auto text-xs text-red-700" (click)="remove()">Delete</button>
+            <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
           </div>
         </div>
         <div class="panel text-sm space-y-2">
@@ -34,12 +34,12 @@ import { CommunicationService } from './services/communication.service';
             <p class="whitespace-pre-wrap"><span class="font-medium">Notes:</span> {{ w.notes }}</p>
           }
         </div>
-        <a routerLink="/communication" class="text-sm text-[var(--xp-blue)] underline">Back</a>
+        <a routerLink="/communication" class="link text-sm">Back</a>
       </div>
     } @else if (loading) {
       <p class="text-sm">Loading…</p>
     } @else {
-      <p class="text-sm text-red-700">Not found.</p>
+      <p class="text-sm" style="color: var(--danger)">Not found.</p>
     }
   `,
 })

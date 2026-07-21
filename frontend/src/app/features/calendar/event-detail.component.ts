@@ -14,11 +14,16 @@ import { CalendarService } from './services/calendar.service';
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h1 class="text-lg font-semibold">{{ e.title }}</h1>
-            <p class="text-xs capitalize text-gray-600">{{ e.category }} · {{ e.recurrence }}</p>
+            <p class="text-xs capitalize" style="color: var(--text-muted)">
+              {{ e.category }} · {{ e.recurrence }}
+              @if (e.source_module) {
+                · <span class="qa-type-badge">{{ e.source_module }}</span>
+              }
+            </p>
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/calendar', e.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
-            <button type="button" class="input-field !w-auto text-xs text-red-700" (click)="remove()">Delete</button>
+            <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
           </div>
         </div>
 
@@ -31,16 +36,16 @@ import { CalendarService } from './services/calendar.service';
             <p><span class="font-medium">Location:</span> {{ e.location }}</p>
           }
           @if (e.description) {
-            <p class="whitespace-pre-wrap text-gray-700">{{ e.description }}</p>
+            <p class="whitespace-pre-wrap" style="color: var(--text)">{{ e.description }}</p>
           }
         </div>
 
-        <a routerLink="/calendar" class="text-sm text-[var(--xp-blue)] underline">Back to calendar</a>
+        <a routerLink="/calendar" class="link text-sm">Back to calendar</a>
       </div>
     } @else if (loading) {
       <p class="text-sm">Loading event…</p>
     } @else {
-      <p class="text-sm text-red-700">Event not found.</p>
+      <p class="text-sm" style="color: var(--danger)">Event not found.</p>
     }
   `,
 })

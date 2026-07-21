@@ -261,6 +261,20 @@ export const routes: Routes = [
         loadComponent: () => import('./features/qa/qa-detail.component').then((m) => m.QADetailComponent),
       },
       {
+        path: 'knowledge',
+        loadComponent: () =>
+          import('./features/knowledge-notes/knowledge-notes-list.component').then(
+            (m) => m.KnowledgeNotesListComponent,
+          ),
+      },
+      {
+        path: 'knowledge/:id',
+        loadComponent: () =>
+          import('./features/knowledge-notes/knowledge-subject.component').then(
+            (m) => m.KnowledgeSubjectComponent,
+          ),
+      },
+      {
         path: 'wishlist',
         loadComponent: () =>
           import('./features/wishlist/wishlist-list.component').then((m) => m.WishlistListComponent),

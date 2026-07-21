@@ -1,10 +1,15 @@
 import json
+from datetime import datetime, time, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.calendar.sync_service import CalendarSyncService
 from app.modules.running.models import RaceEvent
 from app.modules.running.repository import RunningRepository
+
+# Source-module key used for the reusable Calendar scheduling linkage.
+RUNNING_SOURCE_MODULE = "running"
 from app.modules.running.schemas import (
     PersonalBest,
     RaceCreate,
@@ -24,6 +29,21 @@ from app.modules.running.stats import compute_pace, compute_personal_bests, week
 class RunningService:
     def __init__(self, db: AsyncSession):
         self.repo = RunningRepository(db)
+        self.calendar_sync = CalendarSyncService(db)
+
+    async def _sync_race_to_calendar(self, user_id: str, race: RaceEvent) -> None:
+        """Mirror a race/competition into the shared Calendar (all-day event)."""
+        starts_at = datetime.combine(race.race_date, time.min, tzinfo=timezone.utc)
+        await self.calendar_sync.upsert_from_source(
+            user_id=user_id,
+            source_module=RUNNING_SOURCE_MODULE,
+            source_id=race.id,
+            title=race.name,
+            starts_at=starts_at,
+            all_day=True,
+            category="running",
+            location=race.location,
+        )
 
     @staticmethod
     def _normalize_photos(photos) -> list[str]:
@@ -136,6 +156,7 @@ class RunningService:
 
     async def create_race(self, user_id: str, data: RaceCreate) -> RaceResponse:
         race = await self.repo.create_race(user_id, data)
+        await self._sync_race_to_calendar(user_id, race)
         return self._to_race_response(race)
 
     async def update_race(self, user_id: str, race_id: str, data: RaceUpdate) -> RaceResponse:
@@ -143,12 +164,14 @@ class RunningService:
         if race is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Race not found")
         updated = await self.repo.update_race(race, data)
+        await self._sync_race_to_calendar(user_id, updated)
         return self._to_race_response(updated)
 
     async def delete_race(self, user_id: str, race_id: str) -> None:
         race = await self.repo.get_race(user_id, race_id)
         if race is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Race not found")
+        await self.calendar_sync.delete_from_source(user_id, RUNNING_SOURCE_MODULE, race_id)
         await self.repo.delete_race(race)
 
     async def get_settings(self, user_id: str) -> RunningSettingsResponse:

@@ -2,10 +2,10 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  HostListener,
   Input,
   OnChanges,
   OnDestroy,
-  OnInit,
   SimpleChanges,
   ViewChild,
   forwardRef,
@@ -35,49 +35,49 @@ import StarterKit from '@tiptap/starter-kit';
     },
   ],
   template: `
-    <!-- Toolbar -->
-    <div class="rich-editor__toolbar">
-      <button type="button" class="rich-editor__tool" title="Bold (Ctrl+B)"
-              (click)="execCmd('bold')" [class.active]="editor?.isActive('bold')">
-        <strong>B</strong>
-      </button>
-      <button type="button" class="rich-editor__tool" title="Italic (Ctrl+I)"
-              (click)="execCmd('italic')" [class.active]="editor?.isActive('italic')">
-        <em>I</em>
-      </button>
-      <button type="button" class="rich-editor__tool" title="Heading 2"
-              (click)="execCmd('heading')" [class.active]="editor?.isActive('heading', {level: 2})">
-        H2
-      </button>
-      <button type="button" class="rich-editor__tool" title="Bullet list"
-              (click)="execCmd('bulletList')" [class.active]="editor?.isActive('bulletList')">
-        •—
-      </button>
-      <button type="button" class="rich-editor__tool" title="Ordered list"
-              (click)="execCmd('orderedList')" [class.active]="editor?.isActive('orderedList')">
-        1.
-      </button>
-      <button type="button" class="rich-editor__tool" title="Blockquote"
-              (click)="execCmd('blockquote')" [class.active]="editor?.isActive('blockquote')">
-        ❝
-      </button>
-      <button type="button" class="rich-editor__tool" title="Code block"
-              (click)="execCmd('codeBlock')" [class.active]="editor?.isActive('codeBlock')">
-        &#123;&#125;
-      </button>
-      <div class="rich-editor__sep"></div>
-      <button type="button" class="rich-editor__tool" title="Focus mode"
-              (click)="toggleFocus()" [class.active]="focusMode()">
-        ⊡
-      </button>
-    </div>
+    <div class="rich-editor" [class.rich-editor--focus]="focusMode()">
+      <!-- Toolbar (stays reachable in focus mode) -->
+      <div class="rich-editor__toolbar">
+        <button type="button" class="rich-editor__tool" title="Bold (Ctrl+B)"
+                (click)="execCmd('bold')" [class.active]="editor?.isActive('bold')">
+          <strong>B</strong>
+        </button>
+        <button type="button" class="rich-editor__tool" title="Italic (Ctrl+I)"
+                (click)="execCmd('italic')" [class.active]="editor?.isActive('italic')">
+          <em>I</em>
+        </button>
+        <button type="button" class="rich-editor__tool" title="Heading 2"
+                (click)="execCmd('heading')" [class.active]="editor?.isActive('heading', {level: 2})">
+          H2
+        </button>
+        <button type="button" class="rich-editor__tool" title="Bullet list"
+                (click)="execCmd('bulletList')" [class.active]="editor?.isActive('bulletList')">
+          •—
+        </button>
+        <button type="button" class="rich-editor__tool" title="Ordered list"
+                (click)="execCmd('orderedList')" [class.active]="editor?.isActive('orderedList')">
+          1.
+        </button>
+        <button type="button" class="rich-editor__tool" title="Blockquote"
+                (click)="execCmd('blockquote')" [class.active]="editor?.isActive('blockquote')">
+          ❝
+        </button>
+        <button type="button" class="rich-editor__tool" title="Code block"
+                (click)="execCmd('codeBlock')" [class.active]="editor?.isActive('codeBlock')">
+          &#123;&#125;
+        </button>
+        <div class="rich-editor__sep"></div>
+        <button type="button" class="rich-editor__tool"
+                [title]="focusMode() ? 'Exit focus mode (Esc)' : 'Focus mode'"
+                [attr.aria-label]="focusMode() ? 'Exit focus mode' : 'Enter focus mode'"
+                (click)="toggleFocus()" [class.active]="focusMode()">
+          {{ focusMode() ? '✕' : '⊡' }}
+        </button>
+      </div>
 
-    <!-- Editor surface -->
-    <div
-      #editorEl
-      class="rich-editor__content"
-      [class.rich-editor__content--focus]="focusMode()"
-    ></div>
+      <!-- Editor surface -->
+      <div #editorEl class="rich-editor__content"></div>
+    </div>
   `,
 })
 export class RichEditorComponent
@@ -126,6 +126,21 @@ export class RichEditorComponent
 
   ngOnDestroy(): void {
     this.editor?.destroy();
+    this.lockScroll(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.focusMode()) {
+      this.focusMode.set(false);
+      this.lockScroll(false);
+    }
+  }
+
+  private lockScroll(locked: boolean): void {
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = locked ? 'hidden' : '';
+    }
   }
 
   // ControlValueAccessor
@@ -168,7 +183,9 @@ export class RichEditorComponent
   }
 
   toggleFocus(): void {
-    this.focusMode.set(!this.focusMode());
+    const next = !this.focusMode();
+    this.focusMode.set(next);
+    this.lockScroll(next);
     this.editor?.commands.focus();
   }
 

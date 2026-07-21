@@ -9,6 +9,7 @@ export interface QAListItem {
   id: string;
   question: string;
   current_answer: string;
+  type: string | null;
   tags: string[];
   updated_at: string;
 }
@@ -17,6 +18,7 @@ export interface QAEntry {
   id: string;
   question: string;
   current_answer: string;
+  type: string | null;
   tags: string[];
   linked_goal_id: string | null;
   linked_journal_id: string | null;

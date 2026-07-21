@@ -16,17 +16,22 @@ import { QAService } from './services/qa.service';
           <h1 class="text-lg font-semibold">{{ e.question }}</h1>
           <div class="flex gap-2">
             <a [routerLink]="['/qa', e.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
-            <button type="button" class="input-field !w-auto text-xs text-red-700" (click)="remove()">Delete</button>
+            <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
           </div>
         </div>
 
-        @if (e.tags.length) {
-          <p class="text-xs" style="color: var(--text-muted)">Tags: {{ e.tags.join(', ') }}</p>
-        }
+        <div class="flex flex-wrap items-center gap-2 text-xs" style="color: var(--text-muted)">
+          @if (e.type) {
+            <span class="qa-type-badge">{{ e.type }}</span>
+          }
+          @if (e.tags.length) {
+            <span>Tags: {{ e.tags.join(', ') }}</span>
+          }
+        </div>
 
         <div class="panel text-sm">
           <p class="font-medium mb-1">Current Answer</p>
-          <p class="whitespace-pre-wrap text-gray-700">{{ e.current_answer }}</p>
+          <p class="whitespace-pre-wrap" style="color: var(--text)">{{ e.current_answer }}</p>
         </div>
 
         @if (e.versions.length > 1) {
@@ -35,20 +40,20 @@ import { QAService } from './services/qa.service';
             <ul class="divide-y divide-[var(--xp-border)] text-sm">
               @for (v of e.versions; track v.id) {
                 <li class="px-3 py-2">
-                  <p class="text-xs text-gray-600 mb-1">v{{ v.version_number }} · {{ v.created_at | date: 'medium' }}</p>
-                  <p class="whitespace-pre-wrap text-gray-700">{{ v.answer }}</p>
+                  <p class="text-xs mb-1" style="color: var(--text-muted)">v{{ v.version_number }} · {{ v.created_at | date: 'medium' }}</p>
+                  <p class="whitespace-pre-wrap" style="color: var(--text)">{{ v.answer }}</p>
                 </li>
               }
             </ul>
           </div>
         }
 
-        <a routerLink="/qa" class="text-sm text-[var(--xp-blue)] underline">Back to Q&A</a>
+        <a routerLink="/qa" class="link text-sm">Back to Q&A</a>
       </div>
     } @else if (loading) {
       <p class="text-sm">Loading…</p>
     } @else {
-      <p class="text-sm text-red-700">Not found.</p>
+      <p class="text-sm" style="color: var(--danger)">Not found.</p>
     }
   `,
 })

@@ -1,64 +1,78 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { MarkdownEditorComponent } from '../../shared/markdown-editor/markdown-editor.component';
 import { JOURNAL_TYPES, JournalType } from './models/journal.models';
 import { JournalService } from './services/journal.service';
 
 @Component({
   selector: 'app-journal-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, MarkdownEditorComponent],
   template: `
-    <div class="max-w-lg">
-      <div class="panel !p-0 overflow-hidden">
-        <div class="title-bar rounded-none border-x-0 border-t-0">{{ isEdit ? 'Edit Entry' : 'New Entry' }}</div>
-        <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="mb-1 block">Date</label>
-              <input class="input-field" type="date" formControlName="entry_date" />
-            </div>
-            <div>
-              <label class="mb-1 block">Type</label>
-              <select class="input-field" formControlName="entry_type">
-                @for (t of types; track t.value) {
-                  <option [value]="t.value">{{ t.label }}</option>
-                }
-              </select>
-            </div>
-          </div>
-          <div>
-            <label class="mb-1 block">Title (optional)</label>
-            <input class="input-field" formControlName="title" />
-          </div>
-          <div>
-            <label class="mb-1 block">Content</label>
-            <textarea class="input-field min-h-[100px]" formControlName="content"></textarea>
-          </div>
-          <div>
-            <label class="mb-1 block">Gratitude</label>
-            <textarea class="input-field min-h-[60px]" formControlName="gratitude"></textarea>
-          </div>
-          <div>
-            <label class="mb-1 block">Wins</label>
-            <textarea class="input-field min-h-[60px]" formControlName="wins"></textarea>
-          </div>
-          <div>
-            <label class="mb-1 block">Lessons</label>
-            <textarea class="input-field min-h-[60px]" formControlName="lessons"></textarea>
-          </div>
+    <form class="journal-writer" [formGroup]="form" (ngSubmit)="submit()">
+      <div class="journal-writer__bar">
+        <a routerLink="/journal" class="btn-ghost text-xs no-underline">← Journal</a>
+        <div class="flex items-center gap-2">
           @if (error) {
-            <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
+            <span class="text-xs" style="color: var(--danger)">{{ error }}</span>
           }
-          <div class="flex gap-2">
-            <button type="submit" class="btn-primary" [disabled]="form.invalid || saving">
-              {{ saving ? 'Saving…' : 'Save' }}
-            </button>
-            <a routerLink="/journal" class="btn-secondary no-underline">Cancel</a>
-          </div>
-        </form>
+          <a routerLink="/journal" class="btn-secondary text-xs no-underline">Cancel</a>
+          <button type="submit" class="btn-primary text-xs" [disabled]="form.invalid || saving">
+            {{ saving ? 'Saving…' : 'Save entry' }}
+          </button>
+        </div>
       </div>
-    </div>
+
+      <input
+        class="journal-writer__title"
+        formControlName="title"
+        placeholder="Untitled entry"
+        aria-label="Title"
+      />
+
+      <div class="journal-writer__meta">
+        <input class="journal-writer__date" type="date" formControlName="entry_date" aria-label="Date" />
+        <select class="journal-writer__date" formControlName="entry_type" aria-label="Type">
+          @for (t of types; track t.value) {
+            <option [value]="t.value">{{ t.label }}</option>
+          }
+        </select>
+      </div>
+
+      <app-markdown-editor
+        formControlName="content"
+        placeholder="Write freely… what happened today, how you felt, what's on your mind."
+        minHeight="46vh"
+      />
+
+      <div class="journal-section">
+        <label class="journal-section__label">Gratitude</label>
+        <textarea
+          class="journal-textarea"
+          formControlName="gratitude"
+          placeholder="What are you grateful for today?"
+        ></textarea>
+      </div>
+
+      <div class="journal-section">
+        <label class="journal-section__label">Wins</label>
+        <textarea
+          class="journal-textarea"
+          formControlName="wins"
+          placeholder="What went well? Small wins count."
+        ></textarea>
+      </div>
+
+      <div class="journal-section">
+        <label class="journal-section__label">Lessons Learned</label>
+        <textarea
+          class="journal-textarea"
+          formControlName="lessons"
+          placeholder="What did you learn or would do differently?"
+        ></textarea>
+      </div>
+    </form>
   `,
 })
 export class JournalFormComponent implements OnInit {

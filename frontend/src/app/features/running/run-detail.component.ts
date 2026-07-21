@@ -19,7 +19,7 @@ import { RunningService } from './services/running.service';
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/running', r.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
-            <button type="button" class="input-field !w-auto text-xs text-red-700" (click)="remove()">Delete</button>
+            <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
           </div>
         </div>
 
@@ -41,23 +41,23 @@ import { RunningService } from './services/running.service';
         @if (r.weather) {
           <div class="panel text-sm">
             <p class="font-medium mb-1">Weather</p>
-            <p class="capitalize text-gray-700">{{ r.weather }}</p>
+            <p class="capitalize" style="color: var(--text)">{{ r.weather }}</p>
           </div>
         }
 
         @if (r.notes) {
           <div class="panel text-sm">
             <p class="font-medium mb-1">Notes</p>
-            <p class="whitespace-pre-wrap text-gray-700">{{ r.notes }}</p>
+            <p class="whitespace-pre-wrap" style="color: var(--text)">{{ r.notes }}</p>
           </div>
         }
 
-        <a routerLink="/running" class="text-sm text-[var(--xp-blue)] underline">Back to running</a>
+        <a routerLink="/running" class="link text-sm">Back to running</a>
       </div>
     } @else if (loading) {
       <p class="text-sm">Loading run…</p>
     } @else {
-      <p class="text-sm text-red-700">Run not found.</p>
+      <p class="text-sm" style="color: var(--danger)">Run not found.</p>
     }
   `,
 })
