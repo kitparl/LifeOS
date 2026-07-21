@@ -3,6 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
+import { MarkdownService } from '../../shared/markdown/markdown.service';
 import { JOURNAL_TYPES, JournalListItem } from './models/journal.models';
 import { JournalService } from './services/journal.service';
 
@@ -42,7 +43,7 @@ import { JournalService } from './services/journal.service';
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <a [routerLink]="['/journal', entry.id]" class="block truncate text-sm font-semibold text-[var(--xp-blue)] underline">
-                    {{ entry.title || entry.content || 'Untitled entry' }}
+                    {{ entry.title || preview(entry.content) || 'Untitled entry' }}
                   </a>
                   <p class="mt-1 text-xs capitalize text-[var(--text-muted)]">
                     {{ entry.entry_type }} · {{ entry.entry_date | date: 'mediumDate' }}
@@ -76,7 +77,7 @@ import { JournalService } from './services/journal.service';
                   <td class="px-3 py-2 capitalize">{{ entry.entry_type }}</td>
                   <td class="px-3 py-2 max-w-xs truncate">
                     <a [routerLink]="['/journal', entry.id]" class="link">
-                      {{ entry.title || entry.content || '—' }}
+                      {{ entry.title || preview(entry.content) || '—' }}
                     </a>
                   </td>
                   <td class="px-3 py-2">
@@ -100,8 +101,13 @@ import { JournalService } from './services/journal.service';
 export class JournalListComponent implements OnInit {
   private readonly journalService = inject(JournalService);
   private readonly fb = inject(FormBuilder);
+  private readonly markdown = inject(MarkdownService);
 
   types = JOURNAL_TYPES;
+
+  preview(content: string): string {
+    return this.markdown.toPlainText(content, 80);
+  }
   entries: JournalListItem[] = [];
   loading = false;
   currentPage = 1;

@@ -38,6 +38,8 @@ class EventListItem(BaseModel):
     category: str
     recurrence: str
     location: str | None
+    source_module: str | None = None
+    source_id: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -52,6 +54,8 @@ class EventResponse(BaseModel):
     category: str
     recurrence: str
     location: str | None
+    source_module: str | None = None
+    source_id: str | None = None
     created_at: datetime
     updated_at: datetime
 

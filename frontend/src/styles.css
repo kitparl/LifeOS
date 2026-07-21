@@ -827,15 +827,38 @@ tbody tr:hover {
   box-shadow: 0 0 0 3px var(--ring);
 }
 
-.rich-editor__content--focus {
+/* Focus mode: the whole editor (toolbar + content) fills the viewport so the
+   exit control stays reachable. Escape also exits (see component). */
+.rich-editor--focus {
   position: fixed;
-  inset: 2rem;
+  inset: 0;
   z-index: 60;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
+}
+
+.rich-editor--focus .rich-editor__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
+.rich-editor--focus .rich-editor__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: 0;
+  border: none;
+}
+
+.rich-editor--focus .ProseMirror {
+  max-width: 820px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 /* ProseMirror content styles */
@@ -1161,6 +1184,739 @@ summary::-webkit-details-marker {
 
   .calendar-page {
     height: calc(100dvh - 140px);
+  }
+}
+
+/* =========================================================
+   SHARED MODAL ENHANCEMENTS (app-modal)
+   ========================================================= */
+
+.modal-header__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.modal-header__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.modal-header__btn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.modal--maximized {
+  width: calc(100vw - 2rem);
+  max-width: none !important;
+  height: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal--maximized .modal-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Mobile: modals become full-screen sheets */
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 0;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .modal {
+    max-width: none !important;
+    width: 100%;
+    height: 100dvh;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+}
+
+/* =========================================================
+   MARKDOWN EDITOR (app-markdown-editor)
+   ========================================================= */
+
+.md-editor {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.md-editor__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0.375rem 0.5rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.md-editor__tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.md-editor__spacer {
+  flex: 1;
+}
+
+.md-editor__modes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.md-editor__tool,
+.md-editor__mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.md-editor__tool:hover,
+.md-editor__mode:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.md-editor__mode.active {
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+  border-color: var(--primary-soft);
+}
+
+.md-editor__panes {
+  display: flex;
+  min-height: 0;
+}
+
+.md-editor[data-mode='split'] .md-editor__panes > * {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+
+.md-editor[data-mode='split'] .md-editor__input {
+  border-right: 1px solid var(--border);
+}
+
+.md-editor__input {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.875rem 1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.md-editor__input::placeholder {
+  color: var(--text-faint);
+}
+
+.md-editor__input:focus {
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+
+.md-editor__preview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.875rem 1rem;
+  background: var(--surface);
+}
+
+/* Distraction-free fullscreen */
+.md-editor--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  border-radius: 0;
+  height: 100dvh;
+}
+
+.md-editor--fullscreen .md-editor__panes {
+  flex: 1;
+  overflow: hidden;
+}
+
+.md-editor--fullscreen .md-editor__input {
+  overflow-y: auto;
+  height: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  font-size: 1.05rem;
+}
+
+.md-editor--fullscreen .md-editor__preview {
+  height: 100%;
+}
+
+@media (max-width: 640px) {
+  /* Split view is too cramped on phones — hide the split toggle */
+  .md-editor__mode--split {
+    display: none;
+  }
+  .md-editor[data-mode='split'] .md-editor__panes {
+    flex-direction: column;
+  }
+  .md-editor[data-mode='split'] .md-editor__input {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+/* =========================================================
+   MARKDOWN RENDERED CONTENT (.markdown-body / .prose-content)
+   ========================================================= */
+
+.markdown-body,
+.prose-content {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text);
+  word-wrap: break-word;
+}
+
+.markdown-body > *:first-child,
+.prose-content > *:first-child {
+  margin-top: 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.2em 0 0.5em;
+  color: var(--text);
+}
+
+.markdown-body h1 { font-size: 1.5rem; }
+.markdown-body h2 { font-size: 1.25rem; }
+.markdown-body h3 { font-size: 1.1rem; }
+.markdown-body h4 { font-size: 1rem; }
+
+.markdown-body p { margin: 0 0 0.75em; }
+
+.markdown-body a,
+.prose-content a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.5rem;
+  margin: 0.5em 0;
+}
+
+.markdown-body li { margin-bottom: 0.25em; }
+
+.markdown-body li > input[type='checkbox'] {
+  margin-right: 0.4em;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--primary);
+  padding: 0.25rem 0.9rem;
+  margin: 0.9rem 0;
+  color: var(--text-muted);
+  background: var(--primary-soft);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.markdown-body code,
+.prose-content code {
+  font-family: 'Ubuntu Mono', monospace;
+  font-size: 0.875em;
+  background: var(--surface-3);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  color: var(--accent);
+}
+
+.markdown-body pre,
+.prose-content pre {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 0.9rem 0;
+}
+
+.markdown-body pre code,
+.prose-content pre code {
+  background: none;
+  padding: 0;
+  color: var(--text);
+}
+
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.9rem 0;
+  display: block;
+  overflow-x: auto;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.2rem 0;
+}
+
+/* =========================================================
+   TYPE SELECT (app-type-select)
+   ========================================================= */
+
+.type-select {
+  position: relative;
+}
+
+.type-select__control {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.type-select__control--open,
+.type-select__control:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.type-select__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.type-select__input::placeholder {
+  color: var(--text-faint);
+}
+
+.type-select__clear,
+.type-select__caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.type-select__clear:hover,
+.type-select__caret:hover {
+  color: var(--text);
+}
+
+.type-select__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: 0.25rem;
+}
+
+.type-select__option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.type-select__option:hover {
+  background: var(--surface-2);
+}
+
+.type-select__option.active {
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+  font-weight: 500;
+}
+
+.type-select__option--create {
+  color: var(--primary-hover);
+  font-weight: 500;
+}
+
+.type-select__empty {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* =========================================================
+   JOURNAL — IMMERSIVE WRITING EXPERIENCE
+   ========================================================= */
+
+.journal-writer {
+  max-width: 46rem;
+  margin: 0 auto;
+}
+
+.journal-writer__bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+  background: var(--page-bg);
+}
+
+.journal-writer__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.journal-writer__title {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.25;
+  padding: 0.25rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.journal-writer__title::placeholder {
+  color: var(--text-faint);
+}
+
+.journal-writer__date {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.journal-writer__date:hover {
+  background: var(--surface-2);
+}
+
+.journal-section {
+  margin-top: 1.75rem;
+}
+
+.journal-section__label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 0.5rem;
+}
+
+.journal-textarea {
+  width: 100%;
+  min-height: 3.25rem;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.7rem 0.9rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* Progressive enhancement: auto-size to content where supported */
+@supports (field-sizing: content) {
+  .journal-textarea {
+    field-sizing: content;
+    resize: none;
+  }
+}
+
+.journal-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.journal-textarea::placeholder {
+  color: var(--text-faint);
+}
+
+@media (max-width: 640px) {
+  .journal-writer__title {
+    font-size: 1.5rem;
+  }
+}
+
+/* =========================================================
+   TAB BAR (reusable, theme-aware segmented tabs)
+   ========================================================= */
+
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.tab-bar__btn {
+  padding: 0.5rem 0.85rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 100ms ease, border-color 100ms ease, background 100ms ease;
+}
+
+.tab-bar__btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.tab-bar__btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.tab-bar__btn.active {
+  color: var(--primary-hover);
+  border-bottom-color: var(--primary);
+}
+
+/* Q&A type badge */
+.qa-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--primary-hover);
+  background: var(--primary-soft);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   KNOWLEDGE NOTES
+   ========================================================= */
+
+.kn-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.kn-sidebar {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.5rem;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.kn-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.kn-chapter {
+  margin-bottom: 0.35rem;
+}
+
+.kn-chapter__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: var(--radius-sm);
+}
+
+.kn-chapter__actions {
+  display: inline-flex;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.kn-chapter__actions button {
+  width: 24px;
+  height: 24px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.kn-chapter__actions button:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.kn-section-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.35rem 0.4rem 0.35rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  cursor: pointer;
+}
+
+.kn-section-link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.kn-section-link.active {
+  color: var(--primary-hover);
+  background: var(--primary-soft);
+  border-left-color: var(--primary);
+  font-weight: 500;
+}
+
+.kn-section-title {
+  flex: 1;
+  min-width: 12rem;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.15rem;
+  font-weight: 600;
+  padding: 0.25rem 0;
+}
+
+.kn-section-title:focus {
+  border-bottom: 1px solid var(--border);
+}
+
+@media (min-width: 768px) {
+  .kn-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .kn-sidebar {
+    width: 16rem;
+    max-height: calc(100dvh - 180px);
+    position: sticky;
+    top: 0;
   }
 }
 

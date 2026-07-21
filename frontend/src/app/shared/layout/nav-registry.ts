@@ -28,6 +28,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'career', label: 'Career', route: '/career', category: 'Growth' },
   { id: 'wishlist', label: 'Wishlist', route: '/wishlist', category: 'Growth' },
   { id: 'qa', label: 'Q&A', route: '/qa', category: 'Knowledge' },
+  { id: 'knowledge', label: 'Knowledge Notes', route: '/knowledge', shortLabel: 'Notes', category: 'Knowledge' },
   { id: 'memory', label: 'Memory', route: '/memory', category: 'Knowledge' },
   { id: 'voice', label: 'Voice', route: '/voice', category: 'Knowledge' },
   { id: 'coaches', label: 'Coaches', route: '/coaches', category: 'System' },

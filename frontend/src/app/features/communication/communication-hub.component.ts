@@ -29,13 +29,14 @@ import { CommunicationService } from './services/communication.service';
         </div>
       </div>
 
-      <div class="flex gap-1 border-b border-[var(--xp-border)] text-sm">
+      <div class="tab-bar" role="tablist">
         @for (t of tabs; track t.id) {
           <button
             type="button"
-            class="px-3 py-2"
-            [class.bg-[var(--xp-blue)]="tab() === t.id"
-            [class.text-white]="tab() === t.id"
+            role="tab"
+            class="tab-bar__btn"
+            [class.active]="tab() === t.id"
+            [attr.aria-selected]="tab() === t.id"
             (click)="setTab(t.id)"
           >
             {{ t.label }}
@@ -89,7 +90,7 @@ import { CommunicationService } from './services/communication.service';
               <li class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[var(--surface-2)]">
                 <div>
                   <a [routerLink]="['/communication/writing', w.id]" class="link">{{ w.title }}</a>
-                  <p class="text-xs text-gray-600 capitalize">{{ w.category }}</p>
+                  <p class="text-xs capitalize" style="color: var(--text-muted)">{{ w.category }}</p>
                 </div>
                 <a [routerLink]="['/communication/writing', w.id, 'edit']" class="text-xs underline">Edit</a>
               </li>
@@ -107,7 +108,7 @@ import { CommunicationService } from './services/communication.service';
               <li class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[var(--surface-2)]">
                 <div>
                   <a [routerLink]="['/communication/speaking', s.id]" class="link">{{ s.title }}</a>
-                  <p class="text-xs text-gray-600 capitalize">{{ s.category.replace('_', ' ') }}</p>
+                  <p class="text-xs capitalize" style="color: var(--text-muted)">{{ s.category.replace('_', ' ') }}</p>
                 </div>
                 <a [routerLink]="['/communication/speaking', s.id, 'edit']" class="text-xs underline">Edit</a>
               </li>

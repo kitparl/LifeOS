@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class QACreate(BaseModel):
     question: str = Field(min_length=1)
     answer: str = Field(min_length=1)
+    type: str | None = Field(default=None, max_length=64)
     tags: list[str] = []
     linked_goal_id: str | None = None
     linked_journal_id: str | None = None
@@ -14,9 +15,14 @@ class QACreate(BaseModel):
 class QAUpdate(BaseModel):
     question: str | None = Field(default=None, min_length=1)
     answer: str | None = Field(default=None, min_length=1)
+    type: str | None = Field(default=None, max_length=64)
     tags: list[str] | None = None
     linked_goal_id: str | None = None
     linked_journal_id: str | None = None
+
+
+class QATypeCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
 
 
 class QAVersionResponse(BaseModel):
@@ -32,6 +38,7 @@ class QAListItem(BaseModel):
     id: str
     question: str
     current_answer: str
+    type: str | None = None
     tags: list[str]
     updated_at: datetime
 
@@ -40,6 +47,7 @@ class QAResponse(BaseModel):
     id: str
     question: str
     current_answer: str
+    type: str | None = None
     tags: list[str]
     linked_goal_id: str | None
     linked_journal_id: str | None

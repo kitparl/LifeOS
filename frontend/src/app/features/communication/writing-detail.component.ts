@@ -1,6 +1,8 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { MarkdownService } from '../../shared/markdown/markdown.service';
 import { WritingPractice } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 
@@ -31,8 +33,8 @@ function isHtml(content: string): boolean {
           @if (!w.content) {
             <p class="text-sm" style="color: var(--text-muted); font-style: italic">No content.</p>
           } @else if (contentIsHtml(w.content)) {
-            <!-- TipTap HTML content -->
-            <div class="prose-content ProseMirror" [innerHTML]="w.content"></div>
+            <!-- TipTap HTML content (sanitized) -->
+            <div class="prose-content ProseMirror" [innerHTML]="safe(w.content)"></div>
           } @else {
             <!-- Legacy plain-text content -->
             <div class="text-sm whitespace-pre-wrap" style="color: var(--text)">{{ w.content }}</div>
@@ -55,10 +57,17 @@ export class WritingDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
+  private readonly markdown = inject(MarkdownService);
+  private readonly sanitizer = inject(DomSanitizer);
+
   item: WritingPractice | null = null;
   loading = false;
 
   readonly contentIsHtml = isHtml;
+
+  safe(html: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(this.markdown.sanitize(html));
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');

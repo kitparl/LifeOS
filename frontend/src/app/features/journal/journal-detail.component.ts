@@ -1,57 +1,57 @@
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { JournalEntry } from './models/journal.models';
 import { JournalService } from './services/journal.service';
 
 @Component({
   selector: 'app-journal-detail',
   standalone: true,
-  imports: [RouterLink, DatePipe, TitleCasePipe],
+  imports: [RouterLink, DatePipe, TitleCasePipe, MarkdownPipe],
   template: `
     @if (entry; as e) {
-      <div class="space-y-3">
+      <div class="journal-writer space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h1 class="text-lg font-semibold">{{ e.title || (e.entry_type | titlecase) + ' Journal' }}</h1>
-            <p class="text-xs" style="color: var(--text-muted)">{{ e.entry_date | date: 'fullDate' }} · {{ e.entry_type }}</p>
+            <h1 class="text-2xl font-bold">{{ e.title || (e.entry_type | titlecase) + ' Journal' }}</h1>
+            <p class="text-xs" style="color: var(--text-muted)">
+              {{ e.entry_date | date: 'fullDate' }} · {{ e.entry_type }}
+            </p>
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/journal', e.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
-            <button type="button" class="input-field !w-auto text-xs text-red-700" (click)="remove()">Delete</button>
+            <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
           </div>
         </div>
 
-        <div class="panel text-sm">
-          <p class="font-medium mb-1">Content</p>
-          <p class="whitespace-pre-wrap text-gray-700">{{ e.content }}</p>
-        </div>
+        <div class="markdown-body" [innerHTML]="e.content | markdown"></div>
 
         @if (e.gratitude) {
-          <div class="panel text-sm">
-            <p class="font-medium mb-1">Gratitude</p>
-            <p class="whitespace-pre-wrap text-gray-700">{{ e.gratitude }}</p>
+          <div class="journal-section">
+            <p class="journal-section__label">Gratitude</p>
+            <div class="markdown-body" [innerHTML]="e.gratitude | markdown"></div>
           </div>
         }
         @if (e.wins) {
-          <div class="panel text-sm">
-            <p class="font-medium mb-1">Wins</p>
-            <p class="whitespace-pre-wrap text-gray-700">{{ e.wins }}</p>
+          <div class="journal-section">
+            <p class="journal-section__label">Wins</p>
+            <div class="markdown-body" [innerHTML]="e.wins | markdown"></div>
           </div>
         }
         @if (e.lessons) {
-          <div class="panel text-sm">
-            <p class="font-medium mb-1">Lessons</p>
-            <p class="whitespace-pre-wrap text-gray-700">{{ e.lessons }}</p>
+          <div class="journal-section">
+            <p class="journal-section__label">Lessons Learned</p>
+            <div class="markdown-body" [innerHTML]="e.lessons | markdown"></div>
           </div>
         }
 
-        <a routerLink="/journal" class="text-sm text-[var(--xp-blue)] underline">Back to journal</a>
+        <a routerLink="/journal" class="link text-sm">Back to journal</a>
       </div>
     } @else if (loading) {
       <p class="text-sm">Loading entry…</p>
     } @else {
-      <p class="text-sm text-red-700">Entry not found.</p>
+      <p class="text-sm" style="color: var(--danger)">Entry not found.</p>
     }
   `,
 })
