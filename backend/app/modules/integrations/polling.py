@@ -2,6 +2,9 @@
 
 Started from lifespan only when TELEGRAM_POLLING_ENABLED=true.
 Routes through the same CommandHandler as the webhook path.
+
+When polling is enabled, any Telegram-side webhook is removed so getUpdates
+can receive messages (Telegram forbids webhook + polling together).
 """
 
 from __future__ import annotations
@@ -22,6 +25,37 @@ logger = logging.getLogger(__name__)
 
 _poll_task: asyncio.Task | None = None
 _offsets: dict[str, int] = {}  # connection_id -> next offset
+_webhooks_cleared: set[str] = set()
+
+
+async def _ensure_no_webhook(conn_id: str, user_id: str, bot_token: str) -> None:
+    """Delete Telegram webhook (and clear DB secret) once per connection so polling works."""
+    if conn_id in _webhooks_cleared:
+        return
+    client = TelegramClient(bot_token, timeout=15.0)
+    try:
+        info = await client.get_webhook_info()
+        url = (info.get("url") or "") if isinstance(info, dict) else ""
+        if url:
+            logger.info("Polling: removing Telegram webhook for conn=%s (was %s)", conn_id, url)
+            await client.delete_webhook(drop_pending_updates=False)
+    except TelegramClientError as exc:
+        logger.warning("Polling: get/delete webhook failed for conn=%s: %s", conn_id, exc)
+
+    async with async_session_factory() as session:
+        try:
+            repo = IntegrationRepository(session)
+            conn = await repo.get_by_id(user_id, conn_id)
+            if conn is not None and conn.webhook_secret:
+                conn.webhook_secret = None
+                await session.commit()
+            else:
+                await session.rollback()
+        except Exception:
+            await session.rollback()
+            logger.exception("Polling: failed to clear webhook_secret for conn=%s", conn_id)
+
+    _webhooks_cleared.add(conn_id)
 
 
 async def _process_update(user_id: str, chat_id: str, update: dict[str, Any]) -> None:
@@ -31,17 +65,28 @@ async def _process_update(user_id: str, chat_id: str, update: dict[str, Any]) ->
     chat = msg.get("chat") if isinstance(msg.get("chat"), dict) else {}
     incoming_chat = str(chat.get("id") or "")
     if incoming_chat != chat_id:
-        logger.warning("Polling: ignoring update from unknown chat")
+        logger.warning(
+            "Polling: ignoring update from chat_id=%s (expected %s)",
+            incoming_chat,
+            chat_id,
+        )
         return
     text = str(msg.get("text") or "").strip()
     if not text:
         return
+    logger.info("Polling: handling command from user=%s text=%r", user_id, text[:80])
     async with async_session_factory() as session:
         try:
             reply = await handle_command(session, user_id, text)
             notifier = await build_user_notifier(session, user_id, provider="telegram")
-            if notifier is not None:
-                await notifier.send(NotifierMessage(text=reply, parse_mode="HTML"))
+            if notifier is None:
+                logger.warning("Polling: no notifier for user=%s", user_id)
+            else:
+                result = await notifier.send(NotifierMessage(text=reply, parse_mode="HTML"))
+                if not result.ok:
+                    # Retry without HTML in case parse_mode rejected the body
+                    logger.warning("Polling: HTML send failed (%s); retrying plain", result.detail)
+                    await notifier.send(NotifierMessage(text=reply, parse_mode=""))
             await session.commit()
         except Exception:
             await session.rollback()
@@ -59,15 +104,16 @@ async def _poll_loop() -> None:
                 cfg = parse_config(conn.config_json)
                 if cfg is None:
                     continue
-                # Skip connections that have an active webhook (Telegram forbids both)
-                if conn.webhook_secret:
-                    continue
+                await _ensure_no_webhook(conn.id, conn.user_id, cfg.bot_token)
                 offset = _offsets.get(conn.id)
                 client = TelegramClient(cfg.bot_token, timeout=25.0)
                 try:
                     updates = await client.get_updates(limit=20, timeout=10, offset=offset)
                 except TelegramClientError as exc:
                     logger.warning("getUpdates failed for conn=%s: %s", conn.id, exc)
+                    # Conflict: webhook still set — force clear next iteration
+                    if "webhook" in str(exc).lower() or "Conflict" in str(exc):
+                        _webhooks_cleared.discard(conn.id)
                     continue
                 for update in updates:
                     update_id = update.get("update_id")
@@ -100,3 +146,4 @@ async def stop_polling() -> None:
     except asyncio.CancelledError:
         pass
     _poll_task = None
+    _webhooks_cleared.clear()

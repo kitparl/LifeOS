@@ -76,6 +76,9 @@ class TelegramClient:
         result = data.get("result")
         if method == "getUpdates":
             return {"result": result if isinstance(result, list) else []}
+        # setWebhook / deleteWebhook return boolean true
+        if isinstance(result, bool):
+            return {"ok": result}
         if not isinstance(result, dict):
             raise TelegramClientError("Unexpected Telegram API response shape")
         return result
