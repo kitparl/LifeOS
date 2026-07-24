@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,12 +7,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.integrations.models import INTEGRATION_PROVIDERS
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import (
+    ChatCandidate,
+    DetectChatIdResponse,
     IntegrationCreate,
     IntegrationProviderInfo,
     IntegrationResponse,
     IntegrationSyncResponse,
     IntegrationUpdate,
+    TelegramConfigStatus,
+    TelegramConfigUpdate,
+    TelegramTestResponse,
 )
+from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
+from app.modules.integrations.telegram_config import mask_config, parse_config, serialize_config
+
+logger = logging.getLogger(__name__)
 
 PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
     IntegrationProviderInfo(provider="github", display_name="GitHub", description="Sync repos and commits", oauth_required=True),
@@ -31,13 +41,22 @@ def list_integration_providers() -> list[IntegrationProviderInfo]:
     return PROVIDER_CATALOG
 
 
+def _safe_response(conn) -> IntegrationResponse:
+    """Never expose raw bot tokens in API responses."""
+    resp = IntegrationResponse.model_validate(conn)
+    if conn.provider == "telegram":
+        # Encrypted config is not useful to the client; omit secrets entirely.
+        resp.config_json = None
+    return resp
+
+
 class IntegrationService:
     def __init__(self, db: AsyncSession):
         self.repo = IntegrationRepository(db)
 
     async def list_connections(self, user_id: str) -> list[IntegrationResponse]:
         conns = await self.repo.list_connections(user_id)
-        return [IntegrationResponse.model_validate(c) for c in conns]
+        return [_safe_response(c) for c in conns]
 
     async def create_connection(self, user_id: str, data: IntegrationCreate) -> IntegrationResponse:
         if data.provider not in INTEGRATION_PROVIDERS:
@@ -47,8 +66,12 @@ class IntegrationService:
             raise HTTPException(status.HTTP_409_CONFLICT, "Integration already exists for this provider")
         catalog = next((p for p in PROVIDER_CATALOG if p.provider == data.provider), None)
         display_name = data.display_name or (catalog.display_name if catalog else data.provider)
-        conn = await self.repo.create(user_id, data, display_name)
-        return IntegrationResponse.model_validate(conn)
+        # Telegram secrets must go through save_telegram_config (encrypted).
+        create_data = data
+        if data.provider == "telegram" and data.config_json:
+            create_data = data.model_copy(update={"config_json": None})
+        conn = await self.repo.create(user_id, create_data, display_name)
+        return _safe_response(conn)
 
     async def update_connection(
         self, user_id: str, conn_id: str, data: IntegrationUpdate
@@ -56,8 +79,12 @@ class IntegrationService:
         conn = await self.repo.get_by_id(user_id, conn_id)
         if not conn:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
-        updated = await self.repo.update(conn, data)
-        return IntegrationResponse.model_validate(updated)
+        update_data = data
+        if conn.provider == "telegram" and data.config_json is not None:
+            # Reject raw config_json on generic PATCH; use dedicated telegram config endpoint.
+            update_data = data.model_copy(update={"config_json": None})
+        updated = await self.repo.update(conn, update_data)
+        return _safe_response(updated)
 
     async def delete_connection(self, user_id: str, conn_id: str) -> None:
         conn = await self.repo.get_by_id(user_id, conn_id)
@@ -80,4 +107,146 @@ class IntegrationService:
             status="stub_sync",
             message=f"Stub sync completed for {conn.provider}. Configure OAuth credentials for live sync.",
             synced_at=now,
+        )
+
+    async def get_or_create_telegram(self, user_id: str):
+        conn = await self.repo.get_by_provider(user_id, "telegram")
+        if conn is not None:
+            return conn
+        return await self.repo.create(
+            user_id,
+            IntegrationCreate(provider="telegram", enabled=False),
+            "Telegram",
+        )
+
+    async def get_telegram_status(self, user_id: str) -> TelegramConfigStatus:
+        conn = await self.get_or_create_telegram(user_id)
+        masked = mask_config(conn.config_json)
+        return TelegramConfigStatus(
+            connection_id=conn.id,
+            enabled=conn.enabled,
+            status=conn.status,
+            configured=masked.configured,
+            bot_token_masked=masked.bot_token_masked,
+            chat_id=masked.chat_id,
+            last_sync_at=conn.last_sync_at,
+            last_digest_at=getattr(conn, "last_digest_at", None),
+        )
+
+    async def save_telegram_config(self, user_id: str, data: TelegramConfigUpdate) -> TelegramConfigStatus:
+        conn = await self.get_or_create_telegram(user_id)
+        if data.bot_token is None and data.chat_id is None and data.enabled is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+
+        new_json = conn.config_json
+        if data.bot_token is not None or data.chat_id is not None:
+            new_json = serialize_config(
+                bot_token=data.bot_token,
+                chat_id=data.chat_id,
+                existing_json=conn.config_json,
+            )
+
+        update = IntegrationUpdate(config_json=new_json)
+        if data.enabled is not None:
+            update.enabled = data.enabled
+        elif parse_config(new_json) is not None:
+            # Auto-enable when credentials become complete unless explicitly disabled
+            update.enabled = True
+
+        updated = await self.repo.update(conn, update)
+        if parse_config(updated.config_json) is not None and updated.enabled:
+            updated.status = "connected"
+            await self.repo.db.flush()
+        return await self.get_telegram_status(user_id)
+
+    async def test_connection(self, user_id: str, conn_id: str) -> TelegramTestResponse:
+        conn = await self.repo.get_by_id(user_id, conn_id)
+        if not conn:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+        if conn.provider != "telegram":
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Test is only supported for Telegram")
+
+        cfg = parse_config(conn.config_json)
+        if cfg is None:
+            return TelegramTestResponse(ok=False, detail="Telegram not configured")
+
+        client = TelegramClient(cfg.bot_token)
+        try:
+            me = await client.get_me()
+            username = me.get("username")
+            await client.send_message(
+                cfg.chat_id,
+                "✅ LifeOS Telegram connection test succeeded.",
+                parse_mode="HTML",
+            )
+            now = datetime.now(timezone.utc)
+            conn.last_sync_at = now
+            conn.status = "connected"
+            await self.repo.db.flush()
+            return TelegramTestResponse(
+                ok=True,
+                detail="Test message sent",
+                bot_username=str(username) if username else None,
+            )
+        except TelegramClientError as exc:
+            conn.status = "error"
+            await self.repo.db.flush()
+            return TelegramTestResponse(ok=False, detail=str(exc) or "Telegram test failed")
+
+    async def detect_chat_id(
+        self,
+        user_id: str,
+        conn_id: str,
+        bot_token_override: str | None = None,
+    ) -> DetectChatIdResponse:
+        conn = await self.repo.get_by_id(user_id, conn_id)
+        if not conn:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+        if conn.provider != "telegram":
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Detect chat id is only for Telegram")
+
+        token = (bot_token_override or "").strip()
+        if not token:
+            cfg = parse_config(conn.config_json)
+            if cfg is None:
+                return DetectChatIdResponse(
+                    candidates=[],
+                    detail="Provide a bot token or save one first, then message the bot.",
+                )
+            token = cfg.bot_token
+
+        client = TelegramClient(token)
+        try:
+            updates = await client.get_updates(limit=50)
+        except TelegramClientError as exc:
+            return DetectChatIdResponse(candidates=[], detail=str(exc) or "Failed to fetch updates")
+
+        seen: dict[str, ChatCandidate] = {}
+        for update in updates:
+            message = update.get("message") or update.get("channel_post") or {}
+            chat = message.get("chat") if isinstance(message, dict) else None
+            if not isinstance(chat, dict) or chat.get("id") is None:
+                continue
+            chat_id = str(chat["id"])
+            if chat_id in seen:
+                continue
+            title = chat.get("title") or " ".join(
+                p for p in [chat.get("first_name"), chat.get("last_name")] if p
+            ) or None
+            seen[chat_id] = ChatCandidate(
+                chat_id=chat_id,
+                type=chat.get("type"),
+                title=title,
+                username=chat.get("username"),
+            )
+
+        candidates = list(seen.values())
+        if not candidates:
+            return DetectChatIdResponse(
+                candidates=[],
+                detail="No chats found. Open your bot in Telegram, press Start (or send a message), then try again.",
+            )
+        return DetectChatIdResponse(
+            candidates=candidates,
+            detail=f"Found {len(candidates)} chat(s).",
         )

@@ -55,12 +55,21 @@ class NotificationService:
         n = await self.repo.get_by_id(user_id, notification_id)
         if n is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
-        settings = await self.repo.get_settings(user_id)
-        if not settings.telegram_enabled or not settings.telegram_chat_id:
+
+        from app.modules.integrations.notifier import NotifierMessage
+        from app.modules.integrations.notifier_registry import build_user_notifier
+
+        notifier = await build_user_notifier(self.repo.db, user_id, provider="telegram")
+        if notifier is None:
             return TelegramSendResponse(sent=False, detail="Telegram not configured")
+
+        result = await notifier.send(NotifierMessage(text=n.message, parse_mode="HTML"))
+        if not result.ok:
+            return TelegramSendResponse(sent=False, detail=result.detail or "Telegram send failed")
+
         n.telegram_sent = True
         await self.repo.db.flush()
-        return TelegramSendResponse(sent=True, detail="Telegram delivery queued (stub)")
+        return TelegramSendResponse(sent=True, detail="Telegram message sent")
 
     async def get_dashboard_notifications(self, user_id: str, limit: int = 5) -> list[NotificationResponse]:
         return await self.list_notifications(user_id, unread_only=True, limit=limit)

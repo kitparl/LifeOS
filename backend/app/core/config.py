@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     ai_chat_model: str = "gpt-4o-mini"
     ai_embedding_model: str = "text-embedding-3-small"
+    # Fernet key (url-safe base64-encoded 32 bytes) for encrypting integration secrets at rest.
+    # If empty, a stable key is derived from secret_key. Prefer setting this in production.
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Production APIs that handle bot tokens MUST be served over HTTPS (TLS terminated at reverse proxy).
+    integration_enc_key: str = Field(default="", validation_alias="INTEGRATION_ENC_KEY")
 
     @field_validator("database_url", mode="before")
     @classmethod
