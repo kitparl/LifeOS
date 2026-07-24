@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.events import HABIT_CREATED, EntityCreated, event_bus
 from app.modules.habits.repository import HabitRepository
 from app.modules.habits.schemas import (
     HabitCreate,
@@ -73,6 +74,17 @@ class HabitService:
 
     async def create_habit(self, user_id: str, data: HabitCreate) -> HabitResponse:
         habit = await self.repo.create(user_id, data)
+        await event_bus.emit(
+            self.repo.db,
+            EntityCreated(
+                event_type=HABIT_CREATED,
+                user_id=user_id,
+                entity_id=habit.id,
+                title=habit.name,
+                when=habit.frequency,
+                module="habits",
+            ),
+        )
         return self._to_response(habit)
 
     async def update_habit(self, user_id: str, habit_id: str, data: HabitUpdate) -> HabitResponse:

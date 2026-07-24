@@ -1,8 +1,8 @@
-# 🧠 Personal AI Operating System (LifeOS)
+# LifeOS — Personal AI Operating System
 
 > **Version:** 1.0 (Personal Alpha)  
 > **Author:** Pranshu Bisht  
-> **Status:** Phase 3 Complete — ready for personal use & private Heroku deploy  
+> **Status:** Phase 3 complete — ready for personal use & private deploy  
 > **Architecture:** Offline First • AI Powered • Mobile Friendly • Personal Knowledge System
 
 ---
@@ -14,23 +14,27 @@
 | [PHASE-1.md](docs/PHASE-1.md) | Foundation MVP (auth, goals, tasks, habits, PWA, …) |
 | [PHASE-2.md](docs/PHASE-2.md) | Intelligence (AI RAG, learning, finance, analytics, …) |
 | [PHASE-3.md](docs/PHASE-3.md) | Full AI OS (memory, coaches, OCR, voice, …) |
-| [improvements/v1.md](improvements/v1.md) | Release readiness & what to improve before public v1.0 |
+| [TELEGRAM_NOTIFIER.md](TELEGRAM_NOTIFIER.md) | Telegram companion — setup, events, commands, digests |
+| [requirements/v1.md](requirements/v1.md) | Release readiness & what to improve before public v1.0 |
 | [DEPLOY_HEROKU.md](docs/DEPLOY_HEROKU.md) | Deploy to Heroku (~$13/mo, GitHub Student) |
+| [SSL_CADDY.md](docs/SSL_CADDY.md) | HTTPS / Caddy reverse proxy notes |
 | [ROADMAP.md](docs/ROADMAP.md) | Original product roadmap |
 | [runProject.md](runProject.md) | Run locally (dev) |
 
 ---
 
-## Project status (June 2026)
+## Project status (July 2026)
 
-**All 27 units delivered** (Phase 1: 0–11, Phase 2: 12–18, Phase 3: 19–26).
+**All 27 units delivered** (Phase 1: 0–11, Phase 2: 12–18, Phase 3: 19–26).  
+**Telegram Phase 2** is live: event push, two-way bot commands, scheduled digests, webhook + polling.
 
 | Area | Status |
 |------|--------|
 | Feature roadmap | ✅ Complete |
 | Personal / private use | ✅ Ready |
-| Tests | ✅ 39 backend + 18 frontend |
-| Public production release | ⚠️ See [improvements/v1.md](improvements/v1.md) |
+| Telegram companion | ✅ Phase 1 + Phase 2 |
+| Tests | ✅ 69 backend (pytest) + 14 frontend (Karma) |
+| Public production release | ⚠️ See [requirements/v1.md](requirements/v1.md) |
 
 **Not production-complete yet:** Alembic migrations, CI/CD, rate limiting, Playwright e2e, live integration OAuth, full OCR for images/PDF. Fine for personal alpha.
 
@@ -44,7 +48,7 @@
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt email-validator
-cp .env.example .env   # edit SECRET_KEY, OPENAI_API_KEY optional
+cp .env.example .env   # edit SECRET_KEY; set OPENAI_API_KEY / INTEGRATION_ENC_KEY as needed
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -56,7 +60,20 @@ npm install --legacy-peer-deps
 npm start
 ```
 
-Open http://localhost:4200 — API at http://localhost:8000/api/v1.
+Open http://localhost:4200 — API at http://localhost:8000/api/v1.  
+Health check: http://localhost:8000/health.  
+API docs (dev only): http://localhost:8000/docs.
+
+### Useful env (`backend/.env`)
+
+| Variable | Purpose |
+|----------|---------|
+| `ENV=dev` | Local development (insecure cookies OK, `/docs` enabled) |
+| `SECRET_KEY` | JWT / crypto base |
+| `INTEGRATION_ENC_KEY` | Fernet key for bot tokens at rest (recommended) |
+| `OPENAI_API_KEY` | Optional — AI chat, coaches, embeddings |
+| `PUBLIC_BASE_URL` | HTTPS API URL for Telegram `setWebhook` |
+| `TELEGRAM_POLLING_ENABLED=true` | Dev fallback when you have no public HTTPS |
 
 ---
 
@@ -69,11 +86,13 @@ Single-app deploy: FastAPI serves the Angular build + API. Uses Heroku Postgres.
 ```bash
 heroku create lifeos-yourname
 heroku addons:create heroku-postgresql:essential-0
-heroku config:set SECRET_KEY="$(openssl rand -hex 32)" COOKIE_SECURE=true
+heroku config:set SECRET_KEY="$(openssl rand -hex 32)" COOKIE_SECURE=true ENV=production
 heroku buildpacks:add --index 1 heroku/nodejs
 heroku buildpacks:add --index 2 heroku/python
 git push heroku main
 ```
+
+For a VPS with HTTPS (needed for Telegram webhooks), see [docs/SSL_CADDY.md](docs/SSL_CADDY.md).
 
 ---
 
@@ -81,19 +100,21 @@ git push heroku main
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Angular 19 (standalone), Tailwind, Dexie, PWA service worker |
-| Backend | FastAPI, SQLAlchemy 2 async, Pydantic |
-| Database (dev) | SQLite |
-| Database (prod) | PostgreSQL (Heroku Postgres) |
-| Auth | JWT + HttpOnly refresh cookie |
+| Frontend | Angular 19 (standalone), Tailwind 4, Dexie, PWA service worker, FullCalendar, TipTap |
+| Backend | FastAPI, SQLAlchemy 2 async, Pydantic Settings |
+| Database (dev) | SQLite (`aiosqlite`) |
+| Database (prod) | PostgreSQL (Heroku Postgres / self-hosted) |
+| Auth | JWT access + HttpOnly refresh cookie |
 | AI | OpenAI (optional), local RAG index |
-| Tests | pytest, Karma/Jasmine |
+| Integrations | Telegram Bot API, Fernet-encrypted secrets, transactional outbox |
+| Scheduling | APScheduler (`AsyncIOScheduler`) — digests + outbox drain |
+| Tests | pytest / pytest-asyncio, Karma / Jasmine |
 
 ---
 
 ## Modules (API `/api/v1`)
 
-**Phase 1:** auth, dashboard, goals, tasks, habits, running, calendar, journal, mood, communication, qa, wishlist, search, notifications, export, files  
+**Phase 1:** auth, dashboard, goals, tasks, habits, running, calendar, journal, mood, communication, qa, wishlist, knowledge-notes, search, notifications, export, files  
 
 **Phase 2:** ai, learning, career, finance, analytics, timeline, reports  
 
@@ -101,528 +122,9 @@ git push heroku main
 
 ---
 
-# Vision
+## Creating users (manual)
 
-Personal AI Operating System (AI OS) is an intelligent life management platform designed to become my **second brain**.
-
-The goal is to eliminate the need for multiple disconnected applications by providing a unified platform for productivity, learning, finance, running, journaling, communication improvement, AI assistance, analytics, and life history.
-
-Instead of using:
-
-- Notion
-- Google Keep
-- Google Calendar
-- Strava
-- TickTick
-- ChatGPT
-- Excel
-- Habit Tracker
-- Notes
-- Journal Apps
-- Expense Tracker
-
-everything should exist inside a single connected ecosystem.
-
-The application should continuously learn from my data and provide intelligent recommendations based on my history, goals, and current progress.
-
----
-
-# Product Goals
-
-The application should help me become better every day.
-
-Main areas include:
-
-- Productivity
-- Career Growth
-- Backend Engineering
-- AI Learning
-- Communication Improvement
-- Running & Marathon Preparation
-- Finance
-- Personal Growth
-- Journaling
-- Knowledge Management
-- Decision Making
-
----
-
-# Core Philosophy
-
-This application is **not a Todo App**.
-
-This application is **not a Note Taking App**.
-
-This application is **not a Habit Tracker**.
-
-This application is an **Operating System for my life.**
-
-Everything inside the application should be connected.
-
-Examples:
-
-Sleep
-↓
-
-Mood
-
-↓
-
-Productivity
-
-↓
-
-Coding Hours
-
-↓
-
-Learning Progress
-
-↓
-
-Career Growth
-
-Similarly
-
-Running
-
-↓
-
-Health
-
-↓
-
-Confidence
-
-↓
-
-Communication
-
-↓
-
-Interview Performance
-
-↓
-
-Career Opportunities
-
-AI should identify these relationships automatically.
-
----
-
-# Design Philosophy
-
-## Simplicity First
-
-I do not want fancy interfaces.
-
-I prefer professional desktop software.
-
-UI Inspiration
-
-- Windows XP
-- Visual Studio Code
-- IntelliJ IDEA
-- GitHub
-- pgAdmin
-- Jira
-
-Avoid
-
-- Glassmorphism
-- Heavy shadows
-- Large gradients
-- Fancy transitions
-- Unnecessary animations
-
-Use
-
-- Compact UI
-- Information Dense Layout
-- Keyboard Friendly
-- Lightweight Components
-- Fast Navigation
-
-Functionality is always more important than appearance.
-
----
-
-# Primary Principles
-
-The application must be
-
-✅ Fast
-
-✅ Reliable
-
-✅ Offline First
-
-✅ AI Powered
-
-✅ Mobile Friendly
-
-✅ Desktop Friendly
-
-✅ Installable (PWA)
-
-✅ Secure
-
-✅ Easy to Maintain
-
----
-
-# Offline First Philosophy
-
-Internet should never be a requirement.
-
-The application should work normally even without internet.
-
-When offline
-
-- Create Tasks
-- Update Goals
-- Complete Habits
-- Write Journals
-- Add Expenses
-- Record Running Practice
-- Upload Metadata
-
-Everything should continue working.
-
-Whenever internet becomes available
-
-Synchronization should happen automatically.
-
-No manual sync required.
-
-The user should only see
-
-"Syncing..."
-
-then
-
-"Everything is up to date."
-
----
-
-# AI Philosophy
-
-AI should never behave like a generic chatbot.
-
-Instead
-
-AI must answer using
-
-- Goals
-- Tasks
-- Journals
-- Running History
-- Finance
-- Learning
-- Career
-- Personal Q&A
-- Communication Notes
-- Uploaded Documents
-- Previous AI Conversations
-
-If relevant personal data exists
-
-Always use it.
-
-Only use general knowledge when personal data is unavailable.
-
----
-
-# Complete Product Modules
-
-## Foundation
-
-- Authentication
-- Dashboard
-- Profile
-- Settings
-- Notifications
-
----
-
-## Productivity
-
-- Goals
-- Tasks
-- Habits
-- Calendar
-- Journal
-- Notes
-- Timeline
-
----
-
-## Running
-
-- Practice Sessions
-- Marathon Goals
-- Race Events
-- Personal Best
-- Running History
-
----
-
-## Learning
-
-- Books
-- Courses
-- Certifications
-- Coding Practice
-- Study Sessions
-
----
-
-## Career
-
-- Resume
-- Projects
-- Interview Preparation
-- Job Applications
-- GitHub Progress
-
----
-
-## Communication
-
-- Vocabulary
-- Writing Practice
-- Speaking Practice
-- Mock Interviews
-- Grammar Improvement
-
----
-
-## Finance
-
-- Income
-- Expenses
-- Savings
-- Investments
-- Loan Tracking
-- Financial Goals
-
----
-
-## Personal Growth
-
-- Wishlist
-- Bucket List
-- Personal Q&A
-- Life Timeline
-- Memories
-
----
-
-## AI
-
-- Personal Assistant
-- Daily Planner
-- Weekly Review
-- Monthly Review
-- Running Coach
-- Finance Advisor
-- Learning Coach
-- Career Coach
-- Communication Coach
-
----
-
-## Analytics
-
-Everything should be measurable.
-
-Every module should contain
-
-History
-
-Statistics
-
-Charts
-
-Insights
-
-Progress
-
-Achievements
-
-AI Recommendations
-
----
-
-# Storage Philosophy
-
-Large files should never be stored inside PostgreSQL.
-
-PostgreSQL stores
-
-- Metadata
-- References
-- Relationships
-
-Amazon S3 stores
-
-- Images
-- PDFs
-- Certificates
-- Journal Images
-- Running Photos
-- Resume Versions
-- Reports
-- Bucket List Photos
-- OCR Documents
-
----
-
-# Synchronization Philosophy
-
-Synchronization is one of the most important parts of the application.
-
-Every operation should be
-
-Create
-
-Update
-
-Delete
-
-↓
-
-Stored Locally
-
-↓
-
-Displayed Immediately
-
-↓
-
-Added To Sync Queue
-
-↓
-
-Automatically Synced
-
-↓
-
-Marked Completed
-
-The application should never feel blocked because of the network.
-
----
-
-# Performance Philosophy
-
-Target
-
-Instant UI
-
-Requirements
-
-- Lazy Loading
-- Background Sync
-- API Caching
-- Optimistic Updates
-- Virtual Lists
-- Pagination
-- Small Bundle Size
-
-The application should feel similar to native desktop software.
-
----
-
-# Telegram Integration
-
-Telegram should act as a lightweight companion application.
-
-Capabilities
-
-- Daily Briefing
-- Evening Summary
-- Weekly Review
-- AI Chat
-- Quick Expense
-- Quick Journal
-- Quick Running Log
-- Quick Task Creation
-- Notifications
-
-Example
-
-Expense 320 Lunch
-
-↓
-
-Automatically added.
-
-Ran 12km 1h10m
-
-↓
-
-Running history updated.
-
----
-
-# Export Philosophy
-
-Every important piece of data should be exportable.
-
-Supported formats
-
-- PDF
-- CSV
-- Excel
-- JSON
-
-Examples
-
-Running Report
-
-Finance Report
-
-Learning Report
-
-Life Summary
-
-Year Review
-
-AI Progress Report
-
-Resume Timeline
-
----
-
-# Integrations
-
-The application should support integrations with external services wherever they provide value.
-
-Initial Integrations
-
-- Telegram Bot
-- GitHub
-- Google Calendar
-
-Planned Integrations
-
-- Google Fit
-- Apple Health
-- Garmin
-- Strava
-- OpenAI
-- Gemini
-- Email Provider
-- OCR Services
-
-All integrations should be modular so they can be enabled or disabled independently.
-
----
-
-## Creating Users (Manual)
-
-Registration is disabled in the UI. Use the following `curl` command to create a new user directly via the backend API:
+Registration is disabled in the UI. Create a user via the API:
 
 ```bash
 # Local development
@@ -644,42 +146,167 @@ curl -c cookies.txt -X POST https://YOUR_DOMAIN/api/v1/auth/register \
   }'
 ```
 
-The response includes an `access_token`. The `cookies.txt` file saves the `refresh_token` HttpOnly cookie for subsequent requests.
+The response includes an `access_token`. `cookies.txt` saves the `refresh_token` HttpOnly cookie.
 
 ---
 
-# Long Term Goal
+# Vision
 
-Five years from now this application should contain
+Personal AI Operating System (AI OS) is an intelligent life management platform designed to become a **second brain**.
 
-Every Goal
+The goal is to eliminate the need for multiple disconnected applications by providing a unified platform for productivity, learning, finance, running, journaling, communication improvement, AI assistance, analytics, and life history.
 
-Every Achievement
+Instead of using Notion, Google Keep, Google Calendar, Strava, TickTick, ChatGPT, Excel, habit trackers, notes, journals, and expense apps separately — everything should live in one connected ecosystem.
 
-Every Journal
-
-Every Running Practice
-
-Every Marathon
-
-Every Expense
-
-Every Resume
-
-Every Interview
-
-Every Book
-
-Every Course
-
-Every AI Conversation
-
-Every Dream
-
-Every Memory
-
-Everything that represents my personal and professional growth.
-
-This should become the single application I open every morning and the last application I close before sleeping.
+The application should continuously learn from personal data and provide intelligent recommendations based on history, goals, and current progress.
 
 ---
+
+# Product goals
+
+Help become better every day across:
+
+- Productivity
+- Career growth & backend engineering
+- AI learning
+- Communication improvement
+- Running & marathon preparation
+- Finance
+- Personal growth, journaling & knowledge management
+- Decision making
+
+---
+
+# Core philosophy
+
+This is **not** a todo app, note app, or habit tracker.
+
+This is an **operating system for life.**
+
+Everything inside should be connected — for example sleep → mood → productivity → learning → career, or running → health → confidence → communication → interviews → career opportunities. AI should identify these relationships automatically.
+
+---
+
+# Design philosophy
+
+## Simplicity first
+
+Prefer professional desktop-software density over decorative UI.
+
+**Inspiration:** VS Code, IntelliJ, GitHub, pgAdmin, Jira  
+
+**Avoid:** glassmorphism, heavy shadows, large gradients, unnecessary animation  
+
+**Use:** compact layout, keyboard-friendly navigation, lightweight components, fast paths  
+
+Functionality always beats appearance.
+
+---
+
+# Primary principles
+
+The application must be:
+
+- Fast & reliable
+- Offline first
+- AI powered
+- Mobile & desktop friendly
+- Installable (PWA)
+- Secure
+- Easy to maintain
+
+---
+
+# Offline first
+
+Internet should never be a hard requirement. Offline, the user can still create tasks, update goals, complete habits, write journals, add expenses, log runs, and upload metadata.
+
+When connectivity returns, sync happens automatically via a queue — the user only sees “Syncing…” then “Everything is up to date.”
+
+---
+
+# AI philosophy
+
+AI must not behave like a generic chatbot. Prefer answering from personal data: goals, tasks, journals, running, finance, learning, career, Q&A, communication notes, documents, and prior AI conversations. Use general knowledge only when personal data is unavailable.
+
+---
+
+# Product modules
+
+| Area | Includes |
+|------|----------|
+| Foundation | Auth, dashboard, profile, settings, notifications |
+| Productivity | Goals, tasks, habits, calendar, journal, knowledge notes, timeline |
+| Running | Practice sessions, marathon goals, races, PBs, history |
+| Learning | Books, courses, certifications, coding practice, study sessions |
+| Career | Resume, projects, interview prep, applications, GitHub progress |
+| Communication | Vocabulary, writing/speaking practice, mock interviews |
+| Finance | Income, expenses, savings, investments, loans, financial goals |
+| Personal growth | Wishlist, bucket list, personal Q&A, life timeline, memories |
+| AI | Assistant, daily/weekly/monthly reviews, domain coaches |
+| Analytics | History, stats, charts, insights, achievements, recommendations |
+
+---
+
+# Storage philosophy
+
+Large files should not live in PostgreSQL.
+
+- **PostgreSQL / SQLite:** metadata, references, relationships  
+- **Object storage (S3 or local uploads in alpha):** images, PDFs, certificates, OCR docs, resumes, reports  
+
+---
+
+# Synchronization philosophy
+
+Every create / update / delete is stored locally, shown immediately, queued for sync, then marked complete when the server confirms. The UI should never feel blocked by the network.
+
+---
+
+# Performance philosophy
+
+Target: instant UI — lazy loading, background sync, API caching, optimistic updates, virtual lists, pagination, and a small bundle. The product should feel like native desktop software.
+
+---
+
+# Telegram integration
+
+Telegram is a **built-in companion channel** (not just a plan). Full setup: [TELEGRAM_NOTIFIER.md](TELEGRAM_NOTIFIER.md).
+
+**What works today**
+
+- Encrypted bot token + chat id per user
+- Event push on create (tasks, running, calendar, habits, goals / milestones) via domain events + transactional outbox
+- Per-event `notify_on` toggles and scheduled digests (daily/weekly, timezone-aware)
+- Two-way commands: `/help`, `/tasks`, `/today`, `/done <id>`, `/habits`, `/goals`
+- Webhook on HTTPS (`PUBLIC_BASE_URL`) or long-polling in local/dev
+- Integrations UI: credentials, notify-on, digest schedule, webhook register/status, test & manual digest
+
+**Planned / not yet**
+
+- Natural-language quick capture (“Expense 320 Lunch”, “Ran 12km…”) as free-form parsing
+- AI chat over Telegram
+
+---
+
+# Export philosophy
+
+Important data should be exportable (PDF, CSV, Excel, JSON) — running, finance, learning, life summary, year review, AI progress, resume timeline.
+
+---
+
+# Integrations
+
+Modular integrations, independently enableable:
+
+| Status | Integration |
+|--------|-------------|
+| ✅ Built | Telegram bot (notify, commands, digests) |
+| Planned | GitHub, Google Calendar, Google Fit / Apple Health / Garmin / Strava |
+| Optional / planned | OpenAI, Gemini, email, OCR services |
+
+---
+
+# Long-term goal
+
+Five years from now this application should hold every goal, achievement, journal, run, marathon, expense, resume, interview, book, course, AI conversation, dream, and memory — the single app opened every morning and closed last at night.

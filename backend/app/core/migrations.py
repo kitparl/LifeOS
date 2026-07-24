@@ -35,6 +35,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("qa_entries", "type", "VARCHAR(64)"),
     # Integrations: digest bookkeeping for Telegram (and future schedulers)
     ("integration_connections", "last_digest_at", "TIMESTAMP"),
+    # Integrations: per-connection Telegram webhook path secret
+    ("integration_connections", "webhook_secret", "VARCHAR(64)"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [

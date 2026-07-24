@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.events import CALENDAR_EVENT_CREATED, EntityCreated, event_bus
 from app.modules.calendar.models import CalendarEvent
 from app.modules.calendar.repository import CalendarRepository
 from app.modules.calendar.schemas import EventCreate, EventListItem, EventResponse, EventUpdate
@@ -29,6 +30,18 @@ class CalendarService:
 
     async def create_event(self, user_id: str, data: EventCreate) -> EventResponse:
         event = await self.repo.create(user_id, data)
+        when = event.starts_at.strftime("%Y-%m-%d %H:%M") if event.starts_at else None
+        await event_bus.emit(
+            self.db,
+            EntityCreated(
+                event_type=CALENDAR_EVENT_CREATED,
+                user_id=user_id,
+                entity_id=event.id,
+                title=event.title,
+                when=when,
+                module="calendar",
+            ),
+        )
         return EventResponse.model_validate(event)
 
     async def update_event(self, user_id: str, event_id: str, data: EventUpdate) -> EventResponse:

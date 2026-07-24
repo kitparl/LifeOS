@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.events import TASK_CREATED, EntityCreated, event_bus
 from app.modules.tasks.repository import TaskRepository
 from app.modules.tasks.schemas import TaskCreate, TaskListItem, TaskResponse, TaskUpdate
 
@@ -49,6 +50,18 @@ class TaskService:
             if parent is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent task not found")
         task = await self.repo.create(user_id, data)
+        due = task.due_date.date().isoformat() if task.due_date else None
+        await event_bus.emit(
+            self.repo.db,
+            EntityCreated(
+                event_type=TASK_CREATED,
+                user_id=user_id,
+                entity_id=task.id,
+                title=task.title,
+                when=due,
+                module="tasks",
+            ),
+        )
         return TaskResponse.from_model(task)
 
     async def update_task(self, user_id: str, task_id: str, data: TaskUpdate) -> TaskResponse:

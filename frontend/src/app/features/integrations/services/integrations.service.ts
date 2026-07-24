@@ -29,6 +29,14 @@ export interface TelegramConfigStatus {
   chat_id: string | null;
   last_sync_at: string | null;
   last_digest_at: string | null;
+  notify_on: string[];
+  digest_enabled: boolean;
+  digest_time: string;
+  digest_frequency: string;
+  digest_weekday: number;
+  timezone: string;
+  webhook_configured: boolean;
+  webhook_url: string | null;
 }
 
 export interface TelegramTestResponse {
@@ -54,6 +62,29 @@ export interface DigestResponse {
   detail: string;
   sections: Record<string, number>;
 }
+
+export interface TelegramWebhookStatus {
+  configured: boolean;
+  url: string | null;
+  pending_update_count: number | null;
+  last_error_message: string | null;
+  detail: string;
+}
+
+export interface TelegramWebhookRegisterResponse {
+  ok: boolean;
+  detail: string;
+  webhook_url: string | null;
+}
+
+export const TELEGRAM_EVENT_OPTIONS: { key: string; label: string }[] = [
+  { key: 'task_created', label: 'New task' },
+  { key: 'race_added', label: 'New race' },
+  { key: 'calendar_event_created', label: 'New calendar event' },
+  { key: 'habit_created', label: 'New habit' },
+  { key: 'goal_created', label: 'New goal' },
+  { key: 'goal_milestone_added', label: 'Goal milestone' },
+];
 
 @Injectable({ providedIn: 'root' })
 export class IntegrationsService {
@@ -92,6 +123,12 @@ export class IntegrationsService {
     bot_token?: string | null;
     chat_id?: string | null;
     enabled?: boolean | null;
+    notify_on?: string[] | null;
+    digest_enabled?: boolean | null;
+    digest_time?: string | null;
+    digest_frequency?: string | null;
+    digest_weekday?: number | null;
+    timezone?: string | null;
   }): Observable<TelegramConfigStatus> {
     return this.http.put<TelegramConfigStatus>(`${this.api}/telegram/config`, body);
   }
@@ -106,5 +143,17 @@ export class IntegrationsService {
 
   sendDigest(): Observable<DigestResponse> {
     return this.http.post<DigestResponse>(`${this.api}/telegram/digest`, {});
+  }
+
+  getWebhookStatus(): Observable<TelegramWebhookStatus> {
+    return this.http.get<TelegramWebhookStatus>(`${this.api}/telegram/webhook`);
+  }
+
+  registerWebhook(): Observable<TelegramWebhookRegisterResponse> {
+    return this.http.post<TelegramWebhookRegisterResponse>(`${this.api}/telegram/webhook/register`, {});
+  }
+
+  deleteWebhook(): Observable<TelegramWebhookRegisterResponse> {
+    return this.http.delete<TelegramWebhookRegisterResponse>(`${this.api}/telegram/webhook`);
   }
 }

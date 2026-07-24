@@ -48,6 +48,12 @@ class TelegramConfigUpdate(BaseModel):
     bot_token: str | None = Field(default=None, max_length=200)
     chat_id: str | None = Field(default=None, max_length=64)
     enabled: bool | None = None
+    notify_on: list[str] | None = None
+    digest_enabled: bool | None = None
+    digest_time: str | None = Field(default=None, max_length=5)
+    digest_frequency: str | None = Field(default=None, max_length=16)
+    digest_weekday: int | None = Field(default=None, ge=0, le=6)
+    timezone: str | None = Field(default=None, max_length=64)
 
 
 class TelegramConfigStatus(BaseModel):
@@ -60,6 +66,29 @@ class TelegramConfigStatus(BaseModel):
     chat_id: str | None = None
     last_sync_at: datetime | None = None
     last_digest_at: datetime | None = None
+    notify_on: list[str] = Field(default_factory=list)
+    digest_enabled: bool = False
+    digest_time: str = "08:00"
+    digest_frequency: str = "daily"
+    digest_weekday: int = 0
+    timezone: str = "UTC"
+    webhook_configured: bool = False
+    webhook_url: str | None = None
+
+
+class TelegramWebhookStatus(BaseModel):
+    configured: bool
+    url: str | None = None
+    pending_update_count: int | None = None
+    last_error_message: str | None = None
+    detail: str = ""
+
+
+class TelegramWebhookRegisterResponse(BaseModel):
+    ok: bool
+    detail: str
+    webhook_url: str | None = None
+
 
 
 class TelegramTestResponse(BaseModel):

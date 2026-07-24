@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.events import GOAL_CREATED, GOAL_MILESTONE_ADDED, EntityCreated, event_bus
 from app.modules.goals.repository import GoalRepository
 from app.modules.goals.schemas import (
     GoalCreate,
@@ -44,6 +45,18 @@ class GoalService:
 
     async def create_goal(self, user_id: str, data: GoalCreate) -> GoalResponse:
         goal = await self.repo.create(user_id, data)
+        target = goal.target_date.date().isoformat() if goal.target_date else None
+        await event_bus.emit(
+            self.repo.db,
+            EntityCreated(
+                event_type=GOAL_CREATED,
+                user_id=user_id,
+                entity_id=goal.id,
+                title=goal.title,
+                when=target,
+                module="goals",
+            ),
+        )
         return GoalResponse.model_validate(goal)
 
     async def update_goal(self, user_id: str, goal_id: str, data: GoalUpdate) -> GoalResponse:
@@ -71,6 +84,17 @@ class GoalService:
         if goal is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
         milestone = await self.repo.add_milestone(goal, data)
+        await event_bus.emit(
+            self.repo.db,
+            EntityCreated(
+                event_type=GOAL_MILESTONE_ADDED,
+                user_id=user_id,
+                entity_id=milestone.id,
+                title=f"{goal.title}: {milestone.title}",
+                when=None,
+                module="goals",
+            ),
+        )
         return MilestoneResponse.model_validate(milestone)
 
     async def update_milestone(

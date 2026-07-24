@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     # Production APIs that handle bot tokens MUST be served over HTTPS (TLS terminated at reverse proxy).
     integration_enc_key: str = Field(default="", validation_alias="INTEGRATION_ENC_KEY")
+    # Public HTTPS base URL of this API (no trailing slash), used for Telegram setWebhook.
+    # Example: https://lifeos.example.com
+    public_base_url: str = Field(default="", validation_alias="PUBLIC_BASE_URL")
+    # Dev fallback: long-poll getUpdates instead of (or alongside) webhooks.
+    telegram_polling_enabled: bool = Field(default=False, validation_alias="TELEGRAM_POLLING_ENABLED")
 
     @field_validator("database_url", mode="before")
     @classmethod

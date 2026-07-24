@@ -4,7 +4,9 @@ import {
   IntegrationConnection,
   IntegrationProvider,
   IntegrationsService,
+  TELEGRAM_EVENT_OPTIONS,
   TelegramConfigStatus,
+  TelegramWebhookStatus,
 } from './services/integrations.service';
 
 @Component({
@@ -44,10 +46,11 @@ import {
                     Fallback: message <strong>&#64;userinfobot</strong> and copy your Id.
                   </li>
                   <li>Click <strong>Send test message</strong> to verify the connection.</li>
+                  <li>Optionally register a <strong>webhook</strong> (requires PUBLIC_BASE_URL HTTPS) for two-way commands like /tasks.</li>
                 </ol>
               </details>
 
-              <div class="mt-3 flex flex-col gap-2 max-w-md">
+              <div class="mt-3 flex flex-col gap-2 max-w-xl">
                 <div class="flex flex-col gap-1">
                   <label class="form-label" for="tg-token">Bot Token</label>
                   <input
@@ -88,7 +91,124 @@ import {
                   <input type="checkbox" [(ngModel)]="telegramEnabled" />
                   Enable Telegram notifications
                 </label>
-                <div class="flex flex-wrap gap-2 mt-1">
+
+                <div class="mt-3 border-t pt-3" style="border-color: var(--border)">
+                  <p class="font-medium text-xs mb-2">Notify on events</p>
+                  <div class="grid grid-cols-2 gap-1">
+                    @for (opt of eventOptions; track opt.key) {
+                      <label class="flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          [checked]="notifyOn.has(opt.key)"
+                          (change)="toggleNotify(opt.key, $event)"
+                        />
+                        {{ opt.label }}
+                      </label>
+                    }
+                  </div>
+                </div>
+
+                <div class="mt-3 border-t pt-3" style="border-color: var(--border)">
+                  <p class="font-medium text-xs mb-2">Scheduled digest</p>
+                  <label class="flex items-center gap-2 text-xs mb-2">
+                    <input type="checkbox" [(ngModel)]="digestEnabled" />
+                    Enable recurring digest
+                  </label>
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <div class="flex flex-col gap-1">
+                      <label class="form-label" for="tg-digest-time">Time</label>
+                      <input
+                        id="tg-digest-time"
+                        class="input-field"
+                        type="time"
+                        [(ngModel)]="digestTime"
+                      />
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      <label class="form-label" for="tg-digest-freq">Frequency</label>
+                      <select id="tg-digest-freq" class="input-field" [(ngModel)]="digestFrequency">
+                        <option value="daily">Daily</option>
+                        <option value="weekdays">Weekdays</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </div>
+                    @if (digestFrequency === 'weekly') {
+                      <div class="flex flex-col gap-1">
+                        <label class="form-label" for="tg-digest-weekday">Weekday</label>
+                        <select id="tg-digest-weekday" class="input-field" [(ngModel)]="digestWeekday">
+                          <option [ngValue]="0">Monday</option>
+                          <option [ngValue]="1">Tuesday</option>
+                          <option [ngValue]="2">Wednesday</option>
+                          <option [ngValue]="3">Thursday</option>
+                          <option [ngValue]="4">Friday</option>
+                          <option [ngValue]="5">Saturday</option>
+                          <option [ngValue]="6">Sunday</option>
+                        </select>
+                      </div>
+                    }
+                    <div class="flex flex-col gap-1">
+                      <label class="form-label" for="tg-tz">Timezone</label>
+                      <input
+                        id="tg-tz"
+                        class="input-field"
+                        type="text"
+                        [(ngModel)]="timezone"
+                        placeholder="e.g. Asia/Kolkata"
+                      />
+                    </div>
+                  </div>
+                  @if (telegram()?.last_digest_at) {
+                    <p class="text-xs mt-1" style="color: var(--text-muted)">
+                      Last digest: {{ telegram()!.last_digest_at }}
+                    </p>
+                  }
+                </div>
+
+                <div class="mt-3 border-t pt-3" style="border-color: var(--border)">
+                  <p class="font-medium text-xs mb-2">Two-way webhook</p>
+                  <p class="text-xs mb-2" style="color: var(--text-muted)">
+                    @if (webhook()?.url || telegram()?.webhook_url) {
+                      Active: {{ webhook()?.url || telegram()?.webhook_url }}
+                    } @else if (telegram()?.webhook_configured) {
+                      Secret stored — register to push URL to Telegram.
+                    } @else {
+                      Not registered. Requires PUBLIC_BASE_URL (HTTPS) on the server.
+                    }
+                  </p>
+                  @if (webhook()?.last_error_message) {
+                    <p class="text-xs mb-2" style="color: var(--danger)">
+                      {{ webhook()!.last_error_message }}
+                    </p>
+                  }
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="btn-primary text-xs"
+                      [disabled]="tgBusy() || !telegram()?.configured"
+                      (click)="registerWebhook()"
+                    >
+                      Register webhook
+                    </button>
+                    <button
+                      type="button"
+                      class="text-xs"
+                      [disabled]="tgBusy()"
+                      (click)="deleteWebhook()"
+                    >
+                      Disable webhook
+                    </button>
+                    <button
+                      type="button"
+                      class="text-xs"
+                      [disabled]="tgBusy()"
+                      (click)="refreshWebhook()"
+                    >
+                      Refresh status
+                    </button>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 mt-3">
                   <button
                     type="button"
                     class="btn-primary text-xs"
@@ -111,7 +231,7 @@ import {
                     [disabled]="tgBusy() || !telegram()?.configured"
                     (click)="sendDigest()"
                   >
-                    Send digest
+                    Send digest now
                   </button>
                 </div>
                 @if (tgMessage()) {
@@ -157,8 +277,10 @@ export class IntegrationsPageComponent implements OnInit {
   providers: IntegrationProvider[] = [];
   connections: IntegrationConnection[] = [];
   lastSyncMsg: string | null = null;
+  readonly eventOptions = TELEGRAM_EVENT_OPTIONS;
 
   readonly telegram = signal<TelegramConfigStatus | null>(null);
+  readonly webhook = signal<TelegramWebhookStatus | null>(null);
   readonly tgBusy = signal(false);
   readonly tgMessage = signal<string | null>(null);
   readonly tgOk = signal(false);
@@ -166,6 +288,12 @@ export class IntegrationsPageComponent implements OnInit {
   botTokenInput = '';
   chatIdInput = '';
   telegramEnabled = false;
+  notifyOn = new Set<string>(TELEGRAM_EVENT_OPTIONS.map((o) => o.key));
+  digestEnabled = false;
+  digestTime = '08:00';
+  digestFrequency = 'daily';
+  digestWeekday = 0;
+  timezone = 'UTC';
 
   ngOnInit(): void {
     this.integrations.providers().subscribe({ next: (p) => (this.providers = p) });
@@ -177,19 +305,36 @@ export class IntegrationsPageComponent implements OnInit {
     this.integrations.list().subscribe({ next: (c) => (this.connections = c) });
   }
 
+  applyTelegramForm(status: TelegramConfigStatus): void {
+    this.telegram.set(status);
+    this.chatIdInput = status.chat_id ?? '';
+    this.telegramEnabled = status.enabled;
+    this.botTokenInput = '';
+    this.notifyOn = new Set(status.notify_on?.length ? status.notify_on : TELEGRAM_EVENT_OPTIONS.map((o) => o.key));
+    this.digestEnabled = !!status.digest_enabled;
+    this.digestTime = status.digest_time || '08:00';
+    this.digestFrequency = status.digest_frequency || 'daily';
+    this.digestWeekday = status.digest_weekday ?? 0;
+    this.timezone = status.timezone || 'UTC';
+  }
+
   loadTelegram(): void {
     this.integrations.getTelegram().subscribe({
       next: (status) => {
-        this.telegram.set(status);
-        this.chatIdInput = status.chat_id ?? '';
-        this.telegramEnabled = status.enabled;
-        this.botTokenInput = '';
+        this.applyTelegramForm(status);
+        this.refreshWebhook();
       },
       error: () => {
         this.tgOk.set(false);
         this.tgMessage.set('Failed to load Telegram settings');
       },
     });
+  }
+
+  toggleNotify(key: string, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    if (checked) this.notifyOn.add(key);
+    else this.notifyOn.delete(key);
   }
 
   telegramStatusLabel(): string {
@@ -237,21 +382,24 @@ export class IntegrationsPageComponent implements OnInit {
   saveTelegram(): void {
     this.tgBusy.set(true);
     this.tgMessage.set(null);
-    const body: { bot_token?: string; chat_id?: string; enabled: boolean } = {
+    const body: Record<string, unknown> = {
       enabled: this.telegramEnabled,
+      notify_on: Array.from(this.notifyOn),
+      digest_enabled: this.digestEnabled,
+      digest_time: this.digestTime,
+      digest_frequency: this.digestFrequency,
+      digest_weekday: this.digestWeekday,
+      timezone: this.timezone.trim() || 'UTC',
     };
     if (this.botTokenInput.trim()) {
-      body.bot_token = this.botTokenInput.trim();
+      body['bot_token'] = this.botTokenInput.trim();
     }
     if (this.chatIdInput.trim()) {
-      body.chat_id = this.chatIdInput.trim();
+      body['chat_id'] = this.chatIdInput.trim();
     }
     this.integrations.saveTelegramConfig(body).subscribe({
       next: (status) => {
-        this.telegram.set(status);
-        this.botTokenInput = '';
-        this.chatIdInput = status.chat_id ?? this.chatIdInput;
-        this.telegramEnabled = status.enabled;
+        this.applyTelegramForm(status);
         this.tgOk.set(true);
         this.tgMessage.set('Telegram settings saved');
         this.tgBusy.set(false);
@@ -334,6 +482,49 @@ export class IntegrationsPageComponent implements OnInit {
       error: (err) => {
         this.tgOk.set(false);
         this.tgMessage.set(err?.error?.detail ?? 'Digest failed');
+        this.tgBusy.set(false);
+      },
+    });
+  }
+
+  refreshWebhook(): void {
+    this.integrations.getWebhookStatus().subscribe({
+      next: (s) => this.webhook.set(s),
+      error: () => this.webhook.set(null),
+    });
+  }
+
+  registerWebhook(): void {
+    this.tgBusy.set(true);
+    this.tgMessage.set(null);
+    this.integrations.registerWebhook().subscribe({
+      next: (r) => {
+        this.tgOk.set(r.ok);
+        this.tgMessage.set(r.detail + (r.webhook_url ? ` — ${r.webhook_url}` : ''));
+        this.tgBusy.set(false);
+        this.loadTelegram();
+      },
+      error: (err) => {
+        this.tgOk.set(false);
+        this.tgMessage.set(err?.error?.detail ?? 'Webhook register failed');
+        this.tgBusy.set(false);
+      },
+    });
+  }
+
+  deleteWebhook(): void {
+    this.tgBusy.set(true);
+    this.tgMessage.set(null);
+    this.integrations.deleteWebhook().subscribe({
+      next: (r) => {
+        this.tgOk.set(r.ok);
+        this.tgMessage.set(r.detail);
+        this.tgBusy.set(false);
+        this.loadTelegram();
+      },
+      error: (err) => {
+        this.tgOk.set(false);
+        this.tgMessage.set(err?.error?.detail ?? 'Webhook disable failed');
         this.tgBusy.set(false);
       },
     });
