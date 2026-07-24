@@ -143,13 +143,15 @@ export class LearningFormComponent implements OnInit {
     if (this.form.invalid) return;
     this.saving = true;
     const raw = this.form.getRawValue();
+    const progress =
+      raw.progress ?? (raw.status === 'completed' ? 100 : 0);
     const payload = {
       title: raw.title,
       item_type: raw.item_type as LearningType,
       provider: raw.provider || null,
       url: raw.url || null,
       status: raw.status,
-      progress: raw.progress,
+      progress,
       notes: raw.notes || null,
     };
     const req =

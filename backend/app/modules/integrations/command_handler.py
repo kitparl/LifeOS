@@ -1,7 +1,7 @@
 """Inbound Telegram command registry.
 
 Additive: add a new entry to COMMANDS to support another bot command.
-Handlers receive (db, user_id, args) and return reply text.
+Handlers receive (db, user_id, args) and return reply text (HTML templates).
 """
 
 from __future__ import annotations
@@ -14,21 +14,15 @@ from typing import TypeAlias
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.integrations import telegram_templates as tpl
+
 logger = logging.getLogger(__name__)
 
 CommandHandlerFn: TypeAlias = Callable[[AsyncSession, str, str], Awaitable[str]]
 
 
 async def cmd_help(db: AsyncSession, user_id: str, args: str) -> str:
-    return (
-        "LifeOS bot commands:\n"
-        "/tasks — pending tasks\n"
-        "/today — today's agenda\n"
-        "/done <id> — complete a task\n"
-        "/habits — habits due\n"
-        "/goals — active goals\n"
-        "/help — this message"
-    )
+    return tpl.help_message()
 
 
 async def cmd_tasks(db: AsyncSession, user_id: str, args: str) -> str:
@@ -38,14 +32,17 @@ async def cmd_tasks(db: AsyncSession, user_id: str, args: str) -> str:
     in_prog = await TaskService(db).list_tasks(user_id, status="in_progress")
     all_items = list(items) + list(in_prog)
     if not all_items:
-        return "No pending tasks. Nice work!"
-    lines = ["Pending tasks:"]
-    for t in all_items[:20]:
-        due = t.due_date.date().isoformat() if t.due_date else "no due"
-        lines.append(f"• [{t.id[:8]}] {t.title} ({t.status}, {due})")
-    if len(all_items) > 20:
-        lines.append(f"…and {len(all_items) - 20} more")
-    return "\n".join(lines)
+        return tpl.tasks_empty()
+    lines = [
+        tpl.task_line(
+            short_id=t.id[:8],
+            title=t.title,
+            status=t.status,
+            due=t.due_date.date().isoformat() if t.due_date else "no due",
+        )
+        for t in all_items
+    ]
+    return tpl.tasks_list(lines, total=len(all_items))
 
 
 async def cmd_today(db: AsyncSession, user_id: str, args: str) -> str:
@@ -57,34 +54,19 @@ async def cmd_today(db: AsyncSession, user_id: str, args: str) -> str:
     start = datetime.combine(today, time.min, tzinfo=timezone.utc)
     end = datetime.combine(today, time.max, tzinfo=timezone.utc)
 
-    lines = [f"Today ({today.isoformat()}):", ""]
-
     due_tasks = await TaskService(db).list_tasks(user_id, due_today=True)
-    if due_tasks:
-        lines.append("Tasks due today:")
-        for t in due_tasks[:10]:
-            lines.append(f"• [{t.id[:8]}] {t.title}")
-        lines.append("")
+    task_lines = [f"[{t.id[:8]}] {t.title}" for t in due_tasks[:10]]
 
     events = await CalendarRepository(db).list_events(user_id, start=start, end=end)
-    if events:
-        lines.append("Calendar:")
-        for e in events[:10]:
-            when = e.starts_at.strftime("%H:%M") if e.starts_at else "?"
-            lines.append(f"• {when} {e.title}")
-        lines.append("")
+    cal_lines = [
+        f"{e.starts_at.strftime('%H:%M') if e.starts_at else '?'} {e.title}"
+        for e in events[:10]
+    ]
 
     races = await RunningService(db).list_races(user_id, upcoming_only=True)
-    today_races = [r for r in races if str(r.race_date) == today.isoformat()]
-    if today_races:
-        lines.append("Races:")
-        for r in today_races:
-            lines.append(f"• {r.name}")
-        lines.append("")
+    race_lines = [r.name for r in races if str(r.race_date) == today.isoformat()]
 
-    if len(lines) <= 2:
-        lines.append("Nothing scheduled for today.")
-    return "\n".join(lines).strip()
+    return tpl.today_agenda(today, tasks=task_lines, calendar=cal_lines, races=race_lines)
 
 
 async def cmd_done(db: AsyncSession, user_id: str, args: str) -> str:
@@ -93,23 +75,20 @@ async def cmd_done(db: AsyncSession, user_id: str, args: str) -> str:
 
     token = (args or "").strip().split()[0] if args.strip() else ""
     if not token:
-        return "Usage: /done <task_id_prefix>"
+        return tpl.done_usage()
 
     repo = TaskRepository(db)
-    # Match by full id or prefix
     tasks = await repo.list_tasks(user_id, status="pending")
     tasks += await repo.list_tasks(user_id, status="in_progress")
     matches = [t for t in tasks if t.id.startswith(token) or t.id == token]
     if not matches:
-        return f"No open task matching '{token}'."
+        return tpl.done_not_found(token)
     if len(matches) > 1:
-        lines = ["Ambiguous id — matches:"]
-        for t in matches[:5]:
-            lines.append(f"• [{t.id[:8]}] {t.title}")
-        return "\n".join(lines)
+        lines = [f"[{t.id[:8]}] {t.title}" for t in matches[:5]]
+        return tpl.done_ambiguous(lines)
 
     await TaskService(db).complete_task(user_id, matches[0].id)
-    return f"Done: {matches[0].title}"
+    return tpl.done_success(matches[0].title)
 
 
 async def cmd_habits(db: AsyncSession, user_id: str, args: str) -> str:
@@ -118,11 +97,9 @@ async def cmd_habits(db: AsyncSession, user_id: str, args: str) -> str:
     habits = await HabitService(db).list_habits(user_id, active_only=True)
     due = [h for h in habits if not h.completed_today]
     if not due:
-        return "All active habits completed for this period."
-    lines = ["Habits due:"]
-    for h in due[:20]:
-        lines.append(f"• {h.name} ({h.frequency})")
-    return "\n".join(lines)
+        return tpl.habits_empty()
+    lines = [f"{h.name} ({h.frequency})" for h in due]
+    return tpl.habits_list(lines)
 
 
 async def cmd_goals(db: AsyncSession, user_id: str, args: str) -> str:
@@ -130,12 +107,13 @@ async def cmd_goals(db: AsyncSession, user_id: str, args: str) -> str:
 
     goals = await GoalService(db).list_goals(user_id, status="active")
     if not goals:
-        return "No active goals."
-    lines = ["Active goals:"]
-    for g in goals[:15]:
-        target = g.target_date.date().isoformat() if g.target_date else "no target"
-        lines.append(f"• {g.title} · {g.progress}% · {target}")
-    return "\n".join(lines)
+        return tpl.goals_empty()
+    lines = [
+        f"{g.title} · {g.progress}% · "
+        f"{g.target_date.date().isoformat() if g.target_date else 'no target'}"
+        for g in goals
+    ]
+    return tpl.goals_list(lines)
 
 
 COMMANDS: dict[str, CommandHandlerFn] = {
@@ -155,17 +133,17 @@ async def handle_command(db: AsyncSession, user_id: str, text: str) -> str:
     """Parse and dispatch a command. Unknown commands get a short help hint."""
     raw = (text or "").strip()
     if not raw.startswith("/"):
-        return "Send a command like /help to get started."
+        return tpl.hint_send_command()
     m = _CMD_RE.match(raw)
     if not m:
-        return "Unrecognized command. Try /help."
+        return tpl.unrecognized_command()
     cmd = m.group(1).lower()
     args = (m.group(2) or "").strip()
     handler = COMMANDS.get(cmd)
     if handler is None:
-        return f"Unknown command {cmd}. Try /help."
+        return tpl.unknown_command(cmd)
     try:
         return await handler(db, user_id, args)
     except Exception:
         logger.exception("Command %s failed for user=%s", cmd, user_id)
-        return "Sorry, something went wrong running that command."
+        return tpl.command_error()

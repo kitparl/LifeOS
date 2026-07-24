@@ -6,7 +6,6 @@ This module never imports TelegramClient — it goes through the Notifier regist
 
 from __future__ import annotations
 
-import html
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -50,29 +49,16 @@ class DigestContent:
 
 def format_digest(content: DigestContent, *, now: datetime | None = None) -> NotifierMessage:
     """Pure formatter — easy to unit test without I/O."""
-    stamp = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d %H:%M UTC")
-    lines: list[str] = [f"<b>LifeOS Digest</b> · {html.escape(stamp)}", ""]
+    from app.modules.integrations import telegram_templates as tpl
 
-    def section(title: str, items: list[str]) -> None:
-        if not items:
-            return
-        lines.append(f"<b>{html.escape(title)}</b> ({len(items)})")
-        for item in items[:15]:
-            lines.append(f"• {html.escape(item)}")
-        if len(items) > 15:
-            lines.append(f"• …and {len(items) - 15} more")
-        lines.append("")
-
-    if content.is_empty:
-        lines.append("Nothing pending — you're all caught up.")
-    else:
-        section("Pending tasks", content.pending_tasks)
-        section("Upcoming calendar", content.upcoming_events)
-        section("Upcoming races", content.upcoming_races)
-        section("Habits due", content.habits_due)
-        section("Active goals", content.active_goals)
-
-    text = "\n".join(lines).strip()
+    text = tpl.digest_message(
+        stamp=now or datetime.now(timezone.utc),
+        pending_tasks=content.pending_tasks,
+        upcoming_events=content.upcoming_events,
+        upcoming_races=content.upcoming_races,
+        habits_due=content.habits_due,
+        active_goals=content.active_goals,
+    )
     return NotifierMessage(text=text, parse_mode="HTML")
 
 

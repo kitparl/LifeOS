@@ -214,9 +214,11 @@ class IntegrationService:
         try:
             me = await client.get_me()
             username = me.get("username")
+            from app.modules.integrations.telegram_templates import test_connection_message
+
             await client.send_message(
                 cfg.chat_id,
-                "✅ LifeOS Telegram connection test succeeded.",
+                test_connection_message(),
                 parse_mode="HTML",
             )
             now = datetime.now(timezone.utc)

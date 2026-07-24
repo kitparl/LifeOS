@@ -27,7 +27,11 @@ class LearningService:
         item = await self.repo.get_by_id(user_id, item_id)
         if not item:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Learning item not found")
-        updated = await self.repo.update(item, data)
+        # Coerce null progress: completed → 100, otherwise leave unset (repo skips None)
+        patch = data
+        if data.progress is None and data.status == "completed":
+            patch = data.model_copy(update={"progress": 100})
+        updated = await self.repo.update(item, patch)
         return LearningResponse.model_validate(updated)
 
     async def delete_item(self, user_id: str, item_id: str) -> None:

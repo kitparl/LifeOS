@@ -32,6 +32,9 @@ class LearningRepository:
 
     async def update(self, item: LearningItem, data: LearningUpdate) -> LearningItem:
         for key, value in data.model_dump(exclude_unset=True).items():
+            # progress is NOT NULL in DB; ignore null so clients/sync replays don't 500
+            if key == "progress" and value is None:
+                continue
             setattr(item, key, value)
         await self.db.flush()
         await self.db.refresh(item)
