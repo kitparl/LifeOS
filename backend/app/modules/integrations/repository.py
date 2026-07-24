@@ -33,6 +33,26 @@ class IntegrationRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_webhook_secret(self, secret: str) -> IntegrationConnection | None:
+        if not secret:
+            return None
+        result = await self.db.execute(
+            select(IntegrationConnection).where(
+                IntegrationConnection.webhook_secret == secret,
+                IntegrationConnection.provider == "telegram",
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_enabled_telegram(self) -> list[IntegrationConnection]:
+        result = await self.db.execute(
+            select(IntegrationConnection).where(
+                IntegrationConnection.provider == "telegram",
+                IntegrationConnection.enabled.is_(True),
+            )
+        )
+        return list(result.scalars().all())
+
     async def create(self, user_id: str, data: IntegrationCreate, display_name: str) -> IntegrationConnection:
         conn = IntegrationConnection(
             user_id=user_id,

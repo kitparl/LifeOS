@@ -95,7 +95,33 @@ class TelegramClient:
     async def get_me(self) -> dict[str, Any]:
         return await self._post("getMe")
 
-    async def get_updates(self, *, limit: int = 20, timeout: int = 0) -> list[dict[str, Any]]:
-        data = await self._post("getUpdates", {"limit": limit, "timeout": timeout})
+    async def get_updates(self, *, limit: int = 20, timeout: int = 0, offset: int | None = None) -> list[dict[str, Any]]:
+        payload: dict[str, Any] = {"limit": limit, "timeout": timeout}
+        if offset is not None:
+            payload["offset"] = offset
+        data = await self._post("getUpdates", payload)
         result = data.get("result", [])
         return result if isinstance(result, list) else []
+
+    async def set_webhook(
+        self,
+        url: str,
+        *,
+        secret_token: str | None = None,
+        drop_pending_updates: bool = False,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"url": url}
+        if secret_token:
+            payload["secret_token"] = secret_token
+        if drop_pending_updates:
+            payload["drop_pending_updates"] = True
+        return await self._post("setWebhook", payload)
+
+    async def delete_webhook(self, *, drop_pending_updates: bool = False) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if drop_pending_updates:
+            payload["drop_pending_updates"] = True
+        return await self._post("deleteWebhook", payload)
+
+    async def get_webhook_info(self) -> dict[str, Any]:
+        return await self._post("getWebhookInfo")

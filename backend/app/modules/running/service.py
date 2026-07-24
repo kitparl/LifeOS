@@ -4,6 +4,7 @@ from datetime import datetime, time, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.events import RACE_ADDED, EntityCreated, event_bus
 from app.modules.calendar.sync_service import CalendarSyncService
 from app.modules.running.models import RaceEvent
 from app.modules.running.repository import RunningRepository
@@ -157,6 +158,17 @@ class RunningService:
     async def create_race(self, user_id: str, data: RaceCreate) -> RaceResponse:
         race = await self.repo.create_race(user_id, data)
         await self._sync_race_to_calendar(user_id, race)
+        await event_bus.emit(
+            self.repo.db,
+            EntityCreated(
+                event_type=RACE_ADDED,
+                user_id=user_id,
+                entity_id=race.id,
+                title=race.name,
+                when=race.race_date.isoformat() if race.race_date else None,
+                module="running",
+            ),
+        )
         return self._to_race_response(race)
 
     async def update_race(self, user_id: str, race_id: str, data: RaceUpdate) -> RaceResponse:

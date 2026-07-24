@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -17,8 +17,11 @@ from app.modules.integrations.schemas import (
     TelegramConfigStatus,
     TelegramConfigUpdate,
     TelegramTestResponse,
+    TelegramWebhookRegisterResponse,
+    TelegramWebhookStatus,
 )
 from app.modules.integrations.service import IntegrationService, list_integration_providers
+from app.modules.integrations.webhook_service import TelegramWebhookService
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -33,7 +36,15 @@ async def get_telegram_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).get_telegram_status(user.id)
+    status_resp = await IntegrationService(db).get_telegram_status(user.id)
+    try:
+        wh = await TelegramWebhookService(db).webhook_status(user.id)
+        if wh.url:
+            status_resp.webhook_url = wh.url
+            status_resp.webhook_configured = True
+    except Exception:
+        pass
+    return status_resp
 
 
 @router.put("/telegram/config", response_model=TelegramConfigStatus)
@@ -51,6 +62,46 @@ async def send_telegram_digest(
     db: AsyncSession = Depends(get_db),
 ):
     return await DigestService(db).send_digest(user.id)
+
+
+@router.post("/telegram/webhook/register", response_model=TelegramWebhookRegisterResponse)
+async def register_telegram_webhook(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await TelegramWebhookService(db).register_webhook(user.id)
+
+
+@router.delete("/telegram/webhook", response_model=TelegramWebhookRegisterResponse)
+async def delete_telegram_webhook(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await TelegramWebhookService(db).delete_webhook(user.id)
+
+
+@router.get("/telegram/webhook", response_model=TelegramWebhookStatus)
+async def get_telegram_webhook_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await TelegramWebhookService(db).webhook_status(user.id)
+
+
+@router.post("/telegram/webhook/{secret}")
+async def telegram_webhook(
+    secret: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+):
+    """Inbound Telegram updates. Authenticated by path secret (+ optional header)."""
+    payload = await request.json()
+    return await TelegramWebhookService(db).handle_update(
+        secret,
+        payload if isinstance(payload, dict) else {},
+        header_secret=x_telegram_bot_api_secret_token,
+    )
 
 
 @router.get("", response_model=list[IntegrationResponse])

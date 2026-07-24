@@ -19,7 +19,12 @@ from app.modules.integrations.schemas import (
     TelegramTestResponse,
 )
 from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
-from app.modules.integrations.telegram_config import mask_config, parse_config, serialize_config
+from app.modules.integrations.telegram_config import (
+    mask_config,
+    parse_config,
+    parse_preferences,
+    serialize_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +127,8 @@ class IntegrationService:
     async def get_telegram_status(self, user_id: str) -> TelegramConfigStatus:
         conn = await self.get_or_create_telegram(user_id)
         masked = mask_config(conn.config_json)
+        prefs = parse_preferences(conn.config_json)
+        webhook_secret = getattr(conn, "webhook_secret", None)
         return TelegramConfigStatus(
             connection_id=conn.id,
             enabled=conn.enabled,
@@ -131,20 +138,44 @@ class IntegrationService:
             chat_id=masked.chat_id,
             last_sync_at=conn.last_sync_at,
             last_digest_at=getattr(conn, "last_digest_at", None),
+            notify_on=prefs.notify_on,
+            digest_enabled=prefs.digest_enabled,
+            digest_time=prefs.digest_time,
+            digest_frequency=prefs.digest_frequency,
+            digest_weekday=prefs.digest_weekday,
+            timezone=prefs.timezone,
+            webhook_configured=bool(webhook_secret),
+            webhook_url=None,
         )
 
     async def save_telegram_config(self, user_id: str, data: TelegramConfigUpdate) -> TelegramConfigStatus:
         conn = await self.get_or_create_telegram(user_id)
-        if data.bot_token is None and data.chat_id is None and data.enabled is None:
+        has_secret = data.bot_token is not None or data.chat_id is not None
+        has_prefs = any(
+            v is not None
+            for v in (
+                data.notify_on,
+                data.digest_enabled,
+                data.digest_time,
+                data.digest_frequency,
+                data.digest_weekday,
+                data.timezone,
+            )
+        )
+        if data.enabled is None and not has_secret and not has_prefs:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
 
-        new_json = conn.config_json
-        if data.bot_token is not None or data.chat_id is not None:
-            new_json = serialize_config(
-                bot_token=data.bot_token,
-                chat_id=data.chat_id,
-                existing_json=conn.config_json,
-            )
+        new_json = serialize_config(
+            bot_token=data.bot_token,
+            chat_id=data.chat_id,
+            existing_json=conn.config_json,
+            notify_on=data.notify_on,
+            digest_enabled=data.digest_enabled,
+            digest_time=data.digest_time,
+            digest_frequency=data.digest_frequency,
+            digest_weekday=data.digest_weekday,
+            timezone=data.timezone,
+        )
 
         update = IntegrationUpdate(config_json=new_json)
         if data.enabled is not None:
@@ -157,6 +188,15 @@ class IntegrationService:
         if parse_config(updated.config_json) is not None and updated.enabled:
             updated.status = "connected"
             await self.repo.db.flush()
+
+        # Keep per-user digest cron in sync with preferences
+        try:
+            from app.modules.integrations.scheduler import sync_user_digest_job
+
+            sync_user_digest_job(user_id, parse_preferences(updated.config_json), enabled=updated.enabled)
+        except Exception:
+            logger.exception("Failed to sync digest job for user=%s", user_id)
+
         return await self.get_telegram_status(user_id)
 
     async def test_connection(self, user_id: str, conn_id: str) -> TelegramTestResponse:

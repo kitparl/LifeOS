@@ -44,12 +44,41 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Register models with Base.metadata BEFORE create_all so new tables exist.
+    import app.modules.integrations.outbox_models  # noqa: F401
+    from app.modules.integrations.subscriber import register_subscribers
+
+    register_subscribers()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # Idempotent column migrations for schema evolution without Alembic
         from app.core.migrations import ensure_columns
         await ensure_columns(conn)
+
+    from app.modules.integrations.scheduler import (
+        load_all_digest_jobs,
+        shutdown_scheduler,
+        start_scheduler,
+    )
+
+    start_scheduler()
+    await load_all_digest_jobs()
+
+    polling_started = False
+    if settings.telegram_polling_enabled:
+        from app.modules.integrations.polling import start_polling, stop_polling
+
+        start_polling()
+        polling_started = True
+
     yield
+
+    if polling_started:
+        from app.modules.integrations.polling import stop_polling
+
+        await stop_polling()
+    await shutdown_scheduler()
 
 
 app = FastAPI(
