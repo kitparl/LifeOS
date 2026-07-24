@@ -98,6 +98,7 @@ Lists available commands.
 
 ```
 LifeOS bot commands:
+/add-task <title> — create a task
 /tasks — pending tasks
 /today — today's agenda
 /done <id> — complete a task
@@ -105,6 +106,21 @@ LifeOS bot commands:
 /goals — active goals
 /help — this message
 ```
+
+### `/add-task`
+
+Creates a new pending task. **Due date defaults to today.**
+
+```
+/add-task Buy milk
+/add-task Call dentist due 2026-08-01
+/add-task Pay rent tomorrow
+/add-task Ship docs 2026-08-15
+```
+
+Supported due suffixes: `due YYYY-MM-DD`, `YYYY-MM-DD`, `today`, `tomorrow`, `due today`, `due tomorrow`.
+
+Reply includes short id + due date for `/done`.
 
 ### `/tasks`
 

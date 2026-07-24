@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import TypeAlias
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,6 +91,84 @@ async def cmd_done(db: AsyncSession, user_id: str, args: str) -> str:
     return tpl.done_success(matches[0].title)
 
 
+async def cmd_add_task(db: AsyncSession, user_id: str, args: str) -> str:
+    from app.modules.tasks.schemas import TaskCreate
+    from app.modules.tasks.service import TaskService
+
+    raw = (args or "").strip()
+    if not raw:
+        return tpl.add_task_usage()
+
+    title, due_dt, due_error = _parse_add_task_args(raw)
+    if due_error:
+        return tpl.add_task_bad_due(due_error)
+    if not title:
+        return tpl.add_task_usage()
+    if len(title) > 200:
+        return tpl.add_task_too_long()
+
+    task = await TaskService(db).create_task(
+        user_id, TaskCreate(title=title, due_date=due_dt)
+    )
+    due_label = task.due_date.date().isoformat() if task.due_date else "today"
+    return tpl.add_task_success(short_id=task.id[:8], title=task.title, due=due_label)
+
+
+def _parse_add_task_args(raw: str) -> tuple[str, datetime, str | None]:
+    """Split title and optional due date. Default due = today (UTC end-friendly noon).
+
+    Supported endings:
+      ... due 2026-08-01
+      ... 2026-08-01
+      ... due today | tomorrow
+      ... today | tomorrow
+    """
+    text = raw.strip()
+    today = date.today()
+
+    def as_due(d: date) -> datetime:
+        return datetime.combine(d, time(12, 0), tzinfo=timezone.utc)
+
+    # due YYYY-MM-DD | due today | due tomorrow
+    m = re.search(
+        r"\s+due\s+(today|tomorrow|\d{4}-\d{2}-\d{2})\s*$",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if m:
+        token = m.group(1).lower()
+        title = text[: m.start()].strip()
+        parsed = _resolve_due_token(token, today)
+        if parsed is None:
+            return title, as_due(today), token
+        return title, as_due(parsed), None
+
+    # trailing YYYY-MM-DD | today | tomorrow (without "due")
+    m = re.search(r"\s+(today|tomorrow|\d{4}-\d{2}-\d{2})\s*$", text, flags=re.IGNORECASE)
+    if m:
+        token = m.group(1).lower()
+        # Only treat as due if it's a date keyword / ISO date (not part of a normal title word)
+        title = text[: m.start()].strip()
+        if title:
+            parsed = _resolve_due_token(token, today)
+            if parsed is None:
+                return title, as_due(today), token
+            return title, as_due(parsed), None
+
+    return text, as_due(today), None
+
+
+def _resolve_due_token(token: str, today: date) -> date | None:
+    if token == "today":
+        return today
+    if token == "tomorrow":
+        return today + timedelta(days=1)
+    try:
+        return date.fromisoformat(token)
+    except ValueError:
+        return None
+
+
 async def cmd_habits(db: AsyncSession, user_id: str, args: str) -> str:
     from app.modules.habits.service import HabitService
 
@@ -119,6 +197,7 @@ async def cmd_goals(db: AsyncSession, user_id: str, args: str) -> str:
 COMMANDS: dict[str, CommandHandlerFn] = {
     "/help": cmd_help,
     "/start": cmd_help,
+    "/add-task": cmd_add_task,
     "/tasks": cmd_tasks,
     "/today": cmd_today,
     "/done": cmd_done,
@@ -126,7 +205,8 @@ COMMANDS: dict[str, CommandHandlerFn] = {
     "/goals": cmd_goals,
 }
 
-_CMD_RE = re.compile(r"^(/[a-zA-Z_]+)(?:@[^\s]+)?(?:\s+(.*))?$", re.DOTALL)
+# Allow hyphens in command names (e.g. /add-task)
+_CMD_RE = re.compile(r"^(/[a-zA-Z0-9_-]+)(?:@[^\s]+)?(?:\s+(.*))?$", re.DOTALL)
 
 
 async def handle_command(db: AsyncSession, user_id: str, text: str) -> str:

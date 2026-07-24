@@ -46,6 +46,7 @@ def help_message() -> str:
     return join_blocks(
         _header("LifeOS", "Bot commands"),
         (
+            "<b>/add-task</b> <code>&lt;title&gt;</code> — create a task (due today by default)\n"
             "<b>/tasks</b> — pending tasks\n"
             "<b>/today</b> — today's agenda\n"
             "<b>/done</b> <code>&lt;id&gt;</code> — complete a task\n"
@@ -126,6 +127,45 @@ def done_usage() -> str:
         _header("Complete a task"),
         "Usage: <b>/done</b> <code>&lt;task_id_prefix&gt;</code>\n"
         "Get ids from <b>/tasks</b> (the 8-character code in brackets).",
+    )
+
+
+def add_task_usage() -> str:
+    return join_blocks(
+        _header("Add a task"),
+        "Usage:\n"
+        "<b>/add-task</b> <code>&lt;title&gt;</code>\n"
+        "<b>/add-task</b> <code>&lt;title&gt; due YYYY-MM-DD</code>\n"
+        "<b>/add-task</b> <code>&lt;title&gt; tomorrow</code>\n\n"
+        "Default due date: <b>today</b>\n"
+        "Examples:\n"
+        "<code>/add-task Buy milk</code>\n"
+        "<code>/add-task Call dentist due 2026-08-01</code>\n"
+        "<code>/add-task Pay rent tomorrow</code>",
+    )
+
+
+def add_task_success(*, short_id: str, title: str, due: str) -> str:
+    return join_blocks(
+        _header("Task created"),
+        f"<code>[{esc(short_id)}]</code> {esc(title)}\n"
+        f"Due: <b>{esc(due)}</b>\n\n"
+        f"Complete later with <b>/done</b> <code>{esc(short_id)}</code>",
+    )
+
+
+def add_task_too_long() -> str:
+    return join_blocks(
+        _header("Title too long"),
+        "Keep the task title under 200 characters.",
+    )
+
+
+def add_task_bad_due(token: str) -> str:
+    return join_blocks(
+        _header("Invalid due date"),
+        f"Could not parse <code>{esc(token)}</code>.\n"
+        "Use <code>YYYY-MM-DD</code>, <code>today</code>, or <code>tomorrow</code>.",
     )
 
 
