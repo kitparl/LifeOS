@@ -177,7 +177,7 @@ You never need to type a task UUID for the button flows.
 
 ---
 
-## Notifications & digests
+## Notifications & scheduled reports
 
 These arrive from LifeOS without you typing anything.
 
@@ -192,12 +192,34 @@ When something is created (e.g. a new task) and you opted in, Telegram gets a me
 - 📋 Tasks  
 - 🏠 Home  
 
-### Daily / scheduled digest
+### Scheduled reports (IST defaults)
 
-If digest is enabled in Settings → Integrations → Telegram:
+Configure under **Settings → Integrations → Telegram → Scheduled reports**. Only users with Telegram **enabled** receive them.
 
-- You get a summary of pending tasks, calendar, races, habits due, and goals
-- Buttons jump straight into those sections (Tasks, Calendar, Habits, Goals, Home)
+| Report | Default (Asia/Kolkata) | Contents |
+|--------|------------------------|----------|
+| Morning | 06:00 daily | Routine today, pending tasks (Overdue / Due today / Later), calendar next 7 days, habits open, goals |
+| AI briefing | 08:00 daily (off by default) | Optional AI daily review |
+| Midday nudge | 12:30 daily | Overdue + due-today only (skipped if empty) |
+| Night wrap | 22:00 daily | Completed today, habits still open, tomorrow preview |
+| Weekly review | Sunday 18:00 | Goal progress, habit streaks, next 7 days |
+
+Use **Send morning now** (and siblings) in Settings to fire a report immediately. Every attempt is logged in `scheduled_report_runs` (visible as recent runs in Settings).
+
+### Reminder ladders (every 10 minutes)
+
+| Kind | Offsets |
+|------|---------|
+| Birthdays (`event_kind=birthday`, yearly) | 2 days before, 1 day before, **11:55** on the day |
+| Immutable events | 7d, 3d, 1d, 6h, 1h, 59m before start |
+| Routine blocks | 30m, 15m, 5m, 1m before start (honours skip dates) |
+
+Each reminder is sent at most once (deduped). Toggle birthday / immutable / routine reminders in Settings.
+
+### Calendar birthdays & habits on routines
+
+- Create a calendar event with **Event kind → Birthday** (forces yearly recurrence). Feb 29 birthdays use Feb 28 in non-leap years.
+- Attach habits to routine blocks in the Routines editor; morning/night reports can mention linked habits.
 
 ---
 
@@ -234,6 +256,6 @@ While a conversation is active, plain text goes to that flow (not treated as a r
 3. Save token + chat id and enable the connection.
 4. **Local / no public URL:** set `TELEGRAM_POLLING_ENABLED=true` in `backend/.env` and restart the API.
 5. **Production:** set `PUBLIC_BASE_URL` and use **Register webhook** in Settings.
-6. Optionally enable event notifications and a digest schedule.
+6. Optionally enable event notifications and scheduled reports (morning / midday / night / weekly) plus reminder toggles.
 
 For engineer-oriented details (outbox, encryption, env vars), see [TELEGRAM_NOTIFIER.md](./TELEGRAM_NOTIFIER.md).

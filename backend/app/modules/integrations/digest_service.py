@@ -1,6 +1,7 @@
 """Aggregate LifeOS reminders into a single notifier message.
 
-Callers (API or future scheduler) should use DigestService.send_digest(user_id).
+Callers (API or scheduler) should use DigestService.send_digest(user_id)
+which now delegates to the enriched morning scheduled report.
 This module never imports TelegramClient — it goes through the Notifier registry.
 """
 
@@ -113,25 +114,7 @@ class DigestService:
         return content
 
     async def send_digest(self, user_id: str) -> DigestResponse:
-        """Scheduler-ready entry point: build, format, send via registered Notifier."""
-        content = await self.build_digest(user_id)
-        message = format_digest(content)
-        sections = content.section_counts()
+        """Manual / scheduled entry: enriched morning report (Cycle 8)."""
+        from app.modules.integrations.scheduled_report_service import ScheduledReportService
 
-        notifier = await build_user_notifier(self.db, user_id, provider="telegram")
-        if notifier is None:
-            return DigestResponse(
-                sent=False,
-                detail="Telegram not configured or disabled",
-                sections=sections,
-            )
-
-        result = await notifier.send(message)
-        if result.ok:
-            repo = IntegrationRepository(self.db)
-            conn = await repo.get_by_provider(user_id, "telegram")
-            if conn is not None:
-                conn.last_digest_at = datetime.now(timezone.utc)
-                await self.db.flush()
-            return DigestResponse(sent=True, detail=result.detail, sections=sections)
-        return DigestResponse(sent=False, detail=result.detail, sections=sections)
+        return await ScheduledReportService(self.db).run(user_id, "morning")

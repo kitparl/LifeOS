@@ -7,6 +7,11 @@ RoutineArea = Literal["dsa", "gym", "running", "learning", "communication", "boo
 RoutineCategory = Literal["personal", "task", "running", "bill", "learning"]
 
 
+class LinkedHabitBrief(BaseModel):
+    id: str
+    name: str
+
+
 class RoutineBlockCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     start_time: time
@@ -15,6 +20,7 @@ class RoutineBlockCreate(BaseModel):
     category: RoutineCategory = "personal"
     notes: str | None = None
     sort_order: int = 0
+    habit_ids: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def end_after_start(self):
@@ -31,6 +37,7 @@ class RoutineBlockUpdate(BaseModel):
     category: RoutineCategory | None = None
     notes: str | None = None
     sort_order: int | None = None
+    habit_ids: list[str] | None = None
 
 
 class RoutineBlockResponse(BaseModel):
@@ -42,6 +49,8 @@ class RoutineBlockResponse(BaseModel):
     category: str
     notes: str | None
     sort_order: int
+    habit_ids: list[str] = Field(default_factory=list)
+    habits: list[LinkedHabitBrief] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

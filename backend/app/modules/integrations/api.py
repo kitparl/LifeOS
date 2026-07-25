@@ -14,6 +14,7 @@ from app.modules.integrations.schemas import (
     IntegrationResponse,
     IntegrationSyncResponse,
     IntegrationUpdate,
+    ReportRunResponse,
     TelegramConfigStatus,
     TelegramConfigUpdate,
     TelegramTestResponse,
@@ -62,6 +63,38 @@ async def send_telegram_digest(
     db: AsyncSession = Depends(get_db),
 ):
     return await DigestService(db).send_digest(user.id)
+
+
+@router.post("/telegram/reports/{job_type}/run", response_model=DigestResponse)
+async def run_scheduled_report(
+    job_type: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually fire a scheduled report (morning/midday/night/weekly/ai_briefing)."""
+    from fastapi import HTTPException
+
+    from app.modules.integrations.scheduled_report_service import CRON_JOB_TYPES, ScheduledReportService
+
+    if job_type not in CRON_JOB_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"job_type must be one of: {', '.join(CRON_JOB_TYPES)}",
+        )
+    return await ScheduledReportService(db).run(user.id, job_type)
+
+
+@router.get("/telegram/report-runs", response_model=list[ReportRunResponse])
+async def list_report_runs(
+    job_type: str | None = None,
+    limit: int = 50,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.modules.integrations.report_repository import ReportRunRepository
+
+    runs = await ReportRunRepository(db).list_runs(user.id, job_type=job_type, limit=min(limit, 200))
+    return [ReportRunResponse.model_validate(r) for r in runs]
 
 
 @router.post("/telegram/webhook/register", response_model=TelegramWebhookRegisterResponse)

@@ -1,11 +1,15 @@
 import json
 import uuid
 from datetime import date, datetime, time, timezone
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.modules.habits.models import Habit
 
 # Life areas this schedule is meant to protect time for.
 ROUTINE_AREAS = (
@@ -20,6 +24,13 @@ ROUTINE_AREAS = (
 
 # Calendar categories a block can map into.
 ROUTINE_CATEGORIES = ("personal", "task", "running", "bill", "learning")
+
+routine_block_habits = Table(
+    "routine_block_habits",
+    Base.metadata,
+    Column("block_id", String(36), ForeignKey("routine_blocks.id", ondelete="CASCADE"), primary_key=True),
+    Column("habit_id", String(36), ForeignKey("habits.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Routine(Base):
@@ -110,3 +121,8 @@ class RoutineBlock(Base):
     )
 
     routine: Mapped["Routine"] = relationship("Routine", back_populates="blocks")
+    habits: Mapped[list["Habit"]] = relationship(
+        "Habit",
+        secondary=routine_block_habits,
+        lazy="selectin",
+    )
