@@ -21,6 +21,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'finance', label: 'Finance', route: '/finance', icon: 'wallet', category: 'Growth' },
   { id: 'timeline', label: 'Timeline', route: '/timeline', icon: 'route', category: 'Insights' },
   { id: 'insights', label: 'Insights', route: '/insights', icon: 'chart-column', category: 'Insights' },
+  { id: 'analytics', label: 'Analytics', route: '/analytics/dashboard', icon: 'chart-line', category: 'Insights' },
   { id: 'documents', label: 'Documents', route: '/documents', icon: 'file-text', category: 'Knowledge' },
   { id: 'notifications', label: 'Notifications', route: '/notifications', icon: 'bell', shortLabel: 'Alerts', category: 'Core' },
   { id: 'assistant', label: 'AI Assistant', route: '/assistant', icon: 'sparkles', shortLabel: 'AI', category: 'System' },
