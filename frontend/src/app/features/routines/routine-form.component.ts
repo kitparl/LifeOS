@@ -146,23 +146,74 @@ import { RoutinesService } from './services/routines.service';
                     <label class="mb-1 block text-xs">Notes</label>
                     <input class="input-field" formControlName="notes" placeholder="Optional" />
                   </div>
-                  <div>
-                    <label class="mb-1 block text-xs">Linked habits (optional)</label>
-                    <select
-                      class="input-field min-h-[72px]"
-                      multiple
-                      [value]="habitIdsAt(i)"
-                      (change)="onHabitsChange(i, $event)"
-                    >
-                      @for (h of availableHabits; track h.id) {
-                        <option [value]="h.id" [selected]="habitIdsAt(i).includes(h.id)">
-                          {{ h.name }}
-                        </option>
+                  <div class="space-y-2 rounded border border-[var(--xp-border)] p-2.5" style="background: var(--surface-2, var(--surface))">
+                    <label class="block text-xs font-medium">Block source</label>
+                    <div class="grid gap-2 sm:grid-cols-2">
+                      <label
+                        class="flex cursor-pointer items-start gap-2 rounded border px-2.5 py-2 text-xs"
+                        [style.border-color]="linkModeAt(i) === 'custom' ? 'var(--info)' : 'var(--xp-border)'"
+                        [style.background]="linkModeAt(i) === 'custom' ? 'var(--info-soft)' : 'transparent'"
+                      >
+                        <input
+                          type="radio"
+                          class="mt-0.5"
+                          [name]="'linkMode-' + i"
+                          [checked]="linkModeAt(i) === 'custom'"
+                          (change)="setLinkMode(i, 'custom')"
+                        />
+                        <span>
+                          <span class="block font-medium">Custom item</span>
+                          <span style="color: var(--text-muted)">Use this block’s title as-is</span>
+                        </span>
+                      </label>
+                      <label
+                        class="flex cursor-pointer items-start gap-2 rounded border px-2.5 py-2 text-xs"
+                        [style.border-color]="linkModeAt(i) === 'habits' ? 'var(--info)' : 'var(--xp-border)'"
+                        [style.background]="linkModeAt(i) === 'habits' ? 'var(--info-soft)' : 'transparent'"
+                      >
+                        <input
+                          type="radio"
+                          class="mt-0.5"
+                          [name]="'linkMode-' + i"
+                          [checked]="linkModeAt(i) === 'habits'"
+                          (change)="setLinkMode(i, 'habits')"
+                        />
+                        <span>
+                          <span class="block font-medium">Link habits</span>
+                          <span style="color: var(--text-muted)">Track against existing habits</span>
+                        </span>
+                      </label>
+                    </div>
+
+                    @if (linkModeAt(i) === 'habits') {
+                      @if (availableHabits.length === 0) {
+                        <p class="text-xs" style="color: var(--text-muted)">
+                          No active habits yet.
+                          <a routerLink="/habits/new" class="underline" style="color: var(--xp-blue)">Create a habit</a>
+                          first, then come back.
+                        </p>
+                      } @else {
+                        <div class="flex flex-wrap gap-1.5">
+                          @for (h of availableHabits; track h.id) {
+                            <label
+                              class="flex cursor-pointer items-center gap-1.5 rounded border px-2 py-1 text-xs"
+                              [style.border-color]="isHabitSelected(i, h.id) ? 'var(--info)' : 'var(--xp-border)'"
+                              [style.background]="isHabitSelected(i, h.id) ? 'var(--info-soft)' : 'transparent'"
+                            >
+                              <input
+                                type="checkbox"
+                                [checked]="isHabitSelected(i, h.id)"
+                                (change)="toggleHabit(i, h.id, $event)"
+                              />
+                              {{ h.name }}
+                            </label>
+                          }
+                        </div>
+                        <p class="text-[10px]" style="color: var(--text-muted)">
+                          Pick one or more habits this time block represents.
+                        </p>
                       }
-                    </select>
-                    <p class="text-[10px] mt-0.5" style="color: var(--text-muted)">
-                      Optional — link only if this block maps to a trackable habit. Hold Ctrl/Cmd to select multiple.
-                    </p>
+                    }
                   </div>
                 </div>
               }
@@ -282,6 +333,7 @@ export class RoutineFormComponent implements OnInit {
       category: [category, Validators.required],
       notes: [notes],
       habit_ids: [habitIds as string[]],
+      link_mode: [habitIds.length > 0 ? ('habits' as const) : ('custom' as const)],
     });
   }
 
@@ -289,10 +341,29 @@ export class RoutineFormComponent implements OnInit {
     return (this.blocks.at(index).get('habit_ids')?.value as string[]) || [];
   }
 
-  onHabitsChange(index: number, event: Event): void {
-    const select = event.target as HTMLSelectElement;
-    const ids = Array.from(select.selectedOptions).map((o) => o.value);
-    this.blocks.at(index).patchValue({ habit_ids: ids });
+  linkModeAt(index: number): 'custom' | 'habits' {
+    return (this.blocks.at(index).get('link_mode')?.value as 'custom' | 'habits') || 'custom';
+  }
+
+  setLinkMode(index: number, mode: 'custom' | 'habits'): void {
+    const group = this.blocks.at(index);
+    group.patchValue({
+      link_mode: mode,
+      habit_ids: mode === 'custom' ? [] : this.habitIdsAt(index),
+    });
+  }
+
+  isHabitSelected(index: number, habitId: string): boolean {
+    return this.habitIdsAt(index).includes(habitId);
+  }
+
+  toggleHabit(index: number, habitId: string, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    const current = this.habitIdsAt(index);
+    const next = checked
+      ? [...current, habitId]
+      : current.filter((id) => id !== habitId);
+    this.blocks.at(index).patchValue({ habit_ids: next, link_mode: 'habits' });
   }
 
   addBlock(): void {
@@ -337,7 +408,7 @@ export class RoutineFormComponent implements OnInit {
       category: b.category,
       notes: b.notes || null,
       sort_order: i,
-      habit_ids: b.habit_ids || [],
+      habit_ids: b.link_mode === 'habits' ? b.habit_ids || [] : [],
     }));
 
     const payload = {
