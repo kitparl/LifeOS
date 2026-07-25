@@ -131,11 +131,22 @@ class IntegrationService:
             "Telegram",
         )
 
-    async def get_telegram_status(self, user_id: str) -> TelegramConfigStatus:
+    async def get_telegram_status(
+        self, user_id: str, *, scheduler_warning: str | None = None
+    ) -> TelegramConfigStatus:
         conn = await self.get_or_create_telegram(user_id)
         masked = mask_config(conn.config_json)
         prefs = parse_preferences(conn.config_json)
         webhook_secret = getattr(conn, "webhook_secret", None)
+
+        try:
+            from app.modules.integrations.scheduler import next_run_times
+
+            next_runs = next_run_times(user_id) if conn.enabled else {}
+        except Exception:
+            logger.exception("Failed to read scheduler state for user=%s", user_id)
+            next_runs = {}
+
         return TelegramConfigStatus(
             connection_id=conn.id,
             enabled=conn.enabled,
@@ -167,6 +178,8 @@ class IntegrationService:
             routine_reminders_enabled=prefs.routine_reminders_enabled,
             webhook_configured=bool(webhook_secret),
             webhook_url=None,
+            next_runs=next_runs,
+            scheduler_warning=scheduler_warning,
         )
 
     async def save_telegram_config(self, user_id: str, data: TelegramConfigUpdate) -> TelegramConfigStatus:
@@ -238,15 +251,27 @@ class IntegrationService:
             updated.status = "connected"
             await self.repo.db.flush()
 
-        # Keep per-user scheduled report crons in sync with preferences
+        # Keep per-user scheduled report crons in sync with preferences. A failure
+        # here leaves the saved times unscheduled, so it is surfaced to the caller
+        # rather than only written to the log.
+        scheduler_warning: str | None = None
         try:
-            from app.modules.integrations.scheduler import sync_user_jobs
+            from app.modules.integrations.scheduler import get_scheduler, sync_user_jobs
 
-            sync_user_jobs(user_id, parse_preferences(updated.config_json), enabled=updated.enabled)
-        except Exception:
+            if get_scheduler() is None:
+                scheduler_warning = (
+                    "Settings saved, but the scheduler is not running — "
+                    "scheduled reports will only start after the API restarts."
+                )
+            else:
+                sync_user_jobs(
+                    user_id, parse_preferences(updated.config_json), enabled=updated.enabled
+                )
+        except Exception as exc:
             logger.exception("Failed to sync scheduled jobs for user=%s", user_id)
+            scheduler_warning = f"Settings saved, but scheduling them failed: {exc}"
 
-        return await self.get_telegram_status(user_id)
+        return await self.get_telegram_status(user_id, scheduler_warning=scheduler_warning)
 
     async def test_connection(self, user_id: str, conn_id: str) -> TelegramTestResponse:
         conn = await self.repo.get_by_id(user_id, conn_id)

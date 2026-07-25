@@ -6,12 +6,15 @@ SQLAlchemy models require explicit ALTER TABLE statements for existing databases
 This module provides an idempotent helper that safely adds missing columns.
 """
 
+import json
 import logging
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 logger = logging.getLogger(__name__)
+
+_LEGACY_TELEGRAM_TIMEZONE = "UTC"
 
 # List of (table, column, sql_type) tuples to ensure exist
 _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
@@ -97,3 +100,61 @@ async def ensure_columns(conn: AsyncConnection) -> None:
             await conn.execute(text(f"UPDATE {table} SET {column} = FALSE WHERE {column} IS NULL"))
         except Exception as exc:
             logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
+
+    await backfill_telegram_timezone(conn)
+
+
+async def backfill_telegram_timezone(conn: AsyncConnection) -> None:
+    """
+    Rewrite the legacy hardcoded "UTC" timezone on Telegram configs.
+
+    Configs created before scheduled reports persisted timezone="UTC" into
+    config_json. Because the key is present, the newer Asia/Kolkata default
+    never applies, and the settings page posts the stale value straight back —
+    so every cron silently fires at the wrong local time. Each config is
+    rewritten at most once (see TZ_BACKFILL_KEY) so a deliberate UTC choice
+    made afterwards is preserved.
+    """
+    from app.modules.integrations.telegram_config import DEFAULT_TIMEZONE, TZ_BACKFILL_KEY
+
+    try:
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT id, config_json FROM integration_connections "
+                    "WHERE provider = 'telegram'"
+                )
+            )
+        ).fetchall()
+    except Exception as exc:
+        logger.warning("Could not read Telegram configs for timezone backfill: %s", exc)
+        return
+
+    for row_id, raw in rows:
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict) or data.get(TZ_BACKFILL_KEY):
+            continue
+
+        data[TZ_BACKFILL_KEY] = True
+        rewritten = data.get("timezone") == _LEGACY_TELEGRAM_TIMEZONE
+        if rewritten:
+            data["timezone"] = DEFAULT_TIMEZONE
+
+        try:
+            await conn.execute(
+                text("UPDATE integration_connections SET config_json = :cfg WHERE id = :id"),
+                {"cfg": json.dumps(data), "id": row_id},
+            )
+        except Exception as exc:
+            logger.warning("Could not backfill timezone for connection %s: %s", row_id, exc)
+            continue
+
+        if rewritten:
+            logger.info(
+                "Migrated Telegram connection %s from legacy UTC to %s", row_id, DEFAULT_TIMEZONE
+            )

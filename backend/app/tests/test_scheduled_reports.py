@@ -287,3 +287,93 @@ def test_immutable_offset_window_helper():
     fire = now - timedelta(minutes=5)
     assert _in_window(fire, now)
     assert not _in_window(now - POLL_GRACE - timedelta(minutes=1), now)
+
+
+# --- Timezone correctness ---
+
+
+@pytest.mark.asyncio
+async def test_registered_cron_fires_at_local_time():
+    """A report set for 18:16 in Asia/Kolkata must fire at 18:16 IST, not 18:16 UTC."""
+    from app.modules.integrations import scheduler as sched_mod
+
+    sched_mod.start_scheduler()
+    try:
+        prefs = parse_preferences(
+            serialize_config(
+                bot_token="1:ABC",
+                chat_id="123",
+                midday_enabled=True,
+                midday_time="18:16",
+                timezone="Asia/Kolkata",
+            )
+        )
+        sched_mod.sync_user_jobs("u-tz", prefs, enabled=True)
+        next_run = sched_mod.next_run_times("u-tz")["midday"]
+        assert next_run is not None
+        local = next_run.astimezone(ZoneInfo("Asia/Kolkata"))
+        assert (local.hour, local.minute) == (18, 16)
+    finally:
+        await sched_mod.shutdown_scheduler()
+
+
+async def _backfill(config: dict) -> dict:
+    """Run the startup timezone backfill over a single telegram connection row."""
+    import json
+
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from app.core.migrations import backfill_telegram_timezone
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "CREATE TABLE integration_connections "
+                    "(id VARCHAR PRIMARY KEY, provider VARCHAR, config_json TEXT)"
+                )
+            )
+            await conn.execute(
+                text("INSERT INTO integration_connections VALUES ('c1', 'telegram', :cfg)"),
+                {"cfg": json.dumps(config)},
+            )
+            await backfill_telegram_timezone(conn)
+            raw = (
+                await conn.execute(
+                    text("SELECT config_json FROM integration_connections WHERE id = 'c1'")
+                )
+            ).scalar_one()
+        return json.loads(raw)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_backfill_rewrites_legacy_utc_timezone():
+    from app.modules.integrations.telegram_config import TZ_BACKFILL_KEY
+
+    data = await _backfill({"timezone": "UTC", "midday_time": "18:16"})
+    assert data["timezone"] == "Asia/Kolkata"
+    assert data[TZ_BACKFILL_KEY] is True
+    assert data["midday_time"] == "18:16"
+
+
+@pytest.mark.asyncio
+async def test_backfill_keeps_deliberate_utc_choice():
+    from app.modules.integrations.telegram_config import TZ_BACKFILL_KEY
+
+    data = await _backfill({"timezone": "UTC", TZ_BACKFILL_KEY: True})
+    assert data["timezone"] == "UTC"
+
+
+def test_serialize_config_preserves_backfill_marker():
+    import json
+
+    from app.modules.integrations.telegram_config import TZ_BACKFILL_KEY
+
+    existing = json.dumps({"timezone": "UTC", TZ_BACKFILL_KEY: True})
+    saved = json.loads(serialize_config(existing_json=existing, midday_time="18:16"))
+    assert saved[TZ_BACKFILL_KEY] is True
+    assert saved["timezone"] == "UTC"

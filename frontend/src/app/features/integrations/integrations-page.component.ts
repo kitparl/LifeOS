@@ -122,38 +122,63 @@ import {
                       <input type="checkbox" [(ngModel)]="morningEnabled" />
                       Morning
                     </label>
-                    <input class="input-field" type="time" [(ngModel)]="morningTime" />
+                    <div>
+                      <input class="input-field w-full" type="time" [(ngModel)]="morningTime" />
+                      <p class="text-xs mt-1" style="color: var(--text-muted)">
+                        {{ nextRunLabel('morning') }}
+                      </p>
+                    </div>
                     <label class="flex items-center gap-2 text-xs">
                       <input type="checkbox" [(ngModel)]="middayEnabled" />
                       Midday nudge
                     </label>
-                    <input class="input-field" type="time" [(ngModel)]="middayTime" />
+                    <div>
+                      <input class="input-field w-full" type="time" [(ngModel)]="middayTime" />
+                      <p class="text-xs mt-1" style="color: var(--text-muted)">
+                        {{ nextRunLabel('midday') }}
+                      </p>
+                    </div>
                     <label class="flex items-center gap-2 text-xs">
                       <input type="checkbox" [(ngModel)]="nightEnabled" />
                       Night wrap
                     </label>
-                    <input class="input-field" type="time" [(ngModel)]="nightTime" />
+                    <div>
+                      <input class="input-field w-full" type="time" [(ngModel)]="nightTime" />
+                      <p class="text-xs mt-1" style="color: var(--text-muted)">
+                        {{ nextRunLabel('night') }}
+                      </p>
+                    </div>
                     <label class="flex items-center gap-2 text-xs">
                       <input type="checkbox" [(ngModel)]="weeklyEnabled" />
                       Weekly review
                     </label>
-                    <div class="flex gap-1">
-                      <input class="input-field flex-1" type="time" [(ngModel)]="weeklyTime" />
-                      <select class="input-field" [(ngModel)]="weeklyWeekday">
-                        <option [ngValue]="0">Mon</option>
-                        <option [ngValue]="1">Tue</option>
-                        <option [ngValue]="2">Wed</option>
-                        <option [ngValue]="3">Thu</option>
-                        <option [ngValue]="4">Fri</option>
-                        <option [ngValue]="5">Sat</option>
-                        <option [ngValue]="6">Sun</option>
-                      </select>
+                    <div>
+                      <div class="flex gap-1">
+                        <input class="input-field flex-1" type="time" [(ngModel)]="weeklyTime" />
+                        <select class="input-field" [(ngModel)]="weeklyWeekday">
+                          <option [ngValue]="0">Mon</option>
+                          <option [ngValue]="1">Tue</option>
+                          <option [ngValue]="2">Wed</option>
+                          <option [ngValue]="3">Thu</option>
+                          <option [ngValue]="4">Fri</option>
+                          <option [ngValue]="5">Sat</option>
+                          <option [ngValue]="6">Sun</option>
+                        </select>
+                      </div>
+                      <p class="text-xs mt-1" style="color: var(--text-muted)">
+                        {{ nextRunLabel('weekly') }}
+                      </p>
                     </div>
                     <label class="flex items-center gap-2 text-xs">
                       <input type="checkbox" [(ngModel)]="aiBriefingEnabled" />
                       AI briefing
                     </label>
-                    <input class="input-field" type="time" [(ngModel)]="aiBriefingTime" />
+                    <div>
+                      <input class="input-field w-full" type="time" [(ngModel)]="aiBriefingTime" />
+                      <p class="text-xs mt-1" style="color: var(--text-muted)">
+                        {{ nextRunLabel('ai_briefing') }}
+                      </p>
+                    </div>
                     <div class="flex flex-col gap-1 sm:col-span-2">
                       <label class="form-label" for="tg-tz">Timezone</label>
                       <input
@@ -163,8 +188,22 @@ import {
                         [(ngModel)]="timezone"
                         placeholder="Asia/Kolkata"
                       />
+                      @if (timezone !== detectedTimezone) {
+                        <p class="text-xs" style="color: var(--warning)">
+                          Reports fire in {{ timezone }}, but this device is in
+                          {{ detectedTimezone }}.
+                          <button type="button" class="underline" (click)="useDetectedTimezone()">
+                            Use {{ detectedTimezone }}
+                          </button>
+                        </p>
+                      }
                     </div>
                   </div>
+                  @if (telegram()?.scheduler_warning) {
+                    <p class="text-xs mt-2" style="color: var(--danger)">
+                      {{ telegram()!.scheduler_warning }}
+                    </p>
+                  }
                   <p class="font-medium text-xs mt-3 mb-1">Reminders</p>
                   <div class="flex flex-wrap gap-3 text-xs">
                     <label class="flex items-center gap-2">
@@ -353,7 +392,8 @@ export class IntegrationsPageComponent implements OnInit {
   birthdayReminders = true;
   immutableReminders = true;
   routineReminders = true;
-  timezone = 'Asia/Kolkata';
+  readonly detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
+  timezone = this.detectedTimezone;
   readonly reportJobTypes: ReportJobType[] = ['morning', 'midday', 'night', 'weekly', 'ai_briefing'];
   readonly reportRuns = signal<ReportRun[]>([]);
 
@@ -387,7 +427,26 @@ export class IntegrationsPageComponent implements OnInit {
     this.birthdayReminders = status.birthday_reminders_enabled ?? true;
     this.immutableReminders = status.immutable_reminders_enabled ?? true;
     this.routineReminders = status.routine_reminders_enabled ?? true;
-    this.timezone = status.timezone || 'Asia/Kolkata';
+    this.timezone = status.timezone || this.detectedTimezone;
+  }
+
+  useDetectedTimezone(): void {
+    this.timezone = this.detectedTimezone;
+  }
+
+  nextRunLabel(jobType: ReportJobType): string {
+    const raw = this.telegram()?.next_runs?.[jobType];
+    if (!raw) return 'Not scheduled';
+    const at = new Date(raw);
+    if (Number.isNaN(at.getTime())) return 'Not scheduled';
+    const when = at.toLocaleString(undefined, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return `Next: ${when}`;
   }
 
   loadTelegram(): void {
@@ -471,7 +530,7 @@ export class IntegrationsPageComponent implements OnInit {
       birthday_reminders_enabled: this.birthdayReminders,
       immutable_reminders_enabled: this.immutableReminders,
       routine_reminders_enabled: this.routineReminders,
-      timezone: this.timezone.trim() || 'Asia/Kolkata',
+      timezone: this.timezone.trim() || this.detectedTimezone,
       // Keep digest_* in sync for legacy
       digest_enabled: this.morningEnabled,
       digest_time: this.morningTime,
@@ -485,8 +544,8 @@ export class IntegrationsPageComponent implements OnInit {
     this.integrations.saveTelegramConfig(body).subscribe({
       next: (status) => {
         this.applyTelegramForm(status);
-        this.tgOk.set(true);
-        this.tgMessage.set('Telegram settings saved');
+        this.tgOk.set(!status.scheduler_warning);
+        this.tgMessage.set(status.scheduler_warning || 'Telegram settings saved');
         this.tgBusy.set(false);
         this.loadConnections();
       },
