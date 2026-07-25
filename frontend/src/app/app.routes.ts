@@ -385,6 +385,13 @@ export const routes: Routes = [
         pathMatch: 'full',
       },
       {
+        path: 'analytics/dashboard',
+        loadComponent: () =>
+          import('./features/analytics-dashboard/analytics-dashboard-hub.component').then(
+            (m) => m.AnalyticsDashboardHubComponent,
+          ),
+      },
+      {
         path: 'insights',
         loadComponent: () =>
           import('./features/insights/insights-hub.component').then((m) => m.InsightsHubComponent),
