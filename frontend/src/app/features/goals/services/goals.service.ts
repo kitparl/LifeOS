@@ -61,4 +61,12 @@ export class GoalsService {
   deleteMilestone(goalId: string, milestoneId: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/${goalId}/milestones/${milestoneId}`);
   }
+
+  listCategories(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.api}/categories`);
+  }
+
+  createCategory(name: string): Observable<string[]> {
+    return this.http.post<string[]>(`${this.api}/categories`, { name });
+  }
 }

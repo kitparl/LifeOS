@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
 from app.modules.goals.schemas import (
+    GoalCategoryCreate,
     GoalCreate,
     GoalListItem,
     GoalResponse,
@@ -37,6 +38,24 @@ async def create_goal(
     db: AsyncSession = Depends(get_db),
 ):
     return await GoalService(db).create_goal(user.id, data)
+
+
+@router.get("/categories", response_model=list[str])
+async def list_goal_categories(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GoalService(db).list_categories(user.id)
+
+
+@router.post("/categories", response_model=list[str], status_code=status.HTTP_201_CREATED)
+async def create_goal_category(
+    data: GoalCategoryCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await GoalService(db).create_category(user.id, data.name)
+    return await GoalService(db).list_categories(user.id)
 
 
 @router.get("/{goal_id}", response_model=GoalResponse)

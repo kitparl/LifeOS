@@ -1,15 +1,12 @@
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
-
-WishlistCategory = Literal["travel", "cars", "house", "countries", "experiences", "other"]
 
 
 class WishlistCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str | None = None
-    category: WishlistCategory = "other"
+    category: str = Field(default="other", min_length=1, max_length=32)
     cost: float | None = Field(default=None, ge=0)
     progress: int = Field(default=0, ge=0, le=100)
     notes: str | None = None
@@ -19,11 +16,15 @@ class WishlistCreate(BaseModel):
 class WishlistUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
-    category: WishlistCategory | None = None
+    category: str | None = Field(default=None, min_length=1, max_length=32)
     cost: float | None = Field(default=None, ge=0)
     progress: int | None = Field(default=None, ge=0, le=100)
     notes: str | None = None
     image_url: str | None = Field(default=None, max_length=500)
+
+
+class WishlistCategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
 
 
 class WishlistListItem(BaseModel):

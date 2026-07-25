@@ -1,13 +1,14 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { GOAL_CATEGORIES, GOAL_PERIODS, GoalCategory, GoalPeriod } from './models/goal.models';
+import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
+import { GOAL_PERIODS, GoalPeriod } from './models/goal.models';
 import { GoalsService } from './services/goals.service';
 
 @Component({
   selector: 'app-goal-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TypeSelectComponent],
   template: `
     <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
@@ -20,11 +21,12 @@ import { GoalsService } from './services/goals.service';
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="mb-1 block">Category</label>
-              <select class="input-field" formControlName="category">
-                @for (c of categories; track c.value) {
-                  <option [value]="c.value">{{ c.label }}</option>
-                }
-              </select>
+              <app-type-select
+                formControlName="category"
+                placeholder="Select or create a category…"
+                [options]="categories()"
+                (created)="onCategoryCreated($event)"
+              />
             </div>
             <div>
               <label class="mb-1 block">Period</label>
@@ -83,7 +85,7 @@ export class GoalFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  categories = GOAL_CATEGORIES;
+  readonly categories = signal<string[]>([]);
   periods = GOAL_PERIODS;
   isEdit = false;
   goalId: string | null = null;
@@ -92,7 +94,7 @@ export class GoalFormComponent implements OnInit {
 
   form = this.fb.nonNullable.group({
     title: ['', Validators.required],
-    category: ['personal' as GoalCategory, Validators.required],
+    category: ['personal', Validators.required],
     period: ['yearly' as GoalPeriod, Validators.required],
     description: [''],
     notes: [''],
@@ -103,6 +105,8 @@ export class GoalFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.goalsService.listCategories().subscribe({ next: (c) => this.categories.set(c) });
+
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id && url.endsWith('edit')) {
@@ -124,6 +128,11 @@ export class GoalFormComponent implements OnInit {
         },
       });
     }
+  }
+
+  onCategoryCreated(name: string): void {
+    this.categories.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.goalsService.createCategory(name).subscribe({ next: (c) => this.categories.set(c) });
   }
 
   submit(): void {

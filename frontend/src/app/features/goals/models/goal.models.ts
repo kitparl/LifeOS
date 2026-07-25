@@ -1,11 +1,3 @@
-export type GoalCategory =
-  | 'career'
-  | 'running'
-  | 'finance'
-  | 'learning'
-  | 'personal'
-  | 'health';
-
 export type GoalStatus = 'active' | 'archived' | 'completed';
 
 export type GoalPeriod = 'weekly' | 'monthly' | 'yearly' | 'custom';
@@ -23,7 +15,7 @@ export interface Goal {
   id: string;
   title: string;
   description: string | null;
-  category: GoalCategory;
+  category: string;
   status: GoalStatus;
   period: GoalPeriod;
   progress: number;
@@ -42,7 +34,7 @@ export interface Goal {
 export interface GoalListItem {
   id: string;
   title: string;
-  category: GoalCategory;
+  category: string;
   status: GoalStatus;
   period: GoalPeriod;
   progress: number;
@@ -58,7 +50,7 @@ export interface GoalListItem {
 export interface GoalCreate {
   title: string;
   description?: string | null;
-  category: GoalCategory;
+  category: string;
   period?: GoalPeriod;
   progress?: number;
   notes?: string | null;
@@ -70,7 +62,7 @@ export interface GoalCreate {
 export interface GoalUpdate {
   title?: string;
   description?: string | null;
-  category?: GoalCategory;
+  category?: string;
   status?: GoalStatus;
   period?: GoalPeriod;
   progress?: number;
@@ -79,15 +71,6 @@ export interface GoalUpdate {
   period_start?: string | null;
   period_end?: string | null;
 }
-
-export const GOAL_CATEGORIES: { value: GoalCategory; label: string }[] = [
-  { value: 'career', label: 'Career' },
-  { value: 'running', label: 'Running' },
-  { value: 'finance', label: 'Finance' },
-  { value: 'learning', label: 'Learning' },
-  { value: 'personal', label: 'Personal' },
-  { value: 'health', label: 'Health' },
-];
 
 export const GOAL_PERIODS: { value: GoalPeriod; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },

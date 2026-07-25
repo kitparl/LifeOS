@@ -173,6 +173,34 @@ async def test_routine_block_habit_linking(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_routine_block_without_habits(client: AsyncClient):
+    token = await _auth_token(client)
+    routine = await client.post(
+        "/api/v1/routines",
+        json={
+            "name": "No habits",
+            "days_of_week": [0, 1, 2, 3, 4],
+            "timezone": "UTC",
+            "blocks": [
+                {
+                    "title": "Deep work",
+                    "start_time": "09:00:00",
+                    "end_time": "11:00:00",
+                    "area": "other",
+                    "category": "personal",
+                    "habit_ids": [],
+                }
+            ],
+        },
+        headers=_auth(token),
+    )
+    assert routine.status_code == 201, routine.text
+    body = routine.json()
+    assert body["blocks"][0]["habit_ids"] == []
+    assert body["blocks"][0]["habits"] == []
+
+
+@pytest.mark.asyncio
 async def test_report_gate_telegram_disabled(client: AsyncClient):
     token = await _auth_token(client)
     # Ensure telegram connection exists but disabled

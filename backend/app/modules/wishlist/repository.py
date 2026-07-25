@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.wishlist.models import WishlistItem
+from app.modules.wishlist.models import WishlistCategory, WishlistItem
 from app.modules.wishlist.schemas import WishlistCreate, WishlistUpdate
 
 
@@ -17,6 +17,24 @@ class WishlistRepository:
         result = await self.db.execute(q)
         return list(result.scalars().all())
 
+    async def list_category_names(self, user_id: str) -> list[str]:
+        result = await self.db.execute(
+            select(WishlistCategory.name).where(WishlistCategory.user_id == user_id).order_by(WishlistCategory.name.asc())
+        )
+        return list(result.scalars().all())
+
+    async def ensure_category(self, user_id: str, name: str) -> None:
+        """Register a category name for reuse (idempotent, case-insensitive)."""
+        clean = (name or "").strip()
+        if not clean:
+            return
+        existing = await self.db.execute(select(WishlistCategory).where(WishlistCategory.user_id == user_id))
+        for row in existing.scalars().all():
+            if row.name.lower() == clean.lower():
+                return
+        self.db.add(WishlistCategory(user_id=user_id, name=clean))
+        await self.db.flush()
+
     async def get_by_id(self, user_id: str, item_id: str) -> WishlistItem | None:
         result = await self.db.execute(
             select(WishlistItem).where(WishlistItem.id == item_id, WishlistItem.user_id == user_id)
@@ -27,12 +45,17 @@ class WishlistRepository:
         item = WishlistItem(user_id=user_id, **data.model_dump())
         self.db.add(item)
         await self.db.flush()
+        if data.category:
+            await self.ensure_category(user_id, data.category)
         await self.db.refresh(item)
         return item
 
     async def update(self, item: WishlistItem, data: WishlistUpdate) -> WishlistItem:
-        for key, value in data.model_dump(exclude_unset=True).items():
+        fields = data.model_dump(exclude_unset=True)
+        for key, value in fields.items():
             setattr(item, key, value)
+        if "category" in fields and fields["category"]:
+            await self.ensure_category(item.user_id, fields["category"])
         await self.db.flush()
         await self.db.refresh(item)
         return item

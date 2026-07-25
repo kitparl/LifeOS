@@ -1,14 +1,14 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FileUploadComponent } from '../../shared/file-upload/file-upload.component';
-import { WISHLIST_CATEGORIES, WishlistCategory } from './models/wishlist.models';
+import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { WishlistService } from './services/wishlist.service';
 
 @Component({
   selector: 'app-wishlist-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, FileUploadComponent],
+  imports: [ReactiveFormsModule, RouterLink, FileUploadComponent, TypeSelectComponent],
   template: `
     <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
@@ -20,11 +20,12 @@ import { WishlistService } from './services/wishlist.service';
           </div>
           <div>
             <label class="mb-1 block">Category</label>
-            <select class="input-field" formControlName="category">
-              @for (c of categories; track c.value) {
-                <option [value]="c.value">{{ c.label }}</option>
-              }
-            </select>
+            <app-type-select
+              formControlName="category"
+              placeholder="Select or create a category…"
+              [options]="categories()"
+              (created)="onCategoryCreated($event)"
+            />
           </div>
           <div>
             <label class="mb-1 block">Description</label>
@@ -67,7 +68,7 @@ export class WishlistFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  categories = WISHLIST_CATEGORIES;
+  readonly categories = signal<string[]>([]);
   isEdit = false;
   itemId: string | null = null;
   saving = false;
@@ -75,7 +76,7 @@ export class WishlistFormComponent implements OnInit {
 
   form = this.fb.nonNullable.group({
     title: ['', Validators.required],
-    category: ['other' as WishlistCategory, Validators.required],
+    category: ['other', Validators.required],
     description: [''],
     cost: [null as number | null],
     progress: [0, [Validators.min(0), Validators.max(100)]],
@@ -84,6 +85,8 @@ export class WishlistFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.wishlistService.listCategories().subscribe({ next: (c) => this.categories.set(c) });
+
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id && url.endsWith('edit')) {
@@ -102,6 +105,11 @@ export class WishlistFormComponent implements OnInit {
           }),
       });
     }
+  }
+
+  onCategoryCreated(name: string): void {
+    this.categories.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.wishlistService.createCategory(name).subscribe({ next: (c) => this.categories.set(c) });
   }
 
   onImageUploaded(url: string): void {

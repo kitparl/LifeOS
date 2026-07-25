@@ -147,7 +147,7 @@ import { RoutinesService } from './services/routines.service';
                     <input class="input-field" formControlName="notes" placeholder="Optional" />
                   </div>
                   <div>
-                    <label class="mb-1 block text-xs">Linked habits</label>
+                    <label class="mb-1 block text-xs">Linked habits (optional)</label>
                     <select
                       class="input-field min-h-[72px]"
                       multiple
@@ -161,7 +161,7 @@ import { RoutinesService } from './services/routines.service';
                       }
                     </select>
                     <p class="text-[10px] mt-0.5" style="color: var(--text-muted)">
-                      Hold Ctrl/Cmd to select multiple.
+                      Optional — link only if this block maps to a trackable habit. Hold Ctrl/Cmd to select multiple.
                     </p>
                   </div>
                 </div>

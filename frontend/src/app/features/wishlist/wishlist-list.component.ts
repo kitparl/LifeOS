@@ -1,8 +1,8 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { WISHLIST_CATEGORIES, WishlistListItem } from './models/wishlist.models';
+import { WishlistListItem } from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
 
 @Component({
@@ -19,8 +19,8 @@ import { WishlistService } from './services/wishlist.service';
       <form class="flex gap-2 text-sm" [formGroup]="filters" (ngSubmit)="load()">
         <select class="input-field !w-auto" formControlName="category">
           <option value="">All categories</option>
-          @for (c of categories; track c.value) {
-            <option [value]="c.value">{{ c.label }}</option>
+          @for (c of categories(); track c) {
+            <option [value]="c">{{ c }}</option>
           }
         </select>
         <button type="submit" class="btn-primary text-xs">Filter</button>
@@ -57,12 +57,13 @@ export class WishlistListComponent implements OnInit {
   private readonly wishlistService = inject(WishlistService);
   private readonly fb = inject(FormBuilder);
 
-  categories = WISHLIST_CATEGORIES;
+  readonly categories = signal<string[]>([]);
   items: WishlistListItem[] = [];
   loading = false;
   filters = this.fb.nonNullable.group({ category: '' });
 
   ngOnInit(): void {
+    this.wishlistService.listCategories().subscribe({ next: (c) => this.categories.set(c) });
     this.load();
   }
 

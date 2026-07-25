@@ -3,7 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
-import { GOAL_CATEGORIES, GOAL_PERIODS, GoalListItem, GoalPeriod } from './models/goal.models';
+import { GOAL_PERIODS, GoalListItem, GoalPeriod } from './models/goal.models';
 import { GoalsService } from './services/goals.service';
 
 type PeriodTab = 'all' | GoalPeriod;
@@ -36,8 +36,8 @@ type PeriodTab = 'all' | GoalPeriod;
       <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
         <select class="input-field !w-auto" formControlName="category">
           <option value="">All categories</option>
-          @for (c of categories; track c.value) {
-            <option [value]="c.value">{{ c.label }}</option>
+          @for (c of categories(); track c) {
+            <option [value]="c">{{ c }}</option>
           }
         </select>
         <select class="input-field !w-auto" formControlName="status">
@@ -156,7 +156,7 @@ export class GoalsListComponent implements OnInit {
   private readonly goalsService = inject(GoalsService);
   private readonly fb = inject(FormBuilder);
 
-  categories = GOAL_CATEGORIES;
+  readonly categories = signal<string[]>([]);
   periodTabs: { value: PeriodTab; label: string }[] = [
     { value: 'all', label: 'All' },
     ...GOAL_PERIODS,
@@ -171,6 +171,7 @@ export class GoalsListComponent implements OnInit {
   filters = this.fb.nonNullable.group({ category: '', status: 'active' });
 
   ngOnInit(): void {
+    this.goalsService.listCategories().subscribe({ next: (c) => this.categories.set(c) });
     this.load();
     this.loadMissed();
   }

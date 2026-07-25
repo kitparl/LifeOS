@@ -4,10 +4,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
-from app.modules.wishlist.schemas import WishlistCreate, WishlistListItem, WishlistResponse, WishlistUpdate
+from app.modules.wishlist.schemas import (
+    WishlistCategoryCreate,
+    WishlistCreate,
+    WishlistListItem,
+    WishlistResponse,
+    WishlistUpdate,
+)
 from app.modules.wishlist.service import WishlistService
 
 router = APIRouter(prefix="/wishlist", tags=["wishlist"])
+
+
+@router.get("/categories", response_model=list[str])
+async def list_wishlist_categories(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WishlistService(db).list_categories(user.id)
+
+
+@router.post("/categories", response_model=list[str], status_code=status.HTTP_201_CREATED)
+async def create_wishlist_category(
+    data: WishlistCategoryCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await WishlistService(db).create_category(user.id, data.name)
+    return await WishlistService(db).list_categories(user.id)
 
 
 @router.get("/items", response_model=list[WishlistListItem])

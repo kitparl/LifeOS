@@ -47,6 +47,8 @@ async def test_routine_crud_and_calendar_expansion(client):
     body = create.json()
     assert body["name"] == "Weekday Focus"
     assert len(body["blocks"]) == 2
+    assert body["blocks"][0]["habit_ids"] == []
+    assert body["blocks"][1]["habit_ids"] == []
     routine_id = body["id"]
 
     listing = await client.get("/api/v1/routines", headers=headers)

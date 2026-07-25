@@ -152,7 +152,7 @@ Additive column `event_kind`: `normal` | `birthday` | `immutable` (default `norm
 | `birthday` | Forces `recurrence=yearly`; uses **birthday** reminder ladder |
 | `immutable` | Non-changeable reminder policy; uses **immutable** ladder |
 
-Create/edit in the Calendar UI (**Event kind** select). Birthday implies yearly automatically.
+Create/edit in the Calendar UI (**Event kind** select). Birthday implies yearly automatically; prefer an all-day date (month/day; year is only an anchor).
 
 ---
 
