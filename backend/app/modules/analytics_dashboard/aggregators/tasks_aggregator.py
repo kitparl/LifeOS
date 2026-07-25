@@ -40,14 +40,22 @@ async def overdue_count(db: AsyncSession, user_id: str) -> int:
 
 
 async def category_distribution(db: AsyncSession, user_id: str, range_days: int) -> list[SeriesPoint]:
+    """Group by raw category; coalesce NULL → uncategorized in Python.
+
+    Avoids Postgres GroupingError when SQLAlchemy emits coalesce() with
+    different bind params in SELECT vs GROUP BY.
+    """
     start = window_start(range_days)
     start_dt = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
     rows = await db.execute(
-        select(func.coalesce(Task.category, "uncategorized"), func.count())
+        select(Task.category, func.count())
         .where(Task.user_id == user_id, Task.created_at >= start_dt)
-        .group_by(func.coalesce(Task.category, "uncategorized"))
+        .group_by(Task.category)
     )
-    return [SeriesPoint(label=str(label), value=float(count)) for label, count in rows.all()]
+    return [
+        SeriesPoint(label=str(label or "uncategorized"), value=float(count))
+        for label, count in rows.all()
+    ]
 
 
 async def completed_series(
