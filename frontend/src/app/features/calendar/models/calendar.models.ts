@@ -1,5 +1,6 @@
 export type EventCategory = 'personal' | 'task' | 'running' | 'bill' | 'learning';
-export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'monthly';
+export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type EventKind = 'normal' | 'birthday' | 'immutable';
 
 export interface CalendarEvent {
   id: string;
@@ -10,6 +11,7 @@ export interface CalendarEvent {
   all_day: boolean;
   category: EventCategory;
   recurrence: EventRecurrence;
+  event_kind?: EventKind;
   location: string | null;
   /** Owning module for synced events (e.g. 'running'); null for user-created. */
   source_module?: string | null;
@@ -26,6 +28,7 @@ export interface EventListItem {
   all_day: boolean;
   category: EventCategory;
   recurrence: EventRecurrence;
+  event_kind?: EventKind;
   location: string | null;
   source_module?: string | null;
   source_id?: string | null;
@@ -39,6 +42,7 @@ export interface EventCreate {
   all_day?: boolean;
   category?: EventCategory;
   recurrence?: EventRecurrence;
+  event_kind?: EventKind;
   location?: string | null;
 }
 
@@ -50,6 +54,7 @@ export interface EventUpdate {
   all_day?: boolean;
   category?: EventCategory;
   recurrence?: EventRecurrence;
+  event_kind?: EventKind;
   location?: string | null;
 }
 
@@ -66,4 +71,11 @@ export const EVENT_RECURRENCE: { value: EventRecurrence; label: string }[] = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+];
+
+export const EVENT_KINDS: { value: EventKind; label: string }[] = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'birthday', label: 'Birthday (yearly reminders)' },
+  { value: 'immutable', label: 'Immutable (long reminder ladder)' },
 ];

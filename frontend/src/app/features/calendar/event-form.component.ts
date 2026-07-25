@@ -3,8 +3,10 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   EVENT_CATEGORIES,
+  EVENT_KINDS,
   EVENT_RECURRENCE,
   EventCategory,
+  EventKind,
   EventRecurrence,
 } from './models/calendar.models';
 import { CalendarService } from './services/calendar.service';
@@ -39,6 +41,17 @@ import { CalendarService } from './services/calendar.service';
                 }
               </select>
             </div>
+          </div>
+          <div>
+            <label class="mb-1 block">Event kind</label>
+            <select class="input-field" formControlName="event_kind" (change)="onKindChange()">
+              @for (k of kinds; track k.value) {
+                <option [value]="k.value">{{ k.label }}</option>
+              }
+            </select>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">
+              Birthday forces yearly recurrence and the birthday reminder ladder.
+            </p>
           </div>
           <div>
             <label class="mb-1 block">Starts</label>
@@ -82,6 +95,7 @@ export class EventFormComponent implements OnInit {
 
   categories = EVENT_CATEGORIES;
   recurrences = EVENT_RECURRENCE;
+  kinds = EVENT_KINDS;
   isEdit = false;
   eventId: string | null = null;
   saving = false;
@@ -91,6 +105,7 @@ export class EventFormComponent implements OnInit {
     title: ['', Validators.required],
     category: ['personal' as EventCategory, Validators.required],
     recurrence: ['none' as EventRecurrence, Validators.required],
+    event_kind: ['normal' as EventKind, Validators.required],
     starts_at: ['', Validators.required],
     ends_at: [''],
     all_day: [false],
@@ -110,6 +125,7 @@ export class EventFormComponent implements OnInit {
             title: event.title,
             category: event.category,
             recurrence: event.recurrence,
+            event_kind: event.event_kind ?? 'normal',
             starts_at: event.starts_at.slice(0, 16),
             ends_at: event.ends_at ? event.ends_at.slice(0, 16) : '',
             all_day: event.all_day,
@@ -126,6 +142,12 @@ export class EventFormComponent implements OnInit {
     }
   }
 
+  onKindChange(): void {
+    if (this.form.controls.event_kind.value === 'birthday') {
+      this.form.patchValue({ recurrence: 'yearly' });
+    }
+  }
+
   submit(): void {
     if (this.form.invalid) return;
     this.saving = true;
@@ -134,7 +156,8 @@ export class EventFormComponent implements OnInit {
     const payload = {
       title: raw.title,
       category: raw.category,
-      recurrence: raw.recurrence,
+      recurrence: raw.event_kind === 'birthday' ? ('yearly' as EventRecurrence) : raw.recurrence,
+      event_kind: raw.event_kind,
       starts_at: new Date(raw.starts_at).toISOString(),
       ends_at: raw.ends_at ? new Date(raw.ends_at).toISOString() : null,
       all_day: raw.all_day,
