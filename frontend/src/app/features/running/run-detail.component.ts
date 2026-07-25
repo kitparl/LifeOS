@@ -45,6 +45,13 @@ import { RunningService } from './services/running.service';
           </div>
         }
 
+        @if (r.shoe) {
+          <div class="panel text-sm">
+            <p class="font-medium mb-1">Shoes</p>
+            <p style="color: var(--text)">{{ r.shoe }}</p>
+          </div>
+        }
+
         @if (r.notes) {
           <div class="panel text-sm">
             <p class="font-medium mb-1">Notes</p>

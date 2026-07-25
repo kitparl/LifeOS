@@ -24,6 +24,9 @@ async def test_create_and_list_goals(client):
     assert goal["title"] == "Run a marathon"
     assert goal["category"] == "running"
     assert goal["status"] == "active"
+    assert goal["period"] == "yearly"
+    assert goal["period_start"] is not None
+    assert goal["period_end"] is not None
 
     listing = await client.get("/api/v1/goals", headers=headers)
     assert listing.status_code == 200
@@ -76,6 +79,56 @@ async def test_archive_goal(client):
     archived = await client.post(f"/api/v1/goals/{goal_id}/archive", headers=headers)
     assert archived.status_code == 200
     assert archived.json()["status"] == "archived"
+
+
+@pytest.mark.asyncio
+async def test_goal_period_and_missed(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create = await client.post(
+        "/api/v1/goals",
+        headers=headers,
+        json={
+            "title": "Weekly sprint",
+            "category": "personal",
+            "period": "weekly",
+            "progress": 20,
+            "target_date": "2020-01-15T00:00:00Z",
+        },
+    )
+    assert create.status_code == 201, create.text
+    goal = create.json()
+    assert goal["period"] == "weekly"
+    assert goal["period_start"] is not None
+    assert goal["period_end"] is not None
+    assert goal["is_missed"] is True
+
+    filtered = await client.get("/api/v1/goals", headers=headers, params={"period": "weekly"})
+    assert filtered.status_code == 200
+    assert len(filtered.json()) == 1
+
+    missed = await client.get("/api/v1/goals", headers=headers, params={"missed": "true", "status": "active"})
+    assert missed.status_code == 200
+    assert any(g["title"] == "Weekly sprint" for g in missed.json())
+
+    custom = await client.post(
+        "/api/v1/goals",
+        headers=headers,
+        json={
+            "title": "Custom window",
+            "category": "career",
+            "period": "custom",
+            "period_start": "2026-01-01",
+            "period_end": "2026-06-30",
+            "progress": 50,
+        },
+    )
+    assert custom.status_code == 201, custom.text
+    body = custom.json()
+    assert body["period"] == "custom"
+    assert body["period_start"] == "2026-01-01"
+    assert body["period_end"] == "2026-06-30"
 
 
 @pytest.mark.asyncio

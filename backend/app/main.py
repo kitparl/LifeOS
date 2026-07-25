@@ -39,6 +39,7 @@ from app.modules.predictions.api import router as predictions_router
 from app.modules.timeline.api import router as timeline_router
 from app.modules.wishlist.api import router as wishlist_router
 from app.modules.routines.api import router as routines_router
+from app.modules.preferences.api import router as preferences_router
 
 settings = get_settings()
 
@@ -48,6 +49,7 @@ async def lifespan(app: FastAPI):
     # Register models with Base.metadata BEFORE create_all so new tables exist.
     import app.modules.integrations.outbox_models  # noqa: F401
     import app.modules.routines.models  # noqa: F401
+    import app.modules.preferences.models  # noqa: F401
     from app.modules.integrations.subscriber import register_subscribers
 
     register_subscribers()
@@ -104,6 +106,7 @@ app.include_router(habits_router, prefix="/api/v1")
 app.include_router(running_router, prefix="/api/v1")
 app.include_router(calendar_router, prefix="/api/v1")
 app.include_router(routines_router, prefix="/api/v1")
+app.include_router(preferences_router, prefix="/api/v1")
 app.include_router(journal_router, prefix="/api/v1")
 app.include_router(mood_router, prefix="/api/v1")
 app.include_router(communication_router, prefix="/api/v1")

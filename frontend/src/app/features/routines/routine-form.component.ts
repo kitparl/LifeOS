@@ -6,6 +6,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { DateChipsComponent } from '../../shared/date-chips/date-chips.component';
 import {
   ROUTINE_AREAS,
   ROUTINE_CATEGORIES,
@@ -18,7 +19,7 @@ import { RoutinesService } from './services/routines.service';
 @Component({
   selector: 'app-routine-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, DateChipsComponent],
   template: `
     <div class="max-w-2xl">
       <div class="panel !p-0 overflow-hidden">
@@ -43,6 +44,25 @@ import { RoutinesService } from './services/routines.service';
           <div>
             <label class="mb-1 block">Timezone</label>
             <input class="input-field" formControlName="timezone" placeholder="Asia/Kolkata" />
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="mb-1 block">Period start (optional)</label>
+              <input class="input-field" type="date" formControlName="start_date" />
+            </div>
+            <div>
+              <label class="mb-1 block">Period end (optional)</label>
+              <input class="input-field" type="date" formControlName="end_date" />
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-1 block">Skip days</label>
+            <p class="mb-1 text-xs" style="color: var(--text-muted)">
+              Exclude specific dates even if that weekday is normally active.
+            </p>
+            <app-date-chips formControlName="skip_dates" />
           </div>
 
           <div>
@@ -163,6 +183,9 @@ export class RoutineFormComponent implements OnInit {
     name: ['Weekday Focus', Validators.required],
     description: [''],
     timezone: ['Asia/Kolkata', Validators.required],
+    start_date: [''],
+    end_date: [''],
+    skip_dates: [[] as string[]],
     is_active: [true],
     blocks: this.fb.array([
       this.newBlockGroup('DSA', '08:00', '10:00', 'dsa'),
@@ -189,6 +212,9 @@ export class RoutineFormComponent implements OnInit {
             name: r.name,
             description: r.description ?? '',
             timezone: r.timezone,
+            start_date: r.start_date ? r.start_date.slice(0, 10) : '',
+            end_date: r.end_date ? r.end_date.slice(0, 10) : '',
+            skip_dates: r.skip_dates ?? [],
             is_active: r.is_active,
           });
           this.blocks.clear();
@@ -280,6 +306,9 @@ export class RoutineFormComponent implements OnInit {
       description: raw.description || null,
       days_of_week: [...this.selectedDays].sort((a, b) => a - b),
       timezone: raw.timezone,
+      start_date: raw.start_date || null,
+      end_date: raw.end_date || null,
+      skip_dates: raw.skip_dates || [],
       blocks,
       ...(this.isEdit ? { is_active: raw.is_active } : {}),
     };

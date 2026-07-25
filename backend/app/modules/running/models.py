@@ -8,6 +8,13 @@ from app.core.database import Base
 
 RACE_DISTANCES = ("5k", "10k", "15k", "half_marathon", "marathon", "other")
 
+SUGGESTED_SHOES: tuple[str, ...] = (
+    "Daily trainer",
+    "Tempo",
+    "Race day",
+    "Trail",
+)
+
 
 class Run(Base):
     __tablename__ = "runs"
@@ -19,11 +26,25 @@ class Run(Base):
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     weather: Mapped[str | None] = mapped_column(String(64), nullable=True)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    shoe: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
+
+
+class RunningShoe(Base):
+    """User-defined, reusable shoe registry (extensible taxonomy)."""
+
+    __tablename__ = "running_shoes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_running_shoes_user_name"),)
 
 
 class RaceEvent(Base):
@@ -46,6 +67,7 @@ class RaceEvent(Base):
     photos: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     registered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     attended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    shoe: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

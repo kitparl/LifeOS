@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from calendar import monthrange
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +7,55 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.goals.models import Goal, GoalMilestone
 from app.modules.goals.schemas import GoalCreate, GoalUpdate, MilestoneCreate, MilestoneUpdate
+
+
+def derive_period_window(
+    period: str,
+    target_date: datetime | None,
+    created_at: datetime | None,
+    period_start: date | None = None,
+    period_end: date | None = None,
+) -> tuple[date | None, date | None]:
+    """Derive period_start / period_end from period + anchor date.
+
+    For custom, pass-through explicit dates.
+    Anchor = target_date.date() if set else created_at.date() (UTC).
+    """
+    if period == "custom":
+        return period_start, period_end
+
+    anchor_dt = target_date or created_at or datetime.now(timezone.utc)
+    if isinstance(anchor_dt, datetime):
+        anchor = anchor_dt.date()
+    else:
+        anchor = anchor_dt
+
+    if period == "weekly":
+        # Monday–Sunday containing anchor
+        start = anchor - timedelta(days=anchor.weekday())
+        end = start + timedelta(days=6)
+        return start, end
+    if period == "monthly":
+        start = anchor.replace(day=1)
+        last_day = monthrange(anchor.year, anchor.month)[1]
+        end = anchor.replace(day=last_day)
+        return start, end
+    # yearly (default)
+    start = date(anchor.year, 1, 1)
+    end = date(anchor.year, 12, 31)
+    return start, end
+
+
+def is_goal_missed(goal: Goal, today: date | None = None) -> bool:
+    today = today or datetime.now(timezone.utc).date()
+    if goal.status != "active" or goal.progress >= 100:
+        return False
+    end = goal.period_end
+    if end is None and goal.target_date is not None:
+        end = goal.target_date.date() if isinstance(goal.target_date, datetime) else goal.target_date
+    if end is None:
+        return False
+    return end < today
 
 
 class GoalRepository:
@@ -17,12 +67,15 @@ class GoalRepository:
         user_id: str,
         category: str | None = None,
         status: str | None = None,
+        period: str | None = None,
     ) -> list[Goal]:
         q = select(Goal).where(Goal.user_id == user_id).options(selectinload(Goal.milestones))
         if category:
             q = q.where(Goal.category == category)
         if status:
             q = q.where(Goal.status == status)
+        if period:
+            q = q.where(Goal.period == period)
         q = q.order_by(Goal.updated_at.desc())
         result = await self.db.execute(q)
         return list(result.scalars().unique().all())
@@ -45,15 +98,28 @@ class GoalRepository:
         return result.scalar_one_or_none()
 
     async def create(self, user_id: str, data: GoalCreate) -> Goal:
+        now = datetime.now(timezone.utc)
+        period = data.period or "yearly"
+        p_start, p_end = derive_period_window(
+            period,
+            data.target_date,
+            now,
+            data.period_start,
+            data.period_end,
+        )
         goal = Goal(
             user_id=user_id,
             title=data.title,
             description=data.description,
             category=data.category,
+            period=period,
             progress=data.progress,
             notes=data.notes,
             target_date=data.target_date,
+            period_start=p_start,
+            period_end=p_end,
             parent_id=data.parent_id,
+            created_at=now,
         )
         self.db.add(goal)
         await self.db.flush()
@@ -61,10 +127,25 @@ class GoalRepository:
         return goal
 
     async def update(self, goal: Goal, data: GoalUpdate) -> Goal:
-        for field, value in data.model_dump(exclude_unset=True).items():
+        fields = data.model_dump(exclude_unset=True)
+        for field, value in fields.items():
             setattr(goal, field, value)
         if data.status == "completed" and goal.progress < 100:
             goal.progress = 100
+
+        # Re-derive window when period / target_date / custom bounds change
+        period_related = {"period", "target_date", "period_start", "period_end"}
+        if period_related & set(fields.keys()):
+            p_start, p_end = derive_period_window(
+                goal.period,
+                goal.target_date,
+                goal.created_at,
+                goal.period_start if goal.period == "custom" else None,
+                goal.period_end if goal.period == "custom" else None,
+            )
+            goal.period_start = p_start
+            goal.period_end = p_end
+
         await self.db.flush()
         await self.db.refresh(goal, ["milestones"])
         return goal

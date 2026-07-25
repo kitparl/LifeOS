@@ -134,7 +134,7 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
       }
 
       <!-- ====== CENTER COLUMN ====== -->
-      <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 
         <!-- Sticky header bar -->
         <header class="shrink-0 flex items-center justify-between gap-2"
@@ -189,15 +189,22 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
 
         <!-- Main content + AI panel row -->
         <div class="flex flex-1 min-h-0 overflow-hidden">
-          <!-- Scrollable main content -->
-          <main class="flex-1 min-w-0 overflow-y-auto" style="padding: 1.25rem 1.5rem 5rem">
+          <!-- Scrollable main content (full-height routes pin their own scroll) -->
+          <main
+            class="flex-1 min-w-0 min-h-0"
+            [class.overflow-y-auto]="!fullHeightRoute()"
+            [class.overflow-hidden]="fullHeightRoute()"
+            [class.flex]="fullHeightRoute()"
+            [class.flex-col]="fullHeightRoute()"
+            [style.padding]="fullHeightRoute() ? '0' : '1.25rem 1.5rem 5rem'"
+          >
             <router-outlet />
           </main>
 
           <!-- Right AI panel (desktop) -->
           @if (aiPanelOpen()) {
             <aside
-              class="hidden shrink-0 flex-col overflow-hidden lg:flex"
+              class="hidden shrink-0 flex-col overflow-hidden min-h-0 lg:flex"
               style="width: 320px; border-left: 1px solid var(--border); background: var(--surface)"
             >
               <app-ai-chat-panel />
@@ -381,22 +388,14 @@ export class AppShellComponent implements OnInit, OnDestroy {
     this.pinnedNav().filter((d) => d.id !== 'assistant').slice(0, 3),
   );
 
-  readonly navGroups = computed(() => {
-    const items = this.pinnedNav();
-    const groups: Record<string, typeof items> = {};
-    for (const item of items) {
-      const cat = item.category ?? 'Other';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(item);
-    }
-    return Object.entries(groups).map(([category, items]) => ({ category, items }));
-  });
+  readonly navGroups = this.navPrefs.navGroups;
 
   readonly aiPanelOpen = signal(this.readStorage(STORAGE_AI_OPEN, true));
   readonly drawerOpen = signal(false);
   readonly sidebarCollapsed = signal(this.readStorage(STORAGE_COLLAPSED, false));
   readonly sidebarHidden = signal(this.readStorage(STORAGE_HIDDEN, false));
   readonly currentTitle = signal('Dashboard');
+  readonly fullHeightRoute = signal(false);
 
   ngOnInit(): void {
     this.updateRoute(this.router.url);
@@ -500,6 +499,8 @@ export class AppShellComponent implements OnInit, OnDestroy {
 
   private updateRoute(url: string): void {
     this.currentTitle.set(resolvePageTitle(url));
+    const path = url.split('?')[0].split('#')[0];
+    this.fullHeightRoute.set(path === '/assistant' || path.startsWith('/assistant/'));
   }
 
   private updateBodyScrollLock(): void {

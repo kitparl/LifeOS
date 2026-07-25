@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -46,11 +46,28 @@ class RoutineBlockResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _normalize_skip_dates(v: list[str] | list[date] | None) -> list[str] | None:
+    if v is None:
+        return None
+    out: list[str] = []
+    for d in v:
+        if isinstance(d, date):
+            out.append(d.isoformat())
+        else:
+            s = str(d).strip()
+            if s:
+                out.append(s[:10])
+    return sorted(set(out))
+
+
 class RoutineCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str | None = None
     days_of_week: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
     timezone: str = Field(default="Asia/Kolkata", max_length=64)
+    start_date: date | None = None
+    end_date: date | None = None
+    skip_dates: list[str] = Field(default_factory=list)
     blocks: list[RoutineBlockCreate] = Field(default_factory=list)
 
     @field_validator("days_of_week")
@@ -61,12 +78,26 @@ class RoutineCreate(BaseModel):
             raise ValueError("days_of_week must include at least one weekday (0=Mon … 6=Sun)")
         return cleaned
 
+    @field_validator("skip_dates", mode="before")
+    @classmethod
+    def validate_skip(cls, v):
+        return _normalize_skip_dates(v) or []
+
+    @model_validator(mode="after")
+    def validate_window(self):
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
+
 
 class RoutineUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = None
     days_of_week: list[int] | None = None
     timezone: str | None = Field(default=None, max_length=64)
+    start_date: date | None = None
+    end_date: date | None = None
+    skip_dates: list[str] | None = None
     is_active: bool | None = None
     blocks: list[RoutineBlockCreate] | None = None
 
@@ -80,12 +111,27 @@ class RoutineUpdate(BaseModel):
             raise ValueError("days_of_week must include at least one weekday (0=Mon … 6=Sun)")
         return cleaned
 
+    @field_validator("skip_dates", mode="before")
+    @classmethod
+    def validate_skip(cls, v):
+        if v is None:
+            return None
+        return _normalize_skip_dates(v)
+
+    @model_validator(mode="after")
+    def validate_window(self):
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
+
 
 class RoutineListItem(BaseModel):
     id: str
     name: str
     days_of_week: list[int]
     timezone: str
+    start_date: date | None = None
+    end_date: date | None = None
     is_active: bool
     block_count: int
     updated_at: datetime
@@ -97,6 +143,9 @@ class RoutineResponse(BaseModel):
     description: str | None
     days_of_week: list[int]
     timezone: str
+    start_date: date | None = None
+    end_date: date | None = None
+    skip_dates: list[str] = []
     is_active: bool
     blocks: list[RoutineBlockResponse]
     created_at: datetime

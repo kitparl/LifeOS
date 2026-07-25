@@ -19,8 +19,18 @@ export class RunningService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/running`;
 
-  listRuns(): Observable<RunListItem[]> {
-    return this.http.get<RunListItem[]>(`${this.api}/runs`);
+  listRuns(shoe?: string): Observable<RunListItem[]> {
+    let params = new HttpParams();
+    if (shoe) params = params.set('shoe', shoe);
+    return this.http.get<RunListItem[]>(`${this.api}/runs`, { params });
+  }
+
+  listShoes(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.api}/shoes`);
+  }
+
+  createShoe(name: string): Observable<string[]> {
+    return this.http.post<string[]>(`${this.api}/shoes`, { name });
   }
 
   getRun(id: string): Observable<Run> {

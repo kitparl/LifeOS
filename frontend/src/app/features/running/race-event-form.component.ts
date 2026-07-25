@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { RACE_DISTANCES, RaceEvent } from './models/running.models';
 import { RunningService } from './services/running.service';
 
@@ -19,7 +20,7 @@ function isPastDate(dateStr: string): boolean {
 @Component({
   selector: 'app-race-event-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TypeSelectComponent],
   template: `
     <div style="max-width: 600px">
       <div class="panel !p-0 overflow-hidden">
@@ -53,6 +54,18 @@ function isPastDate(dateStr: string): boolean {
             <div>
               <label class="form-label" for="location">Location / City</label>
               <input id="location" class="input-field mt-1" formControlName="location" placeholder="Bengaluru, India" />
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label">Shoes (optional)</label>
+            <div class="mt-1">
+              <app-type-select
+                formControlName="shoe"
+                placeholder="Select or create shoes…"
+                [options]="shoes()"
+                (created)="onShoeCreated($event)"
+              />
             </div>
           </div>
 
@@ -210,6 +223,7 @@ export class RaceEventFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   raceDistances = RACE_DISTANCES;
+  shoes = signal<string[]>([]);
   isEdit = false;
   raceId: string | null = null;
   saving = false;
@@ -221,6 +235,7 @@ export class RaceEventFormComponent implements OnInit {
     distance_type: ['marathon' as const, Validators.required],
     organizer: [''],
     location: [''],
+    shoe: [''],
     bib_number: [''],
     finish_hours: [null as number | null, [Validators.min(0)]],
     finish_minutes: [null as number | null, [Validators.min(0), Validators.max(59)]],
@@ -235,6 +250,7 @@ export class RaceEventFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.runningService.listShoes().subscribe({ next: (s) => this.shoes.set(s) });
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id === 'new' || (!id && url.includes('new'))) {
@@ -259,6 +275,7 @@ export class RaceEventFormComponent implements OnInit {
             distance_type: r.distance_type as any,
             organizer: r.organizer ?? '',
             location: r.location ?? '',
+            shoe: r.shoe ?? '',
             bib_number: r.bib_number ?? '',
             finish_hours: fh,
             finish_minutes: fm,
@@ -274,6 +291,11 @@ export class RaceEventFormComponent implements OnInit {
         },
       });
     }
+  }
+
+  onShoeCreated(name: string): void {
+    this.shoes.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.runningService.createShoe(name).subscribe({ next: (s) => this.shoes.set(s) });
   }
 
   submit(): void {
@@ -295,6 +317,7 @@ export class RaceEventFormComponent implements OnInit {
       distance_type: raw.distance_type,
       organizer: raw.organizer || null,
       location: raw.location || null,
+      shoe: raw.shoe || null,
       bib_number: raw.bib_number || null,
       finish_time_seconds,
       position: raw.position ?? null,

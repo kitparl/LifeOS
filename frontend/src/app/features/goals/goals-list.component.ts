@@ -1,10 +1,12 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
-import { GOAL_CATEGORIES, GoalListItem } from './models/goal.models';
+import { GOAL_CATEGORIES, GOAL_PERIODS, GoalListItem, GoalPeriod } from './models/goal.models';
 import { GoalsService } from './services/goals.service';
+
+type PeriodTab = 'all' | GoalPeriod;
 
 @Component({
   selector: 'app-goals-list',
@@ -15,6 +17,20 @@ import { GoalsService } from './services/goals.service';
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h1 class="text-lg font-semibold">Goals</h1>
         <a routerLink="/goals/new" class="btn-primary text-xs no-underline">New Goal</a>
+      </div>
+
+      <div class="flex flex-wrap gap-1.5 text-xs">
+        @for (tab of periodTabs; track tab.value) {
+          <button
+            type="button"
+            class="rounded-lg border px-3 py-1.5"
+            [class.bg-[var(--primary-soft)]]="periodTab() === tab.value"
+            [style.border-color]="'var(--xp-border)'"
+            (click)="setPeriodTab(tab.value)"
+          >
+            {{ tab.label }}
+          </button>
+        }
       </div>
 
       <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
@@ -33,6 +49,30 @@ import { GoalsService } from './services/goals.service';
         <button type="submit" class="btn-primary text-xs">Filter</button>
       </form>
 
+      @if (missedGoals.length) {
+        <div class="panel !p-0 overflow-hidden border-[var(--danger)]">
+          <div class="title-bar rounded-none border-x-0 border-t-0" style="background: color-mix(in srgb, var(--danger) 12%, var(--surface))">
+            Missed ({{ missedGoals.length }})
+          </div>
+          <ul class="divide-y divide-[var(--xp-border)] text-sm">
+            @for (goal of missedGoals; track goal.id) {
+              <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                <div class="min-w-0">
+                  <a [routerLink]="['/goals', goal.id]" class="link font-medium">{{ goal.title }}</a>
+                  <p class="text-xs capitalize" style="color: var(--text-muted)">
+                    {{ goal.period }} · {{ goal.progress }}%
+                    @if (goal.period_end) {
+                      · ended {{ goal.period_end | date: 'mediumDate' }}
+                    }
+                  </p>
+                </div>
+                <span class="chip text-xs" style="color: var(--danger)">Missed</span>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading goals…</p>
       } @else if (goals.length === 0) {
@@ -49,7 +89,7 @@ import { GoalsService } from './services/goals.service';
                   {{ goal.title }}
                 </a>
                 <p class="mt-1 text-xs capitalize text-[var(--text-muted)]">
-                  {{ goal.category }} · {{ goal.status }} · {{ goal.updated_at | date: 'mediumDate' }}
+                  {{ goal.category }} · {{ goal.period }} · {{ goal.status }} · {{ goal.updated_at | date: 'mediumDate' }}
                 </p>
               </div>
               <div class="flex items-center gap-2">
@@ -73,6 +113,7 @@ import { GoalsService } from './services/goals.service';
               <tr>
                 <th class="px-3 py-2">Title</th>
                 <th class="px-3 py-2">Category</th>
+                <th class="px-3 py-2">Period</th>
                 <th class="px-3 py-2">Progress</th>
                 <th class="px-3 py-2">Status</th>
                 <th class="px-3 py-2">Updated</th>
@@ -85,6 +126,7 @@ import { GoalsService } from './services/goals.service';
                     <a [routerLink]="['/goals', goal.id]" class="link">{{ goal.title }}</a>
                   </td>
                   <td class="px-3 py-2 capitalize">{{ goal.category }}</td>
+                  <td class="px-3 py-2 capitalize">{{ goal.period }}</td>
                   <td class="px-3 py-2">
                     <div class="flex items-center gap-2">
                       <div class="h-2 w-20 bg-gray-200 border border-[var(--xp-border)]">
@@ -115,7 +157,13 @@ export class GoalsListComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
 
   categories = GOAL_CATEGORIES;
+  periodTabs: { value: PeriodTab; label: string }[] = [
+    { value: 'all', label: 'All' },
+    ...GOAL_PERIODS,
+  ];
+  periodTab = signal<PeriodTab>('all');
   goals: GoalListItem[] = [];
+  missedGoals: GoalListItem[] = [];
   loading = false;
   currentPage = 1;
   readonly pageSize = 12;
@@ -124,11 +172,18 @@ export class GoalsListComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadMissed();
   }
 
   get pagedGoals(): GoalListItem[] {
     const start = (this.currentPage - 1) * this.pageSize;
     return this.goals.slice(start, start + this.pageSize);
+  }
+
+  setPeriodTab(tab: PeriodTab): void {
+    this.periodTab.set(tab);
+    this.currentPage = 1;
+    this.load();
   }
 
   applyFilters(): void {
@@ -139,13 +194,26 @@ export class GoalsListComponent implements OnInit {
   load(): void {
     this.loading = true;
     const { category, status } = this.filters.getRawValue();
-    this.goalsService.list(category || undefined, status || undefined).subscribe({
-      next: (data) => {
-        this.goals = data;
-        this.clampPage();
-        this.loading = false;
-      },
-      error: () => (this.loading = false),
+    const tab = this.periodTab();
+    this.goalsService
+      .list({
+        category: category || undefined,
+        status: status || undefined,
+        period: tab === 'all' ? undefined : tab,
+      })
+      .subscribe({
+        next: (data) => {
+          this.goals = data;
+          this.clampPage();
+          this.loading = false;
+        },
+        error: () => (this.loading = false),
+      });
+  }
+
+  loadMissed(): void {
+    this.goalsService.list({ status: 'active', missed: true }).subscribe({
+      next: (data) => (this.missedGoals = data),
     });
   }
 

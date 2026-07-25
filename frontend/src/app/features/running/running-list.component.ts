@@ -53,6 +53,38 @@ import { RunningService } from './services/running.service';
         </div>
       }
 
+      @if (stats?.shoe_totals?.length) {
+        <div class="panel !p-0 overflow-hidden">
+          <div class="title-bar rounded-none border-x-0 border-t-0">Distance by shoe</div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr>
+                  <th class="px-3 py-2 text-left">Shoe</th>
+                  <th class="px-3 py-2 text-left">Km</th>
+                  <th class="px-3 py-2 text-left">Runs</th>
+                  <th class="px-3 py-2 text-left">Last run</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of stats!.shoe_totals; track s.shoe) {
+                  <tr style="border-bottom: 1px solid var(--border)">
+                    <td class="px-3 py-2">
+                      <button type="button" class="link text-sm" (click)="filterByShoe(s.shoe)">{{ s.shoe }}</button>
+                    </td>
+                    <td class="px-3 py-2">{{ s.total_km }} km</td>
+                    <td class="px-3 py-2">{{ s.run_count }}</td>
+                    <td class="px-3 py-2 text-xs" style="color: var(--text-muted)">
+                      {{ s.last_run_date ? (s.last_run_date | date: 'mediumDate') : '—' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
       <!-- Tabs -->
       <div class="flex gap-0" style="border-bottom: 1px solid var(--border)">
         @for (tab of tabs; track tab.id) {
@@ -67,6 +99,18 @@ import { RunningService } from './services/running.service';
 
       <!-- ===== Tab: Previous Runs ===== -->
       @if (activeTab() === 'runs') {
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <label class="text-xs" style="color: var(--text-muted)">Filter by shoe</label>
+          <select class="input-field !w-auto" [value]="shoeFilter()" (change)="onShoeFilter($event)">
+            <option value="">All shoes</option>
+            @for (s of shoeOptions; track s) {
+              <option [value]="s">{{ s }}</option>
+            }
+          </select>
+          @if (shoeFilter()) {
+            <button type="button" class="btn-ghost text-xs" (click)="filterByShoe('')">Clear</button>
+          }
+        </div>
         <div class="panel !p-0 overflow-hidden">
           @if (loading) {
             <div class="empty-state">
@@ -88,6 +132,7 @@ import { RunningService } from './services/running.service';
                     <th class="px-3 py-2 text-left">Distance</th>
                     <th class="px-3 py-2 text-left">Duration</th>
                     <th class="px-3 py-2 text-left">Pace</th>
+                    <th class="px-3 py-2 text-left">Shoes</th>
                     <th class="px-3 py-2 text-left">Location</th>
                     <th class="px-3 py-2 text-left">Weather</th>
                     <th class="px-3 py-2"></th>
@@ -104,6 +149,7 @@ import { RunningService } from './services/running.service';
                       <td class="px-3 py-2">{{ run.distance_km }} km</td>
                       <td class="px-3 py-2">{{ formatDuration(run.duration_seconds) }}</td>
                       <td class="px-3 py-2">{{ formatPace(run.pace_min_per_km) }}</td>
+                      <td class="px-3 py-2" style="color: var(--text-muted)">{{ run.shoe || '—' }}</td>
                       <td class="px-3 py-2" style="color: var(--text-muted)">{{ run.location || '—' }}</td>
                       <td class="px-3 py-2 capitalize" style="color: var(--text-muted)">{{ run.weather ?? '—' }}</td>
                       <td class="px-3 py-2">
@@ -148,6 +194,7 @@ import { RunningService } from './services/running.service';
                   <p class="text-xs" style="color: var(--text-muted)">
                     {{ race.race_date | date: 'mediumDate' }}
                     @if (race.location) { · {{ race.location }} }
+                    @if (race.shoe) { · {{ race.shoe }} }
                     @if (race.finish_time_seconds) { · Finish: {{ formatDuration(race.finish_time_seconds) }} }
                     @if (race.position) { · #{{ race.position }} }
                   </p>
@@ -281,6 +328,8 @@ export class RunningListComponent implements OnInit {
   runs: RunListItem[] = [];
   races: RaceEvent[] = [];
   stats: RunningStats | null = null;
+  shoeOptions: string[] = [];
+  shoeFilter = signal('');
   loading = false;
 
   settingsForm = this.fb.nonNullable.group({
@@ -300,14 +349,20 @@ export class RunningListComponent implements OnInit {
 
   load(): void {
     this.loading = true;
-    this.runningService.listRuns().subscribe({
+    const shoe = this.shoeFilter() || undefined;
+    this.runningService.listRuns(shoe).subscribe({
       next: (runs) => {
         this.runs = runs;
         this.loading = false;
       },
       error: () => (this.loading = false),
     });
-    this.runningService.getStats().subscribe({ next: (s) => (this.stats = s) });
+    this.runningService.getStats().subscribe({
+      next: (s) => {
+        this.stats = s;
+        this.shoeOptions = (s.shoe_totals || []).map((t) => t.shoe);
+      },
+    });
     this.runningService.getSettings().subscribe({
       next: (s) => {
         this.settingsForm.patchValue({
@@ -319,6 +374,17 @@ export class RunningListComponent implements OnInit {
       },
     });
     this.runningService.listRaces().subscribe({ next: (r) => (this.races = r) });
+  }
+
+  filterByShoe(shoe: string): void {
+    this.shoeFilter.set(shoe);
+    this.activeTab.set('runs');
+    this.load();
+  }
+
+  onShoeFilter(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.filterByShoe(value);
   }
 
   saveSettings(): void {

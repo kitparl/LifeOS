@@ -1,11 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
+import { SecretInputComponent } from '../../shared/secret-input/secret-input.component';
 
 @Component({
   selector: 'app-settings-change-password',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, SecretInputComponent],
   template: `
     <div class="panel !p-0 overflow-hidden max-w-md">
       <div class="title-bar">Change Password</div>
@@ -13,10 +14,8 @@ import { AuthService } from '../../core/services/auth.service';
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="flex flex-col gap-3">
           <div class="flex flex-col gap-1">
             <label class="form-label" for="cp-current">Current password</label>
-            <input
-              id="cp-current"
-              class="input-field"
-              type="password"
+            <app-secret-input
+              inputId="cp-current"
               formControlName="current_password"
               autocomplete="current-password"
               placeholder="Enter current password"
@@ -25,10 +24,8 @@ import { AuthService } from '../../core/services/auth.service';
 
           <div class="flex flex-col gap-1">
             <label class="form-label" for="cp-new">New password</label>
-            <input
-              id="cp-new"
-              class="input-field"
-              type="password"
+            <app-secret-input
+              inputId="cp-new"
               formControlName="new_password"
               autocomplete="new-password"
               placeholder="At least 8 characters"
@@ -37,10 +34,8 @@ import { AuthService } from '../../core/services/auth.service';
 
           <div class="flex flex-col gap-1">
             <label class="form-label" for="cp-confirm">Confirm new password</label>
-            <input
-              id="cp-confirm"
-              class="input-field"
-              type="password"
+            <app-secret-input
+              inputId="cp-confirm"
               formControlName="confirm_password"
               autocomplete="new-password"
               placeholder="Repeat new password"

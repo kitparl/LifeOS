@@ -44,6 +44,79 @@ async def test_create_run_and_stats(client):
 
 
 @pytest.mark.asyncio
+async def test_run_shoes_and_totals(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    shoes = await client.get("/api/v1/running/shoes", headers=headers)
+    assert shoes.status_code == 200
+    assert "Daily trainer" in shoes.json()
+
+    created = await client.post(
+        "/api/v1/running/shoes",
+        headers=headers,
+        json={"name": "Pegasus"},
+    )
+    assert created.status_code == 201
+    assert "Pegasus" in created.json()
+
+    run = await client.post(
+        "/api/v1/running/runs",
+        headers=headers,
+        json={
+            "run_date": str(date.today()),
+            "distance_km": 8.0,
+            "duration_seconds": 2400,
+            "shoe": "Pegasus",
+        },
+    )
+    assert run.status_code == 201
+    assert run.json()["shoe"] == "Pegasus"
+
+    filtered = await client.get("/api/v1/running/runs", headers=headers, params={"shoe": "Pegasus"})
+    assert filtered.status_code == 200
+    assert len(filtered.json()) == 1
+
+    stats = await client.get("/api/v1/running/stats", headers=headers)
+    assert stats.status_code == 200
+    totals = stats.json()["shoe_totals"]
+    peg = next(t for t in totals if t["shoe"] == "Pegasus")
+    assert peg["total_km"] == 8.0
+    assert peg["run_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_race_shoes_in_totals(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    race = await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "City 10K",
+            "race_date": "2026-07-01",
+            "distance_type": "10k",
+            "shoe": "Race day Vapor",
+            "attended": True,
+            "finish_time_seconds": 2700,
+        },
+    )
+    assert race.status_code == 201
+    assert race.json()["shoe"] == "Race day Vapor"
+
+    shoes = await client.get("/api/v1/running/shoes", headers=headers)
+    assert "Race day Vapor" in shoes.json()
+
+    stats = await client.get("/api/v1/running/stats", headers=headers)
+    assert stats.status_code == 200
+    totals = stats.json()["shoe_totals"]
+    vapor = next(t for t in totals if t["shoe"] == "Race day Vapor")
+    assert vapor["total_km"] == 10.0
+    assert vapor["run_count"] == 1
+
+
+@pytest.mark.asyncio
 async def test_list_runs_and_race(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}

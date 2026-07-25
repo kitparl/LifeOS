@@ -37,6 +37,17 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("integration_connections", "last_digest_at", "TIMESTAMP"),
     # Integrations: per-connection Telegram webhook path secret
     ("integration_connections", "webhook_secret", "VARCHAR(64)"),
+    # Goals: period types + window
+    ("goals", "period", "VARCHAR(16) DEFAULT 'yearly'"),
+    ("goals", "period_start", "DATE"),
+    ("goals", "period_end", "DATE"),
+    # Running: optional shoe name on runs and race events
+    ("runs", "shoe", "VARCHAR(80)"),
+    ("race_events", "shoe", "VARCHAR(80)"),
+    # Routines: period window + skip dates
+    ("routines", "start_date", "DATE"),
+    ("routines", "end_date", "DATE"),
+    ("routines", "skip_dates_json", "TEXT"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [

@@ -23,6 +23,14 @@ import { RoutinesService } from './services/routines.service';
               {{ daysLabel(r.days_of_week) }} · {{ r.timezone }} ·
               {{ r.is_active ? 'active' : 'paused' }}
             </p>
+            @if (r.start_date || r.end_date) {
+              <p class="text-xs" style="color: var(--text-muted)">
+                Period:
+                {{ r.start_date ? (r.start_date | date: 'mediumDate') : '…' }}
+                –
+                {{ r.end_date ? (r.end_date | date: 'mediumDate') : '…' }}
+              </p>
+            }
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/routines', r.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
@@ -35,6 +43,17 @@ import { RoutinesService } from './services/routines.service';
         @if (r.description) {
           <div class="panel text-sm">
             <p class="whitespace-pre-wrap" style="color: var(--text)">{{ r.description }}</p>
+          </div>
+        }
+
+        @if (r.skip_dates.length) {
+          <div class="panel text-sm">
+            <p class="font-medium mb-2">Skip days</p>
+            <div class="flex flex-wrap gap-1.5">
+              @for (d of r.skip_dates; track d) {
+                <span class="chip">{{ d }}</span>
+              }
+            </div>
           </div>
         }
 

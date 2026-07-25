@@ -45,8 +45,11 @@ class ExportService:
                     "title": g.title,
                     "category": g.category,
                     "status": g.status,
+                    "period": getattr(g, "period", None) or "yearly",
                     "progress": g.progress,
                     "target_date": str(g.target_date) if g.target_date else None,
+                    "period_start": str(g.period_start) if getattr(g, "period_start", None) else None,
+                    "period_end": str(g.period_end) if getattr(g, "period_end", None) else None,
                 }
                 for g in result.scalars().all()
             ]

@@ -19,7 +19,7 @@ import { NotificationsService } from './services/notifications.service';
 
       <p class="text-sm text-[var(--text-muted)]">
         Notification delivery settings are in
-        <a routerLink="/settings" fragment="notifications" class="link">Settings</a>.
+        <a routerLink="/settings" fragment="integrations" class="link">Settings</a>.
       </p>
 
       @if (loading) {

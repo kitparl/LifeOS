@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.running.models import RaceEvent, Run, RunningSettings
+from app.modules.running.models import RaceEvent, Run, RunningSettings, RunningShoe
 from app.modules.running.schemas import RaceCreate, RaceUpdate, RunCreate, RunUpdate, RunningSettingsUpdate
 from app.modules.running.stats import weekly_km
 
@@ -10,17 +10,38 @@ class RunningRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_runs(self, user_id: str) -> list[Run]:
+    async def list_runs(self, user_id: str, shoe: str | None = None) -> list[Run]:
+        q = select(Run).where(Run.user_id == user_id)
+        if shoe:
+            q = q.where(Run.shoe == shoe)
+        q = q.order_by(Run.run_date.desc(), Run.created_at.desc())
+        result = await self.db.execute(q)
+        return list(result.scalars().all())
+
+    async def list_shoe_names(self, user_id: str) -> list[str]:
         result = await self.db.execute(
-            select(Run).where(Run.user_id == user_id).order_by(Run.run_date.desc(), Run.created_at.desc())
+            select(RunningShoe.name).where(RunningShoe.user_id == user_id).order_by(RunningShoe.name.asc())
         )
         return list(result.scalars().all())
+
+    async def ensure_shoe(self, user_id: str, name: str) -> None:
+        """Register a shoe name for reuse (idempotent, case-insensitive)."""
+        clean = (name or "").strip()
+        if not clean:
+            return
+        existing = await self.db.execute(select(RunningShoe).where(RunningShoe.user_id == user_id))
+        for row in existing.scalars().all():
+            if row.name.lower() == clean.lower():
+                return
+        self.db.add(RunningShoe(user_id=user_id, name=clean))
+        await self.db.flush()
 
     async def get_run(self, user_id: str, run_id: str) -> Run | None:
         result = await self.db.execute(select(Run).where(Run.id == run_id, Run.user_id == user_id))
         return result.scalar_one_or_none()
 
     async def create_run(self, user_id: str, data: RunCreate) -> Run:
+        shoe = (data.shoe or "").strip() or None
         run = Run(
             user_id=user_id,
             run_date=data.run_date,
@@ -28,15 +49,24 @@ class RunningRepository:
             duration_seconds=data.duration_seconds,
             weather=data.weather,
             location=data.location,
+            shoe=shoe,
             notes=data.notes,
         )
         self.db.add(run)
+        if shoe:
+            await self.ensure_shoe(user_id, shoe)
         await self.db.flush()
         await self.db.refresh(run)
         return run
 
     async def update_run(self, run: Run, data: RunUpdate) -> Run:
-        for key, value in data.model_dump(exclude_unset=True).items():
+        updates = data.model_dump(exclude_unset=True)
+        if "shoe" in updates:
+            shoe = (updates["shoe"] or "").strip() or None
+            updates["shoe"] = shoe
+            if shoe:
+                await self.ensure_shoe(run.user_id, shoe)
+        for key, value in updates.items():
             setattr(run, key, value)
         await self.db.flush()
         await self.db.refresh(run)
@@ -64,6 +94,7 @@ class RunningRepository:
         return result.scalar_one_or_none()
 
     async def create_race(self, user_id: str, data: RaceCreate) -> RaceEvent:
+        shoe = (data.shoe or "").strip() or None
         race = RaceEvent(
             user_id=user_id,
             name=data.name,
@@ -81,9 +112,12 @@ class RunningRepository:
             photos=data.photos or [],
             registered=data.registered,
             attended=data.attended or bool(data.finish_time_seconds),
+            shoe=shoe,
             notes=data.notes,
         )
         self.db.add(race)
+        if shoe:
+            await self.ensure_shoe(user_id, shoe)
         await self.db.flush()
         await self.db.refresh(race)
         return race
@@ -92,6 +126,11 @@ class RunningRepository:
         updates = data.model_dump(exclude_unset=True)
         if updates.get("finish_time_seconds"):
             updates["attended"] = True
+        if "shoe" in updates:
+            shoe = (updates["shoe"] or "").strip() or None
+            updates["shoe"] = shoe
+            if shoe:
+                await self.ensure_shoe(race.user_id, shoe)
         for key, value in updates.items():
             setattr(race, key, value)
         await self.db.flush()

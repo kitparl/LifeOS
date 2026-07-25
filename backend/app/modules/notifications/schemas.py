@@ -25,6 +25,11 @@ class NotificationResponse(BaseModel):
 
 
 class NotificationSettingsResponse(BaseModel):
+    """Legacy Telegram fields — delivery uses IntegrationConnection.enabled.
+
+    Prefer GET/PUT /integrations/telegram/config for secrets and enablement.
+    """
+
     telegram_chat_id: str | None
     telegram_enabled: bool
 
@@ -32,6 +37,8 @@ class NotificationSettingsResponse(BaseModel):
 
 
 class NotificationSettingsUpdate(BaseModel):
+    """Deprecated for Telegram: use Integrations API instead."""
+
     telegram_chat_id: str | None = None
     telegram_enabled: bool | None = None
 

@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { ExportPageComponent } from '../export/export-page.component';
 import { ProfileComponent } from '../profile/profile.component';
-import { SettingsNotificationsSectionComponent } from './settings-notifications-section.component';
+import { SettingsIntegrationsSectionComponent } from './settings-integrations-section.component';
 import { SettingsSidebarSectionComponent } from './settings-sidebar-section.component';
 import { SettingsChangePasswordComponent } from './settings-change-password.component';
 
@@ -13,7 +13,7 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
   imports: [
     RouterLink,
     ProfileComponent,
-    SettingsNotificationsSectionComponent,
+    SettingsIntegrationsSectionComponent,
     ExportPageComponent,
     SettingsSidebarSectionComponent,
     SettingsChangePasswordComponent,
@@ -41,14 +41,16 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
         <app-settings-change-password />
       </section>
 
-      <section id="notifications" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Notifications</h2>
+      <section id="integrations" class="scroll-mt-24 space-y-3">
+        <h2 class="text-base font-semibold">Integrations</h2>
         <p class="text-sm text-[var(--text-muted)]">
-          Configure delivery channels. Your notification inbox remains at
+          Enable or disable delivery channels. Your notification inbox remains at
           <a routerLink="/notifications" class="link">Notifications</a>.
         </p>
-        <app-settings-notifications-section />
+        <app-settings-integrations-section />
       </section>
+      <!-- Legacy fragment target so #notifications still scrolls here -->
+      <div id="notifications" class="scroll-mt-24" aria-hidden="true"></div>
 
       <section id="export" class="scroll-mt-24 space-y-3">
         <h2 class="text-base font-semibold">Export</h2>
@@ -68,7 +70,7 @@ export class SettingsHubComponent implements OnInit {
   readonly sections = [
     { id: 'profile', label: 'Profile' },
     { id: 'password', label: 'Password' },
-    { id: 'notifications', label: 'Notifications' },
+    { id: 'integrations', label: 'Integrations' },
     { id: 'export', label: 'Export' },
     { id: 'sidebar', label: 'Sidebar' },
   ];
@@ -78,8 +80,10 @@ export class SettingsHubComponent implements OnInit {
       if (!fragment) {
         return;
       }
+      // Map legacy #notifications → #integrations
+      const target = fragment === 'notifications' ? 'integrations' : fragment;
       requestAnimationFrame(() => {
-        document.getElementById(fragment)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
   }

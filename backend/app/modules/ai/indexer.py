@@ -35,7 +35,12 @@ class AiIndexer:
 
         goals = await self.db.execute(select(Goal).where(Goal.user_id == user_id))
         for g in goals.scalars().all():
-            text = " ".join(filter(None, [g.title, g.description, g.notes, g.category, g.status]))
+            text = " ".join(
+                filter(
+                    None,
+                    [g.title, g.description, g.notes, g.category, g.status, getattr(g, "period", None)],
+                )
+            )
             docs.append(IndexDocument("goal", g.id, g.title, text, f"/goals/{g.id}"))
 
         tasks = await self.db.execute(select(Task).where(Task.user_id == user_id))
