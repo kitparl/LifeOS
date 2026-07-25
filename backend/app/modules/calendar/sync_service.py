@@ -1,11 +1,13 @@
 """
 CalendarSyncService — reusable scheduling infrastructure.
 
-Any module that owns a schedulable entity (Running races, and later Tasks,
-Study Planner, Travel, etc.) can mirror it into the shared Calendar through a
-stable ``(source_module, source_id)`` key. This keeps a single source of truth,
-avoids duplicate events, and gives future modules a one-line integration path
-instead of bespoke Running-specific logic.
+Any module that owns a schedulable entity (Running races, Routines expand
+on calendar list reads, and later Tasks, Study Planner, Travel, etc.) can
+mirror it into the shared Calendar through a stable ``(source_module, source_id)``
+key — or, for recurring day templates, expand live via ``RoutineService``.
+
+This keeps a single source of truth, avoids duplicate events, and gives future
+modules a one-line integration path instead of bespoke Running-specific logic.
 
 Integration contract for a source module:
   * On create/update of the entity -> ``upsert_from_source(...)``

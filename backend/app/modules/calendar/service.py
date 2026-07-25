@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +13,72 @@ from app.modules.calendar.schemas import EventCreate, EventListItem, EventRespon
 _RUNNING_SOURCE = "running"
 
 
+def _sort_key(dt: datetime) -> datetime:
+    """Coerce naive datetimes (e.g. from SQLite) to UTC-aware so mixed lists sort safely."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _expand_recurring_event(
+    event: CalendarEvent, start: datetime, end: datetime
+) -> list[EventListItem]:
+    """Expand a single recurring template into occurrences overlapping [start, end)."""
+    if not event.recurrence or event.recurrence == "none":
+        return [EventListItem.model_validate(event)]
+
+    duration = None
+    if event.ends_at is not None:
+        duration = event.ends_at - event.starts_at
+
+    items: list[EventListItem] = []
+    # Walk from a few days before the window so weekly/monthly anchors aren't missed.
+    cursor_date = (start - timedelta(days=1)).date()
+    last_date = (end + timedelta(days=1)).date()
+    anchor = event.starts_at
+
+    while cursor_date <= last_date:
+        include = False
+        if event.recurrence == "daily":
+            include = True
+        elif event.recurrence == "weekly":
+            include = cursor_date.weekday() == anchor.weekday()
+        elif event.recurrence == "monthly":
+            include = cursor_date.day == anchor.day
+
+        if include and cursor_date >= anchor.date():
+            starts_at = datetime.combine(cursor_date, anchor.timetz())
+            # SQLite often returns naive datetimes; align with the query window tz.
+            if starts_at.tzinfo is None:
+                tz = anchor.tzinfo or start.tzinfo or end.tzinfo
+                if tz is not None:
+                    starts_at = starts_at.replace(tzinfo=tz)
+            ends_at = starts_at + duration if duration is not None else None
+            if ends_at is not None and ends_at < start:
+                cursor_date += timedelta(days=1)
+                continue
+            if starts_at > end:
+                cursor_date += timedelta(days=1)
+                continue
+            items.append(
+                EventListItem(
+                    id=f"{event.id}:{cursor_date.isoformat()}" if event.recurrence != "none" else event.id,
+                    title=event.title,
+                    starts_at=starts_at,
+                    ends_at=ends_at,
+                    all_day=event.all_day,
+                    category=event.category,
+                    recurrence=event.recurrence,
+                    location=event.location,
+                    source_module=event.source_module,
+                    source_id=event.source_id or event.id,
+                )
+            )
+        cursor_date += timedelta(days=1)
+
+    return items or [EventListItem.model_validate(event)]
+
+
 class CalendarService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -20,7 +88,23 @@ class CalendarService:
         self, user_id: str, start=None, end=None
     ) -> list[EventListItem]:
         events = await self.repo.list_events(user_id, start=start, end=end)
-        return [EventListItem.model_validate(e) for e in events]
+        items: list[EventListItem] = []
+        if start is not None and end is not None:
+            # Recurring templates: also fetch events that started before the window
+            # but recur into it (repo filters by starts_at overlap; expand handles rest).
+            for e in events:
+                if e.recurrence and e.recurrence != "none":
+                    items.extend(_expand_recurring_event(e, start, end))
+                else:
+                    items.append(EventListItem.model_validate(e))
+            from app.modules.routines.service import RoutineService
+
+            items.extend(await RoutineService(self.db).expand_for_calendar(user_id, start, end))
+        else:
+            items = [EventListItem.model_validate(e) for e in events]
+
+        items.sort(key=lambda i: _sort_key(i.starts_at))
+        return items
 
     async def get_event(self, user_id: str, event_id: str) -> EventResponse:
         event = await self.repo.get_by_id(user_id, event_id)

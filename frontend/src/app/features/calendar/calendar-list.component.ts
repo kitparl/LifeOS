@@ -7,7 +7,7 @@ import {
   inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FullCalendarModule, FullCalendarComponent } from '@fullcalendar/angular';
 import { CalendarOptions, EventInput, EventApi, DateSelectArg, EventClickArg } from '@fullcalendar/core';
@@ -20,6 +20,7 @@ import {
   CalendarEvent,
   EventCategory,
   EventCreate,
+  EventListItem,
   EVENT_CATEGORIES,
 } from './models/calendar.models';
 
@@ -257,6 +258,7 @@ export class CalendarListComponent implements OnDestroy {
   @ViewChild('calendar') calendarRef!: FullCalendarComponent;
 
   private readonly calendarService = inject(CalendarService);
+  private readonly router = inject(Router);
 
   readonly categories = EVENT_CATEGORIES;
 
@@ -324,8 +326,9 @@ export class CalendarListComponent implements OnDestroy {
     });
   }
 
-  private toFCEvent(e: { id: string; title: string; starts_at: string; ends_at: string | null; all_day: boolean; category: EventCategory }): EventInput {
+  private toFCEvent(e: EventListItem): EventInput {
     const color = this.categoryColor(e.category);
+    const isRoutine = e.source_module === 'routine' || e.id.startsWith('routine:');
     return {
       id: e.id,
       title: e.title,
@@ -334,7 +337,14 @@ export class CalendarListComponent implements OnDestroy {
       allDay: e.all_day,
       backgroundColor: color,
       borderColor: color,
-      extendedProps: { category: e.category },
+      editable: !isRoutine,
+      startEditable: !isRoutine,
+      durationEditable: !isRoutine,
+      extendedProps: {
+        category: e.category,
+        source_module: e.source_module ?? null,
+        source_id: e.source_id ?? null,
+      },
     };
   }
 
@@ -369,15 +379,35 @@ export class CalendarListComponent implements OnDestroy {
   handleEventClick(clickInfo: EventClickArg): void {
     clickInfo.jsEvent.preventDefault();
     const id = clickInfo.event.id;
-    this.calendarService.get(id).subscribe({
+    const sourceModule = clickInfo.event.extendedProps['source_module'] as string | null;
+
+    // Routine expansions: routine:{routineId}:{blockId}:{date}
+    if (sourceModule === 'routine' || id.startsWith('routine:')) {
+      const parts = id.split(':');
+      const routineId = parts.length >= 2 ? parts[1] : null;
+      if (routineId) {
+        this.router.navigate(['/routines', routineId]);
+        return;
+      }
+    }
+
+    // Recurring calendar expansions use {uuid}:{YYYY-MM-DD}
+    const baseId = /^[0-9a-f-]{36}:\d{4}-\d{2}-\d{2}$/i.test(id) ? id.slice(0, 36) : id;
+
+    this.calendarService.get(baseId).subscribe({
       next: (ev) => this.detailEvent.set(ev),
     });
   }
 
   handleEventDrop(dropInfo: { event: EventApi; revert: () => void }): void {
     const ev = dropInfo.event;
+    if (ev.extendedProps['source_module'] === 'routine' || ev.id.startsWith('routine:')) {
+      dropInfo.revert();
+      return;
+    }
+    const baseId = /^[0-9a-f-]{36}:\d{4}-\d{2}-\d{2}$/i.test(ev.id) ? ev.id.slice(0, 36) : ev.id;
     this.calendarService
-      .update(ev.id, {
+      .update(baseId, {
         starts_at: ev.start!.toISOString(),
         ends_at: ev.end ? ev.end.toISOString() : null,
         all_day: ev.allDay,
@@ -389,8 +419,13 @@ export class CalendarListComponent implements OnDestroy {
 
   handleEventResize(resizeInfo: { event: EventApi; revert: () => void }): void {
     const ev = resizeInfo.event;
+    if (ev.extendedProps['source_module'] === 'routine' || ev.id.startsWith('routine:')) {
+      resizeInfo.revert();
+      return;
+    }
+    const baseId = /^[0-9a-f-]{36}:\d{4}-\d{2}-\d{2}$/i.test(ev.id) ? ev.id.slice(0, 36) : ev.id;
     this.calendarService
-      .update(ev.id, {
+      .update(baseId, {
         starts_at: ev.start!.toISOString(),
         ends_at: ev.end ? ev.end.toISOString() : null,
       })

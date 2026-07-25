@@ -108,6 +108,7 @@ export class CommandPaletteComponent implements OnInit, OnDestroy {
       { id: 'new-habit', label: 'New Habit', group: 'Actions', route: '/habits/new' },
       { id: 'log-run', label: 'Log Run', group: 'Actions', route: '/running/new' },
       { id: 'new-event', label: 'New Event', group: 'Actions', route: '/calendar/new' },
+      { id: 'new-routine', label: 'New Routine', group: 'Actions', route: '/routines/new' },
       { id: 'new-journal', label: 'New Journal', group: 'Actions', route: '/journal/new' },
       { id: 'add-word', label: 'Add Word', group: 'Actions', route: '/communication/vocabulary/new' },
       { id: 'add-qa', label: 'New Q&A', group: 'Actions', route: '/qa/new' },
