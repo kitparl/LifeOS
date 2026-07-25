@@ -62,15 +62,43 @@ export class PwaService {
     }
   }
 
-  async checkForUpdate(): Promise<void> {
+  /** Returns true when a new version was found (the app reloads itself in that case). */
+  async checkForUpdate(): Promise<boolean> {
     if (!this.swUpdate.isEnabled || document.visibilityState === 'hidden') {
-      return;
+      return false;
     }
     try {
-      await this.swUpdate.checkForUpdate();
+      return await this.swUpdate.checkForUpdate();
     } catch {
       // Network / SW errors are non-fatal; next focus/interval will retry.
+      return false;
     }
+  }
+
+  /**
+   * Last-resort refresh for installed web apps (notably on iOS, where the app has
+   * no reload control and its own isolated storage): drop the service worker and
+   * every cached bundle, then load the current build from the network.
+   */
+  async hardRefresh(): Promise<void> {
+    if (this.applyingUpdate) {
+      return;
+    }
+    this.applyingUpdate = true;
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+    } catch {
+      // Fall through to the reload regardless — a plain reload may still help.
+    }
+    // Cache-busting query so iOS cannot serve index.html from its HTTP cache.
+    window.location.replace(`${window.location.pathname}?reload=${Date.now()}`);
   }
 
   readonly handleBeforeInstallPrompt = (event: Event): void => {
