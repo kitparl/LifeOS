@@ -71,6 +71,7 @@ import { RoutinesService } from './services/routines.service';
                   <th class="px-3 py-2">Title</th>
                   <th class="px-3 py-2">Area</th>
                   <th class="px-3 py-2">Category</th>
+                  <th class="px-3 py-2">Habits</th>
                 </tr>
               </thead>
               <tbody>
@@ -87,6 +88,9 @@ import { RoutinesService } from './services/routines.service';
                     </td>
                     <td class="px-3 py-2">{{ areaLabel(b.area) }}</td>
                     <td class="px-3 py-2 capitalize">{{ b.category }}</td>
+                    <td class="px-3 py-2 text-xs" style="color: var(--text-muted)">
+                      {{ habitNames(b) }}
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -150,6 +154,11 @@ export class RoutineDetailComponent implements OnInit {
 
   areaLabel(area: string): string {
     return ROUTINE_AREAS.find((a) => a.value === area)?.label ?? area;
+  }
+
+  habitNames(b: { habits?: { name: string }[] }): string {
+    const names = b.habits?.map((h) => h.name) ?? [];
+    return names.length ? names.join(', ') : '—';
   }
 
   remove(): void {

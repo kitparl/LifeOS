@@ -49,6 +49,10 @@ class CalendarRepository:
         return result.scalar_one_or_none()
 
     async def create(self, user_id: str, data: EventCreate) -> CalendarEvent:
+        recurrence = data.recurrence
+        event_kind = data.event_kind
+        if event_kind == "birthday":
+            recurrence = "yearly"
         event = CalendarEvent(
             user_id=user_id,
             title=data.title,
@@ -57,7 +61,8 @@ class CalendarRepository:
             ends_at=data.ends_at,
             all_day=data.all_day,
             category=data.category,
-            recurrence=data.recurrence,
+            recurrence=recurrence,
+            event_kind=event_kind,
             location=data.location,
         )
         self.db.add(event)
@@ -66,7 +71,10 @@ class CalendarRepository:
         return event
 
     async def update(self, event: CalendarEvent, data: EventUpdate) -> CalendarEvent:
-        for key, value in data.model_dump(exclude_unset=True).items():
+        payload = data.model_dump(exclude_unset=True)
+        if payload.get("event_kind") == "birthday":
+            payload["recurrence"] = "yearly"
+        for key, value in payload.items():
             setattr(event, key, value)
         await self.db.flush()
         await self.db.refresh(event)

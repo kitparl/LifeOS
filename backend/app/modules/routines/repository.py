@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.habits.models import Habit
 from app.modules.routines.models import Routine, RoutineBlock
 from app.modules.routines.schemas import RoutineBlockCreate, RoutineCreate, RoutineUpdate
 
@@ -14,7 +15,7 @@ class RoutineRepository:
         q = (
             select(Routine)
             .where(Routine.user_id == user_id)
-            .options(selectinload(Routine.blocks))
+            .options(selectinload(Routine.blocks).selectinload(RoutineBlock.habits))
             .order_by(Routine.name.asc())
         )
         if active_only:
@@ -26,7 +27,7 @@ class RoutineRepository:
         result = await self.db.execute(
             select(Routine)
             .where(Routine.id == routine_id, Routine.user_id == user_id)
-            .options(selectinload(Routine.blocks))
+            .options(selectinload(Routine.blocks).selectinload(RoutineBlock.habits))
         )
         return result.scalar_one_or_none()
 
@@ -35,13 +36,24 @@ class RoutineRepository:
             select(Routine)
             .join(RoutineBlock)
             .where(RoutineBlock.id == block_id, Routine.user_id == user_id)
-            .options(selectinload(Routine.blocks))
+            .options(selectinload(Routine.blocks).selectinload(RoutineBlock.habits))
         )
         return result.scalar_one_or_none()
 
-    def _make_blocks(self, blocks: list[RoutineBlockCreate]) -> list[RoutineBlock]:
-        return [
-            RoutineBlock(
+    async def _resolve_habits(self, user_id: str, habit_ids: list[str]) -> list[Habit]:
+        if not habit_ids:
+            return []
+        unique = list(dict.fromkeys(habit_ids))
+        result = await self.db.execute(
+            select(Habit).where(Habit.user_id == user_id, Habit.id.in_(unique))
+        )
+        found = {h.id: h for h in result.scalars().all()}
+        return [found[hid] for hid in unique if hid in found]
+
+    async def _make_blocks(self, user_id: str, blocks: list[RoutineBlockCreate]) -> list[RoutineBlock]:
+        out: list[RoutineBlock] = []
+        for i, b in enumerate(blocks):
+            block = RoutineBlock(
                 title=b.title,
                 start_time=b.start_time,
                 end_time=b.end_time,
@@ -50,8 +62,9 @@ class RoutineRepository:
                 notes=b.notes,
                 sort_order=b.sort_order if b.sort_order else i,
             )
-            for i, b in enumerate(blocks)
-        ]
+            block.habits = await self._resolve_habits(user_id, b.habit_ids or [])
+            out.append(block)
+        return out
 
     async def create(self, user_id: str, data: RoutineCreate) -> Routine:
         routine = Routine(
@@ -64,7 +77,7 @@ class RoutineRepository:
         )
         routine.days_of_week = data.days_of_week
         routine.skip_dates = data.skip_dates or []
-        routine.blocks = self._make_blocks(data.blocks)
+        routine.blocks = await self._make_blocks(user_id, data.blocks)
         self.db.add(routine)
         await self.db.flush()
         await self.db.refresh(routine, ["blocks"])
@@ -85,7 +98,7 @@ class RoutineRepository:
         if blocks is not None:
             routine.blocks.clear()
             await self.db.flush()
-            routine.blocks = self._make_blocks(data.blocks or [])
+            routine.blocks = await self._make_blocks(routine.user_id, data.blocks or [])
 
         await self.db.flush()
         await self.db.refresh(routine, ["blocks"])
