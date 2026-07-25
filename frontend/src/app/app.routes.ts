@@ -170,6 +170,26 @@ export const routes: Routes = [
           import('./features/calendar/event-detail.component').then((m) => m.EventDetailComponent),
       },
       {
+        path: 'routines',
+        loadComponent: () =>
+          import('./features/routines/routines-list.component').then((m) => m.RoutinesListComponent),
+      },
+      {
+        path: 'routines/new',
+        loadComponent: () =>
+          import('./features/routines/routine-form.component').then((m) => m.RoutineFormComponent),
+      },
+      {
+        path: 'routines/:id/edit',
+        loadComponent: () =>
+          import('./features/routines/routine-form.component').then((m) => m.RoutineFormComponent),
+      },
+      {
+        path: 'routines/:id',
+        loadComponent: () =>
+          import('./features/routines/routine-detail.component').then((m) => m.RoutineDetailComponent),
+      },
+      {
         path: 'journal',
         loadComponent: () =>
           import('./features/journal/journal-list.component').then((m) => m.JournalListComponent),

@@ -19,13 +19,15 @@ import { WidgetSkeletonComponent } from './widget-skeleton.component';
       } @else if (events.length === 0) {
         <p class="p-3 text-sm" style="color: var(--text-muted)">
           No upcoming events.
-          <a routerLink="/calendar/new" class="link">Add one</a>
+          <a routerLink="/routines/new" class="link">Add a routine</a>
+          or
+          <a routerLink="/calendar/new" class="link">event</a>
         </p>
       } @else {
         <ul class="divide-y divide-[var(--xp-border)] text-sm">
           @for (event of events; track event.id) {
             <li class="flex justify-between gap-2 px-3 py-2">
-              <a [routerLink]="['/calendar', event.id]" class="hover:underline">{{ event.title }}</a>
+              <a [routerLink]="eventLink(event.id)" class="hover:underline">{{ event.title }}</a>
               <span class="text-xs text-gray-500 shrink-0">{{ event.starts_at | date: 'MMM d, HH:mm' }}</span>
             </li>
           }
@@ -37,4 +39,12 @@ import { WidgetSkeletonComponent } from './widget-skeleton.component';
 export class CalendarWidgetComponent {
   @Input() loading = false;
   @Input() events: CalendarPreviewItem[] = [];
+
+  eventLink(id: string): string[] {
+    if (id.startsWith('routine:')) {
+      const parts = id.split(':');
+      if (parts.length >= 2) return ['/routines', parts[1]];
+    }
+    return ['/calendar', id];
+  }
 }

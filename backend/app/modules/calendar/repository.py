@@ -16,10 +16,13 @@ class CalendarRepository:
     ) -> list[CalendarEvent]:
         q = select(CalendarEvent).where(CalendarEvent.user_id == user_id)
         if start is not None and end is not None:
-            # Overlap query: event starts before range end AND (event ends after range start OR has no end)
+            # Overlap query, plus recurring templates that began before the window
+            # but still generate occurrences inside it.
             q = q.where(
                 CalendarEvent.starts_at <= end,
-                (CalendarEvent.ends_at >= start) | (CalendarEvent.ends_at.is_(None)),
+                (CalendarEvent.ends_at >= start)
+                | (CalendarEvent.ends_at.is_(None))
+                | (CalendarEvent.recurrence != "none"),
             )
         elif start is not None:
             q = q.where(CalendarEvent.starts_at >= start)

@@ -53,10 +53,21 @@ class DashboardService:
             else None
         )
         calendar_items = await self.calendar.get_dashboard_preview(user_id)
-        calendar_preview = [
-            CalendarPreviewItem(id=eid, title=title, starts_at=starts_at)
-            for eid, title, starts_at in calendar_items
-        ]
+        from app.modules.routines.service import RoutineService
+
+        routine_items = await RoutineService(self.db).today_preview(user_id, limit=5)
+        # Prefer showing today's routine blocks first, then upcoming calendar events.
+        seen_titles: set[str] = set()
+        calendar_preview: list[CalendarPreviewItem] = []
+        for eid, title, starts_at, _rid in routine_items:
+            calendar_preview.append(CalendarPreviewItem(id=eid, title=title, starts_at=starts_at))
+            seen_titles.add(title)
+        for eid, title, starts_at in calendar_items:
+            if title in seen_titles:
+                continue
+            calendar_preview.append(CalendarPreviewItem(id=eid, title=title, starts_at=starts_at))
+            if len(calendar_preview) >= 8:
+                break
         notif_items = await self.notifications.get_dashboard_notifications(user_id)
         notifications = [
             NotificationItem(
@@ -84,6 +95,7 @@ class DashboardService:
                 QuickActionItem(id="add_habit", label="New Habit", route="/habits/new", enabled=True),
                 QuickActionItem(id="log_run", label="Log Run", route="/running/new", enabled=True),
                 QuickActionItem(id="add_event", label="New Event", route="/calendar/new", enabled=True),
+                QuickActionItem(id="add_routine", label="New Routine", route="/routines/new", enabled=True),
                 QuickActionItem(id="add_journal", label="New Journal", route="/journal/new", enabled=True),
                 QuickActionItem(id="add_word", label="Add Word", route="/communication/vocabulary/new", enabled=True),
                 QuickActionItem(id="add_qa", label="New Q&A", route="/qa/new", enabled=True),
