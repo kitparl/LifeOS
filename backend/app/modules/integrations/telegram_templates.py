@@ -255,6 +255,157 @@ def digest_message(
     return join_blocks(*blocks)
 
 
+# --- Scheduled report templates (Cycle 8) ---
+
+
+def chunk_text(text: str, *, limit: int = 3900) -> list[str]:
+    """Split long HTML messages for Telegram's ~4096 char limit."""
+    if len(text) <= limit:
+        return [text]
+    parts: list[str] = []
+    remaining = text
+    part_n = 1
+    while remaining:
+        if len(remaining) <= limit:
+            parts.append(remaining)
+            break
+        cut = remaining.rfind("\n\n", 0, limit)
+        if cut < limit // 2:
+            cut = remaining.rfind("\n", 0, limit)
+        if cut < limit // 2:
+            cut = limit
+        chunk = remaining[:cut].rstrip()
+        remaining = remaining[cut:].lstrip()
+        if remaining:
+            parts.append(f"{chunk}\n\n<i>Part {part_n} — continued…</i>")
+        else:
+            parts.append(chunk)
+        part_n += 1
+    if len(parts) > 1:
+        # Label final part
+        last = parts[-1]
+        if not last.endswith("continued…</i>"):
+            parts[-1] = f"{last}\n\n<i>Part {len(parts)} — end</i>"
+    return parts
+
+
+def morning_report(
+    *,
+    stamp: datetime | str,
+    routine: list[str],
+    overdue: list[str],
+    due_today: list[str],
+    later: list[str],
+    calendar: list[str],
+    habits: list[str],
+    linked_habits: list[str] | None = None,
+    goals: list[str],
+) -> str:
+    stamp_s = stamp.strftime("%Y-%m-%d %H:%M %Z") if isinstance(stamp, datetime) else str(stamp)
+    blocks = [_header("☀️ Morning report", stamp_s)]
+    if routine:
+        blocks.append(_section("Routine today", _bullets(routine, limit=12)))
+    else:
+        blocks.append(_section("Routine today", "No blocks scheduled."))
+
+    pending_bits: list[str] = []
+    if overdue:
+        pending_bits.append("<b>Overdue</b>\n" + _bullets(overdue, limit=10))
+    if due_today:
+        pending_bits.append("<b>Due today</b>\n" + _bullets(due_today, limit=10))
+    if later:
+        pending_bits.append("<b>Later</b>\n" + _bullets(later, limit=8))
+    if pending_bits:
+        blocks.append(_section("Pending tasks", "\n\n".join(pending_bits)))
+    else:
+        blocks.append(_section("Pending tasks", "All clear."))
+
+    blocks.append(_section("Calendar (7 days)", _bullets(calendar, limit=25) or "Nothing upcoming."))
+    habit_body = _bullets(habits, limit=15) or "All habits done for today."
+    if linked_habits:
+        habit_body += "\n\n<i>Linked to routine:</i>\n" + _bullets(linked_habits, limit=10)
+    blocks.append(_section("Habits open", habit_body))
+    blocks.append(_section("Goals", _bullets(goals, limit=8) or "No active goals."))
+    blocks.append("<i>Open /dashboard for interactive screens.</i>")
+    return join_blocks(*blocks)
+
+
+def midday_nudge(
+    *,
+    stamp: datetime | str,
+    overdue: list[str],
+    due_today: list[str],
+) -> str:
+    stamp_s = stamp.strftime("%Y-%m-%d %H:%M %Z") if isinstance(stamp, datetime) else str(stamp)
+    blocks = [_header("⏰ Midday nudge", stamp_s)]
+    if overdue:
+        blocks.append(_section("Overdue", _bullets(overdue, limit=12)))
+    if due_today:
+        blocks.append(_section("Due today", _bullets(due_today, limit=12)))
+    return join_blocks(*blocks)
+
+
+def night_wrap(
+    *,
+    stamp: datetime | str,
+    completed: list[str],
+    completed_count: int,
+    habits: list[str],
+    linked_habits: list[str] | None = None,
+    routine_tomorrow: list[str],
+    calendar_tomorrow: list[str],
+    tasks_tomorrow: list[str],
+) -> str:
+    stamp_s = stamp.strftime("%Y-%m-%d %H:%M %Z") if isinstance(stamp, datetime) else str(stamp)
+    blocks = [_header("🌙 Night wrap", stamp_s)]
+    done_body = _bullets(completed, limit=12) if completed else "No tasks completed today."
+    blocks.append(_section(f"Completed today ({completed_count})", done_body))
+    habit_body = _bullets(habits, limit=12) or "All habits done."
+    if linked_habits:
+        habit_body += "\n\n<i>Linked to routine:</i>\n" + _bullets(linked_habits, limit=8)
+    blocks.append(_section("Habits still open", habit_body))
+    tomorrow_bits = [
+        _section("Routine", _bullets(routine_tomorrow, limit=10) or "None"),
+        _section("Calendar", _bullets(calendar_tomorrow, limit=15) or "None"),
+        _section("Tasks due", _bullets(tasks_tomorrow, limit=10) or "None"),
+    ]
+    blocks.append(_section("Tomorrow", "\n\n".join(tomorrow_bits)))
+    return join_blocks(*blocks)
+
+
+def weekly_review(
+    *,
+    stamp: datetime | str,
+    goals: list[str],
+    streaks: list[str],
+    calendar: list[str],
+) -> str:
+    stamp_s = stamp.strftime("%Y-%m-%d %H:%M %Z") if isinstance(stamp, datetime) else str(stamp)
+    blocks = [_header("📊 Weekly review", stamp_s)]
+    blocks.append(_section("Goal progress", _bullets(goals, limit=15) or "No active goals."))
+    blocks.append(_section("Habit streak highlights", _bullets(streaks, limit=15) or "No streaks yet."))
+    blocks.append(_section("Next 7 days", _bullets(calendar, limit=30) or "Nothing scheduled."))
+    return join_blocks(*blocks)
+
+
+def birthday_reminder(*, title: str, when: str) -> str:
+    return join_blocks(_header("🎂 Birthday"), f"{esc(when)}: <b>{esc(title)}</b>")
+
+
+def immutable_reminder(*, title: str, when: str, offset_label: str) -> str:
+    return join_blocks(
+        _header("🔒 Reminder", offset_label),
+        f"<b>{esc(title)}</b>\n{esc(when)}",
+    )
+
+
+def routine_reminder(*, title: str, starts: str, offset_label: str) -> str:
+    return join_blocks(
+        _header("⏱️ Routine starting soon", offset_label),
+        f"<b>{esc(title)}</b>\nStarts at {esc(starts)}",
+    )
+
+
 # --- Outbound event push templates (optional reuse) ---
 
 

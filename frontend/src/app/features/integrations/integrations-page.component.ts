@@ -5,8 +5,11 @@ import {
   IntegrationConnection,
   IntegrationProvider,
   IntegrationsService,
+  ReportJobType,
+  ReportRun,
   TELEGRAM_EVENT_OPTIONS,
   TelegramConfigStatus,
+  TelegramConfigUpdate,
   TelegramWebhookStatus,
 } from './services/integrations.service';
 
@@ -110,57 +113,102 @@ import {
                 </div>
 
                 <div class="mt-3 border-t pt-3" style="border-color: var(--border)">
-                  <p class="font-medium text-xs mb-2">Scheduled digest</p>
-                  <label class="flex items-center gap-2 text-xs mb-2">
-                    <input type="checkbox" [(ngModel)]="digestEnabled" />
-                    Enable recurring digest
-                  </label>
+                  <p class="font-medium text-xs mb-2">Scheduled reports</p>
+                  <p class="text-xs mb-2" style="color: var(--text-muted)">
+                    Defaults use Asia/Kolkata (IST). Morning replaces the old digest.
+                  </p>
                   <div class="grid gap-2 sm:grid-cols-2">
-                    <div class="flex flex-col gap-1">
-                      <label class="form-label" for="tg-digest-time">Time</label>
-                      <input
-                        id="tg-digest-time"
-                        class="input-field"
-                        type="time"
-                        [(ngModel)]="digestTime"
-                      />
-                    </div>
-                    <div class="flex flex-col gap-1">
-                      <label class="form-label" for="tg-digest-freq">Frequency</label>
-                      <select id="tg-digest-freq" class="input-field" [(ngModel)]="digestFrequency">
-                        <option value="daily">Daily</option>
-                        <option value="weekdays">Weekdays</option>
-                        <option value="weekly">Weekly</option>
+                    <label class="flex items-center gap-2 text-xs">
+                      <input type="checkbox" [(ngModel)]="morningEnabled" />
+                      Morning
+                    </label>
+                    <input class="input-field" type="time" [(ngModel)]="morningTime" />
+                    <label class="flex items-center gap-2 text-xs">
+                      <input type="checkbox" [(ngModel)]="middayEnabled" />
+                      Midday nudge
+                    </label>
+                    <input class="input-field" type="time" [(ngModel)]="middayTime" />
+                    <label class="flex items-center gap-2 text-xs">
+                      <input type="checkbox" [(ngModel)]="nightEnabled" />
+                      Night wrap
+                    </label>
+                    <input class="input-field" type="time" [(ngModel)]="nightTime" />
+                    <label class="flex items-center gap-2 text-xs">
+                      <input type="checkbox" [(ngModel)]="weeklyEnabled" />
+                      Weekly review
+                    </label>
+                    <div class="flex gap-1">
+                      <input class="input-field flex-1" type="time" [(ngModel)]="weeklyTime" />
+                      <select class="input-field" [(ngModel)]="weeklyWeekday">
+                        <option [ngValue]="0">Mon</option>
+                        <option [ngValue]="1">Tue</option>
+                        <option [ngValue]="2">Wed</option>
+                        <option [ngValue]="3">Thu</option>
+                        <option [ngValue]="4">Fri</option>
+                        <option [ngValue]="5">Sat</option>
+                        <option [ngValue]="6">Sun</option>
                       </select>
                     </div>
-                    @if (digestFrequency === 'weekly') {
-                      <div class="flex flex-col gap-1">
-                        <label class="form-label" for="tg-digest-weekday">Weekday</label>
-                        <select id="tg-digest-weekday" class="input-field" [(ngModel)]="digestWeekday">
-                          <option [ngValue]="0">Monday</option>
-                          <option [ngValue]="1">Tuesday</option>
-                          <option [ngValue]="2">Wednesday</option>
-                          <option [ngValue]="3">Thursday</option>
-                          <option [ngValue]="4">Friday</option>
-                          <option [ngValue]="5">Saturday</option>
-                          <option [ngValue]="6">Sunday</option>
-                        </select>
-                      </div>
-                    }
-                    <div class="flex flex-col gap-1">
+                    <label class="flex items-center gap-2 text-xs">
+                      <input type="checkbox" [(ngModel)]="aiBriefingEnabled" />
+                      AI briefing
+                    </label>
+                    <input class="input-field" type="time" [(ngModel)]="aiBriefingTime" />
+                    <div class="flex flex-col gap-1 sm:col-span-2">
                       <label class="form-label" for="tg-tz">Timezone</label>
                       <input
                         id="tg-tz"
                         class="input-field"
                         type="text"
                         [(ngModel)]="timezone"
-                        placeholder="e.g. Asia/Kolkata"
+                        placeholder="Asia/Kolkata"
                       />
                     </div>
                   </div>
+                  <p class="font-medium text-xs mt-3 mb-1">Reminders</p>
+                  <div class="flex flex-wrap gap-3 text-xs">
+                    <label class="flex items-center gap-2">
+                      <input type="checkbox" [(ngModel)]="birthdayReminders" />
+                      Birthdays
+                    </label>
+                    <label class="flex items-center gap-2">
+                      <input type="checkbox" [(ngModel)]="immutableReminders" />
+                      Immutable events
+                    </label>
+                    <label class="flex items-center gap-2">
+                      <input type="checkbox" [(ngModel)]="routineReminders" />
+                      Routine blocks
+                    </label>
+                  </div>
+                  <div class="flex flex-wrap gap-2 mt-3">
+                    @for (jt of reportJobTypes; track jt) {
+                      <button
+                        type="button"
+                        class="text-xs btn-secondary"
+                        [disabled]="tgBusy() || !telegram()?.configured"
+                        (click)="runReportNow(jt)"
+                      >
+                        Send {{ jt }} now
+                      </button>
+                    }
+                    <button type="button" class="text-xs" [disabled]="tgBusy()" (click)="loadReportRuns()">
+                      Refresh runs
+                    </button>
+                  </div>
+                  @if (reportRuns().length) {
+                    <ul class="mt-2 text-xs space-y-1" style="color: var(--text-muted)">
+                      @for (r of reportRuns(); track r.id) {
+                        <li>
+                          {{ r.job_type }} · {{ r.status }}
+                          @if (r.skip_reason) { ({{ r.skip_reason }}) }
+                          · {{ r.created_at }}
+                        </li>
+                      }
+                    </ul>
+                  }
                   @if (telegram()?.last_digest_at) {
                     <p class="text-xs mt-1" style="color: var(--text-muted)">
-                      Last digest: {{ telegram()!.last_digest_at }}
+                      Last morning: {{ telegram()!.last_digest_at }}
                     </p>
                   }
                 </div>
@@ -291,11 +339,23 @@ export class IntegrationsPageComponent implements OnInit {
   chatIdInput = '';
   telegramEnabled = false;
   notifyOn = new Set<string>(TELEGRAM_EVENT_OPTIONS.map((o) => o.key));
-  digestEnabled = false;
-  digestTime = '08:00';
-  digestFrequency = 'daily';
-  digestWeekday = 0;
-  timezone = 'UTC';
+  morningEnabled = true;
+  morningTime = '06:00';
+  middayEnabled = true;
+  middayTime = '12:30';
+  nightEnabled = true;
+  nightTime = '22:00';
+  weeklyEnabled = true;
+  weeklyTime = '18:00';
+  weeklyWeekday = 6;
+  aiBriefingEnabled = false;
+  aiBriefingTime = '08:00';
+  birthdayReminders = true;
+  immutableReminders = true;
+  routineReminders = true;
+  timezone = 'Asia/Kolkata';
+  readonly reportJobTypes: ReportJobType[] = ['morning', 'midday', 'night', 'weekly', 'ai_briefing'];
+  readonly reportRuns = signal<ReportRun[]>([]);
 
   ngOnInit(): void {
     this.integrations.providers().subscribe({ next: (p) => (this.providers = p) });
@@ -313,11 +373,21 @@ export class IntegrationsPageComponent implements OnInit {
     this.telegramEnabled = status.enabled;
     this.botTokenInput = '';
     this.notifyOn = new Set(status.notify_on?.length ? status.notify_on : TELEGRAM_EVENT_OPTIONS.map((o) => o.key));
-    this.digestEnabled = !!status.digest_enabled;
-    this.digestTime = status.digest_time || '08:00';
-    this.digestFrequency = status.digest_frequency || 'daily';
-    this.digestWeekday = status.digest_weekday ?? 0;
-    this.timezone = status.timezone || 'UTC';
+    this.morningEnabled = status.morning_enabled ?? status.digest_enabled ?? true;
+    this.morningTime = status.morning_time || status.digest_time || '06:00';
+    this.middayEnabled = status.midday_enabled ?? true;
+    this.middayTime = status.midday_time || '12:30';
+    this.nightEnabled = status.night_enabled ?? true;
+    this.nightTime = status.night_time || '22:00';
+    this.weeklyEnabled = status.weekly_enabled ?? true;
+    this.weeklyTime = status.weekly_time || '18:00';
+    this.weeklyWeekday = status.weekly_weekday ?? 6;
+    this.aiBriefingEnabled = status.ai_briefing_enabled ?? false;
+    this.aiBriefingTime = status.ai_briefing_time || '08:00';
+    this.birthdayReminders = status.birthday_reminders_enabled ?? true;
+    this.immutableReminders = status.immutable_reminders_enabled ?? true;
+    this.routineReminders = status.routine_reminders_enabled ?? true;
+    this.timezone = status.timezone || 'Asia/Kolkata';
   }
 
   loadTelegram(): void {
@@ -384,20 +454,33 @@ export class IntegrationsPageComponent implements OnInit {
   saveTelegram(): void {
     this.tgBusy.set(true);
     this.tgMessage.set(null);
-    const body: Record<string, unknown> = {
+    const body: TelegramConfigUpdate = {
       enabled: this.telegramEnabled,
       notify_on: Array.from(this.notifyOn),
-      digest_enabled: this.digestEnabled,
-      digest_time: this.digestTime,
-      digest_frequency: this.digestFrequency,
-      digest_weekday: this.digestWeekday,
-      timezone: this.timezone.trim() || 'UTC',
+      morning_enabled: this.morningEnabled,
+      morning_time: this.morningTime,
+      midday_enabled: this.middayEnabled,
+      midday_time: this.middayTime,
+      night_enabled: this.nightEnabled,
+      night_time: this.nightTime,
+      weekly_enabled: this.weeklyEnabled,
+      weekly_time: this.weeklyTime,
+      weekly_weekday: this.weeklyWeekday,
+      ai_briefing_enabled: this.aiBriefingEnabled,
+      ai_briefing_time: this.aiBriefingTime,
+      birthday_reminders_enabled: this.birthdayReminders,
+      immutable_reminders_enabled: this.immutableReminders,
+      routine_reminders_enabled: this.routineReminders,
+      timezone: this.timezone.trim() || 'Asia/Kolkata',
+      // Keep digest_* in sync for legacy
+      digest_enabled: this.morningEnabled,
+      digest_time: this.morningTime,
     };
     if (this.botTokenInput.trim()) {
-      body['bot_token'] = this.botTokenInput.trim();
+      body.bot_token = this.botTokenInput.trim();
     }
     if (this.chatIdInput.trim()) {
-      body['chat_id'] = this.chatIdInput.trim();
+      body.chat_id = this.chatIdInput.trim();
     }
     this.integrations.saveTelegramConfig(body).subscribe({
       next: (status) => {
@@ -412,6 +495,31 @@ export class IntegrationsPageComponent implements OnInit {
         this.tgMessage.set(err?.error?.detail ?? 'Failed to save Telegram settings');
         this.tgBusy.set(false);
       },
+    });
+  }
+
+  runReportNow(jobType: ReportJobType): void {
+    this.tgBusy.set(true);
+    this.tgMessage.set(null);
+    this.integrations.runReport(jobType).subscribe({
+      next: (r) => {
+        this.tgOk.set(r.sent);
+        this.tgMessage.set(`${jobType}: ${r.detail}`);
+        this.tgBusy.set(false);
+        this.loadReportRuns();
+      },
+      error: (err) => {
+        this.tgOk.set(false);
+        this.tgMessage.set(err?.error?.detail ?? `Failed to run ${jobType}`);
+        this.tgBusy.set(false);
+      },
+    });
+  }
+
+  loadReportRuns(): void {
+    this.integrations.listReportRuns(15).subscribe({
+      next: (runs) => this.reportRuns.set(runs),
+      error: () => this.reportRuns.set([]),
     });
   }
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,10 @@ def _sort_key(dt: datetime) -> datetime:
 def _expand_recurring_event(
     event: CalendarEvent, start: datetime, end: datetime
 ) -> list[EventListItem]:
-    """Expand a single recurring template into occurrences overlapping [start, end)."""
+    """Expand a single recurring template into occurrences overlapping [start, end).
+
+    Yearly Feb 29 anchors land on Feb 28 in non-leap years.
+    """
     if not event.recurrence or event.recurrence == "none":
         return [EventListItem.model_validate(event)]
 
@@ -36,6 +39,7 @@ def _expand_recurring_event(
     cursor_date = (start - timedelta(days=1)).date()
     last_date = (end + timedelta(days=1)).date()
     anchor = event.starts_at
+    event_kind = getattr(event, "event_kind", None) or "normal"
 
     while cursor_date <= last_date:
         include = False
@@ -45,6 +49,24 @@ def _expand_recurring_event(
             include = cursor_date.weekday() == anchor.weekday()
         elif event.recurrence == "monthly":
             include = cursor_date.day == anchor.day
+        elif event.recurrence == "yearly":
+            # Same month/day; Feb 29 → Feb 28 in non-leap years
+            target_month = anchor.month
+            target_day = anchor.day
+            if target_month == 2 and target_day == 29:
+                try:
+                    include = cursor_date.month == 2 and cursor_date.day == 29
+                except ValueError:
+                    include = False
+                if not include and cursor_date.month == 2 and cursor_date.day == 28:
+                    # Non-leap year substitute
+                    try:
+                        date(cursor_date.year, 2, 29)
+                        include = False  # leap year — wait for actual 29th
+                    except ValueError:
+                        include = True
+            else:
+                include = cursor_date.month == target_month and cursor_date.day == target_day
 
         if include and cursor_date >= anchor.date():
             starts_at = datetime.combine(cursor_date, anchor.timetz())
@@ -69,6 +91,7 @@ def _expand_recurring_event(
                     all_day=event.all_day,
                     category=event.category,
                     recurrence=event.recurrence,
+                    event_kind=event_kind,
                     location=event.location,
                     source_module=event.source_module,
                     source_id=event.source_id or event.id,

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.calendar.schemas import EventListItem
 from app.modules.routines.repository import RoutineRepository
 from app.modules.routines.schemas import (
+    LinkedHabitBrief,
     RoutineBlockResponse,
     RoutineCreate,
     RoutineListItem,
@@ -42,6 +43,21 @@ class RoutineService:
             updated_at=routine.updated_at,
         )
 
+    def _block_response(self, block) -> RoutineBlockResponse:
+        habits = list(getattr(block, "habits", None) or [])
+        return RoutineBlockResponse(
+            id=block.id,
+            title=block.title,
+            start_time=block.start_time,
+            end_time=block.end_time,
+            area=block.area,
+            category=block.category,
+            notes=block.notes,
+            sort_order=block.sort_order,
+            habit_ids=[h.id for h in habits],
+            habits=[LinkedHabitBrief(id=h.id, name=h.name) for h in habits],
+        )
+
     def _to_response(self, routine) -> RoutineResponse:
         return RoutineResponse(
             id=routine.id,
@@ -53,7 +69,7 @@ class RoutineService:
             end_date=getattr(routine, "end_date", None),
             skip_dates=list(getattr(routine, "skip_dates", []) or []),
             is_active=routine.is_active,
-            blocks=[RoutineBlockResponse.model_validate(b) for b in routine.blocks],
+            blocks=[self._block_response(b) for b in routine.blocks],
             created_at=routine.created_at,
             updated_at=routine.updated_at,
         )
@@ -141,6 +157,7 @@ class RoutineService:
                             all_day=False,
                             category=block.category,
                             recurrence="none",
+                            event_kind="normal",
                             location=None,
                             source_module=ROUTINE_SOURCE_MODULE,
                             source_id=block.id,

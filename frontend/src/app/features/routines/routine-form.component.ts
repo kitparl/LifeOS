@@ -7,6 +7,8 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DateChipsComponent } from '../../shared/date-chips/date-chips.component';
+import { HabitListItem } from '../habits/models/habit.models';
+import { HabitsService } from '../habits/services/habits.service';
 import {
   ROUTINE_AREAS,
   ROUTINE_CATEGORIES,
@@ -144,6 +146,24 @@ import { RoutinesService } from './services/routines.service';
                     <label class="mb-1 block text-xs">Notes</label>
                     <input class="input-field" formControlName="notes" placeholder="Optional" />
                   </div>
+                  <div>
+                    <label class="mb-1 block text-xs">Linked habits</label>
+                    <select
+                      class="input-field min-h-[72px]"
+                      multiple
+                      [value]="habitIdsAt(i)"
+                      (change)="onHabitsChange(i, $event)"
+                    >
+                      @for (h of availableHabits; track h.id) {
+                        <option [value]="h.id" [selected]="habitIdsAt(i).includes(h.id)">
+                          {{ h.name }}
+                        </option>
+                      }
+                    </select>
+                    <p class="text-[10px] mt-0.5" style="color: var(--text-muted)">
+                      Hold Ctrl/Cmd to select multiple.
+                    </p>
+                  </div>
                 </div>
               }
             </div>
@@ -167,12 +187,14 @@ import { RoutinesService } from './services/routines.service';
 export class RoutineFormComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly routinesService = inject(RoutinesService);
+  private readonly habitsService = inject(HabitsService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
   areas = ROUTINE_AREAS;
   categories = ROUTINE_CATEGORIES;
   weekdays = WEEKDAYS;
+  availableHabits: HabitListItem[] = [];
   isEdit = false;
   routineId: string | null = null;
   saving = false;
@@ -200,6 +222,9 @@ export class RoutineFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.habitsService.list(true).subscribe({
+      next: (habits) => (this.availableHabits = habits),
+    });
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id && url.endsWith('edit')) {
@@ -230,6 +255,7 @@ export class RoutineFormComponent implements OnInit {
                   b.area,
                   b.category,
                   b.notes ?? '',
+                  b.habit_ids ?? b.habits?.map((h) => h.id) ?? [],
                 ),
               );
             }
@@ -246,6 +272,7 @@ export class RoutineFormComponent implements OnInit {
     area: RoutineArea = 'other',
     category = defaultCategoryForArea(area),
     notes = '',
+    habitIds: string[] = [],
   ) {
     return this.fb.nonNullable.group({
       title: [title, Validators.required],
@@ -254,7 +281,18 @@ export class RoutineFormComponent implements OnInit {
       area: [area as RoutineArea, Validators.required],
       category: [category, Validators.required],
       notes: [notes],
+      habit_ids: [habitIds as string[]],
     });
+  }
+
+  habitIdsAt(index: number): string[] {
+    return (this.blocks.at(index).get('habit_ids')?.value as string[]) || [];
+  }
+
+  onHabitsChange(index: number, event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const ids = Array.from(select.selectedOptions).map((o) => o.value);
+    this.blocks.at(index).patchValue({ habit_ids: ids });
   }
 
   addBlock(): void {
@@ -299,6 +337,7 @@ export class RoutineFormComponent implements OnInit {
       category: b.category,
       notes: b.notes || null,
       sort_order: i,
+      habit_ids: b.habit_ids || [],
     }));
 
     const payload = {
