@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { ExportPageComponent } from '../export/export-page.component';
 import { ProfileComponent } from '../profile/profile.component';
+import { SettingsAppSectionComponent } from './settings-app-section.component';
 import { SettingsIntegrationsSectionComponent } from './settings-integrations-section.component';
 import { SettingsSidebarSectionComponent } from './settings-sidebar-section.component';
 import { SettingsChangePasswordComponent } from './settings-change-password.component';
@@ -17,6 +18,7 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
     ExportPageComponent,
     SettingsSidebarSectionComponent,
     SettingsChangePasswordComponent,
+    SettingsAppSectionComponent,
   ],
   template: `
     <div class="space-y-8">
@@ -61,6 +63,11 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
         <h2 class="text-base font-semibold">Sidebar</h2>
         <app-settings-sidebar-section />
       </section>
+
+      <section id="app" class="scroll-mt-24 space-y-3">
+        <h2 class="text-base font-semibold">App updates</h2>
+        <app-settings-app-section />
+      </section>
     </div>
   `,
 })
@@ -73,6 +80,7 @@ export class SettingsHubComponent implements OnInit {
     { id: 'integrations', label: 'Integrations' },
     { id: 'export', label: 'Export' },
     { id: 'sidebar', label: 'Sidebar' },
+    { id: 'app', label: 'App updates' },
   ];
 
   ngOnInit(): void {

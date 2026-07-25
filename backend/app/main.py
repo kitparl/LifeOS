@@ -144,6 +144,33 @@ async def health():
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
+# Without an explicit Cache-Control, browsers (notably iOS WebKit, including
+# home-screen web apps) apply heuristic freshness and keep serving the previous
+# deploy. These entry points must always be revalidated so the service worker
+# can discover a new build; hashed bundles stay immutable.
+NO_CACHE_FILES = frozenset(
+    {
+        "index.html",
+        "ngsw.json",
+        "ngsw-worker.js",
+        "safety-worker.js",
+        "worker-basic.min.js",
+        "manifest.webmanifest",
+    }
+)
+NO_CACHE_HEADERS = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+IMMUTABLE_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+
+def _static_headers(path: Path) -> dict[str, str]:
+    if path.name in NO_CACHE_FILES:
+        return NO_CACHE_HEADERS
+    # Angular emits content-hashed bundles (e.g. main-A1B2C3D4.js) under production
+    # builds; anything else is revalidated to stay safe.
+    stem_parts = path.stem.rsplit("-", 1)
+    is_hashed = len(stem_parts) == 2 and len(stem_parts[1]) >= 8 and stem_parts[1].isalnum()
+    return IMMUTABLE_HEADERS if is_hashed else NO_CACHE_HEADERS
+
 
 def _register_spa_routes() -> None:
     if not STATIC_DIR.is_dir():
@@ -151,18 +178,18 @@ def _register_spa_routes() -> None:
 
     @app.get("/")
     async def spa_index():
-        return FileResponse(STATIC_DIR / "index.html")
+        return FileResponse(STATIC_DIR / "index.html", headers=NO_CACHE_HEADERS)
 
     @app.get("/{full_path:path}")
     async def spa_files(full_path: str):
         if full_path.startswith("api/") or full_path == "health":
             raise HTTPException(status_code=404, detail="Not found")
-        candidate = STATIC_DIR / full_path
-        if candidate.is_file():
-            return FileResponse(candidate)
+        candidate = (STATIC_DIR / full_path).resolve()
+        if candidate.is_relative_to(STATIC_DIR.resolve()) and candidate.is_file():
+            return FileResponse(candidate, headers=_static_headers(candidate))
         index = STATIC_DIR / "index.html"
         if index.is_file():
-            return FileResponse(index)
+            return FileResponse(index, headers=NO_CACHE_HEADERS)
         raise HTTPException(status_code=404, detail="Not found")
 
 
