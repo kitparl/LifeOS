@@ -10,8 +10,13 @@ class WishlistService:
     def __init__(self, db: AsyncSession):
         self.repo = WishlistRepository(db)
 
-    async def list_items(self, user_id: str, category: str | None = None) -> list[WishlistListItem]:
-        items = await self.repo.list_items(user_id, category=category)
+    async def list_items(
+        self,
+        user_id: str,
+        category: str | None = None,
+        status: str | None = None,
+    ) -> list[WishlistListItem]:
+        items = await self.repo.list_items(user_id, category=category, status=status)
         return [WishlistListItem.model_validate(i) for i in items]
 
     async def list_categories(self, user_id: str) -> list[str]:

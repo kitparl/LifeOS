@@ -37,10 +37,14 @@ async def create_wishlist_category(
 @router.get("/items", response_model=list[WishlistListItem])
 async def list_wishlist_items(
     category: str | None = Query(default=None),
+    status: str | None = Query(
+        default=None,
+        pattern="^(incomplete|in_progress|completed|delayed)$",
+    ),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await WishlistService(db).list_items(user.id, category=category)
+    return await WishlistService(db).list_items(user.id, category=category, status=status)
 
 
 @router.post("/items", response_model=WishlistResponse, status_code=status.HTTP_201_CREATED)
