@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +14,16 @@ from app.modules.integrations.notifier_registry import build_user_notifier
 from app.modules.integrations.outbox_repository import OutboxRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_markup(raw: str | None) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else None
+    except (TypeError, ValueError):
+        return None
 
 
 class NotificationDispatcher:
@@ -29,8 +41,13 @@ class NotificationDispatcher:
                 if notifier is None:
                     await self.repo.mark_failed(row, "Notifier not configured or disabled")
                     continue
+                markup = _parse_markup(getattr(row, "reply_markup_json", None))
                 result = await notifier.send(
-                    NotifierMessage(text=row.text, parse_mode=row.parse_mode)
+                    NotifierMessage(
+                        text=row.text,
+                        parse_mode=row.parse_mode,
+                        reply_markup=markup,
+                    )
                 )
                 if result.ok:
                     await self.repo.mark_sent(row)

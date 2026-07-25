@@ -27,6 +27,7 @@ class PendingNotification(Base):
     channel: Mapped[str] = mapped_column(String(32), nullable=False, default="telegram")
     text: Mapped[str] = mapped_column(Text, nullable=False)
     parse_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="HTML")
+    reply_markup_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default=PENDING, index=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)

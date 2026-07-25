@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import logging
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,6 +51,22 @@ def format_entity_message(event: EntityCreated) -> str:
     return f"LifeOS update: {title}"
 
 
+def _task_action_keyboard(entity_id: str) -> dict[str, Any]:
+    sid = (entity_id or "")[:8]
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Mark done", "callback_data": f"task:done:{sid}"},
+                {"text": "👁 View", "callback_data": f"task:view:{sid}"},
+            ],
+            [
+                {"text": "📋 Tasks", "callback_data": "task:list:0"},
+                {"text": "🏠 Home", "callback_data": "nav:home"},
+            ],
+        ]
+    }
+
+
 async def on_entity_created(db: AsyncSession, event: EntityCreated) -> None:
     repo = IntegrationRepository(db)
     conn = await repo.get_by_provider(event.user_id, "telegram")
@@ -59,8 +76,16 @@ async def on_entity_created(db: AsyncSession, event: EntityCreated) -> None:
     if event.event_type not in prefs.notify_on:
         return
     text = format_entity_message(event)
-    await OutboxRepository(db).enqueue(event.user_id, text, channel="telegram", parse_mode="HTML")
-    # Signal after_commit hook to drain outbox for near-real-time delivery
+    markup = None
+    if event.event_type == TASK_CREATED and event.entity_id:
+        markup = _task_action_keyboard(event.entity_id)
+    await OutboxRepository(db).enqueue(
+        event.user_id,
+        text,
+        channel="telegram",
+        parse_mode="HTML",
+        reply_markup=markup,
+    )
     try:
         db.info["outbox_enqueued"] = True
     except Exception:

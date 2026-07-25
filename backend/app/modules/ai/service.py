@@ -122,3 +122,86 @@ class AiService:
 
         scored.sort(key=lambda s: s.score, reverse=True)
         return scored[:12]
+
+    async def suggest_task_breakdown(self, user_id: str, task_text: str) -> str:
+        """Ask the AI to break a task into concrete sub-steps. Telegram only displays the result."""
+        prompt = (
+            "Break the following task into a short numbered list of concrete sub-steps "
+            "(max 8). Be practical and concise.\n\n"
+            f"Task: {task_text}"
+        )
+        chat = await self.chat(user_id, prompt)
+        return chat.reply
+
+    async def parse_and_create_task(self, user_id: str, natural_language: str):
+        """Parse free-text into a structured task and create it via TaskService.
+
+        Uses the AI provider when available; falls back to regex title + due today.
+        Returns TaskResponse or None.
+        """
+        import json
+        import re
+        from datetime import date, datetime, time, timedelta, timezone
+
+        from app.modules.tasks.schemas import TaskCreate
+        from app.modules.tasks.service import TaskService
+
+        title = natural_language.strip()[:200]
+        due: datetime | None = datetime.combine(
+            date.today(), time(12, 0), tzinfo=timezone.utc
+        )
+
+        if self.provider.enabled:
+            system = (
+                "Extract a task from the user message. Reply with ONLY JSON: "
+                '{"title": "...", "due": "YYYY-MM-DD|today|tomorrow|null"}. '
+                "No markdown."
+            )
+            try:
+                raw = await self.provider.chat(system, natural_language)
+                m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+                if m:
+                    data = json.loads(m.group(0))
+                    title = str(data.get("title") or title).strip()[:200]
+                    due_token = data.get("due")
+                    if due_token in (None, "null", ""):
+                        due = datetime.combine(
+                            date.today(), time(12, 0), tzinfo=timezone.utc
+                        )
+                    elif str(due_token).lower() == "today":
+                        due = datetime.combine(
+                            date.today(), time(12, 0), tzinfo=timezone.utc
+                        )
+                    elif str(due_token).lower() == "tomorrow":
+                        due = datetime.combine(
+                            date.today() + timedelta(days=1),
+                            time(12, 0),
+                            tzinfo=timezone.utc,
+                        )
+                    else:
+                        try:
+                            due = datetime.combine(
+                                date.fromisoformat(str(due_token)[:10]),
+                                time(12, 0),
+                                tzinfo=timezone.utc,
+                            )
+                        except ValueError:
+                            pass
+            except Exception:
+                pass
+        else:
+            # Lightweight fallback: strip leading verbs / "remind me to"
+            cleaned = re.sub(
+                r"^(remind me to|please |add task |todo[:\s]*)",
+                "",
+                natural_language.strip(),
+                flags=re.IGNORECASE,
+            ).strip()
+            if cleaned:
+                title = cleaned[:200]
+
+        if not title:
+            return None
+        return await TaskService(self.db).create_task(
+            user_id, TaskCreate(title=title, due_date=due)
+        )

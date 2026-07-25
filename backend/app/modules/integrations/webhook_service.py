@@ -1,4 +1,4 @@
-"""Telegram webhook handling: authenticate by path secret + chat_id, route commands."""
+"""Telegram webhook handling: authenticate by path secret + chat_id, route updates."""
 
 from __future__ import annotations
 
@@ -10,20 +10,13 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.modules.integrations.command_handler import handle_command
-from app.modules.integrations.notifier import NotifierMessage
-from app.modules.integrations.notifier_registry import build_user_notifier
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import TelegramWebhookRegisterResponse, TelegramWebhookStatus
+from app.modules.integrations.telegram.update_router import route_update
 from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
 from app.modules.integrations.telegram_config import parse_config
 
 logger = logging.getLogger(__name__)
-
-
-def _extract_message(update: dict[str, Any]) -> dict[str, Any] | None:
-    msg = update.get("message") or update.get("edited_message") or update.get("channel_post")
-    return msg if isinstance(msg, dict) else None
 
 
 class TelegramWebhookService:
@@ -42,7 +35,6 @@ class TelegramWebhookService:
         if conn is None or not conn.enabled:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown webhook")
 
-        # Optional header check (Telegram secret_token)
         if conn.webhook_secret and header_secret is not None and header_secret != conn.webhook_secret:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid secret token")
 
@@ -50,25 +42,10 @@ class TelegramWebhookService:
         if cfg is None:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Telegram not configured")
 
-        msg = _extract_message(payload)
-        if msg is None:
-            return {"ok": "ignored"}
-
-        chat = msg.get("chat") if isinstance(msg.get("chat"), dict) else {}
-        chat_id = str(chat.get("id") or "")
-        if not chat_id or chat_id != cfg.chat_id:
-            logger.warning("Rejected Telegram update from unknown chat_id")
+        result = await route_update(self.db, conn.user_id, cfg.chat_id, payload)
+        if result.get("ok") == "rejected_chat":
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Unknown chat")
-
-        text = str(msg.get("text") or "").strip()
-        if not text:
-            return {"ok": "ignored"}
-
-        reply = await handle_command(self.db, conn.user_id, text)
-        notifier = await build_user_notifier(self.db, conn.user_id, provider="telegram")
-        if notifier is not None:
-            await notifier.send(NotifierMessage(text=reply, parse_mode="HTML"))
-        return {"ok": "processed"}
+        return result
 
     async def register_webhook(self, user_id: str) -> TelegramWebhookRegisterResponse:
         settings = get_settings()

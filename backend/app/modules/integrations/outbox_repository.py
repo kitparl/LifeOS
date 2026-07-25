@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,12 +23,14 @@ class OutboxRepository:
         *,
         channel: str = "telegram",
         parse_mode: str = "HTML",
+        reply_markup: dict[str, Any] | None = None,
     ) -> PendingNotification:
         row = PendingNotification(
             user_id=user_id,
             channel=channel,
             text=text,
             parse_mode=parse_mode,
+            reply_markup_json=json.dumps(reply_markup) if reply_markup else None,
             status=PENDING,
         )
         self.db.add(row)
@@ -59,5 +63,4 @@ class OutboxRepository:
         row.last_error = (error or "send failed")[:2000]
         if row.attempts >= row.max_attempts:
             row.status = FAILED
-        # else remain pending for retry
         await self.db.flush()

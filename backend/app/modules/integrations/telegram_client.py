@@ -89,11 +89,66 @@ class TelegramClient:
         text: str,
         *,
         parse_mode: str = "HTML",
+        reply_markup: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"chat_id": chat_id, "text": text}
         if parse_mode:
             payload["parse_mode"] = parse_mode
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
         return await self._post("sendMessage", payload)
+
+    async def edit_message_text(
+        self,
+        chat_id: str,
+        message_id: int,
+        text: str,
+        *,
+        parse_mode: str = "HTML",
+        reply_markup: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text,
+        }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        return await self._post("editMessageText", payload)
+
+    async def answer_callback_query(
+        self,
+        callback_query_id: str,
+        *,
+        text: str = "",
+        show_alert: bool = False,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text
+        if show_alert:
+            payload["show_alert"] = True
+        return await self._post("answerCallbackQuery", payload)
+
+    async def get_file(self, file_id: str) -> dict[str, Any]:
+        return await self._post("getFile", {"file_id": file_id})
+
+    async def download_file(self, file_path: str) -> bytes:
+        """Download a file by Telegram file_path (from getFile)."""
+        url = f"{self._base}/file/bot{self._token}/{file_path.lstrip('/')}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                response = await client.get(url)
+        except httpx.HTTPError as exc:
+            raise TelegramClientError("Telegram file download failed") from exc
+        if response.status_code >= 400:
+            raise TelegramClientError(
+                "Telegram file download failed",
+                status_code=response.status_code,
+            )
+        return response.content
 
     async def get_me(self) -> dict[str, Any]:
         return await self._post("getMe")

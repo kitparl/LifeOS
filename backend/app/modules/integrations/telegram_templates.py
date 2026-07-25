@@ -46,12 +46,14 @@ def help_message() -> str:
     return join_blocks(
         _header("LifeOS", "Bot commands"),
         (
-            "<b>/add-task</b> <code>&lt;title&gt;</code> — create a task (due today by default)\n"
-            "<b>/tasks</b> — pending tasks\n"
-            "<b>/today</b> — today's agenda\n"
+            "<b>/dashboard</b> — interactive home\n"
+            "<b>/add-task</b> <code>&lt;title&gt;</code> — create a task\n"
+            "<b>/tasks</b> — interactive tasks\n"
+            "<b>/today</b> — today's calendar\n"
             "<b>/done</b> <code>&lt;id&gt;</code> — complete a task\n"
-            "<b>/habits</b> — habits due\n"
+            "<b>/habits</b> — habits with one-tap complete\n"
             "<b>/goals</b> — active goals\n"
+            "<b>/search</b> <code>&lt;query&gt;</code> — universal search\n"
             "<b>/help</b> — this message"
         ),
     )
@@ -60,7 +62,7 @@ def help_message() -> str:
 def hint_send_command() -> str:
     return join_blocks(
         _header("LifeOS"),
-        "Send a command like <b>/help</b> to get started.",
+        "Send <b>/dashboard</b> for the interactive home, or <b>/help</b> for commands.",
     )
 
 
