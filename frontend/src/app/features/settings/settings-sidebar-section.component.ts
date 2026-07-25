@@ -1,12 +1,13 @@
 import { Component, computed, inject } from '@angular/core';
 import { CdkDragDrop, CdkDropList, CdkDrag, CdkDragHandle, CdkDragPlaceholder } from '@angular/cdk/drag-drop';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { NavPreferencesService } from '../../core/services/nav-preferences.service';
 import { NavDestination } from '../../shared/layout/nav-registry';
 
 @Component({
   selector: 'app-settings-sidebar-section',
   standalone: true,
-  imports: [CdkDropList, CdkDrag, CdkDragHandle, CdkDragPlaceholder],
+  imports: [CdkDropList, CdkDrag, CdkDragHandle, CdkDragPlaceholder, LucideDynamicIcon],
   template: `
     <div class="space-y-3">
       <p class="text-sm text-[var(--text-muted)]">
@@ -34,17 +35,24 @@ import { NavDestination } from '../../shared/layout/nav-registry';
                 <li class="sidebar-settings-row sidebar-settings-row--pinned" cdkDrag>
                   <span class="sidebar-settings-drag" title="Drag to reorder" aria-hidden="true" cdkDragHandle>⋮⋮</span>
 
-                  <div class="min-w-0 flex-1">
+                  <div class="min-w-0 flex-1 flex items-center gap-2">
+                    @if (item.icon) {
+                      <svg class="settings-nav-icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
+                    }
                     <span>{{ item.label }}</span>
                   </div>
 
                   <button
                     type="button"
-                    class="btn-ghost !px-2 text-xs"
+                    class="btn-ghost !px-2 text-xs inline-flex items-center"
                     [title]="navPrefs.isPinnedTop(item.id) ? 'Unpin from top' : 'Pin to top'"
                     (click)="navPrefs.togglePinTop(item.id)"
                   >
-                    {{ navPrefs.isPinnedTop(item.id) ? '📌' : '📍' }}
+                    <svg
+                      class="settings-nav-icon"
+                      [lucideIcon]="navPrefs.isPinnedTop(item.id) ? 'pin' : 'pin-off'"
+                      aria-hidden="true"
+                    ></svg>
                   </button>
 
                   <label class="toggle-switch" title="Remove from sidebar">
@@ -68,10 +76,13 @@ import { NavDestination } from '../../shared/layout/nav-registry';
               <li class="sidebar-settings-row">
                 <span class="sidebar-settings-drag sidebar-settings-drag--disabled" aria-hidden="true"></span>
 
-                <div class="min-w-0 flex-1">
+                <div class="min-w-0 flex-1 flex items-center gap-2">
+                  @if (item.icon) {
+                    <svg class="settings-nav-icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
+                  }
                   <span>{{ item.label }}</span>
                   @if (item.category) {
-                    <span class="ml-2 text-xs text-[var(--text-muted)]">{{ item.category }}</span>
+                    <span class="ml-1 text-xs text-[var(--text-muted)]">{{ item.category }}</span>
                   }
                 </div>
 
@@ -87,6 +98,13 @@ import { NavDestination } from '../../shared/layout/nav-registry';
     </div>
 
     <style>
+      .settings-nav-icon {
+        width: 1rem;
+        height: 1rem;
+        flex-shrink: 0;
+        color: var(--text-muted);
+        stroke: currentColor;
+      }
       .sidebar-settings-row {
         display: flex;
         align-items: center;

@@ -26,6 +26,7 @@
     "@fullcalendar/interaction": "^6.1.21",
     "@fullcalendar/list": "^6.1.21",
     "@fullcalendar/timegrid": "^6.1.21",
+    "@lucide/angular": "^1.26.0",
     "@tailwindcss/postcss": "^4.3.2",
     "@tiptap/core": "^3.27.1",
     "@tiptap/pm": "^3.27.1",

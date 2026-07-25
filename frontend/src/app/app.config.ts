@@ -13,6 +13,7 @@ import { routes } from './app.routes';
 import { AuthService } from './core/services/auth.service';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { offlineInterceptor } from './core/interceptors/offline.interceptor';
+import { NAV_LUCIDE_ICON_PROVIDERS } from './shared/layout/nav-lucide';
 
 function authBootstrapFactory(auth: AuthService): () => Promise<void> {
   return () => auth.bootstrap();
@@ -43,5 +44,6 @@ export const appConfig: ApplicationConfig = {
       deps: [AuthService],
       multi: true,
     },
+    ...NAV_LUCIDE_ICON_PROVIDERS,
   ],
 };

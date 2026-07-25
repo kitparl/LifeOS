@@ -2,40 +2,42 @@ export interface NavDestination {
   id: string;
   label: string;
   route: string;
+  /** Lucide icon name (kebab-case), e.g. "layout-dashboard". */
+  icon?: string;
   shortLabel?: string;
   category?: string;
   hidden?: boolean;
 }
 
 export const NAV_DESTINATIONS: NavDestination[] = [
-  { id: 'dashboard', label: 'Dashboard', route: '/dashboard', shortLabel: 'Home', category: 'Core' },
-  { id: 'tasks', label: 'Tasks', route: '/tasks', category: 'Core' },
-  { id: 'calendar', label: 'Calendar', route: '/calendar', category: 'Core' },
-  { id: 'routines', label: 'Routines', route: '/routines', category: 'Core' },
-  { id: 'running', label: 'Running', route: '/running', category: 'Health' },
-  { id: 'habits', label: 'Habits', route: '/habits', category: 'Health' },
-  { id: 'goals', label: 'Goals', route: '/goals', category: 'Growth' },
-  { id: 'communication', label: 'Communication', route: '/communication', category: 'Knowledge' },
-  { id: 'finance', label: 'Finance', route: '/finance', category: 'Growth' },
-  { id: 'timeline', label: 'Timeline', route: '/timeline', category: 'Insights' },
-  { id: 'insights', label: 'Insights', route: '/insights', category: 'Insights' },
-  { id: 'documents', label: 'Documents', route: '/documents', category: 'Knowledge' },
-  { id: 'notifications', label: 'Notifications', route: '/notifications', shortLabel: 'Alerts', category: 'Core' },
-  { id: 'assistant', label: 'AI Assistant', route: '/assistant', shortLabel: 'AI', category: 'System' },
-  { id: 'settings', label: 'Settings', route: '/settings', category: 'System' },
-  { id: 'mood', label: 'Mood', route: '/mood', category: 'Health', hidden: true },
-  { id: 'journal', label: 'Journal', route: '/journal', category: 'Health' },
-  { id: 'learning', label: 'Learning', route: '/learning', category: 'Growth' },
-  { id: 'career', label: 'Career', route: '/career', category: 'Growth' },
-  { id: 'wishlist', label: 'Wishlist', route: '/wishlist', category: 'Growth' },
-  { id: 'qa', label: 'Q&A', route: '/qa', category: 'Knowledge' },
-  { id: 'knowledge', label: 'Knowledge Notes', route: '/knowledge', shortLabel: 'Notes', category: 'Knowledge' },
-  { id: 'memory', label: 'Memory', route: '/memory', category: 'Knowledge' },
-  { id: 'voice', label: 'Voice', route: '/voice', category: 'Knowledge' },
-  { id: 'coaches', label: 'Coaches', route: '/coaches', category: 'System' },
-  { id: 'integrations', label: 'Integrations', route: '/integrations', category: 'System' },
-  { id: 'automations', label: 'Automations', route: '/automations', category: 'System' },
-  { id: 'search', label: 'Search', route: '/search', category: 'Core' },
+  { id: 'dashboard', label: 'Dashboard', route: '/dashboard', icon: 'layout-dashboard', shortLabel: 'Home', category: 'Core' },
+  { id: 'tasks', label: 'Tasks', route: '/tasks', icon: 'list-todo', category: 'Core' },
+  { id: 'calendar', label: 'Calendar', route: '/calendar', icon: 'calendar-days', category: 'Core' },
+  { id: 'routines', label: 'Routines', route: '/routines', icon: 'refresh-cw', category: 'Core' },
+  { id: 'running', label: 'Running', route: '/running', icon: 'footprints', category: 'Health' },
+  { id: 'habits', label: 'Habits', route: '/habits', icon: 'flame', category: 'Health' },
+  { id: 'goals', label: 'Goals', route: '/goals', icon: 'target', category: 'Growth' },
+  { id: 'communication', label: 'Communication', route: '/communication', icon: 'message-square', category: 'Knowledge' },
+  { id: 'finance', label: 'Finance', route: '/finance', icon: 'wallet', category: 'Growth' },
+  { id: 'timeline', label: 'Timeline', route: '/timeline', icon: 'route', category: 'Insights' },
+  { id: 'insights', label: 'Insights', route: '/insights', icon: 'chart-column', category: 'Insights' },
+  { id: 'documents', label: 'Documents', route: '/documents', icon: 'file-text', category: 'Knowledge' },
+  { id: 'notifications', label: 'Notifications', route: '/notifications', icon: 'bell', shortLabel: 'Alerts', category: 'Core' },
+  { id: 'assistant', label: 'AI Assistant', route: '/assistant', icon: 'sparkles', shortLabel: 'AI', category: 'System' },
+  { id: 'settings', label: 'Settings', route: '/settings', icon: 'settings', category: 'System' },
+  { id: 'mood', label: 'Mood', route: '/mood', icon: 'smile', category: 'Health', hidden: true },
+  { id: 'journal', label: 'Journal', route: '/journal', icon: 'book-open', category: 'Health' },
+  { id: 'learning', label: 'Learning', route: '/learning', icon: 'graduation-cap', category: 'Growth' },
+  { id: 'career', label: 'Career', route: '/career', icon: 'briefcase-business', category: 'Growth' },
+  { id: 'wishlist', label: 'Wishlist', route: '/wishlist', icon: 'star', category: 'Growth' },
+  { id: 'qa', label: 'Q&A', route: '/qa', icon: 'circle-help', category: 'Knowledge' },
+  { id: 'knowledge', label: 'Knowledge Notes', route: '/knowledge', icon: 'notebook-pen', shortLabel: 'Notes', category: 'Knowledge' },
+  { id: 'memory', label: 'Memory', route: '/memory', icon: 'brain', category: 'Knowledge' },
+  { id: 'voice', label: 'Voice', route: '/voice', icon: 'mic', category: 'Knowledge' },
+  { id: 'coaches', label: 'Coaches', route: '/coaches', icon: 'users', category: 'System' },
+  { id: 'integrations', label: 'Integrations', route: '/integrations', icon: 'plug', category: 'System' },
+  { id: 'automations', label: 'Automations', route: '/automations', icon: 'zap', category: 'System' },
+  { id: 'search', label: 'Search', route: '/search', icon: 'search', category: 'Core' },
 ];
 
 export const DEFAULT_PINNED_IDS: string[] = [
