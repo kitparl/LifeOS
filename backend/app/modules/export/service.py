@@ -118,8 +118,10 @@ class ExportService:
                     "id": w.id,
                     "title": w.title,
                     "category": w.category,
-                    "cost": w.cost,
-                    "progress": w.progress,
+                    "target_year": w.target_year,
+                    "achieved_date": w.achieved_date.isoformat() if w.achieved_date else None,
+                    "status": w.status,
+                    "priority": w.priority,
                 }
                 for w in result.scalars().all()
             ]

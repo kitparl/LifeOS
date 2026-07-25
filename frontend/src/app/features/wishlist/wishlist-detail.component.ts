@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
@@ -8,7 +8,7 @@ import { WishlistService } from './services/wishlist.service';
 @Component({
   selector: 'app-wishlist-detail',
   standalone: true,
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DatePipe],
   template: `
     @if (item; as i) {
       <div class="space-y-3">
@@ -28,15 +28,14 @@ import { WishlistService } from './services/wishlist.service';
         }
 
         <div class="panel text-sm space-y-2">
-          @if (i.cost) {
-            <p><span class="font-medium">Est. cost:</span> {{ i.cost | number }}</p>
+          <p><span class="font-medium">Status:</span> {{ statusLabel(i.status) }}</p>
+          <p><span class="font-medium">Priority:</span> {{ priorityLabel(i.priority) }}</p>
+          @if (i.target_year) {
+            <p><span class="font-medium">Target year:</span> {{ i.target_year }}</p>
           }
-          <div>
-            <p class="font-medium mb-1">Progress: {{ i.progress }}%</p>
-            <div class="h-3 bg-gray-200 border border-[var(--xp-border)]">
-              <div class="h-full bg-[var(--xp-blue)]" [style.width.%]="i.progress"></div>
-            </div>
-          </div>
+          @if (i.achieved_date) {
+            <p><span class="font-medium">Achieved:</span> {{ i.achieved_date | date: 'mediumDate' }}</p>
+          }
           @if (i.description) {
             <p class="whitespace-pre-wrap text-gray-700">{{ i.description }}</p>
           }
@@ -77,6 +76,15 @@ export class WishlistDetailComponent implements OnInit {
         },
       });
     }
+  }
+
+  statusLabel(status: string): string {
+    if (status === 'in_progress') return 'In progress';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  }
+
+  priorityLabel(priority: string): string {
+    return priority.charAt(0).toUpperCase() + priority.slice(1);
   }
 
   remove(): void {

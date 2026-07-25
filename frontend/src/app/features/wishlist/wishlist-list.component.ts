@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -8,7 +8,7 @@ import { WishlistService } from './services/wishlist.service';
 @Component({
   selector: 'app-wishlist-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DecimalPipe],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -38,14 +38,15 @@ import { WishlistService } from './services/wishlist.service';
           @for (item of items; track item.id) {
             <div class="panel text-sm space-y-2">
               <a [routerLink]="['/wishlist', item.id]" class="font-medium text-[var(--xp-blue)] underline">{{ item.title }}</a>
-              <p class="text-xs capitalize text-gray-600">{{ item.category }}</p>
-              @if (item.cost) {
-                <p class="text-xs">Est. cost: {{ item.cost | number }}</p>
+              <p class="text-xs capitalize text-gray-600">
+                {{ item.category }} · {{ statusLabel(item.status) }} · {{ priorityLabel(item.priority) }}
+              </p>
+              @if (item.target_year) {
+                <p class="text-xs">Target: {{ item.target_year }}</p>
               }
-              <div class="h-2 bg-gray-200 border border-[var(--xp-border)]">
-                <div class="h-full bg-[var(--xp-blue)]" [style.width.%]="item.progress"></div>
-              </div>
-              <p class="text-xs" style="color: var(--text-muted)">{{ item.progress }}% progress</p>
+              @if (item.achieved_date) {
+                <p class="text-xs" style="color: var(--text-muted)">Achieved {{ item.achieved_date | date: 'mediumDate' }}</p>
+              }
             </div>
           }
         </div>
@@ -65,6 +66,15 @@ export class WishlistListComponent implements OnInit {
   ngOnInit(): void {
     this.wishlistService.listCategories().subscribe({ next: (c) => this.categories.set(c) });
     this.load();
+  }
+
+  statusLabel(status: string): string {
+    if (status === 'in_progress') return 'In progress';
+    return status.replace('_', ' ');
+  }
+
+  priorityLabel(priority: string): string {
+    return priority.charAt(0).toUpperCase() + priority.slice(1);
   }
 
   load(): void {

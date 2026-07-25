@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -16,6 +16,9 @@ SUGGESTED_WISHLIST_CATEGORIES: tuple[str, ...] = (
     "other",
 )
 
+WISHLIST_STATUSES = ("in_progress", "completed", "delayed")
+WISHLIST_PRIORITIES = ("high", "medium", "low")
+
 
 class WishlistItem(Base):
     __tablename__ = "wishlist_items"
@@ -25,8 +28,10 @@ class WishlistItem(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="other")
-    cost: Mapped[float | None] = mapped_column(Float, nullable=True)
-    progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    target_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    achieved_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="in_progress")
+    priority: Mapped[str] = mapped_column(String(16), nullable=False, default="medium")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

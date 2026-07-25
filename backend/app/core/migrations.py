@@ -55,12 +55,22 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("routines", "start_date", "DATE"),
     ("routines", "end_date", "DATE"),
     ("routines", "skip_dates_json", "TEXT"),
+    # Wishlist: target year / achieved date / status / priority (replaces cost & progress)
+    ("wishlist_items", "target_year", "INTEGER"),
+    ("wishlist_items", "achieved_date", "DATE"),
+    ("wishlist_items", "status", "VARCHAR(16) DEFAULT 'in_progress'"),
+    ("wishlist_items", "priority", "VARCHAR(16) DEFAULT 'medium'"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
     ("race_events", "medal"),
     ("race_events", "registered"),
     ("race_events", "attended"),
+]
+
+_STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
+    ("wishlist_items", "status", "in_progress"),
+    ("wishlist_items", "priority", "medium"),
 ]
 
 
@@ -98,6 +108,15 @@ async def ensure_columns(conn: AsyncConnection) -> None:
     for table, column in _BOOLEAN_DEFAULTS_TO_BACKFILL:
         try:
             await conn.execute(text(f"UPDATE {table} SET {column} = FALSE WHERE {column} IS NULL"))
+        except Exception as exc:
+            logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
+
+    for table, column, default in _STRING_DEFAULTS_TO_BACKFILL:
+        try:
+            await conn.execute(
+                text(f"UPDATE {table} SET {column} = :default WHERE {column} IS NULL"),
+                {"default": default},
+            )
         except Exception as exc:
             logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
 
