@@ -2,6 +2,13 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# Register Cycle 8 tables on Base before create_all (must run before importing FastAPI app,
+# because `import app.modules...` would rebind the name `app` if done after `from app.main import app`).
+import app.modules.habits.models  # noqa: F401
+import app.modules.integrations.report_models  # noqa: F401
+import app.modules.routines.models  # noqa: F401
+
 from app.core.database import Base, get_db
 from app.main import app
 

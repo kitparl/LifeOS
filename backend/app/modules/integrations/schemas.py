@@ -54,6 +54,20 @@ class TelegramConfigUpdate(BaseModel):
     digest_frequency: str | None = Field(default=None, max_length=16)
     digest_weekday: int | None = Field(default=None, ge=0, le=6)
     timezone: str | None = Field(default=None, max_length=64)
+    morning_enabled: bool | None = None
+    morning_time: str | None = Field(default=None, max_length=5)
+    midday_enabled: bool | None = None
+    midday_time: str | None = Field(default=None, max_length=5)
+    night_enabled: bool | None = None
+    night_time: str | None = Field(default=None, max_length=5)
+    weekly_enabled: bool | None = None
+    weekly_time: str | None = Field(default=None, max_length=5)
+    weekly_weekday: int | None = Field(default=None, ge=0, le=6)
+    ai_briefing_enabled: bool | None = None
+    ai_briefing_time: str | None = Field(default=None, max_length=5)
+    birthday_reminders_enabled: bool | None = None
+    immutable_reminders_enabled: bool | None = None
+    routine_reminders_enabled: bool | None = None
 
 
 class TelegramConfigStatus(BaseModel):
@@ -68,12 +82,44 @@ class TelegramConfigStatus(BaseModel):
     last_digest_at: datetime | None = None
     notify_on: list[str] = Field(default_factory=list)
     digest_enabled: bool = False
-    digest_time: str = "08:00"
+    digest_time: str = "06:00"
     digest_frequency: str = "daily"
     digest_weekday: int = 0
-    timezone: str = "UTC"
+    timezone: str = "Asia/Kolkata"
+    morning_enabled: bool = True
+    morning_time: str = "06:00"
+    midday_enabled: bool = True
+    midday_time: str = "12:30"
+    night_enabled: bool = True
+    night_time: str = "22:00"
+    weekly_enabled: bool = True
+    weekly_time: str = "18:00"
+    weekly_weekday: int = 6
+    ai_briefing_enabled: bool = False
+    ai_briefing_time: str = "08:00"
+    birthday_reminders_enabled: bool = True
+    immutable_reminders_enabled: bool = True
+    routine_reminders_enabled: bool = True
     webhook_configured: bool = False
     webhook_url: str | None = None
+
+
+class ReportRunResponse(BaseModel):
+    id: str
+    job_type: str
+    job_id: str
+    status: str
+    skip_reason: str | None = None
+    error: str | None = None
+    sections_json: str | None = None
+    dedupe_key: str | None = None
+    message_chars: int | None = None
+    scheduled_for: datetime | None = None
+    started_at: datetime
+    finished_at: datetime | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class TelegramWebhookStatus(BaseModel):

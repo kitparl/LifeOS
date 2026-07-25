@@ -95,6 +95,13 @@ class IntegrationService:
         conn = await self.repo.get_by_id(user_id, conn_id)
         if not conn:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+        if conn.provider == "telegram":
+            try:
+                from app.modules.integrations.scheduler import remove_user_digest_job
+
+                remove_user_digest_job(user_id)
+            except Exception:
+                logger.exception("Failed to remove scheduled jobs for user=%s", user_id)
         await self.repo.delete(conn)
 
     async def sync_connection(self, user_id: str, conn_id: str) -> IntegrationSyncResponse:
@@ -144,6 +151,20 @@ class IntegrationService:
             digest_frequency=prefs.digest_frequency,
             digest_weekday=prefs.digest_weekday,
             timezone=prefs.timezone,
+            morning_enabled=prefs.morning_enabled,
+            morning_time=prefs.morning_time,
+            midday_enabled=prefs.midday_enabled,
+            midday_time=prefs.midday_time,
+            night_enabled=prefs.night_enabled,
+            night_time=prefs.night_time,
+            weekly_enabled=prefs.weekly_enabled,
+            weekly_time=prefs.weekly_time,
+            weekly_weekday=prefs.weekly_weekday,
+            ai_briefing_enabled=prefs.ai_briefing_enabled,
+            ai_briefing_time=prefs.ai_briefing_time,
+            birthday_reminders_enabled=prefs.birthday_reminders_enabled,
+            immutable_reminders_enabled=prefs.immutable_reminders_enabled,
+            routine_reminders_enabled=prefs.routine_reminders_enabled,
             webhook_configured=bool(webhook_secret),
             webhook_url=None,
         )
@@ -160,6 +181,20 @@ class IntegrationService:
                 data.digest_frequency,
                 data.digest_weekday,
                 data.timezone,
+                data.morning_enabled,
+                data.morning_time,
+                data.midday_enabled,
+                data.midday_time,
+                data.night_enabled,
+                data.night_time,
+                data.weekly_enabled,
+                data.weekly_time,
+                data.weekly_weekday,
+                data.ai_briefing_enabled,
+                data.ai_briefing_time,
+                data.birthday_reminders_enabled,
+                data.immutable_reminders_enabled,
+                data.routine_reminders_enabled,
             )
         )
         if data.enabled is None and not has_secret and not has_prefs:
@@ -175,6 +210,20 @@ class IntegrationService:
             digest_frequency=data.digest_frequency,
             digest_weekday=data.digest_weekday,
             timezone=data.timezone,
+            morning_enabled=data.morning_enabled,
+            morning_time=data.morning_time,
+            midday_enabled=data.midday_enabled,
+            midday_time=data.midday_time,
+            night_enabled=data.night_enabled,
+            night_time=data.night_time,
+            weekly_enabled=data.weekly_enabled,
+            weekly_time=data.weekly_time,
+            weekly_weekday=data.weekly_weekday,
+            ai_briefing_enabled=data.ai_briefing_enabled,
+            ai_briefing_time=data.ai_briefing_time,
+            birthday_reminders_enabled=data.birthday_reminders_enabled,
+            immutable_reminders_enabled=data.immutable_reminders_enabled,
+            routine_reminders_enabled=data.routine_reminders_enabled,
         )
 
         update = IntegrationUpdate(config_json=new_json)
@@ -189,13 +238,13 @@ class IntegrationService:
             updated.status = "connected"
             await self.repo.db.flush()
 
-        # Keep per-user digest cron in sync with preferences
+        # Keep per-user scheduled report crons in sync with preferences
         try:
-            from app.modules.integrations.scheduler import sync_user_digest_job
+            from app.modules.integrations.scheduler import sync_user_jobs
 
-            sync_user_digest_job(user_id, parse_preferences(updated.config_json), enabled=updated.enabled)
+            sync_user_jobs(user_id, parse_preferences(updated.config_json), enabled=updated.enabled)
         except Exception:
-            logger.exception("Failed to sync digest job for user=%s", user_id)
+            logger.exception("Failed to sync scheduled jobs for user=%s", user_id)
 
         return await self.get_telegram_status(user_id)
 

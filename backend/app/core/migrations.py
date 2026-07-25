@@ -31,6 +31,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     # Calendar: reusable scheduling linkage (source module + entity id)
     ("calendar_events", "source_module", "VARCHAR(32)"),
     ("calendar_events", "source_id", "VARCHAR(36)"),
+    # Calendar: birthday / immutable event kind
+    ("calendar_events", "event_kind", "VARCHAR(16) DEFAULT 'normal'"),
     # Q&A: extensible type/category
     ("qa_entries", "type", "VARCHAR(64)"),
     # Integrations: digest bookkeeping for Telegram (and future schedulers)

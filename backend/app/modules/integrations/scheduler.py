@@ -1,7 +1,7 @@
-"""APScheduler wiring for per-user digests and outbox drain.
+"""APScheduler wiring for per-user scheduled reports, reminder poller, and outbox drain.
 
 Per-user cron jobs use the user's timezone from TelegramPreferences.
-Digest entry point is DigestService.send_digest (same as the manual endpoint).
+Report entry point is ScheduledReportService.run (same as the manual endpoints).
 """
 
 from __future__ import annotations
@@ -24,31 +24,68 @@ logger = logging.getLogger(__name__)
 _scheduler: AsyncIOScheduler | None = None
 _nudge_pending = False
 
+CRON_JOB_TYPES = ("morning", "midday", "night", "weekly", "ai_briefing")
+
 
 def get_scheduler() -> AsyncIOScheduler | None:
     return _scheduler
 
 
-def _job_id(user_id: str) -> str:
-    return f"telegram_digest_{user_id}"
+def _job_id(user_id: str, job_type: str = "morning") -> str:
+    return f"telegram_{job_type}_{user_id}"
 
 
 def _safe_zone(tz_name: str) -> ZoneInfo:
     try:
-        return ZoneInfo(tz_name or "UTC")
+        return ZoneInfo(tz_name or "Asia/Kolkata")
     except ZoneInfoNotFoundError:
-        logger.warning("Unknown timezone %s — falling back to UTC", tz_name)
-        return ZoneInfo("UTC")
+        logger.warning("Unknown timezone %s — falling back to Asia/Kolkata", tz_name)
+        return ZoneInfo("Asia/Kolkata")
+
+
+def _time_parts(time_s: str) -> tuple[int, int]:
+    hour_s, minute_s = time_s.split(":")
+    return int(hour_s), int(minute_s)
+
+
+def _cron_for_job(job_type: str, prefs: TelegramPreferences) -> CronTrigger | None:
+    tz = _safe_zone(prefs.timezone)
+    if job_type == "morning":
+        if not prefs.morning_enabled:
+            return None
+        h, m = _time_parts(prefs.morning_time)
+        return CronTrigger(hour=h, minute=m, timezone=tz)
+    if job_type == "midday":
+        if not prefs.midday_enabled:
+            return None
+        h, m = _time_parts(prefs.midday_time)
+        return CronTrigger(hour=h, minute=m, timezone=tz)
+    if job_type == "night":
+        if not prefs.night_enabled:
+            return None
+        h, m = _time_parts(prefs.night_time)
+        return CronTrigger(hour=h, minute=m, timezone=tz)
+    if job_type == "weekly":
+        if not prefs.weekly_enabled:
+            return None
+        h, m = _time_parts(prefs.weekly_time)
+        return CronTrigger(day_of_week=str(prefs.weekly_weekday), hour=h, minute=m, timezone=tz)
+    if job_type == "ai_briefing":
+        if not prefs.ai_briefing_enabled:
+            return None
+        h, m = _time_parts(prefs.ai_briefing_time)
+        return CronTrigger(hour=h, minute=m, timezone=tz)
+    return None
 
 
 def _cron_for_prefs(prefs: TelegramPreferences) -> CronTrigger:
+    """Backward-compatible helper used by older Phase 2 tests (legacy digest cron)."""
     hour_s, minute_s = prefs.digest_time.split(":")
     hour, minute = int(hour_s), int(minute_s)
     tz = _safe_zone(prefs.timezone)
     if prefs.digest_frequency == "weekdays":
         return CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute, timezone=tz)
     if prefs.digest_frequency == "weekly":
-        # APScheduler: 0=Mon … 6=Sun matches our digest_weekday
         return CronTrigger(
             day_of_week=str(prefs.digest_weekday),
             hour=hour,
@@ -57,18 +94,40 @@ def _cron_for_prefs(prefs: TelegramPreferences) -> CronTrigger:
         )
     return CronTrigger(hour=hour, minute=minute, timezone=tz)
 
-
-async def _run_user_digest(user_id: str) -> None:
-    from app.modules.integrations.digest_service import DigestService
+async def _run_user_report(user_id: str, job_type: str) -> None:
+    from app.modules.integrations.scheduled_report_service import ScheduledReportService
 
     async with async_session_factory() as session:
         try:
-            result = await DigestService(session).send_digest(user_id)
+            result = await ScheduledReportService(session).run(user_id, job_type)
             await session.commit()
-            logger.info("Scheduled digest for user=%s sent=%s", user_id, result.sent)
+            logger.info(
+                "Scheduled %s for user=%s sent=%s", job_type, user_id, result.sent
+            )
         except Exception:
             await session.rollback()
-            logger.exception("Scheduled digest failed for user=%s", user_id)
+            logger.exception("Scheduled %s failed for user=%s", job_type, user_id)
+
+
+async def _run_user_digest(user_id: str) -> None:
+    """Backward-compatible alias used by older job ids."""
+    await _run_user_report(user_id, "morning")
+
+
+async def _run_reminder_poll() -> None:
+    from app.modules.integrations.reminder_scanner import ReminderScanner
+    from app.modules.integrations.repository import IntegrationRepository
+
+    async with async_session_factory() as session:
+        try:
+            conns = await IntegrationRepository(session).list_enabled_telegram()
+            scanner = ReminderScanner(session)
+            for conn in conns:
+                await scanner.scan_user(conn.user_id, connection_id=conn.id)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            logger.exception("Reminder poll failed")
 
 
 async def _run_outbox_drain() -> None:
@@ -77,51 +136,79 @@ async def _run_outbox_drain() -> None:
     await dispatch_pending_notifications(limit=50)
 
 
+def sync_user_jobs(
+    user_id: str,
+    prefs: TelegramPreferences,
+    *,
+    enabled: bool,
+) -> None:
+    """Register or remove all per-user report crons based on prefs."""
+    sched = _scheduler
+    if sched is None:
+        return
+
+    # Remove legacy single digest job id if present
+    legacy = f"telegram_digest_{user_id}"
+    if sched.get_job(legacy):
+        sched.remove_job(legacy)
+
+    for job_type in CRON_JOB_TYPES:
+        jid = _job_id(user_id, job_type)
+        if sched.get_job(jid):
+            sched.remove_job(jid)
+        if not enabled:
+            continue
+        trigger = _cron_for_job(job_type, prefs)
+        if trigger is None:
+            continue
+        sched.add_job(
+            _run_user_report,
+            trigger=trigger,
+            id=jid,
+            args=[user_id, job_type],
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Registered job %s (%s)", jid, prefs.timezone)
+
+
 def sync_user_digest_job(
     user_id: str,
     prefs: TelegramPreferences,
     *,
     enabled: bool,
 ) -> None:
-    """Register or remove the per-user digest cron based on prefs."""
-    sched = _scheduler
-    if sched is None:
-        return
-    jid = _job_id(user_id)
-    if sched.get_job(jid):
-        sched.remove_job(jid)
-    if not enabled or not prefs.digest_enabled:
-        return
-    trigger = _cron_for_prefs(prefs)
-    sched.add_job(
-        _run_user_digest,
-        trigger=trigger,
-        id=jid,
-        args=[user_id],
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
-    logger.info("Registered digest job %s at %s (%s)", jid, prefs.digest_time, prefs.timezone)
+    """Alias for callers that still pass digest prefs."""
+    sync_user_jobs(user_id, prefs, enabled=enabled)
 
 
 def remove_user_digest_job(user_id: str) -> None:
     sched = _scheduler
     if sched is None:
         return
-    jid = _job_id(user_id)
-    if sched.get_job(jid):
-        sched.remove_job(jid)
+    legacy = f"telegram_digest_{user_id}"
+    if sched.get_job(legacy):
+        sched.remove_job(legacy)
+    for job_type in CRON_JOB_TYPES:
+        jid = _job_id(user_id, job_type)
+        if sched.get_job(jid):
+            sched.remove_job(jid)
 
 
-async def load_all_digest_jobs() -> None:
-    """On startup: register digest jobs for all enabled Telegram connections."""
+async def load_all_scheduled_jobs() -> None:
+    """On startup: register report jobs for all enabled Telegram connections."""
     from app.modules.integrations.repository import IntegrationRepository
 
     async with async_session_factory() as session:
         conns = await IntegrationRepository(session).list_enabled_telegram()
         for conn in conns:
             prefs = parse_preferences(conn.config_json)
-            sync_user_digest_job(conn.user_id, prefs, enabled=True)
+            sync_user_jobs(conn.user_id, prefs, enabled=True)
+
+
+async def load_all_digest_jobs() -> None:
+    """Backward-compatible alias."""
+    await load_all_scheduled_jobs()
 
 
 def _schedule_nudge() -> None:
@@ -147,14 +234,12 @@ def _schedule_nudge() -> None:
 
 
 def _on_session_commit(session: Session) -> None:
-    # Only nudge when this transaction enqueued outbox rows (set by subscriber).
     if not session.info.pop("outbox_enqueued", False):
         return
     _schedule_nudge()
 
 
 def _install_after_commit_hook() -> None:
-    # SQLAlchemy async sessions use the sync Session under the hood.
     try:
         event.listen(Session, "after_commit", _on_session_commit)
     except Exception:
@@ -173,9 +258,17 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
         max_instances=1,
     )
+    _scheduler.add_job(
+        _run_reminder_poll,
+        trigger=IntervalTrigger(minutes=10),
+        id="telegram_reminder_poll",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
     _scheduler.start()
     _install_after_commit_hook()
-    logger.info("APScheduler started (outbox drain every 30s)")
+    logger.info("APScheduler started (outbox 30s, reminders 10m)")
     return _scheduler
 
 

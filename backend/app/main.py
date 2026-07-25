@@ -49,6 +49,7 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     # Register models with Base.metadata BEFORE create_all so new tables exist.
     import app.modules.integrations.outbox_models  # noqa: F401
+    import app.modules.integrations.report_models  # noqa: F401
     import app.modules.routines.models  # noqa: F401
     import app.modules.preferences.models  # noqa: F401
     from app.modules.integrations.subscriber import register_subscribers
@@ -62,13 +63,13 @@ async def lifespan(app: FastAPI):
         await ensure_columns(conn)
 
     from app.modules.integrations.scheduler import (
-        load_all_digest_jobs,
+        load_all_scheduled_jobs,
         shutdown_scheduler,
         start_scheduler,
     )
 
     start_scheduler()
-    await load_all_digest_jobs()
+    await load_all_scheduled_jobs()
 
     polling_started = False
     if settings.telegram_polling_enabled:
