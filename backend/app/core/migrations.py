@@ -37,6 +37,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("integration_connections", "last_digest_at", "TIMESTAMP"),
     # Integrations: per-connection Telegram webhook path secret
     ("integration_connections", "webhook_secret", "VARCHAR(64)"),
+    # Integrations: actionable notification keyboards
+    ("pending_notifications", "reply_markup_json", "TEXT"),
     # Goals: period types + window
     ("goals", "period", "VARCHAR(16) DEFAULT 'yearly'"),
     ("goals", "period_start", "DATE"),

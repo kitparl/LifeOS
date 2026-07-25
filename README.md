@@ -14,7 +14,8 @@
 | [PHASE-1.md](docs/PHASE-1.md) | Foundation MVP (auth, goals, tasks, habits, PWA, …) |
 | [PHASE-2.md](docs/PHASE-2.md) | Intelligence (AI RAG, learning, finance, analytics, …) |
 | [PHASE-3.md](docs/PHASE-3.md) | Full AI OS (memory, coaches, OCR, voice, …) |
-| [TELEGRAM_NOTIFIER.md](TELEGRAM_NOTIFIER.md) | Telegram companion — setup, events, commands, digests |
+| [TELEGRAM_BOT_GUIDE.md](docs/TELEGRAM_BOT_GUIDE.md) | Telegram bot — all commands & features (user guide) |
+| [TELEGRAM_NOTIFIER.md](docs/TELEGRAM_NOTIFIER.md) | Telegram — engineer setup, events, digests, env |
 | [requirements/v1.md](requirements/v1.md) | Release readiness & what to improve before public v1.0 |
 | [DEPLOY_HEROKU.md](docs/DEPLOY_HEROKU.md) | Deploy to Heroku (~$13/mo, GitHub Student) |
 | [SSL_CADDY.md](docs/SSL_CADDY.md) | HTTPS / Caddy reverse proxy notes |
@@ -271,7 +272,7 @@ Target: instant UI — lazy loading, background sync, API caching, optimistic up
 
 # Telegram integration
 
-Telegram is a **built-in companion channel** (not just a plan). Full setup: [TELEGRAM_NOTIFIER.md](TELEGRAM_NOTIFIER.md).
+Telegram is a **built-in companion channel** (not just a plan). How to use it: [docs/TELEGRAM_BOT_GUIDE.md](docs/TELEGRAM_BOT_GUIDE.md). Setup details: [docs/TELEGRAM_NOTIFIER.md](docs/TELEGRAM_NOTIFIER.md).
 
 **What works today**
 

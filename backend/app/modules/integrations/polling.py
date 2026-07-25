@@ -1,7 +1,7 @@
 """Long-polling fallback for Telegram inbound updates (dev / no public URL).
 
 Started from lifespan only when TELEGRAM_POLLING_ENABLED=true.
-Routes through the same CommandHandler as the webhook path.
+Routes through the same update_router as the webhook path.
 
 When polling is enabled, any Telegram-side webhook is removed so getUpdates
 can receive messages (Telegram forbids webhook + polling together).
@@ -14,10 +14,8 @@ import logging
 from typing import Any
 
 from app.core.database import async_session_factory
-from app.modules.integrations.command_handler import handle_command
-from app.modules.integrations.notifier import NotifierMessage
-from app.modules.integrations.notifier_registry import build_user_notifier
 from app.modules.integrations.repository import IntegrationRepository
+from app.modules.integrations.telegram.update_router import route_update
 from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
 from app.modules.integrations.telegram_config import parse_config
 
@@ -59,38 +57,14 @@ async def _ensure_no_webhook(conn_id: str, user_id: str, bot_token: str) -> None
 
 
 async def _process_update(user_id: str, chat_id: str, update: dict[str, Any]) -> None:
-    msg = update.get("message") or update.get("edited_message") or {}
-    if not isinstance(msg, dict):
-        return
-    chat = msg.get("chat") if isinstance(msg.get("chat"), dict) else {}
-    incoming_chat = str(chat.get("id") or "")
-    if incoming_chat != chat_id:
-        logger.warning(
-            "Polling: ignoring update from chat_id=%s (expected %s)",
-            incoming_chat,
-            chat_id,
-        )
-        return
-    text = str(msg.get("text") or "").strip()
-    if not text:
-        return
-    logger.info("Polling: handling command from user=%s text=%r", user_id, text[:80])
     async with async_session_factory() as session:
         try:
-            reply = await handle_command(session, user_id, text)
-            notifier = await build_user_notifier(session, user_id, provider="telegram")
-            if notifier is None:
-                logger.warning("Polling: no notifier for user=%s", user_id)
-            else:
-                result = await notifier.send(NotifierMessage(text=reply, parse_mode="HTML"))
-                if not result.ok:
-                    # Retry without HTML in case parse_mode rejected the body
-                    logger.warning("Polling: HTML send failed (%s); retrying plain", result.detail)
-                    await notifier.send(NotifierMessage(text=reply, parse_mode=""))
+            result = await route_update(session, user_id, chat_id, update)
             await session.commit()
+            logger.info("Polling: routed update user=%s result=%s", user_id, result)
         except Exception:
             await session.rollback()
-            logger.exception("Polling command handling failed")
+            logger.exception("Polling update handling failed")
 
 
 async def _poll_loop() -> None:
@@ -111,7 +85,6 @@ async def _poll_loop() -> None:
                     updates = await client.get_updates(limit=20, timeout=10, offset=offset)
                 except TelegramClientError as exc:
                     logger.warning("getUpdates failed for conn=%s: %s", conn.id, exc)
-                    # Conflict: webhook still set — force clear next iteration
                     if "webhook" in str(exc).lower() or "Conflict" in str(exc):
                         _webhooks_cleared.discard(conn.id)
                     continue

@@ -59,7 +59,22 @@ def format_digest(content: DigestContent, *, now: datetime | None = None) -> Not
         habits_due=content.habits_due,
         active_goals=content.active_goals,
     )
-    return NotifierMessage(text=text, parse_mode="HTML")
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "📋 Tasks", "callback_data": "task:list:0"},
+                {"text": "📅 Calendar", "callback_data": "cal:today"},
+            ],
+            [
+                {"text": "🔁 Habits", "callback_data": "habit:list"},
+                {"text": "🎯 Goals", "callback_data": "goal:list"},
+            ],
+            [
+                {"text": "🏠 Home", "callback_data": "nav:home"},
+            ],
+        ]
+    }
+    return NotifierMessage(text=text, parse_mode="HTML", reply_markup=keyboard)
 
 
 class DigestService:

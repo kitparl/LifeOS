@@ -92,6 +92,7 @@ class TaskListItem(BaseModel):
     tags: list[str]
     due_date: datetime | None
     updated_at: datetime
+    goal_id: str | None = None
     subtask_count: int = 0
     completed_subtasks: int = 0
 

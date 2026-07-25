@@ -32,6 +32,7 @@ class TaskService:
                 tags=t.tags,
                 due_date=t.due_date,
                 updated_at=t.updated_at,
+                goal_id=t.goal_id,
                 subtask_count=len(t.subtasks),
                 completed_subtasks=sum(1 for s in t.subtasks if s.status == "completed"),
             )

@@ -1,6 +1,9 @@
 # Telegram Notifier — What Was Built & How to Use It
 
-This guide covers the Telegram integration in LifeOS (Phase 1 one-way + Phase 2 event push, two-way commands, and scheduled digests).
+> **Looking for how to use the bot day-to-day?**  
+> Read the plain-language guide: **[TELEGRAM_BOT_GUIDE.md](./TELEGRAM_BOT_GUIDE.md)** (all commands, buttons, and features).
+
+This document covers the Telegram integration in LifeOS from an engineering / setup angle (Phase 1 one-way + Phase 2 event push / two-way commands / digests + **Cycle 7 interactive UI**).
 
 ---
 
@@ -8,18 +11,25 @@ This guide covers the Telegram integration in LifeOS (Phase 1 one-way + Phase 2 
 
 ### Phase 1 — One-way outbound
 - **Encrypted storage** of each user’s bot token and chat id in `IntegrationConnection.config_json` (Fernet encryption at rest).
-- **`TelegramClient`** — thin async adapter (`sendMessage`, `getMe`, `getUpdates`, `setWebhook`, `deleteWebhook`, `getWebhookInfo`).
-- **`Notifier` abstraction** — callers send messages without knowing about Telegram; a registry builds the right channel per user.
+- **`TelegramClient`** — thin async adapter (`sendMessage`, `getMe`, `getUpdates`, `setWebhook`, `deleteWebhook`, `getWebhookInfo`, plus Cycle 7: `editMessageText`, `answerCallbackQuery`, `getFile`).
+- **`Notifier` abstraction** — callers send messages without knowing about Telegram; a registry builds the right channel per user. Supports optional `reply_markup` (inline keyboards).
 - Endpoints for status / config / test / detect-chat-id / manual digest.
 
 ### Phase 2 — Events, two-way, scheduling
 - **Domain event bus** (`app.core.events`) — tasks/running/calendar/habits/goals emit `EntityCreated` on create (no Telegram imports).
-- **Transactional outbox** (`pending_notifications`) — integrations subscriber writes a row in the same DB transaction; a dispatcher delivers after commit via Notifier (retries on failure).
+- **Transactional outbox** (`pending_notifications`) — integrations subscriber writes a row in the same DB transaction; a dispatcher delivers after commit via Notifier (retries on failure). Outbox rows may carry `reply_markup_json` for actionable notifications.
 - **Per-event toggles** (`notify_on` in config_json) and **digest schedule** (`digest_enabled`, `digest_time`, `digest_frequency`, `digest_weekday`, `timezone`).
 - **Webhook** `POST /api/v1/integrations/telegram/webhook/{secret}` + register/status/delete helpers; unknown chat ids rejected.
 - **Commands**: `/help`, `/tasks`, `/today`, `/done <id>`, `/habits`, `/goals` (additive registry).
 - **Long-polling fallback** when `TELEGRAM_POLLING_ENABLED=true` (dev; skip connections that have a webhook).
 - **APScheduler** (`AsyncIOScheduler`) in app lifespan: per-user digest cron jobs + 30s outbox drain.
+
+### Cycle 7 — Interactive bot (Phases 1–7 of the product roadmap)
+- **UI kernel** under `backend/app/modules/integrations/telegram/`: keyboards, callback router, conversation engine, in-memory state, renderer, shared `update_router` used by webhook + polling.
+- **Tap-driven screens** for Tasks, Calendar, Habits, Goals (with linked tasks), Routines (skip today), Notes capture, Automations, AI briefing, Analytics, Search, Attachments.
+- **`/dashboard`** (also `/start`) — interactive home. Existing slash commands still work and now open interactive screens where available.
+- **Actionable notifications** — task-created pushes include Mark done / View buttons; digests include section-jump buttons.
+- **AI helpers** on `AiService`: `suggest_task_breakdown`, `parse_and_create_task` (Telegram only displays results).
 
 ### Frontend
 - Integrations page Telegram card: setup guide, credentials, **notify-on checkboxes**, **digest schedule/timezone**, **webhook register/status**, test / digest buttons.
