@@ -17,6 +17,7 @@ import { CommandPaletteComponent } from '../command-palette/command-palette.comp
 import { CommandPaletteService } from '../command-palette/command-palette.service';
 import { NavPreferencesService } from '../../core/services/nav-preferences.service';
 import { AssistantShellService } from '../../core/services/assistant-shell.service';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { resolvePageTitle } from './nav-registry';
 
 const STORAGE_AI_OPEN    = 'lifeos-ai-panel-open';
@@ -32,6 +33,7 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
     RouterLinkActive,
     CommandPaletteComponent,
     AiChatPanelComponent,
+    LucideDynamicIcon,
   ],
   template: `
     <app-command-palette />
@@ -98,15 +100,42 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
               <p class="section-heading" style="padding: 0.5rem 0.5rem 0.25rem">{{ group.category }}</p>
             }
             @for (item of group.items; track item.id) {
-              <a
-                [routerLink]="item.route"
-                routerLinkActive="nav-item--active"
-                class="nav-item"
-                [class.nav-item--collapsed]="sidebarCollapsed()"
-                [title]="sidebarCollapsed() ? item.label : ''"
+              <div
+                class="nav-row"
+                [class.nav-row--collapsed]="sidebarCollapsed()"
+                [class.nav-row--pinned]="navPrefs.isPinnedTop(item.id)"
               >
-                {{ sidebarCollapsed() ? (item.shortLabel ?? item.label).slice(0, 2) : item.label }}
-              </a>
+                <a
+                  [routerLink]="item.route"
+                  routerLinkActive="nav-item--active"
+                  class="nav-item"
+                  [class.nav-item--truncated]="sidebarCollapsed()"
+                  [title]="sidebarCollapsed() ? item.label : ''"
+                >
+                  @if (item.icon) {
+                    <svg class="nav-item__icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
+                  }
+                  @if (!sidebarCollapsed()) {
+                    <span class="nav-item__label">{{ item.label }}</span>
+                  }
+                </a>
+                @if (!sidebarCollapsed()) {
+                  <button
+                    type="button"
+                    class="nav-pin"
+                    [class.nav-pin--active]="navPrefs.isPinnedTop(item.id)"
+                    [title]="navPrefs.isPinnedTop(item.id) ? 'Unpin from top' : 'Pin to top'"
+                    [attr.aria-label]="navPrefs.isPinnedTop(item.id) ? 'Unpin ' + item.label + ' from top' : 'Pin ' + item.label + ' to top'"
+                    (click)="onTogglePinTop($event, item.id)"
+                  >
+                    <svg
+                      class="nav-pin__icon"
+                      [lucideIcon]="navPrefs.isPinnedTop(item.id) ? 'pin' : 'pin-off'"
+                      aria-hidden="true"
+                    ></svg>
+                  </button>
+                }
+              </div>
             }
           }
         </nav>
@@ -223,7 +252,10 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
                 routerLinkActive="mobile-nav--active"
                 class="mobile-nav-item"
               >
-                {{ item.shortLabel ?? item.label }}
+                @if (item.icon) {
+                  <svg class="mobile-nav-item__icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
+                }
+                <span>{{ item.shortLabel ?? item.label }}</span>
               </a>
             }
             <!-- Dedicated AI button — always visible, independent of pin order -->
@@ -233,9 +265,13 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
               [class.mobile-nav--active]="assistantShell.mobileOpen()"
               (click)="openMobileAi()"
             >
-              AI
+              <svg class="mobile-nav-item__icon" lucideIcon="sparkles" aria-hidden="true"></svg>
+              <span>AI</span>
             </button>
-            <button type="button" class="mobile-nav-item" (click)="toggleDrawer()">More</button>
+            <button type="button" class="mobile-nav-item" (click)="toggleDrawer()">
+              <svg class="mobile-nav-item__icon" lucideIcon="menu" aria-hidden="true"></svg>
+              <span>More</span>
+            </button>
           </div>
         </nav>
       </div>
@@ -264,25 +300,50 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
         @for (group of navGroups(); track group.category) {
           <p class="section-heading" style="padding: 0.5rem 0.375rem 0.25rem">{{ group.category }}</p>
           @for (item of group.items; track item.id) {
-            @if (item.route === '/assistant') {
+            <div
+              class="nav-row"
+              [class.nav-row--pinned]="navPrefs.isPinnedTop(item.id)"
+            >
+              @if (item.route === '/assistant') {
+                <button
+                  type="button"
+                  class="nav-item w-full text-left"
+                  [class.nav-item--active]="assistantShell.mobileOpen()"
+                  (click)="openAssistantFromNav()"
+                >
+                  @if (item.icon) {
+                    <svg class="nav-item__icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
+                  }
+                  <span class="nav-item__label">{{ item.label }}</span>
+                </button>
+              } @else {
+                <a
+                  [routerLink]="item.route"
+                  routerLinkActive="nav-item--active"
+                  class="nav-item"
+                  (click)="closeDrawer()"
+                >
+                  @if (item.icon) {
+                    <svg class="nav-item__icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
+                  }
+                  <span class="nav-item__label">{{ item.label }}</span>
+                </a>
+              }
               <button
                 type="button"
-                class="nav-item w-full text-left"
-                [class.nav-item--active]="assistantShell.mobileOpen()"
-                (click)="openAssistantFromNav()"
+                class="nav-pin"
+                [class.nav-pin--active]="navPrefs.isPinnedTop(item.id)"
+                [title]="navPrefs.isPinnedTop(item.id) ? 'Unpin from top' : 'Pin to top'"
+                [attr.aria-label]="navPrefs.isPinnedTop(item.id) ? 'Unpin ' + item.label + ' from top' : 'Pin ' + item.label + ' to top'"
+                (click)="onTogglePinTop($event, item.id)"
               >
-                {{ item.label }}
+                <svg
+                  class="nav-pin__icon"
+                  [lucideIcon]="navPrefs.isPinnedTop(item.id) ? 'pin' : 'pin-off'"
+                  aria-hidden="true"
+                ></svg>
               </button>
-            } @else {
-              <a
-                [routerLink]="item.route"
-                routerLinkActive="nav-item--active"
-                class="nav-item"
-                (click)="closeDrawer()"
-              >
-                {{ item.label }}
-              </a>
-            }
+            </div>
           }
         }
       </nav>
@@ -314,20 +375,67 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
 
     <!-- Nav item + mobile nav styles -->
     <style>
+      .nav-row {
+        display: flex;
+        align-items: stretch;
+        gap: 1px;
+        margin-bottom: 1px;
+        border-radius: 4px;
+        position: relative;
+      }
+      .nav-row:hover {
+        background: var(--sidebar-hover-bg);
+      }
+      .nav-row:hover .nav-item:not(.nav-item--active),
+      .nav-row:hover .nav-pin:not(:focus-visible) {
+        background: transparent;
+      }
+      .nav-row:has(.nav-item--active) {
+        background: var(--sidebar-active-bg);
+      }
+      .nav-row:has(.nav-item--active):hover {
+        background: var(--sidebar-active-bg);
+      }
+      .nav-row--collapsed {
+        justify-content: center;
+      }
       .nav-item {
         display: flex;
         align-items: center;
-        padding: 0.375rem 0.625rem;
+        gap: 0.45rem;
+        flex: 1;
+        min-width: 0;
+        padding: 0.375rem 0.5rem 0.375rem 0.625rem;
         border-radius: 4px;
         font-size: 0.8125rem;
         color: var(--text);
         text-decoration: none;
+        background: transparent;
+        border: none;
+        cursor: pointer;
         transition: background 100ms ease, color 100ms ease;
         white-space: nowrap;
         overflow: hidden;
-        text-overflow: ellipsis;
-        margin-bottom: 1px;
         font-weight: 400;
+        text-align: left;
+      }
+      .nav-item__icon {
+        flex-shrink: 0;
+        width: 1rem;
+        height: 1rem;
+        color: inherit;
+        stroke: currentColor;
+      }
+      .nav-pin__icon {
+        width: 0.875rem;
+        height: 0.875rem;
+        color: inherit;
+        stroke: currentColor;
+      }
+      .nav-item__label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .nav-item:hover {
         background: var(--sidebar-hover-bg);
@@ -337,17 +445,76 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
         color: var(--sidebar-active-text) !important;
         font-weight: 500;
       }
+      .nav-row:has(.nav-item--active) .nav-item--active {
+        background: transparent !important;
+      }
       .nav-item--collapsed {
         justify-content: center;
-        padding: 0.375rem 0;
+        padding: 0.4rem 0;
+        flex: none;
+        width: 100%;
+      }
+      .nav-pin {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.75rem;
+        margin: 1px;
+        border: none;
+        border-radius: 3px;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 120ms ease, background 100ms ease, color 100ms ease;
+      }
+      .nav-row:hover .nav-pin,
+      .nav-row:focus-within .nav-pin,
+      .nav-pin--active,
+      .nav-pin:focus-visible {
+        opacity: 1;
+      }
+      .nav-pin:hover {
+        background: var(--surface-3);
+        color: var(--text);
+      }
+      .nav-pin:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
+      }
+      .nav-row:has(.nav-item--active) .nav-pin {
+        color: rgba(255, 255, 255, 0.85);
+        opacity: 0.75;
+      }
+      .nav-row:has(.nav-item--active):hover .nav-pin,
+      .nav-row:has(.nav-item--active) .nav-pin--active,
+      .nav-row:has(.nav-item--active) .nav-pin:focus-visible {
+        opacity: 1;
+      }
+      .nav-row:has(.nav-item--active) .nav-pin:hover {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+      }
+      @media (hover: none) {
+        .nav-pin {
+          opacity: 0.55;
+        }
+        .nav-pin--active {
+          opacity: 1;
+        }
       }
       .mobile-nav-item {
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 0.375rem 0.25rem;
+        gap: 0.1rem;
+        padding: 0.3rem 0.2rem;
         border-radius: 4px;
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: 500;
         color: var(--text-muted);
         text-decoration: none;
@@ -358,6 +525,13 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        min-width: 0;
+      }
+      .mobile-nav-item__icon {
+        width: 1.05rem;
+        height: 1.05rem;
+        color: inherit;
+        stroke: currentColor;
       }
       .mobile-nav-item:hover {
         background: var(--surface-3);
@@ -376,7 +550,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly palette = inject(CommandPaletteService);
-  private   readonly navPrefs = inject(NavPreferencesService);
+  readonly navPrefs = inject(NavPreferencesService);
   readonly assistantShell = inject(AssistantShellService);
   readonly sync = inject(SyncService);
   readonly theme = inject(ThemeService);
@@ -483,6 +657,12 @@ export class AppShellComponent implements OnInit, OnDestroy {
 
   cycleTheme(): void {
     this.theme.cyclePreference();
+  }
+
+  onTogglePinTop(event: Event, id: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.navPrefs.togglePinTop(id);
   }
 
   promptInstall(): void {

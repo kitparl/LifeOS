@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SearchService } from '../../features/search/services/search.service';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { NAV_DESTINATIONS } from '../layout/nav-registry';
 import { CommandPaletteItem } from './command-palette.models';
 import { CommandPaletteService } from './command-palette.service';
@@ -10,7 +11,7 @@ import { CommandPaletteService } from './command-palette.service';
 @Component({
   selector: 'app-command-palette',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LucideDynamicIcon],
   template: `
     @if (palette.isOpen()) {
       <div
@@ -48,8 +49,13 @@ import { CommandPaletteService } from './command-palette.service';
                   (click)="run(item)"
                   (mouseenter)="palette.activeIndex.set(i)"
                 >
-                  <span>{{ item.label }}</span>
-              <span class="text-xs" style="color: var(--text-muted)">{{ item.hint ?? item.group }}</span>
+                  <span class="flex min-w-0 items-center gap-2">
+                    @if (item.icon) {
+                      <svg class="palette-icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
+                    }
+                    <span class="truncate">{{ item.label }}</span>
+                  </span>
+                  <span class="text-xs shrink-0" style="color: var(--text-muted)">{{ item.hint ?? item.group }}</span>
                 </button>
               </li>
             } @empty {
@@ -59,6 +65,15 @@ import { CommandPaletteService } from './command-palette.service';
         </div>
       </div>
     }
+    <style>
+      .palette-icon {
+        width: 1rem;
+        height: 1rem;
+        flex-shrink: 0;
+        color: var(--text-muted);
+        stroke: currentColor;
+      }
+    </style>
   `,
 })
 export class CommandPaletteComponent implements OnInit, OnDestroy {
@@ -90,6 +105,7 @@ export class CommandPaletteComponent implements OnInit, OnDestroy {
     const navigationItems: CommandPaletteItem[] = NAV_DESTINATIONS.filter(d => !d.hidden).map((d) => ({
       id: d.id,
       label: d.label,
+      icon: d.icon,
       group: d.category ?? 'Navigation',
       route: d.route,
     }));
