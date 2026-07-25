@@ -1,13 +1,14 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 GOAL_CATEGORIES = ("career", "running", "finance", "learning", "personal", "health")
 GOAL_STATUSES = ("active", "archived", "completed")
+GOAL_PERIODS = ("weekly", "monthly", "yearly", "custom")
 
 
 class Goal(Base):
@@ -19,9 +20,12 @@ class Goal(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="personal")
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    period: Mapped[str] = mapped_column(String(16), nullable=False, default="yearly")
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     target_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    period_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     parent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("goals.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

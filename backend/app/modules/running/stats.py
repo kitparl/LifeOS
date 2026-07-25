@@ -29,6 +29,63 @@ def weekly_km(runs: list[Run], ref: date | None = None) -> float:
     return round(total, 2)
 
 
+RACE_DISTANCE_KM_DEFAULTS: dict[str, float] = {
+    "5k": 5.0,
+    "10k": 10.0,
+    "15k": 15.0,
+    "half_marathon": 21.1,
+    "marathon": 42.2,
+}
+
+
+def _race_distance_km(race) -> float:
+    km = getattr(race, "distance_km", None)
+    if km:
+        return float(km)
+    return RACE_DISTANCE_KM_DEFAULTS.get(getattr(race, "distance_type", "") or "", 0.0)
+
+
+def compute_shoe_totals(runs: list[Run], races: list | None = None) -> list[dict]:
+    """Aggregate distance / activity count / last date per shoe (runs + race events)."""
+    buckets: dict[str, dict] = {}
+    for r in runs:
+        name = (getattr(r, "shoe", None) or "").strip()
+        if not name:
+            continue
+        bucket = buckets.setdefault(
+            name,
+            {"shoe": name, "total_km": 0.0, "run_count": 0, "last_run_date": None},
+        )
+        bucket["total_km"] += r.distance_km
+        bucket["run_count"] += 1
+        if bucket["last_run_date"] is None or r.run_date > bucket["last_run_date"]:
+            bucket["last_run_date"] = r.run_date
+    for race in races or []:
+        name = (getattr(race, "shoe", None) or "").strip()
+        if not name:
+            continue
+        bucket = buckets.setdefault(
+            name,
+            {"shoe": name, "total_km": 0.0, "run_count": 0, "last_run_date": None},
+        )
+        bucket["total_km"] += _race_distance_km(race)
+        bucket["run_count"] += 1
+        if bucket["last_run_date"] is None or race.race_date > bucket["last_run_date"]:
+            bucket["last_run_date"] = race.race_date
+    results = []
+    for name in sorted(buckets.keys(), key=str.lower):
+        b = buckets[name]
+        results.append(
+            {
+                "shoe": b["shoe"],
+                "total_km": round(b["total_km"], 2),
+                "run_count": b["run_count"],
+                "last_run_date": b["last_run_date"],
+            }
+        )
+    return results
+
+
 def compute_personal_bests(runs: list[Run]) -> list[dict]:
     results = []
     for key, (lo, hi, label) in DISTANCE_RANGES.items():

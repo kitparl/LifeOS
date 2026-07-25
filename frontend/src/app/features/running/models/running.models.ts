@@ -10,6 +10,7 @@ export interface Run {
   pace_min_per_km: number;
   weather: string | null;
   location: string | null;
+  shoe: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -23,6 +24,7 @@ export interface RunListItem {
   pace_min_per_km: number;
   weather: string | null;
   location: string | null;
+  shoe: string | null;
   updated_at: string;
 }
 
@@ -32,6 +34,7 @@ export interface RunCreate {
   duration_seconds: number;
   weather?: string | null;
   location?: string | null;
+  shoe?: string | null;
   notes?: string | null;
 }
 
@@ -41,6 +44,7 @@ export interface RunUpdate {
   duration_seconds?: number;
   weather?: string | null;
   location?: string | null;
+  shoe?: string | null;
   notes?: string | null;
 }
 
@@ -61,6 +65,7 @@ export interface RaceEvent {
   photos: string[];
   registered: boolean;
   attended?: boolean;
+  shoe: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -82,6 +87,7 @@ export interface RaceCreate {
   photos?: string[];
   registered?: boolean;
   attended?: boolean;
+  shoe?: string | null;
   notes?: string | null;
 }
 
@@ -104,6 +110,13 @@ export interface PersonalBest {
   duration_seconds: number | null;
 }
 
+export interface ShoeTotal {
+  shoe: string;
+  total_km: number;
+  run_count: number;
+  last_run_date: string | null;
+}
+
 export interface RunningStats {
   weekly_km: number;
   weekly_goal_km: number;
@@ -111,6 +124,7 @@ export interface RunningStats {
   total_km: number;
   last_run_date: string | null;
   personal_bests: PersonalBest[];
+  shoe_totals: ShoeTotal[];
 }
 
 export const RACE_DISTANCES: { value: RaceDistanceType; label: string }[] = [

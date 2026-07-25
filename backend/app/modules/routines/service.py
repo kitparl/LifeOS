@@ -35,6 +35,8 @@ class RoutineService:
             name=routine.name,
             days_of_week=routine.days_of_week,
             timezone=routine.timezone,
+            start_date=getattr(routine, "start_date", None),
+            end_date=getattr(routine, "end_date", None),
             is_active=routine.is_active,
             block_count=len(routine.blocks),
             updated_at=routine.updated_at,
@@ -47,6 +49,9 @@ class RoutineService:
             description=routine.description,
             days_of_week=routine.days_of_week,
             timezone=routine.timezone,
+            start_date=getattr(routine, "start_date", None),
+            end_date=getattr(routine, "end_date", None),
+            skip_dates=list(getattr(routine, "skip_dates", []) or []),
             is_active=routine.is_active,
             blocks=[RoutineBlockResponse.model_validate(b) for b in routine.blocks],
             created_at=routine.created_at,
@@ -110,6 +115,15 @@ class RoutineService:
             weekday = day.weekday()  # Mon=0
             for routine in routines:
                 if weekday not in routine.days_of_week:
+                    continue
+                start_bound = getattr(routine, "start_date", None)
+                end_bound = getattr(routine, "end_date", None)
+                if start_bound and day < start_bound:
+                    continue
+                if end_bound and day > end_bound:
+                    continue
+                skip_set = set(getattr(routine, "skip_dates", []) or [])
+                if day.isoformat() in skip_set:
                     continue
                 tz = self._resolve_tz(routine.timezone)
                 for block in routine.blocks:

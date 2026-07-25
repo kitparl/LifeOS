@@ -15,18 +15,38 @@ from app.modules.running.schemas import (
     RunningSettingsResponse,
     RunningSettingsUpdate,
     RunningStatsResponse,
+    ShoeCreate,
 )
 from app.modules.running.service import RunningService
 
 router = APIRouter(prefix="/running", tags=["running"])
 
 
-@router.get("/runs", response_model=list[RunListItem])
-async def list_runs(
+@router.get("/shoes", response_model=list[str])
+async def list_shoes(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await RunningService(db).list_runs(user.id)
+    return await RunningService(db).list_shoes(user.id)
+
+
+@router.post("/shoes", response_model=list[str], status_code=status.HTTP_201_CREATED)
+async def create_shoe(
+    data: ShoeCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await RunningService(db).create_shoe(user.id, data.name)
+    return await RunningService(db).list_shoes(user.id)
+
+
+@router.get("/runs", response_model=list[RunListItem])
+async def list_runs(
+    shoe: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RunningService(db).list_runs(user.id, shoe=shoe)
 
 
 @router.post("/runs", response_model=RunResponse, status_code=status.HTTP_201_CREATED)

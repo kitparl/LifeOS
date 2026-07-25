@@ -1,5 +1,5 @@
-import { Component, inject } from '@angular/core';
-import { CdkDragDrop, CdkDropList, CdkDrag, CdkDragHandle, CdkDragPlaceholder, moveItemInArray } from '@angular/cdk/drag-drop';
+import { Component, computed, inject } from '@angular/core';
+import { CdkDragDrop, CdkDropList, CdkDrag, CdkDragHandle, CdkDragPlaceholder } from '@angular/cdk/drag-drop';
 import { NavPreferencesService } from '../../core/services/nav-preferences.service';
 import { NavDestination } from '../../shared/layout/nav-registry';
 
@@ -10,42 +10,60 @@ import { NavDestination } from '../../shared/layout/nav-registry';
   template: `
     <div class="space-y-3">
       <p class="text-sm text-[var(--text-muted)]">
-        Toggle destinations on or off for your sidebar. Drag pinned items to reorder. Unpinned items remain available via Search and the command palette.
+        Toggle destinations on or off for your sidebar. Drag within a category (or Pin) to reorder.
+        Pin-to-top moves a module into the Pin group at the top of the sidebar.
+        Unpinned items remain available via Search and the command palette.
       </p>
       <button type="button" class="btn-primary text-xs" (click)="navPrefs.resetToDefault()">Reset to defaults</button>
 
       <div class="panel !p-0 overflow-hidden">
         <div class="title-bar">Navigation</div>
-        <ul
-          class="divide-y divide-[var(--border)] text-sm"
-          cdkDropList
-          (cdkDropListDropped)="onDrop($event)"
-        >
-          <!-- Pinned items: draggable -->
-          @for (item of navPrefs.pinnedDestinations(); track item.id) {
-            <li class="sidebar-settings-row sidebar-settings-row--pinned" cdkDrag>
-              <span class="sidebar-settings-drag" title="Drag to reorder" aria-hidden="true" cdkDragHandle>⋮⋮</span>
 
-              <div class="min-w-0 flex-1">
-                <span>{{ item.label }}</span>
-                @if (item.category) {
-                  <span class="ml-2 text-xs text-[var(--text-muted)]">{{ item.category }}</span>
-                }
-              </div>
+        @for (group of settingsGroups(); track group.category) {
+          <div class="border-b border-[var(--border)]">
+            <p class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted); background: var(--surface-2)">
+              {{ group.category }}
+            </p>
+            <ul
+              class="divide-y divide-[var(--border)] text-sm"
+              cdkDropList
+              [id]="'nav-cat-' + group.category"
+              (cdkDropListDropped)="onDrop(group.category, $event)"
+            >
+              @for (item of group.items; track item.id) {
+                <li class="sidebar-settings-row sidebar-settings-row--pinned" cdkDrag>
+                  <span class="sidebar-settings-drag" title="Drag to reorder" aria-hidden="true" cdkDragHandle>⋮⋮</span>
 
-              <label class="toggle-switch" title="Remove from sidebar">
-                <input type="checkbox" [checked]="true" (change)="navPrefs.togglePin(item.id)" />
-                <span class="toggle-switch__track" aria-hidden="true"></span>
-              </label>
+                  <div class="min-w-0 flex-1">
+                    <span>{{ item.label }}</span>
+                  </div>
 
-              <div *cdkDragPlaceholder class="sidebar-settings-placeholder"></div>
-            </li>
-          }
-        </ul>
+                  <button
+                    type="button"
+                    class="btn-ghost !px-2 text-xs"
+                    [title]="navPrefs.isPinnedTop(item.id) ? 'Unpin from top' : 'Pin to top'"
+                    (click)="navPrefs.togglePinTop(item.id)"
+                  >
+                    {{ navPrefs.isPinnedTop(item.id) ? '📌' : '📍' }}
+                  </button>
 
-        <!-- Unpinned items: not draggable, just toggle -->
+                  <label class="toggle-switch" title="Remove from sidebar">
+                    <input type="checkbox" [checked]="true" (change)="navPrefs.togglePin(item.id)" />
+                    <span class="toggle-switch__track" aria-hidden="true"></span>
+                  </label>
+
+                  <div *cdkDragPlaceholder class="sidebar-settings-placeholder"></div>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
         @if (navPrefs.unpinnedDestinations().length > 0) {
-          <ul class="divide-y divide-[var(--border)] text-sm border-t border-[var(--border)]">
+          <p class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted); background: var(--surface-2)">
+            Available
+          </p>
+          <ul class="divide-y divide-[var(--border)] text-sm">
             @for (item of navPrefs.unpinnedDestinations(); track item.id) {
               <li class="sidebar-settings-row">
                 <span class="sidebar-settings-drag sidebar-settings-drag--disabled" aria-hidden="true"></span>
@@ -129,8 +147,10 @@ import { NavDestination } from '../../shared/layout/nav-registry';
 export class SettingsSidebarSectionComponent {
   readonly navPrefs = inject(NavPreferencesService);
 
-  onDrop(event: CdkDragDrop<NavDestination[]>): void {
+  readonly settingsGroups = computed(() => this.navPrefs.navGroups());
+
+  onDrop(category: string, event: CdkDragDrop<NavDestination[]>): void {
     if (event.previousIndex === event.currentIndex) return;
-    this.navPrefs.reorder(event.previousIndex, event.currentIndex);
+    this.navPrefs.reorderWithinCategory(category, event.previousIndex, event.currentIndex);
   }
 }

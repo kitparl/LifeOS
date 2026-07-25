@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { SecretInputComponent } from '../../shared/secret-input/secret-input.component';
 import {
   IntegrationConnection,
   IntegrationProvider,
@@ -12,7 +13,7 @@ import {
 @Component({
   selector: 'app-integrations-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, SecretInputComponent],
   template: `
     <div class="space-y-4">
       <h1 class="text-lg font-semibold">Integration Hub</h1>
@@ -50,16 +51,16 @@ import {
                 </ol>
               </details>
 
+              <details class="mt-3 text-xs">
+                <summary class="cursor-pointer font-medium">Credentials &amp; configuration</summary>
               <div class="mt-3 flex flex-col gap-2 max-w-xl">
                 <div class="flex flex-col gap-1">
                   <label class="form-label" for="tg-token">Bot Token</label>
-                  <input
-                    id="tg-token"
-                    class="input-field"
-                    type="password"
-                    autocomplete="off"
+                  <app-secret-input
+                    inputId="tg-token"
                     [(ngModel)]="botTokenInput"
                     [placeholder]="tokenPlaceholder()"
+                    autocomplete="off"
                   />
                   @if (telegram()?.configured && telegram()?.bot_token_masked) {
                     <p class="text-xs" style="color: var(--text-muted)">
@@ -69,14 +70,14 @@ import {
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="form-label" for="tg-chat">Chat ID</label>
-                  <div class="flex gap-2">
-                    <input
-                      id="tg-chat"
-                      class="input-field flex-1"
-                      type="text"
-                      [(ngModel)]="chatIdInput"
-                      placeholder="e.g. 123456789"
-                    />
+                  <div class="flex gap-2 items-stretch">
+                    <div class="flex-1 min-w-0">
+                      <app-secret-input
+                        inputId="tg-chat"
+                        [(ngModel)]="chatIdInput"
+                        placeholder="e.g. 123456789"
+                      />
+                    </div>
                     <button
                       type="button"
                       class="btn-primary text-xs shrink-0"
@@ -248,6 +249,7 @@ import {
                   </p>
                 }
               </div>
+              </details>
             </div>
           } @else {
             <div class="panel text-sm">

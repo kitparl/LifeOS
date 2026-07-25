@@ -46,6 +46,7 @@ import { RoutinesService } from './services/routines.service';
               <tr>
                 <th class="px-3 py-2">Name</th>
                 <th class="px-3 py-2">Days</th>
+                <th class="px-3 py-2">Period</th>
                 <th class="px-3 py-2">Blocks</th>
                 <th class="px-3 py-2">Status</th>
                 <th class="px-3 py-2"></th>
@@ -58,6 +59,13 @@ import { RoutinesService } from './services/routines.service';
                     <a [routerLink]="['/routines', r.id]" class="link">{{ r.name }}</a>
                   </td>
                   <td class="px-3 py-2">{{ daysLabel(r.days_of_week) }}</td>
+                  <td class="px-3 py-2 text-xs" style="color: var(--text-muted)">
+                    @if (r.start_date || r.end_date) {
+                      {{ r.start_date || '…' }} → {{ r.end_date || '…' }}
+                    } @else {
+                      —
+                    }
+                  </td>
                   <td class="px-3 py-2">{{ r.block_count }}</td>
                   <td class="px-3 py-2">{{ r.is_active ? 'Active' : 'Paused' }}</td>
                   <td class="px-3 py-2">

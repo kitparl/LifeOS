@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import RACE_ADDED, EntityCreated, event_bus
 from app.modules.calendar.sync_service import CalendarSyncService
-from app.modules.running.models import RaceEvent
+from app.modules.running.models import RaceEvent, SUGGESTED_SHOES
 from app.modules.running.repository import RunningRepository
 
 # Source-module key used for the reusable Calendar scheduling linkage.
@@ -23,8 +23,9 @@ from app.modules.running.schemas import (
     RunningSettingsResponse,
     RunningSettingsUpdate,
     RunningStatsResponse,
+    ShoeTotal,
 )
-from app.modules.running.stats import compute_pace, compute_personal_bests, weekly_km
+from app.modules.running.stats import compute_pace, compute_personal_bests, compute_shoe_totals, weekly_km
 
 
 class RunningService:
@@ -87,6 +88,7 @@ class RunningService:
             photos=RunningService._normalize_photos(race.photos),
             registered=RunningService._bool_field(race, "registered"),
             attended=RunningService._bool_field(race, "attended"),
+            shoe=getattr(race, "shoe", None),
             notes=race.notes,
             created_at=race.created_at,
             updated_at=race.updated_at,
@@ -101,6 +103,7 @@ class RunningService:
             pace_min_per_km=compute_pace(run.distance_km, run.duration_seconds),
             weather=run.weather,
             location=getattr(run, 'location', None),
+            shoe=getattr(run, 'shoe', None),
             updated_at=run.updated_at,
         )
 
@@ -113,14 +116,31 @@ class RunningService:
             pace_min_per_km=compute_pace(run.distance_km, run.duration_seconds),
             weather=run.weather,
             location=getattr(run, 'location', None),
+            shoe=getattr(run, 'shoe', None),
             notes=run.notes,
             created_at=run.created_at,
             updated_at=run.updated_at,
         )
 
-    async def list_runs(self, user_id: str) -> list[RunListItem]:
-        runs = await self.repo.list_runs(user_id)
+    async def list_runs(self, user_id: str, shoe: str | None = None) -> list[RunListItem]:
+        runs = await self.repo.list_runs(user_id, shoe=shoe)
         return [self._to_list_item(r) for r in runs]
+
+    async def list_shoes(self, user_id: str) -> list[str]:
+        stored = await self.repo.list_shoe_names(user_id)
+        seen: dict[str, str] = {}
+        for name in [*SUGGESTED_SHOES, *stored]:
+            key = name.strip().lower()
+            if key and key not in seen:
+                seen[key] = name.strip()
+        return sorted(seen.values(), key=str.lower)
+
+    async def create_shoe(self, user_id: str, name: str) -> str:
+        clean = name.strip()
+        if not clean:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shoe name required")
+        await self.repo.ensure_shoe(user_id, clean)
+        return clean
 
     async def get_run(self, user_id: str, run_id: str) -> RunResponse:
         run = await self.repo.get_run(user_id, run_id)
@@ -196,6 +216,7 @@ class RunningService:
 
     async def get_stats(self, user_id: str) -> RunningStatsResponse:
         runs = await self.repo.list_runs(user_id)
+        races = await self.repo.list_races(user_id)
         settings = await self.repo.get_settings(user_id)
         last_run = runs[0] if runs else None
         total_km = round(sum(r.distance_km for r in runs), 2)
@@ -207,6 +228,7 @@ class RunningService:
             total_km=total_km,
             last_run_date=last_run.run_date if last_run else None,
             personal_bests=bests,
+            shoe_totals=[ShoeTotal(**s) for s in compute_shoe_totals(runs, races)],
         )
 
     async def get_dashboard_progress(self, user_id: str) -> dict | None:

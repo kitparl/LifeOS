@@ -12,6 +12,7 @@ class RunCreate(BaseModel):
     duration_seconds: int = Field(gt=0, le=86400)
     weather: str | None = Field(default=None, max_length=64)
     location: str | None = Field(default=None, max_length=200)
+    shoe: str | None = Field(default=None, max_length=80)
     notes: str | None = None
 
 
@@ -21,7 +22,12 @@ class RunUpdate(BaseModel):
     duration_seconds: int | None = Field(default=None, gt=0, le=86400)
     weather: str | None = Field(default=None, max_length=64)
     location: str | None = Field(default=None, max_length=200)
+    shoe: str | None = Field(default=None, max_length=80)
     notes: str | None = None
+
+
+class ShoeCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
 
 
 class RunListItem(BaseModel):
@@ -32,6 +38,7 @@ class RunListItem(BaseModel):
     pace_min_per_km: float
     weather: str | None
     location: str | None
+    shoe: str | None = None
     updated_at: datetime
 
     model_config = {"from_attributes": True}
@@ -45,6 +52,7 @@ class RunResponse(BaseModel):
     pace_min_per_km: float
     weather: str | None
     location: str | None
+    shoe: str | None = None
     notes: str | None
     created_at: datetime
     updated_at: datetime
@@ -68,6 +76,7 @@ class RaceCreate(BaseModel):
     photos: list[str] = Field(default_factory=list)
     registered: bool = False
     attended: bool = False
+    shoe: str | None = Field(default=None, max_length=80)
     notes: str | None = None
 
 
@@ -87,6 +96,7 @@ class RaceUpdate(BaseModel):
     photos: list[str] | None = None
     registered: bool | None = None
     attended: bool | None = None
+    shoe: str | None = Field(default=None, max_length=80)
     notes: str | None = None
 
 
@@ -107,6 +117,7 @@ class RaceResponse(BaseModel):
     photos: list[str]
     registered: bool
     attended: bool
+    shoe: str | None = None
     notes: str | None
     created_at: datetime
     updated_at: datetime
@@ -140,6 +151,13 @@ class PersonalBest(BaseModel):
     duration_seconds: int | None
 
 
+class ShoeTotal(BaseModel):
+    shoe: str
+    total_km: float
+    run_count: int
+    last_run_date: date | None
+
+
 class RunningStatsResponse(BaseModel):
     weekly_km: float
     weekly_goal_km: float
@@ -147,3 +165,4 @@ class RunningStatsResponse(BaseModel):
     total_km: float
     last_run_date: date | None
     personal_bests: list[PersonalBest]
+    shoe_totals: list[ShoeTotal] = []

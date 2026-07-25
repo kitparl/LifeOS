@@ -35,6 +35,8 @@ export interface RoutineListItem {
   name: string;
   days_of_week: number[];
   timezone: string;
+  start_date?: string | null;
+  end_date?: string | null;
   is_active: boolean;
   block_count: number;
   updated_at: string;
@@ -46,6 +48,9 @@ export interface Routine {
   description: string | null;
   days_of_week: number[];
   timezone: string;
+  start_date: string | null;
+  end_date: string | null;
+  skip_dates: string[];
   is_active: boolean;
   blocks: RoutineBlock[];
   created_at: string;
@@ -57,6 +62,9 @@ export interface RoutineCreate {
   description?: string | null;
   days_of_week: number[];
   timezone?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  skip_dates?: string[];
   blocks: RoutineBlockInput[];
 }
 
@@ -65,6 +73,9 @@ export interface RoutineUpdate {
   description?: string | null;
   days_of_week?: number[];
   timezone?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  skip_dates?: string[];
   is_active?: boolean;
   blocks?: RoutineBlockInput[];
 }

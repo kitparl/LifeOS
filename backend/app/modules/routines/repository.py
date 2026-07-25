@@ -59,8 +59,11 @@ class RoutineRepository:
             name=data.name,
             description=data.description,
             timezone=data.timezone,
+            start_date=data.start_date,
+            end_date=data.end_date,
         )
         routine.days_of_week = data.days_of_week
+        routine.skip_dates = data.skip_dates or []
         routine.blocks = self._make_blocks(data.blocks)
         self.db.add(routine)
         await self.db.flush()
@@ -71,11 +74,14 @@ class RoutineRepository:
         payload = data.model_dump(exclude_unset=True)
         blocks = payload.pop("blocks", None)
         days = payload.pop("days_of_week", None)
+        skips = payload.pop("skip_dates", None)
 
         for key, value in payload.items():
             setattr(routine, key, value)
         if days is not None:
             routine.days_of_week = days
+        if skips is not None:
+            routine.skip_dates = skips
         if blocks is not None:
             routine.blocks.clear()
             await self.db.flush()

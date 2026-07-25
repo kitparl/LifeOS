@@ -15,7 +15,12 @@ import { GoalsService } from './services/goals.service';
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h1 class="text-lg font-semibold">{{ g.title }}</h1>
-            <p class="text-xs capitalize text-gray-600">{{ g.category }} · {{ g.status }}</p>
+            <p class="text-xs capitalize text-gray-600">
+              {{ g.category }} · {{ g.period }} · {{ g.status }}
+              @if (g.is_missed) {
+                <span style="color: var(--danger)"> · missed</span>
+              }
+            </p>
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/goals', g.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
@@ -36,6 +41,14 @@ import { GoalsService } from './services/goals.service';
               <p>{{ g.progress }}% complete</p>
               @if (g.target_date) {
                 <p class="text-xs" style="color: var(--text-muted)">Target: {{ g.target_date | date: 'mediumDate' }}</p>
+              }
+              @if (g.period_start || g.period_end) {
+                <p class="text-xs capitalize" style="color: var(--text-muted)">
+                  {{ g.period }} window:
+                  {{ g.period_start | date: 'mediumDate' }}
+                  –
+                  {{ g.period_end | date: 'mediumDate' }}
+                </p>
               }
             </div>
           </div>

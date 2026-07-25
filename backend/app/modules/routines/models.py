@@ -1,8 +1,8 @@
 import json
 import uuid
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -34,6 +34,9 @@ class Routine(Base):
     # JSON list of Python weekdays: 0=Mon … 6=Sun
     days_of_week_json: Mapped[str] = mapped_column(Text, nullable=False, default="[0,1,2,3,4]")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Asia/Kolkata")
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    skip_dates_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
@@ -61,6 +64,28 @@ class Routine(Base):
     def days_of_week(self, value: list[int]) -> None:
         cleaned = sorted({int(d) for d in value if 0 <= int(d) <= 6})
         self.days_of_week_json = json.dumps(cleaned or [0, 1, 2, 3, 4])
+
+    @property
+    def skip_dates(self) -> list[str]:
+        try:
+            raw = json.loads(self.skip_dates_json or "[]")
+            if isinstance(raw, list):
+                return sorted({str(d) for d in raw if d})
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+        return []
+
+    @skip_dates.setter
+    def skip_dates(self, value: list[str] | list[date]) -> None:
+        cleaned: list[str] = []
+        for d in value or []:
+            if isinstance(d, date):
+                cleaned.append(d.isoformat())
+            else:
+                s = str(d).strip()
+                if s:
+                    cleaned.append(s[:10])
+        self.skip_dates_json = json.dumps(sorted(set(cleaned)))
 
 
 class RoutineBlock(Base):

@@ -72,3 +72,64 @@ async def test_routine_crud_and_calendar_expansion(client):
 
     delete = await client.delete(f"/api/v1/routines/{routine_id}", headers=headers)
     assert delete.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_routine_period_and_skip_dates(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    today = datetime.now(timezone.utc).date()
+    skip = today.isoformat()
+    create = await client.post(
+        "/api/v1/routines",
+        headers=headers,
+        json={
+            "name": "Bounded",
+            "days_of_week": [0, 1, 2, 3, 4, 5, 6],
+            "timezone": "UTC",
+            "start_date": (today - timedelta(days=1)).isoformat(),
+            "end_date": (today + timedelta(days=1)).isoformat(),
+            "skip_dates": [skip],
+            "blocks": [
+                {
+                    "title": "Focus",
+                    "start_time": "09:00:00",
+                    "end_time": "10:00:00",
+                    "area": "learning",
+                    "category": "learning",
+                }
+            ],
+        },
+    )
+    assert create.status_code == 201, create.text
+    body = create.json()
+    assert body["start_date"] == (today - timedelta(days=1)).isoformat()
+    assert skip in body["skip_dates"]
+
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+    cal = await client.get(
+        "/api/v1/calendar/events",
+        headers=headers,
+        params={"start": start.isoformat(), "end": end.isoformat()},
+    )
+    assert cal.status_code == 200
+    # Skipped today — no Focus block for today
+    today_focus = [
+        e
+        for e in cal.json()
+        if e["title"] == "Focus" and e["id"].endswith(skip)
+    ]
+    assert today_focus == []
+
+    # Outside period: far future should have no blocks
+    far_start = start + timedelta(days=30)
+    far_end = far_start + timedelta(days=1)
+    cal2 = await client.get(
+        "/api/v1/calendar/events",
+        headers=headers,
+        params={"start": far_start.isoformat(), "end": far_end.isoformat()},
+    )
+    assert cal2.status_code == 200
+    assert not any(e["title"] == "Focus" for e in cal2.json())

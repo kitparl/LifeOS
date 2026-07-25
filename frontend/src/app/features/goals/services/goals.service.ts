@@ -15,10 +15,18 @@ export class GoalsService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/goals`;
 
-  list(category?: string, status?: string): Observable<GoalListItem[]> {
+  list(opts?: {
+    category?: string;
+    status?: string;
+    period?: string;
+    missed?: boolean;
+  }): Observable<GoalListItem[]> {
     let params = new HttpParams();
-    if (category) params = params.set('category', category);
-    if (status) params = params.set('status', status);
+    if (opts?.category) params = params.set('category', opts.category);
+    if (opts?.status) params = params.set('status', opts.status);
+    if (opts?.period) params = params.set('period', opts.period);
+    if (opts?.missed === true) params = params.set('missed', 'true');
+    if (opts?.missed === false) params = params.set('missed', 'false');
     return this.http.get<GoalListItem[]>(this.api, { params });
   }
 

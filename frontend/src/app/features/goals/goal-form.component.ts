@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { GOAL_CATEGORIES, GoalCategory } from './models/goal.models';
+import { GOAL_CATEGORIES, GOAL_PERIODS, GoalCategory, GoalPeriod } from './models/goal.models';
 import { GoalsService } from './services/goals.service';
 
 @Component({
@@ -17,14 +17,36 @@ import { GoalsService } from './services/goals.service';
             <label class="mb-1 block">Title</label>
             <input class="input-field" formControlName="title" />
           </div>
-          <div>
-            <label class="mb-1 block">Category</label>
-            <select class="input-field" formControlName="category">
-              @for (c of categories; track c.value) {
-                <option [value]="c.value">{{ c.label }}</option>
-              }
-            </select>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="mb-1 block">Category</label>
+              <select class="input-field" formControlName="category">
+                @for (c of categories; track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="mb-1 block">Period</label>
+              <select class="input-field" formControlName="period">
+                @for (p of periods; track p.value) {
+                  <option [value]="p.value">{{ p.label }}</option>
+                }
+              </select>
+            </div>
           </div>
+          @if (form.controls.period.value === 'custom') {
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label class="mb-1 block">Period start</label>
+                <input class="input-field" type="date" formControlName="period_start" />
+              </div>
+              <div>
+                <label class="mb-1 block">Period end</label>
+                <input class="input-field" type="date" formControlName="period_end" />
+              </div>
+            </div>
+          }
           <div>
             <label class="mb-1 block">Description</label>
             <textarea class="input-field min-h-[80px]" formControlName="description"></textarea>
@@ -62,6 +84,7 @@ export class GoalFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   categories = GOAL_CATEGORIES;
+  periods = GOAL_PERIODS;
   isEdit = false;
   goalId: string | null = null;
   saving = false;
@@ -70,9 +93,12 @@ export class GoalFormComponent implements OnInit {
   form = this.fb.nonNullable.group({
     title: ['', Validators.required],
     category: ['personal' as GoalCategory, Validators.required],
+    period: ['yearly' as GoalPeriod, Validators.required],
     description: [''],
     notes: [''],
     target_date: [''],
+    period_start: [''],
+    period_end: [''],
     progress: [0, [Validators.min(0), Validators.max(100)]],
   });
 
@@ -87,9 +113,12 @@ export class GoalFormComponent implements OnInit {
           this.form.patchValue({
             title: goal.title,
             category: goal.category,
+            period: goal.period || 'yearly',
             description: goal.description ?? '',
             notes: goal.notes ?? '',
             target_date: goal.target_date ? goal.target_date.slice(0, 10) : '',
+            period_start: goal.period_start ? goal.period_start.slice(0, 10) : '',
+            period_end: goal.period_end ? goal.period_end.slice(0, 10) : '',
             progress: goal.progress,
           });
         },
@@ -105,10 +134,13 @@ export class GoalFormComponent implements OnInit {
     const payload = {
       title: raw.title,
       category: raw.category,
+      period: raw.period,
       description: raw.description || null,
       notes: raw.notes || null,
       progress: raw.progress,
       target_date: raw.target_date ? new Date(raw.target_date).toISOString() : null,
+      period_start: raw.period === 'custom' && raw.period_start ? raw.period_start : null,
+      period_end: raw.period === 'custom' && raw.period_end ? raw.period_end : null,
     };
 
     const req = this.isEdit && this.goalId

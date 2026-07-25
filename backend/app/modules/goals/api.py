@@ -22,10 +22,12 @@ router = APIRouter(prefix="/goals", tags=["goals"])
 async def list_goals(
     category: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    period: str | None = Query(default=None),
+    missed: bool | None = Query(default=None),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await GoalService(db).list_goals(user.id, category, status)
+    return await GoalService(db).list_goals(user.id, category, status, period, missed)
 
 
 @router.post("", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)

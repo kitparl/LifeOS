@@ -51,6 +51,9 @@ import { RunningService } from './services/running.service';
           @if (r.bib_number) {
             <span class="chip">Bib: {{ r.bib_number }}</span>
           }
+          @if (r.shoe) {
+            <span class="chip">Shoes: {{ r.shoe }}</span>
+          }
         </div>
 
         <!-- Details grid -->
@@ -65,6 +68,12 @@ import { RunningService } from './services/running.service';
             <div class="panel">
               <p class="text-xs" style="color: var(--text-muted)">Location</p>
               <p class="font-medium text-sm mt-0.5">{{ r.location }}</p>
+            </div>
+          }
+          @if (r.shoe) {
+            <div class="panel">
+              <p class="text-xs" style="color: var(--text-muted)">Shoes</p>
+              <p class="font-medium text-sm mt-0.5">{{ r.shoe }}</p>
             </div>
           }
           @if (r.distance_km) {

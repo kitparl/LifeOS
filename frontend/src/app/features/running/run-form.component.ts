@@ -1,13 +1,14 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { Run, WEATHER_OPTIONS, durationToSeconds, secondsToParts } from './models/running.models';
 import { RunningService } from './services/running.service';
 
 @Component({
   selector: 'app-run-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TypeSelectComponent],
   template: `
     <div style="max-width: 520px">
       <div class="panel !p-0 overflow-hidden">
@@ -56,6 +57,18 @@ import { RunningService } from './services/running.service';
           </div>
 
           <div>
+            <label class="form-label">Shoes (optional)</label>
+            <div class="mt-1">
+              <app-type-select
+                formControlName="shoe"
+                placeholder="Select or create shoes…"
+                [options]="shoes()"
+                (created)="onShoeCreated($event)"
+              />
+            </div>
+          </div>
+
+          <div>
             <label class="form-label" for="notes">Notes</label>
             <textarea id="notes" class="input-field mt-1" style="min-height: 72px; resize: vertical" formControlName="notes" placeholder="How did it feel?"></textarea>
           </div>
@@ -81,6 +94,7 @@ export class RunFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   weatherOptions = WEATHER_OPTIONS;
+  shoes = signal<string[]>([]);
   isEdit = false;
   runId: string | null = null;
   saving = false;
@@ -94,10 +108,12 @@ export class RunFormComponent implements OnInit {
     seconds: [0, [Validators.min(0), Validators.max(59)]],
     weather: [''],
     location: [''],
+    shoe: [''],
     notes: [''],
   });
 
   ngOnInit(): void {
+    this.runningService.listShoes().subscribe({ next: (s) => this.shoes.set(s) });
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id && url.endsWith('edit')) {
@@ -114,11 +130,17 @@ export class RunFormComponent implements OnInit {
             seconds: parts.seconds,
             weather: run.weather ?? '',
             location: run.location ?? '',
+            shoe: run.shoe ?? '',
             notes: run.notes ?? '',
           });
         },
       });
     }
+  }
+
+  onShoeCreated(name: string): void {
+    this.shoes.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.runningService.createShoe(name).subscribe({ next: (s) => this.shoes.set(s) });
   }
 
   submit(): void {
@@ -138,6 +160,7 @@ export class RunFormComponent implements OnInit {
       duration_seconds,
       weather: raw.weather || null,
       location: raw.location || null,
+      shoe: raw.shoe || null,
       notes: raw.notes || null,
     };
 
