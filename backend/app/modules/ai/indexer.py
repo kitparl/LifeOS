@@ -78,7 +78,12 @@ class AiIndexer:
 
         wishes = await self.db.execute(select(WishlistItem).where(WishlistItem.user_id == user_id))
         for w in wishes.scalars().all():
-            text = " ".join(filter(None, [w.title, w.description, w.notes, w.category]))
+            text = " ".join(
+                filter(
+                    None,
+                    [w.title, w.description, w.notes, w.category, w.status, w.priority],
+                )
+            )
             docs.append(IndexDocument("wishlist", w.id, w.title, text, f"/wishlist/{w.id}"))
 
         learning = await self.db.execute(select(LearningItem).where(LearningItem.user_id == user_id))

@@ -3,6 +3,12 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FileUploadComponent } from '../../shared/file-upload/file-upload.component';
 import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
+import {
+  WISHLIST_PRIORITIES,
+  WISHLIST_STATUSES,
+  WishlistPriority,
+  WishlistStatus,
+} from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
 
 @Component({
@@ -33,12 +39,30 @@ import { WishlistService } from './services/wishlist.service';
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="mb-1 block">Est. cost</label>
-              <input class="input-field" type="number" min="0" step="0.01" formControlName="cost" />
+              <label class="mb-1 block">Target year</label>
+              <input class="input-field" type="number" min="1900" max="2200" formControlName="target_year" placeholder="e.g. 2027" />
             </div>
             <div>
-              <label class="mb-1 block">Progress (%)</label>
-              <input class="input-field" type="number" min="0" max="100" formControlName="progress" />
+              <label class="mb-1 block">Achieved date</label>
+              <input class="input-field" type="date" formControlName="achieved_date" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="mb-1 block">Status</label>
+              <select class="input-field" formControlName="status">
+                @for (s of statuses; track s.value) {
+                  <option [value]="s.value">{{ s.label }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="mb-1 block">Priority</label>
+              <select class="input-field" formControlName="priority">
+                @for (p of priorities; track p.value) {
+                  <option [value]="p.value">{{ p.label }}</option>
+                }
+              </select>
             </div>
           </div>
           <div>
@@ -69,6 +93,8 @@ export class WishlistFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly categories = signal<string[]>([]);
+  statuses = WISHLIST_STATUSES;
+  priorities = WISHLIST_PRIORITIES;
   isEdit = false;
   itemId: string | null = null;
   saving = false;
@@ -78,8 +104,10 @@ export class WishlistFormComponent implements OnInit {
     title: ['', Validators.required],
     category: ['other', Validators.required],
     description: [''],
-    cost: [null as number | null],
-    progress: [0, [Validators.min(0), Validators.max(100)]],
+    target_year: [null as number | null],
+    achieved_date: [''],
+    status: ['in_progress' as WishlistStatus, Validators.required],
+    priority: ['medium' as WishlistPriority, Validators.required],
     image_url: [''],
     notes: [''],
   });
@@ -98,8 +126,10 @@ export class WishlistFormComponent implements OnInit {
             title: item.title,
             category: item.category,
             description: item.description ?? '',
-            cost: item.cost,
-            progress: item.progress,
+            target_year: item.target_year,
+            achieved_date: item.achieved_date ? item.achieved_date.slice(0, 10) : '',
+            status: item.status,
+            priority: item.priority,
             image_url: item.image_url ?? '',
             notes: item.notes ?? '',
           }),
@@ -124,8 +154,10 @@ export class WishlistFormComponent implements OnInit {
       title: raw.title,
       category: raw.category,
       description: raw.description || null,
-      cost: raw.cost,
-      progress: raw.progress,
+      target_year: raw.target_year,
+      achieved_date: raw.achieved_date || null,
+      status: raw.status,
+      priority: raw.priority,
       image_url: raw.image_url || null,
       notes: raw.notes || null,
     };

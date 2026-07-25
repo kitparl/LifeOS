@@ -61,7 +61,7 @@ async def test_wishlist_and_dashboard_actions(client):
     create = await client.post(
         "/api/v1/wishlist/items",
         headers=headers,
-        json={"title": "Visit Japan", "category": "travel", "cost": 5000, "progress": 20},
+        json={"title": "Visit Japan", "category": "travel", "target_year": 2027, "status": "in_progress", "priority": "high"},
     )
     assert create.status_code == 201
 
