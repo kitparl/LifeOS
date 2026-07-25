@@ -196,6 +196,8 @@ When something is created (e.g. a new task) and you opted in, Telegram gets a me
 
 Configure under **Settings → Integrations → Telegram → Scheduled reports**. Only users with Telegram **enabled** receive them.
 
+For the full engineering guide (cron suite, reminder ladders, audit table, APIs), see **[SCHEDULED_REPORTS.md](./SCHEDULED_REPORTS.md)**.
+
 | Report | Default (Asia/Kolkata) | Contents |
 |--------|------------------------|----------|
 | Morning | 06:00 daily | Routine today, pending tasks (Overdue / Due today / Later), calendar next 7 days, habits open, goals |
