@@ -7,7 +7,8 @@ import { WishlistItem, WishlistListItem } from '../models/wishlist.models';
 @Injectable({ providedIn: 'root' })
 export class WishlistService {
   private readonly http = inject(HttpClient);
-  private readonly api = `${environment.apiUrl}/wishlist/items`;
+  private readonly base = `${environment.apiUrl}/wishlist`;
+  private readonly api = `${this.base}/items`;
 
   list(category?: string): Observable<WishlistListItem[]> {
     let params = new HttpParams();
@@ -29,5 +30,13 @@ export class WishlistService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/${id}`);
+  }
+
+  listCategories(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.base}/categories`);
+  }
+
+  createCategory(name: string): Observable<string[]> {
+    return this.http.post<string[]>(`${this.base}/categories`, { name });
   }
 }

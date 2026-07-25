@@ -144,6 +144,85 @@ async def test_qa_create_type_endpoint(client):
 
 
 # =========================================================
+# Wishlist / Goals extensible categories
+# =========================================================
+
+
+@pytest.mark.asyncio
+async def test_wishlist_categories_suggested_and_custom(client):
+    token = await _auth_token(client, "wishcats@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    cats = await client.get("/api/v1/wishlist/categories", headers=headers)
+    assert cats.status_code == 200
+    assert "travel" in cats.json()
+    assert "other" in cats.json()
+
+    created = await client.post(
+        "/api/v1/wishlist/items",
+        headers=headers,
+        json={"title": "F1 car", "category": "motorsport"},
+    )
+    assert created.status_code == 201
+    assert created.json()["category"] == "motorsport"
+
+    cats = await client.get("/api/v1/wishlist/categories", headers=headers)
+    assert "motorsport" in cats.json()
+
+    filtered = await client.get("/api/v1/wishlist/items?category=motorsport", headers=headers)
+    assert filtered.status_code == 200
+    assert len(filtered.json()) == 1
+    assert filtered.json()[0]["category"] == "motorsport"
+
+
+@pytest.mark.asyncio
+async def test_wishlist_create_category_endpoint(client):
+    token = await _auth_token(client, "wishcats2@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = await client.post("/api/v1/wishlist/categories", headers=headers, json={"name": "gadgets"})
+    assert resp.status_code == 201
+    assert "gadgets" in resp.json()
+
+
+@pytest.mark.asyncio
+async def test_goal_categories_suggested_and_custom(client):
+    token = await _auth_token(client, "goalcats@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    cats = await client.get("/api/v1/goals/categories", headers=headers)
+    assert cats.status_code == 200
+    assert "career" in cats.json()
+    assert "personal" in cats.json()
+
+    created = await client.post(
+        "/api/v1/goals",
+        headers=headers,
+        json={"title": "Side project", "category": "side-hustle"},
+    )
+    assert created.status_code == 201
+    assert created.json()["category"] == "side-hustle"
+
+    cats = await client.get("/api/v1/goals/categories", headers=headers)
+    assert "side-hustle" in cats.json()
+
+    filtered = await client.get("/api/v1/goals?category=side-hustle", headers=headers)
+    assert filtered.status_code == 200
+    assert len(filtered.json()) == 1
+    assert filtered.json()[0]["category"] == "side-hustle"
+
+
+@pytest.mark.asyncio
+async def test_goal_create_category_endpoint(client):
+    token = await _auth_token(client, "goalcats2@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = await client.post("/api/v1/goals/categories", headers=headers, json={"name": "family"})
+    assert resp.status_code == 201
+    assert "family" in resp.json()
+
+
+# =========================================================
 # Knowledge Notes module
 # =========================================================
 

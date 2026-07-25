@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import GOAL_CREATED, GOAL_MILESTONE_ADDED, EntityCreated, event_bus
-from app.modules.goals.models import Goal
+from app.modules.goals.models import SUGGESTED_GOAL_CATEGORIES, Goal
 from app.modules.goals.repository import GoalRepository, is_goal_missed
 from app.modules.goals.schemas import (
     GoalCreate,
@@ -58,6 +58,23 @@ class GoalService:
         elif missed is False:
             items = [i for i in items if not i.is_missed]
         return items
+
+    async def list_categories(self, user_id: str) -> list[str]:
+        """Suggested defaults + user-created, de-duplicated (CI) and sorted."""
+        stored = await self.repo.list_category_names(user_id)
+        seen: dict[str, str] = {}
+        for name in [*SUGGESTED_GOAL_CATEGORIES, *stored]:
+            key = name.strip().lower()
+            if key and key not in seen:
+                seen[key] = name.strip()
+        return sorted(seen.values(), key=str.lower)
+
+    async def create_category(self, user_id: str, name: str) -> str:
+        clean = name.strip()
+        if not clean:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name required")
+        await self.repo.ensure_category(user_id, clean)
+        return clean
 
     async def get_goal(self, user_id: str, goal_id: str) -> GoalResponse:
         goal = await self.repo.get_by_id(user_id, goal_id)

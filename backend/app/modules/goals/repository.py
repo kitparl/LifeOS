@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.goals.models import Goal, GoalMilestone
+from app.modules.goals.models import Goal, GoalCategory, GoalMilestone
 from app.modules.goals.schemas import GoalCreate, GoalUpdate, MilestoneCreate, MilestoneUpdate
 
 
@@ -97,6 +97,24 @@ class GoalRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_category_names(self, user_id: str) -> list[str]:
+        result = await self.db.execute(
+            select(GoalCategory.name).where(GoalCategory.user_id == user_id).order_by(GoalCategory.name.asc())
+        )
+        return list(result.scalars().all())
+
+    async def ensure_category(self, user_id: str, name: str) -> None:
+        """Register a category name for reuse (idempotent, case-insensitive)."""
+        clean = (name or "").strip()
+        if not clean:
+            return
+        existing = await self.db.execute(select(GoalCategory).where(GoalCategory.user_id == user_id))
+        for row in existing.scalars().all():
+            if row.name.lower() == clean.lower():
+                return
+        self.db.add(GoalCategory(user_id=user_id, name=clean))
+        await self.db.flush()
+
     async def create(self, user_id: str, data: GoalCreate) -> Goal:
         now = datetime.now(timezone.utc)
         period = data.period or "yearly"
@@ -123,6 +141,8 @@ class GoalRepository:
         )
         self.db.add(goal)
         await self.db.flush()
+        if data.category:
+            await self.ensure_category(user_id, data.category)
         await self.db.refresh(goal, ["milestones"])
         return goal
 
@@ -132,6 +152,8 @@ class GoalRepository:
             setattr(goal, field, value)
         if data.status == "completed" and goal.progress < 100:
             goal.progress = 100
+        if "category" in fields and fields["category"]:
+            await self.ensure_category(goal.user_id, fields["category"])
 
         # Re-derive window when period / target_date / custom bounds change
         period_related = {"period", "target_date", "period_start", "period_end"}

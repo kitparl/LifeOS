@@ -3,7 +3,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-GoalCategory = Literal["career", "running", "finance", "learning", "personal", "health"]
 GoalStatus = Literal["active", "archived", "completed"]
 GoalPeriod = Literal["weekly", "monthly", "yearly", "custom"]
 
@@ -28,10 +27,14 @@ class MilestoneResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class GoalCategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
+
+
 class GoalCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str | None = None
-    category: GoalCategory = "personal"
+    category: str = Field(default="personal", min_length=1, max_length=32)
     period: GoalPeriod = "yearly"
     progress: int = Field(default=0, ge=0, le=100)
     notes: str | None = None
@@ -44,7 +47,7 @@ class GoalCreate(BaseModel):
 class GoalUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
-    category: GoalCategory | None = None
+    category: str | None = Field(default=None, min_length=1, max_length=32)
     status: GoalStatus | None = None
     period: GoalPeriod | None = None
     progress: int | None = Field(default=None, ge=0, le=100)
