@@ -56,6 +56,7 @@ async def render_screen(
         try:
             await client.answer_callback_query(callback_id, text=callback_toast or "")
         except TelegramClientError as exc:
+            # Stale/expired callbacks are common after slow handlers or retries.
             logger.debug("answerCallbackQuery failed: %s", exc)
 
     try:
@@ -76,7 +77,11 @@ async def render_screen(
         )
         return {"ok": True, "mode": "send", "result": result}
     except TelegramClientError as exc:
-        # Fallback: send new message if edit fails (e.g. message too old / identical)
+        detail = str(exc).lower()
+        # Refresh tapped with identical content — treat as success, do not resend.
+        if "message is not modified" in detail:
+            return {"ok": True, "mode": "unchanged"}
+        # Fallback: send new message if edit fails (e.g. message too old)
         logger.warning("render_screen edit/send failed (%s); trying send", exc)
         try:
             result = await client.send_message(

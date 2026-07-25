@@ -70,7 +70,15 @@ class TelegramClient:
         if response.status_code >= 400 or not data.get("ok"):
             description = data.get("description") if isinstance(data, dict) else None
             safe = _redact_token(self._token, str(description or "Telegram API error"))
-            logger.warning("Telegram API %s failed: %s", method, safe)
+            benign = (
+                "message is not modified" in safe.lower()
+                or "query is too old" in safe.lower()
+                or "response timeout expired" in safe.lower()
+            )
+            if benign:
+                logger.debug("Telegram API %s soft-fail: %s", method, safe)
+            else:
+                logger.warning("Telegram API %s failed: %s", method, safe)
             raise TelegramClientError(safe, status_code=response.status_code)
 
         result = data.get("result")
