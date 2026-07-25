@@ -51,6 +51,8 @@ export interface TelegramConfigStatus {
   routine_reminders_enabled: boolean;
   webhook_configured: boolean;
   webhook_url: string | null;
+  next_runs: Record<string, string | null>;
+  scheduler_warning: string | null;
 }
 
 export interface TelegramConfigUpdate {

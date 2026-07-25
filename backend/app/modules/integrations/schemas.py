@@ -102,6 +102,10 @@ class TelegramConfigStatus(BaseModel):
     routine_reminders_enabled: bool = True
     webhook_configured: bool = False
     webhook_url: str | None = None
+    # Next fire time per cron job type as currently registered in the scheduler.
+    next_runs: dict[str, datetime | None] = Field(default_factory=dict)
+    # Set when preferences were stored but the scheduler could not be updated.
+    scheduler_warning: str | None = None
 
 
 class ReportRunResponse(BaseModel):

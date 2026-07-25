@@ -32,6 +32,17 @@ Sun 18:00 Weekly review
 
 Prefs store local clock times; cron triggers use the user’s timezone (default IST).
 
+### Timezone
+
+`timezone` decides the wall clock a cron fires on, so a wrong value shifts every report
+without any error. Two safeguards exist:
+
+- The Settings page defaults the field to the browser timezone and warns when the saved
+  timezone differs from the device’s.
+- Telegram configs created before scheduled reports persisted a hardcoded `"UTC"`. A
+  startup backfill (`backfill_telegram_timezone`) rewrites that to `Asia/Kolkata` once per
+  connection and records `tz_backfilled`, so a deliberate UTC choice made afterwards sticks.
+
 ---
 
 ## Who gets jobs
@@ -267,6 +278,28 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 3. Disable Telegram → run again → expect `skipped` / `telegram_disabled`.
 
+### Verify the cron itself is registered
+
+Manual sends bypass the scheduler entirely, so a working **Send now** proves nothing about
+cron. `GET /integrations/telegram/config` returns `next_runs` (per job type, as registered
+in APScheduler), which the Settings page renders under each time picker:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8000/api/v1/integrations/telegram/config | jq .next_runs
+```
+
+`Not scheduled` / `null` means the pref is off or the job never registered. A time in the
+wrong zone means `timezone` is wrong. Saving also returns `scheduler_warning` when the
+preferences were stored but could not be scheduled. Server side:
+
+```bash
+sudo journalctl -u lifeos --since today | grep -E "APScheduler started|Registered job"
+```
+
+Note that a time already past today registers for tomorrow — `misfire_grace_time` does not
+apply, because the job did not exist at its fire time.
+
 ### Reminder dry-runs
 
 | Kind | Setup |
@@ -287,7 +320,6 @@ More detail: [aidlc-docs/construction/scheduled-reports/build-and-test.md](../ai
 - Single-process APScheduler (no Celery / multi-worker HA).
 - Quiet hours for reminders: deferred.
 - Habit “completed today” uses UTC while reports use user TZ (near-midnight IST edge cases).
-- Existing connections that explicitly stored `timezone: "UTC"` keep UTC; IST applies when unset.
 
 ---
 

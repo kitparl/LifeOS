@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -170,6 +171,18 @@ def sync_user_jobs(
             misfire_grace_time=3600,
         )
         logger.info("Registered job %s (%s)", jid, prefs.timezone)
+
+
+def next_run_times(user_id: str) -> dict[str, datetime | None]:
+    """Next fire time per cron job type, so clients can verify what is registered."""
+    sched = _scheduler
+    if sched is None:
+        return {}
+    runs: dict[str, datetime | None] = {}
+    for job_type in CRON_JOB_TYPES:
+        job = sched.get_job(_job_id(user_id, job_type))
+        runs[job_type] = getattr(job, "next_run_time", None) if job else None
+    return runs
 
 
 def sync_user_digest_job(

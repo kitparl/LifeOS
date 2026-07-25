@@ -47,6 +47,9 @@ logger = logging.getLogger(__name__)
 _TIME_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 _DIGEST_FREQUENCIES = frozenset({"daily", "weekdays", "weekly"})
 DEFAULT_TIMEZONE = "Asia/Kolkata"
+# Marks a config whose legacy hardcoded "UTC" timezone has been rewritten once.
+# Without it the startup backfill would keep overwriting a deliberate UTC choice.
+TZ_BACKFILL_KEY = "tz_backfilled"
 
 
 @dataclass(frozen=True)
@@ -288,6 +291,8 @@ def serialize_config(
             else prefs.routine_reminders_enabled
         ),
     }
+    if existing.get(TZ_BACKFILL_KEY):
+        payload[TZ_BACKFILL_KEY] = True
     return json.dumps(payload)
 
 
