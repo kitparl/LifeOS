@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.core.database import Base, engine
 from app.modules.ai.api import router as ai_router
 from app.modules.analytics.api import router as analytics_router
+from app.modules.analytics_dashboard.api import router as analytics_dashboard_router
 from app.modules.auth.api import router as auth_router
 from app.modules.calendar.api import router as calendar_router
 from app.modules.career.api import router as career_router
@@ -122,6 +123,7 @@ app.include_router(learning_router, prefix="/api/v1")
 app.include_router(career_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(analytics_dashboard_router, prefix="/api/v1")
 app.include_router(timeline_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(memory_router, prefix="/api/v1")
