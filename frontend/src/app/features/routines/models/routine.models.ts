@@ -18,6 +18,8 @@ export interface RoutineBlock {
   category: RoutineCategory;
   notes: string | null;
   sort_order: number;
+  habit_ids?: string[];
+  habits?: { id: string; name: string }[];
 }
 
 export interface RoutineBlockInput {
@@ -28,6 +30,7 @@ export interface RoutineBlockInput {
   category: RoutineCategory;
   notes?: string | null;
   sort_order?: number;
+  habit_ids?: string[];
 }
 
 export interface RoutineListItem {
