@@ -9,10 +9,19 @@ class WishlistRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_items(self, user_id: str, category: str | None = None) -> list[WishlistItem]:
+    async def list_items(
+        self,
+        user_id: str,
+        category: str | None = None,
+        status: str | None = None,
+    ) -> list[WishlistItem]:
         q = select(WishlistItem).where(WishlistItem.user_id == user_id)
         if category:
             q = q.where(WishlistItem.category == category)
+        if status == "incomplete":
+            q = q.where(WishlistItem.status.in_(("in_progress", "delayed")))
+        elif status:
+            q = q.where(WishlistItem.status == status)
         q = q.order_by(WishlistItem.updated_at.desc())
         result = await self.db.execute(q)
         return list(result.scalars().all())

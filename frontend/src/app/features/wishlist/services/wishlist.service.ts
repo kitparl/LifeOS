@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { WishlistItem, WishlistListItem } from '../models/wishlist.models';
+import { WishlistItem, WishlistListItem, WishlistStatusFilter } from '../models/wishlist.models';
 
 @Injectable({ providedIn: 'root' })
 export class WishlistService {
@@ -10,9 +10,10 @@ export class WishlistService {
   private readonly base = `${environment.apiUrl}/wishlist`;
   private readonly api = `${this.base}/items`;
 
-  list(category?: string): Observable<WishlistListItem[]> {
+  list(opts?: { category?: string; status?: WishlistStatusFilter }): Observable<WishlistListItem[]> {
     let params = new HttpParams();
-    if (category) params = params.set('category', category);
+    if (opts?.category) params = params.set('category', opts.category);
+    if (opts?.status) params = params.set('status', opts.status);
     return this.http.get<WishlistListItem[]>(this.api, { params });
   }
 

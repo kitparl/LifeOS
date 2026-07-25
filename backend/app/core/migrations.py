@@ -73,6 +73,13 @@ _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
     ("wishlist_items", "priority", "medium"),
 ]
 
+# Columns removed from the ORM but still present on older databases.
+# Must be dropped (or at least made nullable) or INSERTs omit them and fail NOT NULL.
+_COLUMNS_TO_DROP: list[tuple[str, str]] = [
+    ("wishlist_items", "cost"),
+    ("wishlist_items", "progress"),
+]
+
 
 async def ensure_columns(conn: AsyncConnection) -> None:
     """
@@ -120,7 +127,47 @@ async def ensure_columns(conn: AsyncConnection) -> None:
         except Exception as exc:
             logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
 
+    await drop_obsolete_columns(conn, dialect)
     await backfill_telegram_timezone(conn)
+
+
+async def drop_obsolete_columns(conn: AsyncConnection, dialect: str) -> None:
+    """Drop columns no longer mapped by SQLAlchemy models (idempotent)."""
+    for table, column in _COLUMNS_TO_DROP:
+        try:
+            if dialect == "postgresql":
+                await conn.execute(text(f"ALTER TABLE {table} DROP COLUMN IF EXISTS {column}"))
+            else:
+                # SQLite 3.35+ supports DROP COLUMN
+                await conn.execute(text(f"ALTER TABLE {table} DROP COLUMN {column}"))
+            logger.info("Dropped obsolete column %s.%s", table, column)
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "no such column" in msg or "does not exist" in msg:
+                logger.debug("Column %s.%s already absent — skipping", table, column)
+            else:
+                # Fallback: at least clear NOT NULL so inserts that omit the column work
+                try:
+                    if dialect == "postgresql":
+                        await conn.execute(
+                            text(f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL")
+                        )
+                        if column == "progress":
+                            await conn.execute(
+                                text(f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT 0")
+                            )
+                        logger.warning(
+                            "Could not drop %s.%s (%s); made nullable instead",
+                            table,
+                            column,
+                            exc,
+                        )
+                    else:
+                        logger.warning("Could not drop column %s.%s: %s", table, column, exc)
+                except Exception as inner:
+                    logger.warning(
+                        "Could not relax obsolete column %s.%s: %s", table, column, inner
+                    )
 
 
 async def backfill_telegram_timezone(conn: AsyncConnection) -> None:

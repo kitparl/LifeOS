@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
-import { WishlistItem } from './models/wishlist.models';
+import { WishlistItem, wishlistStatusAccent, wishlistStatusBadge } from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
 
 @Component({
@@ -27,8 +27,15 @@ import { WishlistService } from './services/wishlist.service';
           <img [src]="i.image_url" [alt]="i.title" class="max-h-48 border border-[var(--xp-border)]" />
         }
 
-        <div class="panel text-sm space-y-2">
-          <p><span class="font-medium">Status:</span> {{ statusLabel(i.status) }}</p>
+        <div
+          class="panel text-sm space-y-2 border-l-4"
+          [style.border-left-color]="statusAccent(i.status)"
+          [style.background]="cardBackground(i.status)"
+        >
+          <p class="flex flex-wrap items-center gap-2">
+            <span class="font-medium">Status:</span>
+            <span [class]="statusBadge(i.status)">{{ statusLabel(i.status) }}</span>
+          </p>
           <p><span class="font-medium">Priority:</span> {{ priorityLabel(i.priority) }}</p>
           @if (i.target_year) {
             <p><span class="font-medium">Target year:</span> {{ i.target_year }}</p>
@@ -81,6 +88,27 @@ export class WishlistDetailComponent implements OnInit {
   statusLabel(status: string): string {
     if (status === 'in_progress') return 'In progress';
     return status.charAt(0).toUpperCase() + status.slice(1);
+  }
+
+  statusBadge(status: string): string {
+    return wishlistStatusBadge(status);
+  }
+
+  statusAccent(status: string): string {
+    return wishlistStatusAccent(status);
+  }
+
+  cardBackground(status: string): string {
+    switch (status) {
+      case 'completed':
+        return 'color-mix(in srgb, var(--success-soft) 70%, var(--surface))';
+      case 'delayed':
+        return 'color-mix(in srgb, var(--warning-soft) 70%, var(--surface))';
+      case 'in_progress':
+        return 'color-mix(in srgb, var(--info-soft) 70%, var(--surface))';
+      default:
+        return 'var(--surface)';
+    }
   }
 
   priorityLabel(priority: string): string {
