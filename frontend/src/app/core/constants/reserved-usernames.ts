@@ -1,0 +1,28 @@
+export const RESERVED_USERNAMES = new Set([
+  'admin',
+  'administrator',
+  'root',
+  'system',
+  'support',
+  'help',
+  'owner',
+  'api',
+  'bot',
+  'telegram',
+  'null',
+  'undefined',
+  'guest',
+  'me',
+  'settings',
+  'profile',
+  'login',
+  'logout',
+  'register',
+  'dashboard',
+  'task',
+  'tasks',
+  'notification',
+  'notifications',
+]);
+
+export const USERNAME_FORMAT = /^[a-z][a-z0-9._]*[a-z0-9]$/;

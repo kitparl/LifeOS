@@ -60,12 +60,18 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("wishlist_items", "achieved_date", "DATE"),
     ("wishlist_items", "status", "VARCHAR(16) DEFAULT 'in_progress'"),
     ("wishlist_items", "priority", "VARCHAR(16) DEFAULT 'medium'"),
+    # Auth: public username system (nullable until backfill_usernames)
+    ("users", "username", "VARCHAR(30)"),
+    ("users", "username_changed_at", "TIMESTAMP"),
+    ("users", "username_change_count", "INTEGER DEFAULT 0"),
+    ("users", "is_admin", "BOOLEAN DEFAULT FALSE"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
     ("race_events", "medal"),
     ("race_events", "registered"),
     ("race_events", "attended"),
+    ("users", "is_admin"),
 ]
 
 _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
@@ -129,6 +135,7 @@ async def ensure_columns(conn: AsyncConnection) -> None:
 
     await drop_obsolete_columns(conn, dialect)
     await backfill_telegram_timezone(conn)
+    await backfill_usernames(conn)
 
 
 async def drop_obsolete_columns(conn: AsyncConnection, dialect: str) -> None:
@@ -224,3 +231,58 @@ async def backfill_telegram_timezone(conn: AsyncConnection) -> None:
             logger.info(
                 "Migrated Telegram connection %s from legacy UTC to %s", row_id, DEFAULT_TIMEZONE
             )
+
+
+async def backfill_usernames(conn: AsyncConnection) -> None:
+    """
+    Assign usernames derived from email local parts for existing users.
+
+    Adds a unique index afterward. Safe to re-run: skips rows that already
+    have a username.
+    """
+    from app.modules.auth.username_rules import derive_username_from_email
+
+    try:
+        rows = (
+            await conn.execute(text("SELECT id, email, username FROM users"))
+        ).fetchall()
+    except Exception as exc:
+        logger.warning("Could not read users for username backfill: %s", exc)
+        return
+
+    taken: set[str] = set()
+    for _id, _email, username in rows:
+        if username:
+            taken.add(username.lower())
+
+    for row_id, email, username in rows:
+        if username:
+            continue
+        try:
+            derived = derive_username_from_email(
+                email or f"user{row_id[:8]}@local",
+                lambda candidate, _taken=taken: candidate in _taken,
+            )
+            taken.add(derived)
+            await conn.execute(
+                text(
+                    "UPDATE users SET username = :username, "
+                    "username_change_count = COALESCE(username_change_count, 0) "
+                    "WHERE id = :id"
+                ),
+                {"username": derived, "id": row_id},
+            )
+            logger.info("Backfilled username %s for user %s", derived, row_id)
+        except Exception as exc:
+            logger.warning("Could not backfill username for user %s: %s", row_id, exc)
+
+    try:
+        await conn.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)")
+        )
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "already exists" in msg or "duplicate" in msg:
+            logger.debug("Unique index ix_users_username already exists — skipping")
+        else:
+            logger.warning("Could not create unique index on users.username: %s", exc)

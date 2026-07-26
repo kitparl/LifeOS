@@ -10,6 +10,7 @@ from app.modules.ai.api import router as ai_router
 from app.modules.analytics.api import router as analytics_router
 from app.modules.analytics_dashboard.api import router as analytics_dashboard_router
 from app.modules.auth.api import router as auth_router
+from app.modules.users.api import router as users_router
 from app.modules.calendar.api import router as calendar_router
 from app.modules.career.api import router as career_router
 from app.modules.communication.api import router as communication_router
@@ -48,6 +49,7 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Register models with Base.metadata BEFORE create_all so new tables exist.
+    import app.modules.auth.models  # noqa: F401 — User + UsernameHistory
     import app.modules.integrations.outbox_models  # noqa: F401
     import app.modules.integrations.report_models  # noqa: F401
     import app.modules.routines.models  # noqa: F401
@@ -101,6 +103,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(goals_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")

@@ -4,7 +4,8 @@ import pytest
 async def _auth_token(client, email="prefs@example.com"):
     reg = await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "password123", "display_name": "Prefs User"},
+        json={
+        "username": ("usr_" + email.split("@")[0].replace(".", "").replace("+", "").replace("-", "")[:26]),"email": email, "password": "password123", "display_name": "Prefs User"},
     )
     return reg.json()["access_token"]
 
