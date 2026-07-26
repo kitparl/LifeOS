@@ -18,3 +18,8 @@ frontend/.env
 __pycache__/
 *.pyc
 .pytest_cache/
+
+
+# Local file storage (see docs/FILE_STORAGE.md)
+backend/uploads/
+uploads/

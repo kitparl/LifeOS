@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription, distinctUntilChanged, map } from 'rxjs';
 import { PublicUser } from '../../core/models/auth.models';
 import { UserPickerComponent } from './components/user-picker.component';
+import { AttachmentListComponent } from '../files/components/attachment-list.component';
 import {
   ActivityLogEntry,
   StatusHistoryEntry,
@@ -21,7 +22,7 @@ type DetailTab = 'overview' | 'people' | 'activity';
 @Component({
   selector: 'app-task-detail',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, UserPickerComponent],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, UserPickerComponent, AttachmentListComponent],
   template: `
     @if (task; as t) {
       <div class="space-y-3">
@@ -271,6 +272,8 @@ type DetailTab = 'overview' | 'people' | 'activity';
               }
             </div>
           </div>
+
+          <app-attachment-list module="tasks" [entityId]="t.id" />
         }
 
         @if (activeTab === 'people') {

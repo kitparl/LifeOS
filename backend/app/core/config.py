@@ -23,10 +23,28 @@ class Settings(BaseSettings):
     github_client_id: str = ""
     s3_bucket: str = ""
     s3_region: str = "us-east-1"
+    s3_endpoint_url: str = ""
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     upload_dir: str = "./uploads"
     max_upload_bytes: int = 10 * 1024 * 1024
+    storage_backend: str = "local"  # local | s3
+    allowed_upload_types: str = (
+        "image/png,image/jpeg,image/webp,image/gif,"
+        "application/pdf,"
+        "text/plain,text/markdown,text/csv,"
+        "application/msword,"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document,"
+        "application/vnd.ms-excel,"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+        "application/vnd.ms-powerpoint,"
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation,"
+        "audio/mp4,audio/mpeg,audio/ogg,audio/webm,audio/x-m4a"
+    )
+    user_storage_quota_bytes: int = 1 * 1024 * 1024 * 1024  # 1 GiB
+    uploads_per_hour: int = 100
+    download_token_ttl_seconds: int = 300
+    file_purge_after_days: int = 30
     openai_api_key: str = ""
     ai_chat_model: str = "gpt-4o-mini"
     ai_embedding_model: str = "text-embedding-3-small"

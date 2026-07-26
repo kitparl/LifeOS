@@ -50,6 +50,7 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     # Register models with Base.metadata BEFORE create_all so new tables exist.
     import app.modules.auth.models  # noqa: F401 — User + UsernameHistory
+    import app.modules.files.models  # noqa: F401 — FileRecord
     import app.modules.integrations.outbox_models  # noqa: F401
     import app.modules.integrations.report_models  # noqa: F401
     import app.modules.routines.models  # noqa: F401
@@ -102,6 +103,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"],
 )
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
