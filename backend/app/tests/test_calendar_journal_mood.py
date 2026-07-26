@@ -5,7 +5,8 @@ from datetime import date, datetime, timedelta, timezone
 async def _auth_token(client, email="unit7@example.com"):
     reg = await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "password123", "display_name": "Unit7 User"},
+        json={
+        "username": ("usr_" + email.split("@")[0].replace(".", "").replace("+", "").replace("-", "")[:26]),"email": email, "password": "password123", "display_name": "Unit7 User"},
     )
     return reg.json()["access_token"]
 

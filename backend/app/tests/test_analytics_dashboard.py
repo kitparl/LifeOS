@@ -7,7 +7,8 @@ from httpx import AsyncClient
 async def _auth_headers(client: AsyncClient, email: str = "analytics_dash@example.com") -> dict[str, str]:
     reg = await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "password123", "display_name": "Analytics User"},
+        json={
+        "username": ("usr_" + email.split("@")[0].replace(".", "").replace("+", "").replace("-", "")[:26]),"email": email, "password": "password123", "display_name": "Analytics User"},
     )
     assert reg.status_code == 201, reg.text
     token = reg.json()["access_token"]

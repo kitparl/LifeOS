@@ -8,7 +8,8 @@ from app.modules.running.service import RunningService
 async def _auth_token(client):
     reg = await client.post(
         "/api/v1/auth/register",
-        json={"email": "running@example.com", "password": "password123", "display_name": "Runner"},
+        json={
+        "username": "runuser","email": "running@example.com", "password": "password123", "display_name": "Runner"},
     )
     return reg.json()["access_token"]
 

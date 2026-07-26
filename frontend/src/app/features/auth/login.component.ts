@@ -69,14 +69,14 @@ import { AuthService } from '../../core/services/auth.service';
 
           <form [formGroup]="form" (ngSubmit)="onSubmit()" class="login-form" autocomplete="on">
             <div class="form-group">
-              <label class="form-label" for="email">Email address</label>
+              <label class="form-label" for="identifier">Email or username</label>
               <input
-                id="email"
+                id="identifier"
                 class="input-field"
-                type="email"
-                formControlName="email"
-                autocomplete="email"
-                placeholder="you@example.com"
+                type="text"
+                formControlName="identifier"
+                autocomplete="username"
+                placeholder="you@example.com or johndoe"
               />
             </div>
 
@@ -300,7 +300,7 @@ export class LoginComponent {
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
+    identifier: ['', Validators.required],
     password: ['', Validators.required],
   });
 
@@ -311,7 +311,7 @@ export class LoginComponent {
     this.auth.login(this.form.getRawValue()).subscribe({
       next: () => this.router.navigate(['/dashboard']),
       error: () => {
-        this.error.set('Invalid email or password. Please try again.');
+        this.error.set('Invalid email, username, or password. Please try again.');
         this.submitting.set(false);
       },
       complete: () => this.submitting.set(false),

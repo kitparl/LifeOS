@@ -12,6 +12,7 @@ async def test_dashboard_summary_empty_state(client):
     reg = await client.post(
         "/api/v1/auth/register",
         json={
+        "username": "dashuser",
             "email": "dash@example.com",
             "password": "password123",
             "display_name": "Dash User",

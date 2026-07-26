@@ -4,7 +4,8 @@ import pytest
 async def _auth(client, email="phase2@example.com"):
     await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "password123", "display_name": "Phase2"},
+        json={
+        "username": ("usr_" + email.split("@")[0].replace(".", "").replace("+", "").replace("-", "")[:26]),"email": email, "password": "password123", "display_name": "Phase2"},
     )
     res = await client.post("/api/v1/auth/login", json={"email": email, "password": "password123"})
     return {"Authorization": f"Bearer {res.json()['access_token']}"}

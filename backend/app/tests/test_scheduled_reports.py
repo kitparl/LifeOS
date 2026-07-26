@@ -19,7 +19,8 @@ async def _auth_token(client: AsyncClient) -> str:
     email = f"cycle8_{datetime.now(timezone.utc).timestamp()}@example.com"
     resp = await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "password123", "display_name": "Cycle8"},
+        json={
+        "username": ("usr_" + email.split("@")[0].replace(".", "").replace("+", "").replace("-", "")[:26]),"email": email, "password": "password123", "display_name": "Cycle8"},
     )
     assert resp.status_code in (200, 201), resp.text
     return resp.json()["access_token"]
