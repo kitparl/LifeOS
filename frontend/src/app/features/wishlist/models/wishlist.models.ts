@@ -12,6 +12,7 @@ export interface WishlistItem {
   priority: WishlistPriority;
   notes: string | null;
   image_url: string | null;
+  photos: string[];
   created_at: string;
   updated_at: string;
 }

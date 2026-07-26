@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
+import { FilesService } from '../files/services/files.service';
 import { WishlistItem, wishlistStatusAccent, wishlistStatusBadge } from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
 
@@ -23,8 +24,16 @@ import { WishlistService } from './services/wishlist.service';
           </div>
         </div>
 
-        @if (i.image_url) {
-          <img [src]="i.image_url" [alt]="i.title" class="max-h-48 border border-[var(--xp-border)]" />
+        @if (imageSrcs.length) {
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            @for (src of imageSrcs; track src; let idx = $index) {
+              <img
+                [src]="src"
+                [alt]="i.title + ' ' + (idx + 1)"
+                class="max-h-48 w-full object-cover border border-[var(--xp-border)]"
+              />
+            }
+          </div>
         }
 
         <div
@@ -62,11 +71,13 @@ import { WishlistService } from './services/wishlist.service';
 })
 export class WishlistDetailComponent implements OnInit {
   private readonly wishlistService = inject(WishlistService);
+  private readonly filesService = inject(FilesService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
   item: WishlistItem | null = null;
   loading = false;
+  imageSrcs: string[] = [];
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -76,12 +87,36 @@ export class WishlistDetailComponent implements OnInit {
         next: (i) => {
           this.item = i;
           this.loading = false;
+          this.resolveImages(i);
         },
         error: () => {
           this.item = null;
           this.loading = false;
         },
       });
+    }
+  }
+
+  private resolveImages(item: WishlistItem): void {
+    const urls = item.photos?.length ? item.photos : item.image_url ? [item.image_url] : [];
+    for (const url of urls) {
+      const fileId = url.match(/\/files\/([0-9a-f-]{36})\/content/i)?.[1];
+      if (fileId) {
+        this.filesService.tokenUrl(fileId).subscribe({
+          next: (src) => {
+            if (!this.imageSrcs.includes(src)) {
+              this.imageSrcs = [...this.imageSrcs, src];
+            }
+          },
+          error: () => {
+            if (!this.imageSrcs.includes(url)) {
+              this.imageSrcs = [...this.imageSrcs, url];
+            }
+          },
+        });
+      } else if (!this.imageSrcs.includes(url)) {
+        this.imageSrcs = [...this.imageSrcs, url];
+      }
     }
   }
 

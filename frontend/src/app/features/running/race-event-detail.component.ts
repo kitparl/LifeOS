@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FilesService } from '../files/services/files.service';
 import {
   RACE_DISTANCES,
   RaceEvent,
@@ -17,7 +18,6 @@ import { RunningService } from './services/running.service';
   template: `
     @if (race; as r) {
       <div class="space-y-3">
-        <!-- Header -->
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h1 class="text-lg font-semibold" style="color: var(--text)">{{ r.name }}</h1>
@@ -31,9 +31,23 @@ import { RunningService } from './services/running.service';
           </div>
         </div>
 
-        <!-- Stat chips row -->
+        @if (eventImageSrcs.length) {
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            @for (src of eventImageSrcs; track src; let i = $index) {
+              <div class="panel !p-0 overflow-hidden">
+                <img [src]="src" [alt]="'Event photo ' + (i + 1)" class="max-h-64 w-full object-cover" />
+              </div>
+            }
+          </div>
+        }
+
         <div class="flex flex-wrap gap-2">
-          <span class="badge" [class.badge--success]="raceStatus(r) === 'completed'" [class.badge--warning]="raceStatus(r) === 'registered'" [class.badge--default]="raceStatus(r) === 'upcoming' || raceStatus(r) === 'missed'">
+          <span
+            class="badge"
+            [class.badge--success]="raceStatus(r) === 'completed'"
+            [class.badge--warning]="raceStatus(r) === 'registered'"
+            [class.badge--default]="raceStatus(r) === 'upcoming' || raceStatus(r) === 'missed'"
+          >
             {{ raceStatusLabel(raceStatus(r)) }}
           </span>
           @if (r.registered) {
@@ -56,7 +70,6 @@ import { RunningService } from './services/running.service';
           }
         </div>
 
-        <!-- Details grid -->
         <div class="grid gap-3 sm:grid-cols-2">
           @if (r.organizer) {
             <div class="panel">
@@ -83,15 +96,31 @@ import { RunningService } from './services/running.service';
             </div>
           }
           @if (r.certificate_url) {
-            <div class="panel">
+            <div class="panel space-y-2">
               <p class="text-xs" style="color: var(--text-muted)">Certificate</p>
-              <a [href]="r.certificate_url" target="_blank" rel="noopener noreferrer" class="link text-sm mt-0.5 block">View certificate</a>
+              @if (certificateImageSrc) {
+                <img
+                  [src]="certificateImageSrc"
+                  alt="Certificate"
+                  class="max-h-48 rounded border border-[var(--xp-border)]"
+                />
+              }
+              <a
+                [href]="certificateOpenHref || r.certificate_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link text-sm block"
+              >
+                View certificate
+              </a>
             </div>
           }
           @if (r.event_url) {
             <div class="panel">
               <p class="text-xs" style="color: var(--text-muted)">Event source</p>
-              <a [href]="r.event_url" target="_blank" rel="noopener noreferrer" class="link text-sm mt-0.5 block">View event page</a>
+              <a [href]="r.event_url" target="_blank" rel="noopener noreferrer" class="link text-sm mt-0.5 block">
+                View event page
+              </a>
             </div>
           }
         </div>
@@ -116,6 +145,7 @@ import { RunningService } from './services/running.service';
 })
 export class RaceEventDetailComponent implements OnInit {
   private readonly runningService = inject(RunningService);
+  private readonly filesService = inject(FilesService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -124,6 +154,9 @@ export class RaceEventDetailComponent implements OnInit {
 
   race: RaceEvent | null = null;
   loading = true;
+  eventImageSrcs: string[] = [];
+  certificateImageSrc = '';
+  certificateOpenHref = '';
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
@@ -138,16 +171,63 @@ export class RaceEventDetailComponent implements OnInit {
 
   load(id: string): void {
     this.loading = true;
+    this.eventImageSrcs = [];
+    this.certificateImageSrc = '';
+    this.certificateOpenHref = '';
     this.runningService.getRace(id).subscribe({
       next: (r) => {
         this.race = r;
         this.loading = false;
+        this.resolveMedia(r);
       },
       error: () => {
         this.race = null;
         this.loading = false;
       },
     });
+  }
+
+  private resolveMedia(r: RaceEvent): void {
+    for (const photo of r.photos ?? []) {
+      this.resolveDisplayUrl(photo, (src) => {
+        if (!this.eventImageSrcs.includes(src)) {
+          this.eventImageSrcs = [...this.eventImageSrcs, src];
+        }
+      });
+    }
+    if (r.certificate_url) {
+      const cert = r.certificate_url;
+      const fileId = this.extractFileId(cert);
+      if (fileId) {
+        this.filesService.tokenUrl(fileId).subscribe({
+          next: (url) => {
+            this.certificateOpenHref = url;
+            if (!/\.pdf(\?|$)/i.test(cert)) {
+              this.certificateImageSrc = url;
+            }
+          },
+        });
+      } else if (/\.(png|jpe?g|gif|webp)(\?|$)/i.test(cert)) {
+        this.certificateImageSrc = cert;
+        this.certificateOpenHref = cert;
+      } else {
+        this.certificateOpenHref = cert;
+      }
+    }
+  }
+
+  private resolveDisplayUrl(url: string, apply: (src: string) => void): void {
+    const fileId = this.extractFileId(url);
+    if (fileId) {
+      this.filesService.tokenUrl(fileId).subscribe({ next: apply, error: () => apply(url) });
+    } else {
+      apply(url);
+    }
+  }
+
+  private extractFileId(url: string): string | null {
+    const match = url.match(/\/files\/([0-9a-f-]{36})\/content/i);
+    return match?.[1] ?? null;
   }
 
   remove(): void {

@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FileUploadComponent } from '../../shared/file-upload/file-upload.component';
 import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
+import { FilesService } from '../files/services/files.service';
 import {
   WISHLIST_PRIORITIES,
   WISHLIST_STATUSES,
@@ -10,6 +11,11 @@ import {
   WishlistStatus,
 } from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
+
+interface PhotoItem {
+  url: string;
+  preview: string;
+}
 
 @Component({
   selector: 'app-wishlist-form',
@@ -66,9 +72,42 @@ import { WishlistService } from './services/wishlist.service';
             </div>
           </div>
           <div>
-            <label class="mb-1 block">Image</label>
-            <app-file-upload module="wishlist" [entityId]="itemId" (uploaded)="onImageUploaded($event)" />
-            <input class="input-field mt-2" formControlName="image_url" placeholder="Or paste image URL…" />
+            <label class="mb-1 block">Images</label>
+            @if (photos.length) {
+              <div class="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                @for (photo of photos; track photo.url; let i = $index) {
+                  <div class="relative overflow-hidden rounded border border-[var(--xp-border)]">
+                    <img [src]="photo.preview || photo.url" alt="Photo {{ i + 1 }}" class="h-28 w-full object-cover" />
+                    <button
+                      type="button"
+                      class="absolute right-1 top-1 rounded px-1.5 py-0.5 text-[10px]"
+                      style="background: var(--surface); color: var(--danger); border: 1px solid var(--xp-border)"
+                      (click)="removePhoto(i)"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+            <app-file-upload
+              label="Add images"
+              hint="Images — choose, paste (Ctrl/Cmd+V), or drop (multiple OK)"
+              accept="image/*"
+              module="wishlist"
+              [entityId]="itemId"
+              [multiple]="true"
+              [knownChecksums]="photoChecksums"
+              (uploaded)="onImageUploaded($event)"
+            />
+            <input
+              class="input-field mt-2"
+              [value]="externalUrl"
+              (input)="externalUrl = $any($event.target).value"
+              (change)="addExternalUrl()"
+              placeholder="Or paste an image URL and press Enter…"
+              (keydown.enter)="$event.preventDefault(); addExternalUrl()"
+            />
           </div>
           <div>
             <label class="mb-1 block">Notes</label>
@@ -89,6 +128,7 @@ import { WishlistService } from './services/wishlist.service';
 export class WishlistFormComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly wishlistService = inject(WishlistService);
+  private readonly filesService = inject(FilesService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -99,6 +139,9 @@ export class WishlistFormComponent implements OnInit {
   itemId: string | null = null;
   saving = false;
   error = '';
+  photos: PhotoItem[] = [];
+  photoChecksums: string[] = [];
+  externalUrl = '';
 
   form = this.fb.nonNullable.group({
     title: ['', Validators.required],
@@ -108,7 +151,6 @@ export class WishlistFormComponent implements OnInit {
     achieved_date: [''],
     status: ['in_progress' as WishlistStatus, Validators.required],
     priority: ['medium' as WishlistPriority, Validators.required],
-    image_url: [''],
     notes: [''],
   });
 
@@ -121,7 +163,7 @@ export class WishlistFormComponent implements OnInit {
       this.isEdit = true;
       this.itemId = id;
       this.wishlistService.get(id).subscribe({
-        next: (item) =>
+        next: (item) => {
           this.form.patchValue({
             title: item.title,
             category: item.category,
@@ -130,9 +172,13 @@ export class WishlistFormComponent implements OnInit {
             achieved_date: item.achieved_date ? item.achieved_date.slice(0, 10) : '',
             status: item.status,
             priority: item.priority,
-            image_url: item.image_url ?? '',
             notes: item.notes ?? '',
-          }),
+          });
+          this.photos = [];
+          this.photoChecksums = [];
+          const urls = item.photos?.length ? item.photos : item.image_url ? [item.image_url] : [];
+          for (const u of urls) this.addPhoto(u);
+        },
       });
     }
   }
@@ -143,13 +189,75 @@ export class WishlistFormComponent implements OnInit {
   }
 
   onImageUploaded(url: string): void {
-    this.form.patchValue({ image_url: url });
+    if (this.photos.some((p) => p.url === url)) return;
+    this.addPhoto(url);
+  }
+
+  addExternalUrl(): void {
+    const url = this.externalUrl.trim();
+    if (!url) return;
+    if (this.photos.some((p) => p.url === url)) {
+      this.externalUrl = '';
+      return;
+    }
+    this.addPhoto(url);
+    this.externalUrl = '';
+  }
+
+  removePhoto(index: number): void {
+    this.photos = this.photos.filter((_, i) => i !== index);
+    this.refreshPhotoChecksums();
+  }
+
+  private addPhoto(url: string): void {
+    this.photos = [...this.photos, { url, preview: url }];
+    const fileId = url.match(/\/files\/([0-9a-f-]{36})\/content/i)?.[1];
+    if (fileId) {
+      this.filesService.tokenUrl(fileId).subscribe({
+        next: (preview) => {
+          this.photos = this.photos.map((p) => (p.url === url ? { ...p, preview } : p));
+        },
+      });
+      this.filesService.get(fileId).subscribe({
+        next: (record) => {
+          if (record.checksum_sha256) {
+            this.photoChecksums = [...this.photoChecksums, record.checksum_sha256];
+          }
+        },
+      });
+    }
+  }
+
+  private refreshPhotoChecksums(): void {
+    const ids = this.photos
+      .map((p) => p.url.match(/\/files\/([0-9a-f-]{36})\/content/i)?.[1])
+      .filter((id): id is string => !!id);
+    if (!ids.length) {
+      this.photoChecksums = [];
+      return;
+    }
+    const sums: string[] = [];
+    let pending = ids.length;
+    for (const id of ids) {
+      this.filesService.get(id).subscribe({
+        next: (record) => {
+          if (record.checksum_sha256) sums.push(record.checksum_sha256);
+          pending -= 1;
+          if (pending === 0) this.photoChecksums = [...sums];
+        },
+        error: () => {
+          pending -= 1;
+          if (pending === 0) this.photoChecksums = [...sums];
+        },
+      });
+    }
   }
 
   submit(): void {
     if (this.form.invalid) return;
     this.saving = true;
     const raw = this.form.getRawValue();
+    const photoUrls = this.photos.map((p) => p.url);
     const payload = {
       title: raw.title,
       category: raw.category,
@@ -158,7 +266,8 @@ export class WishlistFormComponent implements OnInit {
       achieved_date: raw.achieved_date || null,
       status: raw.status,
       priority: raw.priority,
-      image_url: raw.image_url || null,
+      photos: photoUrls,
+      image_url: photoUrls[0] ?? null,
       notes: raw.notes || null,
     };
     const req =
