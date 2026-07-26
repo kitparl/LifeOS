@@ -1,5 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { filesFromClipboard, filesFromDataTransfer } from '../../shared/file-upload/clipboard-files';
 import { OcrDocument, OcrService } from './services/ocr.service';
 
 @Component({
@@ -20,7 +21,33 @@ import { OcrDocument, OcrService } from './services/ocr.service';
               <option value="note">Note</option>
               <option value="document">Document</option>
             </select>
-            <input type="file" class="text-sm" (change)="onFile($event)" />
+            <div
+              class="flex flex-col items-center justify-center gap-2 rounded border border-dashed px-3 py-4 text-center outline-none"
+              tabindex="0"
+              [style.border-color]="dragOver ? 'var(--xp-blue)' : 'var(--xp-border)'"
+              [style.background]="
+                dragOver
+                  ? 'color-mix(in srgb, var(--xp-blue) 12%, transparent)'
+                  : 'color-mix(in srgb, var(--primary-soft) 35%, transparent)'
+              "
+              [class.opacity-60]="uploading"
+              (paste)="onPaste($event)"
+              (dragover)="onDragOver($event)"
+              (dragleave)="dragOver = false"
+              (drop)="onDrop($event)"
+            >
+              <p class="text-sm font-medium">Upload for OCR</p>
+              <p class="text-xs" style="color: var(--text-muted)">
+                PDF, images, text — choose, paste (Ctrl/Cmd+V), or drop
+              </p>
+              <input #fileInput type="file" class="hidden" (change)="onFile($event)" [disabled]="uploading" />
+              <button type="button" class="btn-primary text-xs" [disabled]="uploading" (click)="fileInput.click()">
+                {{ uploading ? 'Uploading…' : 'Choose file' }}
+              </button>
+              @if (uploadError) {
+                <p class="text-xs" style="color: var(--danger)">{{ uploadError }}</p>
+              }
+            </div>
           </div>
         </div>
         <div class="panel !p-0 overflow-hidden">
@@ -52,6 +79,9 @@ export class OcrPageComponent implements OnInit {
   private readonly ocr = inject(OcrService);
   private readonly fb = inject(FormBuilder);
   docs: OcrDocument[] = [];
+  uploading = false;
+  dragOver = false;
+  uploadError = '';
   uploadForm = this.fb.nonNullable.group({ doc_type: 'document' });
   textForm = this.fb.nonNullable.group({ filename: 'pasted.txt', text: '', doc_type: 'document' });
 
@@ -66,15 +96,51 @@ export class OcrPageComponent implements OnInit {
   onFile(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!file) return;
-    this.ocr.upload(file, this.uploadForm.getRawValue().doc_type).subscribe({ next: () => this.load() });
     input.value = '';
+    if (file) this.upload(file);
+  }
+
+  onPaste(event: ClipboardEvent): void {
+    const files = filesFromClipboard(event);
+    if (!files.length) return;
+    event.preventDefault();
+    this.upload(files[0]);
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.dragOver = true;
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.dragOver = false;
+    const files = filesFromDataTransfer(event.dataTransfer);
+    if (files[0]) this.upload(files[0]);
+  }
+
+  private upload(file: File): void {
+    this.uploading = true;
+    this.uploadError = '';
+    this.ocr.upload(file, this.uploadForm.getRawValue().doc_type).subscribe({
+      next: () => {
+        this.uploading = false;
+        this.load();
+      },
+      error: () => {
+        this.uploading = false;
+        this.uploadError = 'Upload failed';
+      },
+    });
   }
 
   submitText(): void {
     const v = this.textForm.getRawValue();
     this.ocr.createFromText({ filename: v.filename, doc_type: v.doc_type, text: v.text }).subscribe({
-      next: () => { this.textForm.patchValue({ text: '' }); this.load(); },
+      next: () => {
+        this.textForm.patchValue({ text: '' });
+        this.load();
+      },
     });
   }
 

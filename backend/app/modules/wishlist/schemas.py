@@ -1,10 +1,19 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 WishlistStatus = Literal["in_progress", "completed", "delayed"]
 WishlistPriority = Literal["high", "medium", "low"]
+
+
+def _sync_cover(photos: list[str] | None, image_url: str | None) -> tuple[list[str], str | None]:
+    """Prefer photos list; keep image_url as cover (first photo) for list cards."""
+    normalized = [str(p) for p in (photos or []) if p]
+    if not normalized and image_url:
+        normalized = [image_url]
+    cover = normalized[0] if normalized else None
+    return normalized, cover
 
 
 class WishlistCreate(BaseModel):
@@ -17,6 +26,14 @@ class WishlistCreate(BaseModel):
     priority: WishlistPriority = "medium"
     notes: str | None = None
     image_url: str | None = Field(default=None, max_length=500)
+    photos: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def sync_photos_and_cover(self):
+        photos, cover = _sync_cover(self.photos, self.image_url)
+        self.photos = photos
+        self.image_url = cover
+        return self
 
 
 class WishlistUpdate(BaseModel):
@@ -29,6 +46,21 @@ class WishlistUpdate(BaseModel):
     priority: WishlistPriority | None = None
     notes: str | None = None
     image_url: str | None = Field(default=None, max_length=500)
+    photos: list[str] | None = None
+
+    @model_validator(mode="after")
+    def sync_photos_and_cover(self):
+        if self.photos is not None or self.image_url is not None:
+            # Only sync when either field is being set (partial updates).
+            if self.photos is not None:
+                photos, cover = _sync_cover(self.photos, self.image_url)
+                self.photos = photos
+                self.image_url = cover
+            elif self.image_url is not None:
+                photos, cover = _sync_cover(None, self.image_url)
+                self.photos = photos
+                self.image_url = cover
+        return self
 
 
 class WishlistCategoryCreate(BaseModel):
@@ -60,7 +92,16 @@ class WishlistResponse(BaseModel):
     priority: str
     notes: str | None
     image_url: str | None
+    photos: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def normalize_photos(self):
+        photos, cover = _sync_cover(self.photos, self.image_url)
+        self.photos = photos
+        if not self.image_url:
+            self.image_url = cover
+        return self

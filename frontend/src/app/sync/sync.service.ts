@@ -47,7 +47,8 @@ export class SyncService {
     return (
       url.includes('/auth/') ||
       url.includes('/files/upload') ||
-      url.includes('/files/') && url.includes('/content')
+      (url.includes('/files/') && url.includes('/content')) ||
+      (url.includes('/files/') && url.includes('/download-token'))
     );
   }
 

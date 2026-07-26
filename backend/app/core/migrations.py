@@ -60,6 +60,7 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("wishlist_items", "achieved_date", "DATE"),
     ("wishlist_items", "status", "VARCHAR(16) DEFAULT 'in_progress'"),
     ("wishlist_items", "priority", "VARCHAR(16) DEFAULT 'medium'"),
+    ("wishlist_items", "photos", "TEXT"),  # JSON list of image URLs
     # Auth: public username system (nullable until backfill_usernames)
     ("users", "username", "VARCHAR(30)"),
     ("users", "username_changed_at", "TIMESTAMP"),
@@ -69,6 +70,12 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("tasks", "deleted_at", "TIMESTAMP"),
     ("tasks", "archived_at", "TIMESTAMP"),
     ("tasks", "version", "INTEGER DEFAULT 1"),
+    # Files: hardening columns (nullable / defaulted for existing rows)
+    ("file_records", "checksum_sha256", "VARCHAR(64)"),
+    ("file_records", "extension", "VARCHAR(16)"),
+    ("file_records", "visibility", "VARCHAR(16) DEFAULT 'private'"),
+    ("file_records", "deleted_at", "TIMESTAMP"),
+    ("file_records", "updated_at", "TIMESTAMP"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
@@ -81,6 +88,7 @@ _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
 _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
     ("wishlist_items", "status", "in_progress"),
     ("wishlist_items", "priority", "medium"),
+    ("file_records", "visibility", "private"),
 ]
 
 # Columns removed from the ORM but still present on older databases.
