@@ -170,9 +170,8 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
                 style="padding: 0 1rem; min-height: 48px; background: var(--header-bg); border-bottom: 1px solid var(--border);">
           <!-- Left: Mobile menu + title -->
           <div class="flex items-center gap-2 min-w-0">
-            <button type="button" class="btn-ghost !px-2 lg:hidden" (click)="toggleDrawer()">☰</button>
+            <button type="button" class="btn-ghost !px-2 lg:hidden" (click)="toggleMenu()">☰</button>
             <!-- Desktop sidebar toggle: matches mobile open/close behaviour -->
-            <button type="button" class="btn-ghost !px-2 hidden lg:inline-flex" (click)="toggleSidebarHidden()" [title]="sidebarHidden() ? 'Show sidebar' : 'Hide sidebar'">☰</button>
             <div class="min-w-0">
               <p class="truncate text-sm font-semibold" style="color: var(--text)">{{ currentTitle() }}</p>
             </div>
@@ -601,6 +600,14 @@ export class AppShellComponent implements OnInit, OnDestroy {
   openSearch(): void {
     this.closeOverlays();
     this.palette.open();
+  }
+
+  toggleMenu(): void {
+    if (window.innerWidth >= 1024) {
+      this.toggleSidebarHidden();   // Desktop
+    } else {
+      this.toggleDrawer();          // Mobile
+    }
   }
 
   toggleDrawer(): void {
