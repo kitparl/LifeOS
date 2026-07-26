@@ -195,7 +195,7 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
             <button
               type="button"
               class="btn-secondary text-xs hidden lg:inline-flex"
-              (click)="toggleAiPanel()"
+             (click)="toggleAssistant()"
             >
               {{ aiPanelOpen() ? 'Hide Assistant' : 'Assistant' }}
             </button>
@@ -656,7 +656,26 @@ export class AppShellComponent implements OnInit, OnDestroy {
     localStorage.setItem(STORAGE_HIDDEN, String(next));
   }
 
+  toggleAssistant(): void {
+    if (window.innerWidth < 1024) {
+      this.router.navigate(['/assistant']);
+    } else {
+      this.toggleAiPanel();
+    }
+  }
+
   toggleAiPanel(): void {
+    // Mobile
+    if (window.innerWidth < 1024) {
+      if (this.router.url === '/assistant') {
+        this.router.navigate(['/dashboard']);
+      } else {
+        this.router.navigate(['/assistant']);
+      }
+      return;
+    }
+  
+    // Desktop
     const next = !this.aiPanelOpen();
     this.aiPanelOpen.set(next);
     localStorage.setItem(STORAGE_AI_OPEN, String(next));
