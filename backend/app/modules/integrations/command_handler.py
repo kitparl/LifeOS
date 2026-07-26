@@ -42,8 +42,8 @@ async def cmd_tasks(db: AsyncSession, user_id: str, args: str):
         logger.exception("Interactive /tasks failed; using text fallback")
         from app.modules.tasks.service import TaskService
 
-        items = await TaskService(db).list_tasks(user_id, status="pending")
-        in_prog = await TaskService(db).list_tasks(user_id, status="in_progress")
+        items, _ = await TaskService(db).list_tasks(user_id, status="pending")
+        in_prog, _ = await TaskService(db).list_tasks(user_id, status="in_progress")
         all_items = list(items) + list(in_prog)
         if not all_items:
             return tpl.tasks_empty()
@@ -74,7 +74,7 @@ async def cmd_today(db: AsyncSession, user_id: str, args: str):
         start = datetime.combine(today, time.min, tzinfo=timezone.utc)
         end = datetime.combine(today, time.max, tzinfo=timezone.utc)
 
-        due_tasks = await TS(db).list_tasks(user_id, due_today=True)
+        due_tasks, _ = await TS(db).list_tasks(user_id, due_today=True)
         task_lines = [f"[{t.id[:8]}] {t.title}" for t in due_tasks[:10]]
 
         events = await CalendarRepository(db).list_events(user_id, start=start, end=end)
@@ -98,8 +98,9 @@ async def cmd_done(db: AsyncSession, user_id: str, args: str) -> str:
         return tpl.done_usage()
 
     repo = TaskRepository(db)
-    tasks = await repo.list_tasks(user_id, status="pending")
-    tasks += await repo.list_tasks(user_id, status="in_progress")
+    tasks, _ = await repo.list_tasks(user_id, status="pending")
+    more, _ = await repo.list_tasks(user_id, status="in_progress")
+    tasks += more
     matches = [t for t in tasks if t.id.startswith(token) or t.id == token]
     if not matches:
         return tpl.done_not_found(token)

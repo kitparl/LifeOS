@@ -51,7 +51,8 @@ async def _open_tasks(db: AsyncSession, user_id: str) -> list[Task]:
     repo = TaskRepository(db)
     out: list[Task] = []
     for status_name in ("pending", "in_progress"):
-        out.extend(await repo.list_tasks(user_id, status=status_name))
+        items, _ = await repo.list_tasks(user_id, status=status_name)
+        out.extend(items)
     return out
 
 
@@ -208,6 +209,7 @@ async def build_night(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportBui
     result = await db.execute(
         select(Task).where(
             Task.user_id == user_id,
+            Task.deleted_at.is_(None),
             Task.status == "completed",
             Task.completed_at.is_not(None),
             Task.completed_at >= day_start.astimezone(timezone.utc),

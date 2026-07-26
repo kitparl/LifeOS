@@ -34,7 +34,7 @@ import { TasksWidgetComponent } from './widgets/tasks-widget.component';
             @if (auth.user(); as user) {
               {{ user.display_name }}
             } @else {
-              Dashboard
+              Quick Action
             }
           </h1>
           <p class="text-sm text-[var(--text-muted)]">Pick the next useful action, then move on.</p>

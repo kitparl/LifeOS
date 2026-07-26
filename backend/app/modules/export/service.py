@@ -54,7 +54,7 @@ class ExportService:
                 for g in result.scalars().all()
             ]
         if module == "tasks":
-            result = await self.db.execute(select(Task).where(Task.user_id == user_id))
+            result = await self.db.execute(select(Task).where(Task.user_id == user_id, Task.deleted_at.is_(None)))
             return [
                 {
                     "id": t.id,

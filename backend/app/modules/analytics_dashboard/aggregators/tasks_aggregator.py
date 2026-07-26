@@ -10,7 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.analytics_dashboard.aggregators import utc_today, window_start
 from app.modules.analytics_dashboard.schemas import HeatmapCell, SeriesPoint, TimeSeries
-from app.modules.tasks.models import Task
+from app.modules.tasks.models import OPEN_TASK_STATUSES, Task
+
+
+def _alive():
+    return Task.deleted_at.is_(None)
 
 
 async def task_completion_breakdown(db: AsyncSession, user_id: str, range_days: int) -> list[SeriesPoint]:
@@ -18,7 +22,7 @@ async def task_completion_breakdown(db: AsyncSession, user_id: str, range_days: 
     start_dt = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
     rows = await db.execute(
         select(Task.status, func.count())
-        .where(Task.user_id == user_id, Task.created_at >= start_dt)
+        .where(Task.user_id == user_id, _alive(), Task.created_at >= start_dt)
         .group_by(Task.status)
     )
     return [SeriesPoint(label=str(status), value=float(count)) for status, count in rows.all()]
@@ -31,7 +35,8 @@ async def overdue_count(db: AsyncSession, user_id: str) -> int:
         .select_from(Task)
         .where(
             Task.user_id == user_id,
-            Task.status.in_(("pending", "in_progress")),
+            _alive(),
+            Task.status.in_(OPEN_TASK_STATUSES),
             Task.due_date.is_not(None),
             Task.due_date < now,
         )
@@ -49,7 +54,7 @@ async def category_distribution(db: AsyncSession, user_id: str, range_days: int)
     start_dt = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
     rows = await db.execute(
         select(Task.category, func.count())
-        .where(Task.user_id == user_id, Task.created_at >= start_dt)
+        .where(Task.user_id == user_id, _alive(), Task.created_at >= start_dt)
         .group_by(Task.category)
     )
     return [
@@ -70,6 +75,7 @@ async def completed_series(
         select(Task.completed_at)
         .where(
             Task.user_id == user_id,
+            _alive(),
             Task.status == "completed",
             Task.completed_at.is_not(None),
             Task.completed_at >= start_dt,
@@ -125,7 +131,8 @@ async def todays_open_tasks(db: AsyncSession, user_id: str) -> int:
         .select_from(Task)
         .where(
             Task.user_id == user_id,
-            Task.status.in_(("pending", "in_progress")),
+            _alive(),
+            Task.status.in_(OPEN_TASK_STATUSES),
             Task.due_date.is_not(None),
             Task.due_date >= start_dt,
             Task.due_date < end_dt,
@@ -142,6 +149,7 @@ async def completed_in_range(db: AsyncSession, user_id: str, range_days: int) ->
         .select_from(Task)
         .where(
             Task.user_id == user_id,
+            _alive(),
             Task.status == "completed",
             Task.completed_at.is_not(None),
             Task.completed_at >= start_dt,
@@ -156,14 +164,15 @@ async def completion_rate(db: AsyncSession, user_id: str, range_days: int) -> fl
     completed = await db.execute(
         select(func.count())
         .select_from(Task)
-        .where(Task.user_id == user_id, Task.status == "completed", Task.created_at >= start_dt)
+        .where(Task.user_id == user_id, _alive(), Task.status == "completed", Task.created_at >= start_dt)
     )
     open_ = await db.execute(
         select(func.count())
         .select_from(Task)
         .where(
             Task.user_id == user_id,
-            Task.status.in_(("pending", "in_progress")),
+            _alive(),
+            Task.status.in_(OPEN_TASK_STATUSES),
             Task.created_at >= start_dt,
         )
     )
@@ -181,8 +190,9 @@ async def remaining_tasks_for_goal(db: AsyncSession, user_id: str, goal_id: str)
         .select_from(Task)
         .where(
             Task.user_id == user_id,
+            _alive(),
             Task.goal_id == goal_id,
-            Task.status.in_(("pending", "in_progress")),
+            Task.status.in_(OPEN_TASK_STATUSES),
         )
     )
     return int(result.scalar() or 0)

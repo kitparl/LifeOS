@@ -1,18 +1,20 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { TASK_PRIORITIES, TASK_RECURRENCE, TaskPriority, TaskRecurrence } from './models/task.models';
+import { PublicUser } from '../../core/models/auth.models';
+import { UserPickerComponent } from './components/user-picker.component';
+import { TASK_PRIORITIES, TASK_RECURRENCE, TASK_STATUSES, TaskPriority, TaskRecurrence, TaskStatus } from './models/task.models';
 import { TasksService } from './services/tasks.service';
 
 @Component({
   selector: 'app-task-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, UserPickerComponent],
   template: `
-    <div class="mx-auto max-w-2xl">
+    <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
         <div class="title-bar rounded-none border-x-0 border-t-0">{{ isEdit ? 'Edit Task' : 'New Task' }}</div>
-        <form class="space-y-4 p-4 text-sm sm:p-5" [formGroup]="form" (ngSubmit)="submit()">
+        <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
           <div>
             <label class="mb-1 block">Title</label>
             <input class="input-field" formControlName="title" />
@@ -27,6 +29,16 @@ import { TasksService } from './services/tasks.service';
               </select>
             </div>
             <div>
+              <label class="mb-1 block">Status</label>
+              <select class="input-field" formControlName="status">
+                @for (s of statuses; track s.value) {
+                  <option [value]="s.value">{{ s.label }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
               <label class="mb-1 block">Recurrence</label>
               <select class="input-field" formControlName="recurrence">
                 @for (r of recurrences; track r.value) {
@@ -34,15 +46,21 @@ import { TasksService } from './services/tasks.service';
                 }
               </select>
             </div>
-          </div>
-          <div>
-            <label class="mb-1 block">Category</label>
-            <input class="input-field" formControlName="category" placeholder="e.g. work, personal" />
+            <div>
+              <label class="mb-1 block">Category</label>
+              <input class="input-field" formControlName="category" placeholder="e.g. work, personal" />
+            </div>
           </div>
           <div>
             <label class="mb-1 block">Tags (comma-separated)</label>
             <input class="input-field" formControlName="tags" />
           </div>
+          @if (!isEdit) {
+            <div>
+              <label class="mb-1 block">Assign to (optional — defaults to you)</label>
+              <app-user-picker (picked)="onAssignee($event)" />
+            </div>
+          }
           <div>
             <label class="mb-1 block">Description</label>
             <textarea class="input-field min-h-[80px]" formControlName="description"></textarea>
@@ -54,15 +72,11 @@ import { TasksService } from './services/tasks.service';
           @if (error) {
             <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
           }
-          <div class="sticky bottom-2 flex flex-col gap-2 rounded-2xl border border-[var(--xp-border)] bg-[var(--surface)] p-3 backdrop-blur sm:static sm:flex-row sm:border-0 sm:bg-transparent sm:p-0">
-            <button type="submit" class="btn-primary w-full sm:w-auto" [disabled]="form.invalid || saving">
+          <div class="flex gap-2">
+            <button type="submit" class="btn-primary" [disabled]="form.invalid || saving">
               {{ saving ? 'Saving…' : 'Save' }}
             </button>
-            <a
-              routerLink="/tasks"
-              class="input-field inline-flex w-full items-center justify-center no-underline text-gray-700 sm:!w-auto"
-              >Cancel</a
-            >
+            <a routerLink="/tasks" class="btn-secondary no-underline">Cancel</a>
           </div>
         </form>
       </div>
@@ -76,15 +90,18 @@ export class TaskFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   priorities = TASK_PRIORITIES;
+  statuses = TASK_STATUSES;
   recurrences = TASK_RECURRENCE;
   isEdit = false;
   taskId: string | null = null;
   saving = false;
   error = '';
+  assigneeUsername: string | null = null;
 
   form = this.fb.nonNullable.group({
     title: ['', Validators.required],
     priority: ['medium' as TaskPriority, Validators.required],
+    status: ['pending' as TaskStatus, Validators.required],
     recurrence: ['none' as TaskRecurrence, Validators.required],
     category: [''],
     tags: [''],
@@ -103,6 +120,7 @@ export class TaskFormComponent implements OnInit {
           this.form.patchValue({
             title: task.title,
             priority: task.priority,
+            status: task.status === 'done' ? 'completed' : task.status,
             recurrence: task.recurrence,
             category: task.category ?? '',
             tags: task.tags.join(', '),
@@ -114,6 +132,10 @@ export class TaskFormComponent implements OnInit {
     }
   }
 
+  onAssignee(user: PublicUser | null): void {
+    this.assigneeUsername = user?.username ?? null;
+  }
+
   submit(): void {
     if (this.form.invalid) return;
     this.saving = true;
@@ -123,20 +145,24 @@ export class TaskFormComponent implements OnInit {
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    const payload = {
+    const payload: Record<string, unknown> = {
       title: raw.title,
       priority: raw.priority,
+      status: raw.status,
       recurrence: raw.recurrence,
       category: raw.category || null,
       tags,
       description: raw.description || null,
       due_date: raw.due_date ? new Date(raw.due_date).toISOString() : null,
     };
+    if (!this.isEdit && this.assigneeUsername) {
+      payload['assignee_username'] = this.assigneeUsername;
+    }
 
     const req =
       this.isEdit && this.taskId
-        ? this.tasksService.update(this.taskId, payload)
-        : this.tasksService.create(payload);
+        ? this.tasksService.update(this.taskId, payload as never)
+        : this.tasksService.create(payload as never);
 
     req.subscribe({
       next: (task) => this.router.navigate(['/tasks', task.id]),

@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 
 # Event type constants (also used as notify_on preference keys)
 TASK_CREATED = "task_created"
+TASK_ASSIGNED = "task_assigned"
+TASK_ASSIGNMENT_ACCEPTED = "task_assignment_accepted"
+TASK_ASSIGNMENT_REJECTED = "task_assignment_rejected"
+TASK_ASSIGNMENT_CANCELLED = "task_assignment_cancelled"
+TASK_REASSIGNED = "task_reassigned"
+TASK_STATUS_CHANGED = "task_status_changed"
+TASK_COMPLETED = "task_completed"
 RACE_ADDED = "race_added"
 CALENDAR_EVENT_CREATED = "calendar_event_created"
 HABIT_CREATED = "habit_created"
@@ -25,6 +32,13 @@ GOAL_MILESTONE_ADDED = "goal_milestone_added"
 
 ALL_EVENT_TYPES: tuple[str, ...] = (
     TASK_CREATED,
+    TASK_ASSIGNED,
+    TASK_ASSIGNMENT_ACCEPTED,
+    TASK_ASSIGNMENT_REJECTED,
+    TASK_ASSIGNMENT_CANCELLED,
+    TASK_REASSIGNED,
+    TASK_STATUS_CHANGED,
+    TASK_COMPLETED,
     RACE_ADDED,
     CALENDAR_EVENT_CREATED,
     HABIT_CREATED,

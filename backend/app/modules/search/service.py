@@ -48,6 +48,7 @@ class SearchService:
             rows = await self.db.execute(
                 select(Task).where(
                     Task.user_id == user_id,
+                    Task.deleted_at.is_(None),
                     or_(Task.title.ilike(pattern), Task.description.ilike(pattern)),
                 ).limit(limit)
             )

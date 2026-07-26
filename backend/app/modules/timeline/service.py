@@ -31,7 +31,7 @@ class TimelineService:
                 )
             )
 
-        tasks = await self.db.execute(select(Task).where(Task.user_id == user_id))
+        tasks = await self.db.execute(select(Task).where(Task.user_id == user_id, Task.deleted_at.is_(None)))
         for t in tasks.scalars().all():
             at = t.completed_at or t.updated_at
             items.append(

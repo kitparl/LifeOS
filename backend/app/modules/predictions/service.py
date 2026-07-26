@@ -52,7 +52,7 @@ class PredictionsService:
         )
         tasks_open = await self.db.execute(
             select(func.count()).select_from(Task).where(
-                Task.user_id == user_id, Task.status != "completed"
+                Task.user_id == user_id, Task.deleted_at.is_(None), Task.status != "completed"
             )
         )
         j_count = int(journal.scalar() or 0)

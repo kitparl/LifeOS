@@ -37,9 +37,15 @@
   ],
   "shortcuts": [
     {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "url": "/dashboard",
+      "name": "Analytics",
+      "short_name": "Home",
+      "url": "/analytics/dashboard",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Quick Action",
+      "short_name": "Quick",
+      "url": "/quick-action",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {

@@ -75,6 +75,7 @@ async def recent_activity(db: AsyncSession, user_id: str, limit: int = 10) -> li
         select(Task)
         .where(
             Task.user_id == user_id,
+            Task.deleted_at.is_(None),
             Task.status == "completed",
             Task.completed_at.is_not(None),
         )

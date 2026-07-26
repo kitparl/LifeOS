@@ -65,6 +65,10 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("users", "username_changed_at", "TIMESTAMP"),
     ("users", "username_change_count", "INTEGER DEFAULT 0"),
     ("users", "is_admin", "BOOLEAN DEFAULT FALSE"),
+    # Tasks: enterprise soft-delete / archive / optimistic concurrency
+    ("tasks", "deleted_at", "TIMESTAMP"),
+    ("tasks", "archived_at", "TIMESTAMP"),
+    ("tasks", "version", "INTEGER DEFAULT 1"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
