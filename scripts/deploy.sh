@@ -279,7 +279,9 @@ log "Current commit before pull: $(git rev-parse --short HEAD)"
 log "Pulling latest changes from $BRANCH..."
 git fetch origin
 git checkout "$BRANCH"
-git pull origin "$BRANCH"
+# Deploy scripts should match remote exactly. A plain `git pull` fails when
+# main was force-pushed (diverged history). Reset hard to origin after fetch.
+git reset --hard "origin/$BRANCH"
 COMMIT_SHA="$(git rev-parse --short HEAD)"
 log "Deploying commit $COMMIT_SHA ($(git log -1 --format='%s'))"
 
