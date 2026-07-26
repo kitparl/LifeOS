@@ -54,6 +54,7 @@ async def lifespan(app: FastAPI):
     import app.modules.integrations.report_models  # noqa: F401
     import app.modules.routines.models  # noqa: F401
     import app.modules.preferences.models  # noqa: F401
+    import app.modules.tasks.models  # noqa: F401 — Task + assignment/history/collab tables
     from app.modules.integrations.subscriber import register_subscribers
 
     register_subscribers()

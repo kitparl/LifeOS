@@ -19,6 +19,12 @@ class AnalyticsService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def _count_tasks(self, user_id: str) -> int:
+        result = await self.db.execute(
+            select(func.count()).select_from(Task).where(Task.user_id == user_id, Task.deleted_at.is_(None))
+        )
+        return int(result.scalar() or 0)
+
     async def summary(self, user_id: str) -> AnalyticsSummary:
         since = datetime.now(timezone.utc) - timedelta(days=30)
         since_date = date.today() - timedelta(days=30)
@@ -29,7 +35,7 @@ class AnalyticsService:
 
         modules = [
             ModuleCount(module="goals", count=await count(Goal, Goal.user_id)),
-            ModuleCount(module="tasks", count=await count(Task, Task.user_id)),
+            ModuleCount(module="tasks", count=await self._count_tasks(user_id)),
             ModuleCount(module="habits", count=await count(Habit, Habit.user_id)),
             ModuleCount(module="runs", count=await count(Run, Run.user_id)),
             ModuleCount(module="journal", count=await count(JournalEntry, JournalEntry.user_id)),
@@ -39,7 +45,7 @@ class AnalyticsService:
         ]
 
         tasks_done = await self.db.execute(
-            select(func.count()).select_from(Task).where(Task.user_id == user_id, Task.status == "completed")
+            select(func.count()).select_from(Task).where(Task.user_id == user_id, Task.deleted_at.is_(None), Task.status == "completed")
         )
         habits_30 = await self.db.execute(
             select(func.count())
@@ -84,7 +90,7 @@ class AnalyticsService:
 
     async def charts(self, user_id: str) -> AnalyticsCharts:
         task_rows = await self.db.execute(
-            select(Task.status, func.count()).where(Task.user_id == user_id).group_by(Task.status)
+            select(Task.status, func.count()).where(Task.user_id == user_id, Task.deleted_at.is_(None)).group_by(Task.status)
         )
         tasks_by_status = [ChartPoint(label=row[0], value=float(row[1])) for row in task_rows.all()]
 

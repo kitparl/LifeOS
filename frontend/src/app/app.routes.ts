@@ -23,12 +23,13 @@ export const routes: Routes = [
       import('./shared/layout/app-shell.component').then((m) => m.AppShellComponent),
     canActivate: [authGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      { path: '', pathMatch: 'full', redirectTo: 'analytics/dashboard' },
       {
-        path: 'dashboard',
+        path: 'quick-action',
         loadComponent: () =>
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
+      { path: 'dashboard', pathMatch: 'full', redirectTo: 'quick-action' },
       {
         path: 'profile',
         loadComponent: () =>
@@ -448,5 +449,5 @@ export const routes: Routes = [
       },
     ],
   },
-  { path: '**', redirectTo: 'dashboard' },
+  { path: '**', redirectTo: 'analytics/dashboard' },
 ];

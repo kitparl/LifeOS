@@ -116,7 +116,7 @@ async def test_tasks_list_screen_empty():
     db = MagicMock()
     with patch("app.modules.integrations.telegram.screens.tasks.TaskService") as Svc:
         svc = Svc.return_value
-        svc.list_tasks = AsyncMock(return_value=[])
+        svc.list_tasks = AsyncMock(return_value=([], 0))
         screen = await tasks_list_screen(db, "u1", 0)
     assert isinstance(screen, Screen)
     assert "No open tasks" in screen.text
@@ -137,7 +137,18 @@ async def test_tasks_done_callback():
 
     with patch("app.modules.integrations.telegram.screens.tasks.TaskService") as Svc:
         svc = Svc.return_value
-        svc.list_tasks = AsyncMock(side_effect=[[task], [], [], []])
+        svc.list_tasks = AsyncMock(
+            side_effect=[
+                ([task], 1),
+                ([], 0),
+                ([], 0),
+                ([], 0),
+                ([], 0),
+                ([], 0),
+                ([], 0),
+                ([], 0),
+            ]
+        )
         svc.complete_task = AsyncMock(return_value=task)
         ctx = CallbackContext(
             db=db,

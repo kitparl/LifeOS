@@ -42,4 +42,34 @@ describe('TasksService', () => {
       subtasks: [],
     });
   });
+
+  it('should list assigned_to_me scope', () => {
+    service.list({ scope: 'assigned_to_me' }).subscribe((rows) => {
+      expect(rows.length).toBe(0);
+    });
+    const req = http.expectOne((r) => r.url === `${environment.apiUrl}/tasks` && r.params.get('scope') === 'assigned_to_me');
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('should assign a task', () => {
+    service.assign('t1', { assignee_username: 'bob' }).subscribe((a) => {
+      expect(a.status).toBe('pending');
+    });
+    const req = http.expectOne(`${environment.apiUrl}/tasks/t1/assign`);
+    expect(req.request.method).toBe('POST');
+    req.flush({
+      id: 'a1',
+      task_id: 't1',
+      assignee_user_id: 'u2',
+      assigned_by_user_id: 'u1',
+      status: 'pending',
+      reason: null,
+      assigned_at: new Date().toISOString(),
+      accepted_at: null,
+      rejected_at: null,
+      cancelled_at: null,
+      completed_at: null,
+    });
+  });
 });

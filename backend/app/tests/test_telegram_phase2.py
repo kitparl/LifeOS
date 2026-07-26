@@ -135,7 +135,7 @@ async def test_handle_command_done_completes_match():
         patch("app.modules.tasks.service.TaskService") as Svc,
     ):
         repo = Repo.return_value
-        repo.list_tasks = AsyncMock(side_effect=[[task], []])
+        repo.list_tasks = AsyncMock(side_effect=[([task], 1), ([], 0)])
         svc = Svc.return_value
         svc.complete_task = AsyncMock(return_value=MagicMock())
         msg = await handle_command(db, "user-1", "/done abcdef12")

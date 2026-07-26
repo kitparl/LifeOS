@@ -10,7 +10,8 @@ export interface NavDestination {
 }
 
 export const NAV_DESTINATIONS: NavDestination[] = [
-  { id: 'dashboard', label: 'Dashboard', route: '/dashboard', icon: 'layout-dashboard', shortLabel: 'Home', category: 'Core' },
+  { id: 'analytics', label: 'Analytics', route: '/analytics/dashboard', icon: 'chart-line', shortLabel: 'Home', category: 'Core' },
+  { id: 'dashboard', label: 'Quick Action', route: '/quick-action', icon: 'layout-dashboard', shortLabel: 'Quick', category: 'Core' },
   { id: 'tasks', label: 'Tasks', route: '/tasks', icon: 'list-todo', category: 'Core' },
   { id: 'calendar', label: 'Calendar', route: '/calendar', icon: 'calendar-days', category: 'Core' },
   { id: 'routines', label: 'Routines', route: '/routines', icon: 'refresh-cw', category: 'Core' },
@@ -21,7 +22,6 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'finance', label: 'Finance', route: '/finance', icon: 'wallet', category: 'Growth' },
   { id: 'timeline', label: 'Timeline', route: '/timeline', icon: 'route', category: 'Insights' },
   { id: 'insights', label: 'Insights', route: '/insights', icon: 'chart-column', category: 'Insights' },
-  { id: 'analytics', label: 'Analytics', route: '/analytics/dashboard', icon: 'chart-line', category: 'Insights' },
   { id: 'documents', label: 'Documents', route: '/documents', icon: 'file-text', category: 'Knowledge' },
   { id: 'notifications', label: 'Notifications', route: '/notifications', icon: 'bell', shortLabel: 'Alerts', category: 'Core' },
   { id: 'assistant', label: 'AI Assistant', route: '/assistant', icon: 'sparkles', shortLabel: 'AI', category: 'System' },
@@ -42,6 +42,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
 ];
 
 export const DEFAULT_PINNED_IDS: string[] = [
+  'analytics',
   'dashboard',
   'tasks',
   'calendar',
@@ -81,6 +82,7 @@ const LEGACY_ROUTE_LABELS: Record<string, string> = {
   '/ocr': 'Documents',
   '/profile': 'Settings',
   '/export': 'Settings',
+  '/dashboard': 'Quick Action',
 };
 
 export function resolvePageTitle(url: string): string {

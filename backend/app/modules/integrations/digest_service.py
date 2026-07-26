@@ -87,7 +87,7 @@ class DigestService:
 
         task_repo = TaskRepository(self.db)
         for status_name in ("pending", "in_progress"):
-            tasks = await task_repo.list_tasks(user_id, status=status_name)
+            tasks, _ = await task_repo.list_tasks(user_id, status=status_name)
             for t in tasks:
                 due = t.due_date.date().isoformat() if t.due_date else "no due date"
                 content.pending_tasks.append(f"{t.title} [{status_name}, {due}]")

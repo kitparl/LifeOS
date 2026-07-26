@@ -56,8 +56,8 @@ async def goal_detail_screen(db: AsyncSession, user_id: str, token: str) -> Scre
             ms_rows.append(kb.row(kb.button(f"✅ {m.title[:28]}", f"goal:msdone:{sid}:{msid}")))
 
     # Linked tasks (Projects substitute)
-    pending = await TaskService(db).list_tasks(user_id, status="pending")
-    in_prog = await TaskService(db).list_tasks(user_id, status="in_progress")
+    pending, _ = await TaskService(db).list_tasks(user_id, status="pending")
+    in_prog, _ = await TaskService(db).list_tasks(user_id, status="in_progress")
     linked = [t for t in list(pending) + list(in_prog) if getattr(t, "goal_id", None) == goal.id]
     task_lines = [f"• {tpl.esc(t.title)}" for t in linked[:10]]
 

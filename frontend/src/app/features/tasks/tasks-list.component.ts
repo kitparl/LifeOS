@@ -3,7 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
-import { TASK_PRIORITIES, TASK_STATUSES, TaskListItem } from './models/task.models';
+import { TASK_PRIORITIES, TASK_STATUSES, TaskListItem, TaskScope } from './models/task.models';
 import { TasksService } from './services/tasks.service';
 
 @Component({
@@ -11,69 +11,86 @@ import { TasksService } from './services/tasks.service';
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink, DatePipe, ListPaginatorComponent],
   template: `
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold sm:text-2xl">Tasks</h1>
-          <p class="text-sm text-[var(--text-muted)]">Track priorities, deadlines, and subtasks.</p>
-        </div>
-        <a routerLink="/tasks/new" class="btn-primary text-xs no-underline sm:text-sm">New Task</a>
+    <div class="space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h1 class="text-lg font-semibold">Tasks</h1>
+        <a routerLink="/tasks/new" class="btn-primary text-xs no-underline">New Task</a>
       </div>
 
-      <form class="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]" [formGroup]="filters" (ngSubmit)="applyFilters()">
-        <input class="input-field min-w-0" formControlName="search" placeholder="Search…" />
-        <select class="input-field min-w-0" formControlName="status">
+      <div class="flex flex-wrap gap-1.5 text-xs">
+        @for (tab of scopeTabs; track tab.value) {
+          <button
+            type="button"
+            class="rounded-lg border px-3 py-1.5"
+            [class.bg-[var(--primary-soft)]]="scope === tab.value"
+            [style.border-color]="'var(--xp-border)'"
+            (click)="setScope(tab.value)"
+          >
+            {{ tab.label }}
+          </button>
+        }
+      </div>
+
+      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
+        <input class="input-field !w-auto min-w-[10rem] flex-1" formControlName="search" placeholder="Search…" />
+        <select class="input-field !w-auto" formControlName="status">
           <option value="">All statuses</option>
           @for (s of statuses; track s.value) {
             <option [value]="s.value">{{ s.label }}</option>
           }
         </select>
-        <select class="input-field min-w-0" formControlName="priority">
+        <select class="input-field !w-auto" formControlName="priority">
           <option value="">All priorities</option>
           @for (p of priorities; track p.value) {
             <option [value]="p.value">{{ p.label }}</option>
           }
         </select>
-        <label class="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--xp-border)] bg-[var(--surface)] px-3 text-xs text-[var(--text-muted)]">
+        <label class="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
           <input type="checkbox" formControlName="due_today" />
           Due today
         </label>
-        <button type="submit" class="btn-primary text-xs sm:col-span-2 xl:col-span-1">Filter</button>
+        <button type="submit" class="btn-primary text-xs">Filter</button>
       </form>
 
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading tasks…</p>
       } @else if (tasks.length === 0) {
         <div class="panel">
-          <p class="text-sm" style="color: var(--text-muted)">No tasks found.</p>
-          <a routerLink="/tasks/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create task</a>
+          <p class="text-sm" style="color: var(--text-muted)">
+            {{
+              scope === 'assigned_to_me'
+                ? 'No tasks from others assigned to you.'
+                : 'No tasks yet.'
+            }}
+          </p>
+          @if (scope === 'owned') {
+            <a routerLink="/tasks/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create task</a>
+          }
         </div>
       } @else {
-        <div class="space-y-3 md:hidden">
+        <div class="space-y-2 md:hidden">
           @for (task of pagedTasks; track task.id) {
-            <article class="panel space-y-3">
-              <div class="flex items-start justify-between gap-3">
+            <article class="panel space-y-2 !py-3">
+              <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
-                  <a [routerLink]="['/tasks', task.id]" class="block truncate text-base font-semibold text-[var(--xp-blue)] underline">
-                    {{ task.title }}
-                  </a>
-                  <p class="mt-1 text-xs capitalize text-[var(--text-muted)]">
-                    {{ task.priority }} priority · {{ task.status.replace('_', ' ') }}
+                  <a [routerLink]="['/tasks', task.id]" class="link font-medium">{{ task.title }}</a>
+                  <div class="mt-1.5 flex flex-wrap gap-1">
+                    <span class="chip text-xs capitalize">{{ task.priority }}</span>
+                    <span class="chip text-xs capitalize">{{ task.status.replace('_', ' ') }}</span>
+                    @if (task.assignment_status === 'pending') {
+                      <span class="chip text-xs" style="color: var(--warning, #b45309)">Pending accept</span>
+                    }
+                  </div>
+                  <p class="mt-1 text-xs" style="color: var(--text-muted)">
+                    {{ task.due_date ? (task.due_date | date: 'mediumDate') : 'No due date' }}
+                    · {{ task.completed_subtasks }}/{{ task.subtask_count }} subtasks
                   </p>
                 </div>
                 @if (task.status !== 'completed') {
-                  <button type="button" class="btn-primary px-3 text-xs" (click)="complete(task.id)">Done</button>
+                  <button type="button" class="btn-primary shrink-0 px-2 text-xs" (click)="complete(task.id)">
+                    Done
+                  </button>
                 }
-              </div>
-              <div class="grid grid-cols-2 gap-3 text-xs text-[var(--text-muted)]">
-                <div>
-                  <p class="font-medium text-[var(--xp-text)]">Due</p>
-                  <p>{{ task.due_date ? (task.due_date | date: 'mediumDate') : '—' }}</p>
-                </div>
-                <div>
-                  <p class="font-medium text-[var(--xp-text)]">Subtasks</p>
-                  <p>{{ task.completed_subtasks }}/{{ task.subtask_count }}</p>
-                </div>
               </div>
             </article>
           }
@@ -84,15 +101,16 @@ import { TasksService } from './services/tasks.service';
             (pageChange)="setPage($event)"
           />
         </div>
+
         <div class="panel hidden !p-0 overflow-hidden md:block">
           <table class="w-full text-sm">
-            <thead class="border-b border-[var(--xp-border)] bg-[var(--xp-silver)] text-left">
+            <thead class="border-b border-[var(--xp-border)] bg-[var(--xp-silver)] text-left text-xs">
               <tr>
-                <th class="px-3 py-2">Title</th>
-                <th class="px-3 py-2">Priority</th>
-                <th class="px-3 py-2">Status</th>
-                <th class="px-3 py-2">Due</th>
-                <th class="px-3 py-2">Subtasks</th>
+                <th class="px-3 py-2 font-medium">Title</th>
+                <th class="px-3 py-2 font-medium">Priority</th>
+                <th class="px-3 py-2 font-medium">Status</th>
+                <th class="px-3 py-2 font-medium">Due</th>
+                <th class="px-3 py-2 font-medium">Subtasks</th>
                 <th class="px-3 py-2"></th>
               </tr>
             </thead>
@@ -100,17 +118,22 @@ import { TasksService } from './services/tasks.service';
               @for (task of pagedTasks; track task.id) {
                 <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
                   <td class="px-3 py-2">
-                    <a [routerLink]="['/tasks', task.id]" class="link">{{ task.title }}</a>
+                    <a [routerLink]="['/tasks', task.id]" class="link font-medium">{{ task.title }}</a>
+                    @if (task.assignment_status === 'pending') {
+                      <span class="chip ml-2 text-xs" style="color: var(--warning, #b45309)">Pending</span>
+                    }
                   </td>
-                  <td class="px-3 py-2 capitalize">{{ task.priority }}</td>
-                  <td class="px-3 py-2 capitalize">{{ task.status.replace('_', ' ') }}</td>
-                  <td class="px-3 py-2 text-xs text-gray-600">
+                  <td class="px-3 py-2 capitalize text-xs">{{ task.priority }}</td>
+                  <td class="px-3 py-2">
+                    <span class="chip text-xs capitalize">{{ task.status.replace('_', ' ') }}</span>
+                  </td>
+                  <td class="px-3 py-2 text-xs" style="color: var(--text-muted)">
                     {{ task.due_date ? (task.due_date | date: 'mediumDate') : '—' }}
                   </td>
                   <td class="px-3 py-2 text-xs">{{ task.completed_subtasks }}/{{ task.subtask_count }}</td>
-                  <td class="px-3 py-2">
+                  <td class="px-3 py-2 text-right">
                     @if (task.status !== 'completed') {
-                      <button type="button" class="text-xs text-green-700 underline" (click)="complete(task.id)">Done</button>
+                      <button type="button" class="btn-ghost text-xs" (click)="complete(task.id)">Done</button>
                     }
                   </td>
                 </tr>
@@ -134,9 +157,14 @@ export class TasksListComponent implements OnInit {
 
   priorities = TASK_PRIORITIES;
   statuses = TASK_STATUSES;
+  scopeTabs: { value: TaskScope; label: string }[] = [
+    { value: 'owned', label: 'My tasks' },
+    { value: 'assigned_to_me', label: 'Assigned to me' },
+  ];
   tasks: TaskListItem[] = [];
   loading = false;
   currentPage = 1;
+  scope: TaskScope = 'owned';
   readonly pageSize = 12;
 
   filters = this.fb.nonNullable.group({
@@ -155,6 +183,12 @@ export class TasksListComponent implements OnInit {
     return this.tasks.slice(start, start + this.pageSize);
   }
 
+  setScope(scope: TaskScope): void {
+    this.scope = scope;
+    this.currentPage = 1;
+    this.load();
+  }
+
   applyFilters(): void {
     this.currentPage = 1;
     this.load();
@@ -169,6 +203,7 @@ export class TasksListComponent implements OnInit {
         status: raw.status || undefined,
         priority: raw.priority || undefined,
         due_today: raw.due_today || undefined,
+        scope: this.scope,
       })
       .subscribe({
         next: (data) => {

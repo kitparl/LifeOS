@@ -43,7 +43,7 @@ class AiIndexer:
             )
             docs.append(IndexDocument("goal", g.id, g.title, text, f"/goals/{g.id}"))
 
-        tasks = await self.db.execute(select(Task).where(Task.user_id == user_id))
+        tasks = await self.db.execute(select(Task).where(Task.user_id == user_id, Task.deleted_at.is_(None)))
         for t in tasks.scalars().all():
             text = " ".join(filter(None, [t.title, t.description, t.status, t.priority]))
             docs.append(IndexDocument("task", t.id, t.title, text, f"/tasks/{t.id}"))

@@ -20,7 +20,7 @@ import { RouterLink } from '@angular/router';
         </p>
         <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button type="button" class="btn-primary" (click)="reload()">Try again</button>
-          <a routerLink="/dashboard" class="input-field inline-flex !w-auto items-center justify-center no-underline">
+          <a routerLink="/analytics/dashboard" class="input-field inline-flex !w-auto items-center justify-center no-underline">
             Back to dashboard
           </a>
         </div>

@@ -122,7 +122,7 @@ export class RegisterComponent {
     this.submitting.set(true);
     this.error.set(null);
     this.auth.register(this.form.getRawValue()).subscribe({
-      next: () => this.router.navigate(['/dashboard']),
+      next: () => this.router.navigate(['/analytics/dashboard']),
       error: (err) => {
         const detail = err?.error?.detail;
         this.error.set(

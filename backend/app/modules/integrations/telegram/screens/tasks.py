@@ -21,6 +21,8 @@ PAGE_SIZE = 5
 _STATUS_EMOJI = {
     "pending": "⬜",
     "in_progress": "🔵",
+    "hold": "⏸",
+    "delayed": "⏰",
     "completed": "✅",
     "cancelled": "⛔",
 }
@@ -28,9 +30,11 @@ _STATUS_EMOJI = {
 
 async def _open_tasks(db: AsyncSession, user_id: str):
     svc = TaskService(db)
-    pending = await svc.list_tasks(user_id, status="pending")
-    in_prog = await svc.list_tasks(user_id, status="in_progress")
-    return list(pending) + list(in_prog)
+    pending, _ = await svc.list_tasks(user_id, status="pending")
+    in_prog, _ = await svc.list_tasks(user_id, status="in_progress")
+    hold, _ = await svc.list_tasks(user_id, status="hold")
+    delayed, _ = await svc.list_tasks(user_id, status="delayed")
+    return list(pending) + list(in_prog) + list(hold) + list(delayed)
 
 
 async def tasks_list_screen(db: AsyncSession, user_id: str, page: int = 0) -> Screen:
@@ -81,7 +85,7 @@ async def task_detail_screen(db: AsyncSession, user_id: str, token: str) -> Scre
     items = await _open_tasks(db, user_id)
     # Also try completed for view
     if not resolve_one(items, token):
-        completed = await TaskService(db).list_tasks(user_id, status="completed")
+        completed, _ = await TaskService(db).list_tasks(user_id, status="completed")
         items = items + list(completed)
     task = resolve_one(items, token)
     if task is None:
@@ -97,7 +101,7 @@ async def task_detail_screen(db: AsyncSession, user_id: str, token: str) -> Scre
         f"Due: <b>{tpl.esc(due)}</b>\nPriority: {tpl.esc(task.priority)}\n<code>{sid}</code>",
     )
     rows = []
-    if task.status in ("pending", "in_progress"):
+    if task.status in ("pending", "in_progress", "hold", "delayed"):
         rows.append(
             kb.row(
                 kb.button("✅ Done", f"task:done:{sid}"),
