@@ -41,40 +41,34 @@ import { RunningService } from './services/running.service';
           </div>
           <div class="panel">
             <p class="text-xs" style="color: var(--text-muted)">Events</p>
-            <div class="stat-row mt-0.5">
-              <div>
-                <p class="stat-figure">{{ stats.events_attended }}</p>
-                <p class="stat-caption">Attended</p>
-              </div>
-              <div>
-                <p class="stat-figure stat-figure--plain">{{ stats.events_registered }}</p>
-                <p class="stat-caption">Registered</p>
-              </div>
-            </div>
-            <div class="stat-divider"></div>
-            <p class="stat-caption">Last event</p>
-            <p class="stat-event-name">{{ stats.last_event_name || '—' }}</p>
-            <p class="stat-caption">
-              {{ stats.last_event_date ? (stats.last_event_date | date: 'mediumDate') : '—' }}
+            <p class="stat-line mt-0.5">
+              <span class="stat-figure">{{ stats.events_attended }}</span>
+              <span class="stat-caption">attended</span>
+              <span class="stat-sep">·</span>
+              <span class="stat-figure stat-figure--plain">{{ stats.events_registered }}</span>
+              <span class="stat-caption">registered</span>
+            </p>
+            <p class="stat-detail mt-1.5">
+              Last: <span class="stat-event-name">{{ stats.last_event_name || '—' }}</span>
+              @if (stats.last_event_date) {
+                <span class="stat-sep">·</span>{{ stats.last_event_date | date: 'mediumDate' }}
+              }
             </p>
           </div>
           <div class="panel">
             <p class="text-xs" style="color: var(--text-muted)">Distance in events</p>
-            <div class="stat-row mt-0.5">
-              <div>
-                <p class="stat-figure">{{ stats.event_total_km }} <span class="stat-unit">km</span></p>
-                <p class="stat-caption">Lifetime</p>
-              </div>
-              <div>
-                <p class="stat-figure stat-figure--plain">{{ stats.event_year_km }} <span class="stat-unit">km</span></p>
-                <p class="stat-caption">In {{ stats.event_year }}</p>
-              </div>
-            </div>
-            <div class="stat-divider"></div>
-            <p class="stat-caption">Next event</p>
-            <p class="stat-event-name">{{ stats.next_event_name || '—' }}</p>
-            <p class="stat-caption">
-              {{ stats.next_event_date ? (stats.next_event_date | date: 'mediumDate') : '—' }}
+            <p class="stat-line mt-0.5">
+              <span class="stat-figure">{{ stats.event_total_km }}</span>
+              <span class="stat-caption">km total</span>
+              <span class="stat-sep">·</span>
+              <span class="stat-figure stat-figure--plain">{{ stats.event_year_km }}</span>
+              <span class="stat-caption">km in {{ stats.event_year }}</span>
+            </p>
+            <p class="stat-detail mt-1.5">
+              Next: <span class="stat-event-name">{{ stats.next_event_name || '—' }}</span>
+              @if (stats.next_event_date) {
+                <span class="stat-sep">·</span>{{ stats.next_event_date | date: 'mediumDate' }}
+              }
             </p>
           </div>
         </div>
@@ -325,41 +319,40 @@ import { RunningService } from './services/running.service';
         font-weight: 500;
         color: var(--text);
       }
-      .stat-row {
+      .stat-line {
         display: flex;
-        gap: 1.5rem;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.3rem 0.4rem;
+        line-height: 1.3;
       }
       .stat-figure {
         font-size: 1.25rem;
         font-weight: 600;
-        line-height: 1.25;
         color: var(--primary);
         font-variant-numeric: tabular-nums;
       }
       .stat-figure--plain {
         color: var(--text);
       }
-      .stat-unit {
+      .stat-caption {
         font-size: 0.8125rem;
-        font-weight: 400;
         color: var(--text-muted);
       }
-      .stat-caption {
+      .stat-sep {
+        color: var(--text-faint);
+        margin: 0 0.1rem;
+      }
+      .stat-detail {
         font-size: 0.75rem;
         color: var(--text-muted);
-      }
-      .stat-divider {
-        height: 1px;
-        background: var(--border);
-        margin: 0.625rem 0;
-      }
-      .stat-event-name {
-        font-size: 0.8125rem;
-        font-weight: 500;
-        color: var(--text);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      .stat-event-name {
+        font-weight: 500;
+        color: var(--text);
       }
       .tab-btn {
         padding: 0.5rem 1rem;
