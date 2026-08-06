@@ -3,13 +3,13 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
-  RACE_DISTANCES,
   RaceEvent,
   RunListItem,
   RunningStats,
   formatDuration,
   formatPace,
   getRaceStatus,
+  raceDistanceLabel,
   raceStatusLabel,
 } from './models/running.models';
 import { RunningService } from './services/running.service';
@@ -40,26 +40,40 @@ import { RunningService } from './services/running.service';
             </div>
           </div>
           <div class="panel">
-            <p class="text-xs" style="color: var(--text-muted)">Total event attended: {{ stats.events_attended }}</p>
-            <p class="text-xs mt-1" style="color: var(--text-muted)">Total event registered: {{ stats.events_registered }}</p>
-            <p class="text-xs mt-1" style="color: var(--text-muted)">
-              last event: {{ stats.last_event_name || '—' }}
-            </p>
-            <p class="text-xs mt-1" style="color: var(--text-muted)">
-              last event Date:
+            <p class="text-xs" style="color: var(--text-muted)">Events</p>
+            <div class="stat-row mt-0.5">
+              <div>
+                <p class="stat-figure">{{ stats.events_attended }}</p>
+                <p class="stat-caption">Attended</p>
+              </div>
+              <div>
+                <p class="stat-figure stat-figure--plain">{{ stats.events_registered }}</p>
+                <p class="stat-caption">Registered</p>
+              </div>
+            </div>
+            <div class="stat-divider"></div>
+            <p class="stat-caption">Last event</p>
+            <p class="stat-event-name">{{ stats.last_event_name || '—' }}</p>
+            <p class="stat-caption">
               {{ stats.last_event_date ? (stats.last_event_date | date: 'mediumDate') : '—' }}
             </p>
           </div>
           <div class="panel">
-            <p class="text-xs" style="color: var(--text-muted)">Total run in event: {{ stats.event_total_km }} km</p>
-            <p class="text-xs mt-1" style="color: var(--text-muted)">
-              Total run in {{ stats.event_year }}: {{ stats.event_year_km }} km
-            </p>
-            <p class="text-xs mt-1" style="color: var(--text-muted)">
-              Next event: {{ stats.next_event_name || '—' }}
-            </p>
-            <p class="text-xs mt-1" style="color: var(--text-muted)">
-              Next event Date:
+            <p class="text-xs" style="color: var(--text-muted)">Distance in events</p>
+            <div class="stat-row mt-0.5">
+              <div>
+                <p class="stat-figure">{{ stats.event_total_km }} <span class="stat-unit">km</span></p>
+                <p class="stat-caption">Lifetime</p>
+              </div>
+              <div>
+                <p class="stat-figure stat-figure--plain">{{ stats.event_year_km }} <span class="stat-unit">km</span></p>
+                <p class="stat-caption">In {{ stats.event_year }}</p>
+              </div>
+            </div>
+            <div class="stat-divider"></div>
+            <p class="stat-caption">Next event</p>
+            <p class="stat-event-name">{{ stats.next_event_name || '—' }}</p>
+            <p class="stat-caption">
               {{ stats.next_event_date ? (stats.next_event_date | date: 'mediumDate') : '—' }}
             </p>
           </div>
@@ -311,6 +325,42 @@ import { RunningService } from './services/running.service';
         font-weight: 500;
         color: var(--text);
       }
+      .stat-row {
+        display: flex;
+        gap: 1.5rem;
+      }
+      .stat-figure {
+        font-size: 1.25rem;
+        font-weight: 600;
+        line-height: 1.25;
+        color: var(--primary);
+        font-variant-numeric: tabular-nums;
+      }
+      .stat-figure--plain {
+        color: var(--text);
+      }
+      .stat-unit {
+        font-size: 0.8125rem;
+        font-weight: 400;
+        color: var(--text-muted);
+      }
+      .stat-caption {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+      .stat-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 0.625rem 0;
+      }
+      .stat-event-name {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .tab-btn {
         padding: 0.5rem 1rem;
         font-size: 0.8125rem;
@@ -343,7 +393,6 @@ export class RunningListComponent implements OnInit {
   readonly formatDuration = formatDuration;
   readonly formatPace = formatPace;
   readonly raceStatusLabel = raceStatusLabel;
-  raceDistances = RACE_DISTANCES;
 
   activeTab = signal<'runs' | 'events' | 'bests' | 'goals'>('runs');
 
@@ -435,7 +484,7 @@ export class RunningListComponent implements OnInit {
   }
 
   raceLabel(race: RaceEvent): string {
-    return RACE_DISTANCES.find((d) => d.value === race.distance_type)?.label ?? race.distance_type;
+    return raceDistanceLabel(race.distance_type, race.distance_km);
   }
 
   raceStatus(race: RaceEvent) {

@@ -1,10 +1,15 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FileUploadComponent } from '../../shared/file-upload/file-upload.component';
 import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { FilesService } from '../files/services/files.service';
-import { RACE_DISTANCES, RaceEvent } from './models/running.models';
+import {
+  RACE_DISTANCES,
+  RaceEvent,
+  parseRaceDistance,
+  raceDistanceLabel,
+} from './models/running.models';
 import { RunningService } from './services/running.service';
 
 interface EventPhotoItem {
@@ -46,12 +51,15 @@ function isPastDate(dateStr: string): boolean {
                 <input id="race_date" class="input-field mt-1" type="date" formControlName="race_date" />
               </div>
               <div>
-                <label class="form-label" for="distance_type">Distance</label>
-                <select id="distance_type" class="input-field mt-1" formControlName="distance_type">
-                  @for (d of raceDistances; track d.value) {
-                    <option [value]="d.value">{{ d.label }}</option>
-                  }
-                </select>
+                <label class="form-label">Distance</label>
+                <div class="mt-1">
+                  <app-type-select
+                    formControlName="distance_label"
+                    placeholder="Select or type e.g. 12 km"
+                    [options]="distanceOptions()"
+                    (created)="onDistanceCreated($event)"
+                  />
+                </div>
               </div>
             </div>
 
@@ -309,7 +317,11 @@ export class RaceEventFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  raceDistances = RACE_DISTANCES;
+  customDistances = signal<string[]>([]);
+  distanceOptions = computed(() => [
+    ...RACE_DISTANCES.map((d) => d.label),
+    ...this.customDistances(),
+  ]);
   shoes = signal<string[]>([]);
   isEdit = false;
   raceId: string | null = null;
@@ -323,7 +335,7 @@ export class RaceEventFormComponent implements OnInit {
   form = this.fb.nonNullable.group({
     name: ['', Validators.required],
     race_date: [todayIsoDate(), Validators.required],
-    distance_type: ['marathon' as const, Validators.required],
+    distance_label: ['Marathon', Validators.required],
     organizer: [''],
     location: [''],
     shoe: [''],
@@ -370,10 +382,14 @@ export class RaceEventFormComponent implements OnInit {
           if (cert.includes('/files/') && cert.includes('/content')) {
             this.certificateFileUrl = cert;
           }
+          const distanceLabel = raceDistanceLabel(r.distance_type, r.distance_km);
+          if (!this.distanceOptions().includes(distanceLabel)) {
+            this.customDistances.update((list) => [...list, distanceLabel]);
+          }
           this.form.patchValue({
             name: r.name,
             race_date: r.race_date.slice(0, 10),
-            distance_type: r.distance_type as any,
+            distance_label: distanceLabel,
             organizer: r.organizer ?? '',
             location: r.location ?? '',
             shoe: r.shoe ?? '',
@@ -393,6 +409,10 @@ export class RaceEventFormComponent implements OnInit {
         },
       });
     }
+  }
+
+  onDistanceCreated(label: string): void {
+    this.customDistances.update((list) => (list.includes(label) ? list : [...list, label]));
   }
 
   onShoeCreated(name: string): void {
@@ -498,10 +518,13 @@ export class RaceEventFormComponent implements OnInit {
     const attended = !raw.skipped && (raw.attended || !!finish_time_seconds);
     const skipped = !!raw.skipped && !attended;
 
+    const distance = parseRaceDistance(raw.distance_label);
+
     const payload = {
       name: raw.name,
       race_date: raw.race_date,
-      distance_type: raw.distance_type,
+      distance_type: distance.distance_type,
+      distance_km: distance.distance_km,
       organizer: raw.organizer || null,
       location: raw.location || null,
       shoe: raw.shoe || null,

@@ -151,6 +151,37 @@ export const RACE_DISTANCES: { value: RaceDistanceType; label: string }[] = [
 
 export const WEATHER_OPTIONS = ['sunny', 'cloudy', 'rain', 'cold', 'hot', 'windy'];
 
+/** Display label for a race distance, including custom distances like "13.2 km". */
+export function raceDistanceLabel(
+  distanceType: string,
+  distanceKm?: number | null,
+): string {
+  if (distanceType === 'other' && distanceKm) return `${distanceKm} km`;
+  return RACE_DISTANCES.find((d) => d.value === distanceType)?.label ?? distanceType;
+}
+
+/**
+ * Resolve a typed distance into the API pair. Standard labels map to their enum
+ * value; anything numeric ("12km", "13.2 km") becomes an "other" race with an
+ * explicit distance so event totals count it correctly.
+ */
+export function parseRaceDistance(input: string): {
+  distance_type: RaceDistanceType;
+  distance_km: number | null;
+} {
+  const trimmed = input.trim();
+  const standard = RACE_DISTANCES.find(
+    (d) => d.label.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (standard) return { distance_type: standard.value, distance_km: null };
+
+  const km = Number.parseFloat(trimmed.replace(',', '.').replace(/[^0-9.]/g, ''));
+  if (Number.isFinite(km) && km > 0) {
+    return { distance_type: 'other', distance_km: Math.round(km * 100) / 100 };
+  }
+  return { distance_type: 'other', distance_km: null };
+}
+
 export function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);

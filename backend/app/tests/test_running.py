@@ -270,6 +270,35 @@ async def test_event_stats_and_merged_runs(client):
 
 
 @pytest.mark.asyncio
+async def test_custom_distance_event_counts_in_totals(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    year = date.today().year
+
+    create = await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "Custom 13.2K",
+            "race_date": f"{year}-02-10",
+            "distance_type": "other",
+            "distance_km": 13.2,
+            "attended": True,
+        },
+    )
+    assert create.status_code == 201
+    assert create.json()["distance_km"] == 13.2
+
+    stats = await client.get("/api/v1/running/stats", headers=headers)
+    assert stats.json()["event_total_km"] == 13.2
+    assert stats.json()["event_year_km"] == 13.2
+
+    runs = await client.get("/api/v1/running/runs", headers=headers)
+    row = next(r for r in runs.json() if r["event_name"] == "Custom 13.2K")
+    assert row["distance_km"] == 13.2
+
+
+@pytest.mark.asyncio
 async def test_skipped_exclusive_with_attended(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}

@@ -3,10 +3,10 @@ import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FilesService } from '../files/services/files.service';
 import {
-  RACE_DISTANCES,
   RaceEvent,
   formatDuration,
   getRaceStatus,
+  raceDistanceLabel,
   raceStatusLabel,
 } from './models/running.models';
 import { RunningService } from './services/running.service';
@@ -238,7 +238,7 @@ export class RaceEventDetailComponent implements OnInit {
   }
 
   raceLabel(race: RaceEvent): string {
-    return RACE_DISTANCES.find((d) => d.value === race.distance_type)?.label ?? race.distance_type;
+    return raceDistanceLabel(race.distance_type, race.distance_km);
   }
 
   raceStatus(race: RaceEvent) {
