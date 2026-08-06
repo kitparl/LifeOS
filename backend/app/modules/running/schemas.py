@@ -40,6 +40,8 @@ class RunListItem(BaseModel):
     location: str | None
     shoe: str | None = None
     updated_at: datetime
+    source: Literal["run", "race"] = "run"
+    event_name: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -76,6 +78,7 @@ class RaceCreate(BaseModel):
     photos: list[str] = Field(default_factory=list)
     registered: bool = False
     attended: bool = False
+    skipped: bool = False
     shoe: str | None = Field(default=None, max_length=80)
     notes: str | None = None
 
@@ -96,6 +99,7 @@ class RaceUpdate(BaseModel):
     photos: list[str] | None = None
     registered: bool | None = None
     attended: bool | None = None
+    skipped: bool | None = None
     shoe: str | None = Field(default=None, max_length=80)
     notes: str | None = None
 
@@ -117,6 +121,7 @@ class RaceResponse(BaseModel):
     photos: list[str]
     registered: bool
     attended: bool
+    skipped: bool
     shoe: str | None = None
     notes: str | None
     created_at: datetime
@@ -166,3 +171,12 @@ class RunningStatsResponse(BaseModel):
     last_run_date: date | None
     personal_bests: list[PersonalBest]
     shoe_totals: list[ShoeTotal] = []
+    events_attended: int = 0
+    events_registered: int = 0
+    last_event_name: str | None = None
+    last_event_date: date | None = None
+    next_event_name: str | None = None
+    next_event_date: date | None = None
+    event_total_km: float = 0.0
+    event_year_km: float = 0.0
+    event_year: int = 0

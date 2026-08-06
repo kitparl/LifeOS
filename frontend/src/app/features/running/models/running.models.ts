@@ -1,6 +1,6 @@
 export type RaceDistanceType = '5k' | '10k' | '15k' | 'half_marathon' | 'marathon' | 'other';
 
-export type RaceStatus = 'upcoming' | 'registered' | 'completed' | 'missed';
+export type RaceStatus = 'upcoming' | 'registered' | 'completed' | 'missed' | 'skipped';
 
 export interface Run {
   id: string;
@@ -26,6 +26,8 @@ export interface RunListItem {
   location: string | null;
   shoe: string | null;
   updated_at: string;
+  source?: 'run' | 'race';
+  event_name?: string | null;
 }
 
 export interface RunCreate {
@@ -65,6 +67,7 @@ export interface RaceEvent {
   photos: string[];
   registered: boolean;
   attended?: boolean;
+  skipped?: boolean;
   shoe: string | null;
   notes: string | null;
   created_at: string;
@@ -87,6 +90,7 @@ export interface RaceCreate {
   photos?: string[];
   registered?: boolean;
   attended?: boolean;
+  skipped?: boolean;
   shoe?: string | null;
   notes?: string | null;
 }
@@ -125,6 +129,15 @@ export interface RunningStats {
   last_run_date: string | null;
   personal_bests: PersonalBest[];
   shoe_totals: ShoeTotal[];
+  events_attended: number;
+  events_registered: number;
+  last_event_name: string | null;
+  last_event_date: string | null;
+  next_event_name: string | null;
+  next_event_date: string | null;
+  event_total_km: number;
+  event_year_km: number;
+  event_year: number;
 }
 
 export const RACE_DISTANCES: { value: RaceDistanceType; label: string }[] = [
@@ -159,6 +172,7 @@ export function getRaceStatus(race: RaceEvent): RaceStatus {
   today.setHours(0, 0, 0, 0);
   const raceDate = new Date(`${race.race_date.slice(0, 10)}T00:00:00`);
 
+  if (race.skipped) return 'skipped';
   if (race.attended || race.finish_time_seconds) return 'completed';
   if (raceDate < today) return 'missed';
   if (race.registered) return 'registered';
@@ -173,6 +187,8 @@ export function raceStatusLabel(status: RaceStatus): string {
       return 'Did not attend';
     case 'registered':
       return 'Registered';
+    case 'skipped':
+      return 'Skipped / Incomplete';
     default:
       return 'Upcoming';
   }

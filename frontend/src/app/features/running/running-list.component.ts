@@ -40,14 +40,27 @@ import { RunningService } from './services/running.service';
             </div>
           </div>
           <div class="panel">
-            <p class="text-xs" style="color: var(--text-muted)">Total runs</p>
-            <p class="text-xl font-semibold mt-0.5">{{ stats.total_runs }} <span class="text-sm font-normal" style="color: var(--text-muted)">runs</span></p>
-            <p class="text-xs mt-0.5" style="color: var(--text-muted)">{{ stats.total_km }} km lifetime</p>
+            <p class="text-xs" style="color: var(--text-muted)">Total event attended: {{ stats.events_attended }}</p>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">Total event registered: {{ stats.events_registered }}</p>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">
+              last event: {{ stats.last_event_name || '—' }}
+            </p>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">
+              last event Date:
+              {{ stats.last_event_date ? (stats.last_event_date | date: 'mediumDate') : '—' }}
+            </p>
           </div>
           <div class="panel">
-            <p class="text-xs" style="color: var(--text-muted)">Last run</p>
-            <p class="text-xl font-semibold mt-0.5">
-              {{ stats.last_run_date ? (stats.last_run_date | date: 'mediumDate') : '—' }}
+            <p class="text-xs" style="color: var(--text-muted)">Total run in event: {{ stats.event_total_km }} km</p>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">
+              Total run in {{ stats.event_year }}: {{ stats.event_year_km }} km
+            </p>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">
+              Next event: {{ stats.next_event_name || '—' }}
+            </p>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">
+              Next event Date:
+              {{ stats.next_event_date ? (stats.next_event_date | date: 'mediumDate') : '—' }}
             </p>
           </div>
         </div>
@@ -142,18 +155,34 @@ import { RunningService } from './services/running.service';
                   @for (run of runs; track run.id) {
                     <tr style="border-bottom: 1px solid var(--border)">
                       <td class="px-3 py-2">
-                        <a [routerLink]="['/running', run.id]" class="link font-medium">
+                        <a
+                          [routerLink]="run.source === 'race' ? ['/running/races', run.id] : ['/running', run.id]"
+                          class="link font-medium"
+                        >
                           {{ run.run_date | date: 'mediumDate' }}
                         </a>
+                        @if (run.source === 'race') {
+                          <span class="badge badge--default ml-1">Event</span>
+                          @if (run.event_name) {
+                            <span class="text-xs ml-1" style="color: var(--text-muted)">{{ run.event_name }}</span>
+                          }
+                        }
                       </td>
                       <td class="px-3 py-2">{{ run.distance_km }} km</td>
-                      <td class="px-3 py-2">{{ formatDuration(run.duration_seconds) }}</td>
-                      <td class="px-3 py-2">{{ formatPace(run.pace_min_per_km) }}</td>
+                      <td class="px-3 py-2">
+                        {{ run.duration_seconds ? formatDuration(run.duration_seconds) : '—' }}
+                      </td>
+                      <td class="px-3 py-2">
+                        {{ run.pace_min_per_km ? formatPace(run.pace_min_per_km) : '—' }}
+                      </td>
                       <td class="px-3 py-2" style="color: var(--text-muted)">{{ run.shoe || '—' }}</td>
                       <td class="px-3 py-2" style="color: var(--text-muted)">{{ run.location || '—' }}</td>
                       <td class="px-3 py-2 capitalize" style="color: var(--text-muted)">{{ run.weather ?? '—' }}</td>
                       <td class="px-3 py-2">
-                        <a [routerLink]="['/running', run.id, 'edit']" class="link text-xs">Edit</a>
+                        <a
+                          [routerLink]="run.source === 'race' ? ['/running/races', run.id, 'edit'] : ['/running', run.id, 'edit']"
+                          class="link text-xs"
+                        >Edit</a>
                       </td>
                     </tr>
                   }
@@ -186,7 +215,7 @@ import { RunningService } from './services/running.service';
                     <span
                       class="badge"
                       [class.badge--success]="raceStatus(race) === 'completed'"
-                      [class.badge--warning]="raceStatus(race) === 'registered'"
+                      [class.badge--warning]="raceStatus(race) === 'registered' || raceStatus(race) === 'skipped'"
                       [class.badge--default]="raceStatus(race) === 'upcoming' || raceStatus(race) === 'missed'"
                     >{{ raceStatusLabel(raceStatus(race)) }}</span>
                     @if (race.medal) { <span class="badge badge--warning">🏅 Medal</span> }

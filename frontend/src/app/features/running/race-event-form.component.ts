@@ -98,12 +98,16 @@ function isPastDate(dateStr: string): boolean {
                 <span class="form-label" style="margin: 0">Registered for event</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" formControlName="attended" class="w-4 h-4" />
+                <input type="checkbox" formControlName="attended" class="w-4 h-4" (change)="onAttendedChange()" />
                 <span class="form-label" style="margin: 0">I attended / completed this race</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" formControlName="medal" class="w-4 h-4" />
                 <span class="form-label" style="margin: 0">Medal</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" formControlName="skipped" class="w-4 h-4" (change)="onSkippedChange()" />
+                <span class="form-label" style="margin: 0">Skipped / Incomplete</span>
               </label>
             </div>
 
@@ -330,6 +334,7 @@ export class RaceEventFormComponent implements OnInit {
     position: [null as number | null],
     registered: [false],
     attended: [false],
+    skipped: [false],
     medal: [false],
     event_url: [''],
     certificate_url: [''],
@@ -379,6 +384,7 @@ export class RaceEventFormComponent implements OnInit {
             position: r.position ?? null,
             registered: r.registered,
             attended: r.attended,
+            skipped: r.skipped ?? false,
             medal: r.medal,
             event_url: r.event_url ?? '',
             certificate_url: cert,
@@ -461,6 +467,23 @@ export class RaceEventFormComponent implements OnInit {
     }
   }
 
+  onAttendedChange(): void {
+    if (this.form.controls.attended.value) {
+      this.form.patchValue({ skipped: false });
+    }
+  }
+
+  onSkippedChange(): void {
+    if (this.form.controls.skipped.value) {
+      this.form.patchValue({
+        attended: false,
+        finish_hours: null,
+        finish_minutes: null,
+        finish_seconds: null,
+      });
+    }
+  }
+
   submit(): void {
     if (this.form.invalid) return;
     this.saving = true;
@@ -471,8 +494,9 @@ export class RaceEventFormComponent implements OnInit {
     const fm = raw.finish_minutes ?? 0;
     const fs = raw.finish_seconds ?? 0;
     const finish_time_seconds =
-      raw.attended && (fh || fm || fs) ? fh * 3600 + fm * 60 + fs : null;
-    const attended = raw.attended || !!finish_time_seconds;
+      !raw.skipped && raw.attended && (fh || fm || fs) ? fh * 3600 + fm * 60 + fs : null;
+    const attended = !raw.skipped && (raw.attended || !!finish_time_seconds);
+    const skipped = !!raw.skipped && !attended;
 
     const payload = {
       name: raw.name,
@@ -486,6 +510,7 @@ export class RaceEventFormComponent implements OnInit {
       position: raw.position ?? null,
       registered: raw.registered,
       attended,
+      skipped,
       medal: raw.medal,
       event_url: raw.event_url || null,
       certificate_url: raw.certificate_url || null,

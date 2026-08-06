@@ -203,8 +203,115 @@ def test_race_response_handles_legacy_nulls_and_string_photos():
 
     assert response.registered is False
     assert response.attended is False
+    assert response.skipped is False
     assert response.medal is False
     assert response.photos == ["https://example.com/photo.jpg"]
+
+
+@pytest.mark.asyncio
+async def test_event_stats_and_merged_runs(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    year = date.today().year
+
+    await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "Big Bangalore",
+            "race_date": f"{year}-01-05",
+            "distance_type": "10k",
+            "registered": True,
+            "attended": True,
+            "finish_time_seconds": 3000,
+        },
+    )
+    await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "Future Half",
+            "race_date": f"{year + 1}-06-01",
+            "distance_type": "half_marathon",
+            "registered": True,
+        },
+    )
+    await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "Old 5K",
+            "race_date": f"{year - 1}-03-01",
+            "distance_type": "5k",
+            "attended": True,
+        },
+    )
+
+    stats = await client.get("/api/v1/running/stats", headers=headers)
+    assert stats.status_code == 200
+    body = stats.json()
+    assert body["events_attended"] == 2
+    assert body["events_registered"] == 2
+    assert body["event_total_km"] == 15.0
+    assert body["event_year_km"] == 10.0
+    assert body["event_year"] == year
+    assert body["last_event_name"] == "Big Bangalore"
+    assert body["next_event_name"] == "Future Half"
+
+    runs = await client.get("/api/v1/running/runs", headers=headers)
+    assert runs.status_code == 200
+    race_rows = [r for r in runs.json() if r["source"] == "race"]
+    assert len(race_rows) == 2
+    names = {r["event_name"] for r in race_rows}
+    assert names == {"Big Bangalore", "Old 5K"}
+    bangalore = next(r for r in race_rows if r["event_name"] == "Big Bangalore")
+    assert bangalore["distance_km"] == 10.0
+    assert bangalore["duration_seconds"] == 3000
+
+
+@pytest.mark.asyncio
+async def test_skipped_exclusive_with_attended(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create = await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "Skipped Race",
+            "race_date": "2026-04-01",
+            "distance_type": "10k",
+            "skipped": True,
+            "attended": True,
+            "finish_time_seconds": 2700,
+        },
+    )
+    assert create.status_code == 201
+    data = create.json()
+    assert data["skipped"] is True
+    assert data["attended"] is False
+    race_id = data["id"]
+
+    runs = await client.get("/api/v1/running/runs", headers=headers)
+    assert all(r["id"] != race_id for r in runs.json())
+
+    patch = await client.patch(
+        f"/api/v1/running/races/{race_id}",
+        headers=headers,
+        json={"attended": True, "skipped": False, "finish_time_seconds": 2800},
+    )
+    assert patch.status_code == 200
+    assert patch.json()["attended"] is True
+    assert patch.json()["skipped"] is False
+
+    patch_skip = await client.patch(
+        f"/api/v1/running/races/{race_id}",
+        headers=headers,
+        json={"skipped": True},
+    )
+    assert patch_skip.status_code == 200
+    assert patch_skip.json()["skipped"] is True
+    assert patch_skip.json()["attended"] is False
 
 
 @pytest.mark.asyncio

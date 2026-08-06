@@ -25,7 +25,14 @@ from app.modules.running.schemas import (
     RunningStatsResponse,
     ShoeTotal,
 )
-from app.modules.running.stats import compute_pace, compute_personal_bests, compute_shoe_totals, weekly_km
+from app.modules.running.stats import (
+    _race_distance_km,
+    compute_event_stats,
+    compute_pace,
+    compute_personal_bests,
+    compute_shoe_totals,
+    weekly_km,
+)
 
 
 class RunningService:
@@ -88,6 +95,7 @@ class RunningService:
             photos=RunningService._normalize_photos(race.photos),
             registered=RunningService._bool_field(race, "registered"),
             attended=RunningService._bool_field(race, "attended"),
+            skipped=RunningService._bool_field(race, "skipped"),
             shoe=getattr(race, "shoe", None),
             notes=race.notes,
             created_at=race.created_at,
@@ -105,6 +113,25 @@ class RunningService:
             location=getattr(run, 'location', None),
             shoe=getattr(run, 'shoe', None),
             updated_at=run.updated_at,
+            source="run",
+            event_name=None,
+        )
+
+    def _race_to_list_item(self, race: RaceEvent) -> RunListItem:
+        distance_km = _race_distance_km(race)
+        duration = race.finish_time_seconds or 0
+        return RunListItem(
+            id=race.id,
+            run_date=race.race_date,
+            distance_km=distance_km,
+            duration_seconds=duration,
+            pace_min_per_km=compute_pace(distance_km, duration) if duration and distance_km else 0.0,
+            weather=None,
+            location=race.location,
+            shoe=getattr(race, "shoe", None),
+            updated_at=race.updated_at,
+            source="race",
+            event_name=race.name,
         )
 
     def _to_run_response(self, run) -> RunResponse:
@@ -124,7 +151,17 @@ class RunningService:
 
     async def list_runs(self, user_id: str, shoe: str | None = None) -> list[RunListItem]:
         runs = await self.repo.list_runs(user_id, shoe=shoe)
-        return [self._to_list_item(r) for r in runs]
+        items = [self._to_list_item(r) for r in runs]
+        races = await self.repo.list_races(user_id)
+        for race in races:
+            if not self._bool_field(race, "attended"):
+                continue
+            race_shoe = (getattr(race, "shoe", None) or "").strip() or None
+            if shoe and race_shoe != shoe:
+                continue
+            items.append(self._race_to_list_item(race))
+        items.sort(key=lambda item: (item.run_date, item.updated_at), reverse=True)
+        return items
 
     async def list_shoes(self, user_id: str) -> list[str]:
         stored = await self.repo.list_shoe_names(user_id)
@@ -221,6 +258,7 @@ class RunningService:
         last_run = runs[0] if runs else None
         total_km = round(sum(r.distance_km for r in runs), 2)
         bests = [PersonalBest(**b) for b in compute_personal_bests(runs)]
+        event_stats = compute_event_stats(races)
         return RunningStatsResponse(
             weekly_km=weekly_km(runs),
             weekly_goal_km=settings.weekly_goal_km,
@@ -229,6 +267,7 @@ class RunningService:
             last_run_date=last_run.run_date if last_run else None,
             personal_bests=bests,
             shoe_totals=[ShoeTotal(**s) for s in compute_shoe_totals(runs, races)],
+            **event_stats,
         )
 
     async def get_dashboard_progress(self, user_id: str) -> dict | None:

@@ -86,6 +86,37 @@ def compute_shoe_totals(runs: list[Run], races: list | None = None) -> list[dict
     return results
 
 
+def compute_event_stats(races: list, ref: date | None = None) -> dict:
+    """Event attendance / distance / next-last summary for Running stats cards."""
+    ref = ref or datetime.now(timezone.utc).date()
+    year = ref.year
+    attended = [r for r in races if getattr(r, "attended", False)]
+    registered = [r for r in races if getattr(r, "registered", False)]
+    past_or_today = [r for r in races if r.race_date <= ref]
+    upcoming = [r for r in races if r.race_date >= ref]
+
+    last_event = max(past_or_today, key=lambda r: r.race_date) if past_or_today else None
+    next_event = min(upcoming, key=lambda r: r.race_date) if upcoming else None
+
+    event_total_km = round(sum(_race_distance_km(r) for r in attended), 2)
+    event_year_km = round(
+        sum(_race_distance_km(r) for r in attended if r.race_date.year == year),
+        2,
+    )
+
+    return {
+        "events_attended": len(attended),
+        "events_registered": len(registered),
+        "last_event_name": last_event.name if last_event else None,
+        "last_event_date": last_event.race_date if last_event else None,
+        "next_event_name": next_event.name if next_event else None,
+        "next_event_date": next_event.race_date if next_event else None,
+        "event_total_km": event_total_km,
+        "event_year_km": event_year_km,
+        "event_year": year,
+    }
+
+
 def compute_personal_bests(runs: list[Run]) -> list[dict]:
     results = []
     for key, (lo, hi, label) in DISTANCE_RANGES.items():

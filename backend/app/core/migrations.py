@@ -31,6 +31,7 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("race_events", "photos", "TEXT"),  # stored as JSON string
     ("race_events", "attended", "BOOLEAN DEFAULT FALSE"),
     ("race_events", "registered", "BOOLEAN DEFAULT FALSE"),
+    ("race_events", "skipped", "BOOLEAN DEFAULT FALSE"),
     # Calendar: reusable scheduling linkage (source module + entity id)
     ("calendar_events", "source_module", "VARCHAR(32)"),
     ("calendar_events", "source_id", "VARCHAR(36)"),
@@ -82,6 +83,7 @@ _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
     ("race_events", "medal"),
     ("race_events", "registered"),
     ("race_events", "attended"),
+    ("race_events", "skipped"),
     ("users", "is_admin"),
 ]
 

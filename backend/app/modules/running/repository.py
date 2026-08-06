@@ -95,6 +95,10 @@ class RunningRepository:
 
     async def create_race(self, user_id: str, data: RaceCreate) -> RaceEvent:
         shoe = (data.shoe or "").strip() or None
+        skipped = bool(data.skipped)
+        attended = (not skipped) and (data.attended or bool(data.finish_time_seconds))
+        if attended:
+            skipped = False
         race = RaceEvent(
             user_id=user_id,
             name=data.name,
@@ -104,14 +108,15 @@ class RunningRepository:
             location=data.location,
             organizer=data.organizer,
             bib_number=data.bib_number,
-            finish_time_seconds=data.finish_time_seconds,
+            finish_time_seconds=None if skipped else data.finish_time_seconds,
             position=data.position,
             medal=data.medal,
             certificate_url=data.certificate_url,
             event_url=data.event_url,
             photos=data.photos or [],
             registered=data.registered,
-            attended=data.attended or bool(data.finish_time_seconds),
+            attended=attended,
+            skipped=skipped,
             shoe=shoe,
             notes=data.notes,
         )
@@ -124,13 +129,23 @@ class RunningRepository:
 
     async def update_race(self, race: RaceEvent, data: RaceUpdate) -> RaceEvent:
         updates = data.model_dump(exclude_unset=True)
-        if updates.get("finish_time_seconds"):
+        if updates.get("finish_time_seconds") and not updates.get("skipped"):
             updates["attended"] = True
         if "shoe" in updates:
             shoe = (updates["shoe"] or "").strip() or None
             updates["shoe"] = shoe
             if shoe:
                 await self.ensure_shoe(race.user_id, shoe)
+
+        skipped = updates.get("skipped", race.skipped)
+        attended = updates.get("attended", race.attended)
+        if skipped:
+            updates["skipped"] = True
+            updates["attended"] = False
+        elif attended:
+            updates["attended"] = True
+            updates["skipped"] = False
+
         for key, value in updates.items():
             setattr(race, key, value)
         await self.db.flush()

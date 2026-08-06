@@ -67,6 +67,7 @@ class RaceEvent(Base):
     photos: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     registered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     attended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    skipped: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     shoe: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
