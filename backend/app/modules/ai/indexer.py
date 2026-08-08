@@ -10,7 +10,7 @@ from app.modules.finance.models import FinanceTransaction
 from app.modules.goals.models import Goal
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
-from app.modules.learning.models import LearningItem
+from app.modules.learning.models import LearningConcept, LearningItem, StudySession
 from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
 from app.modules.tasks.models import Task
@@ -90,6 +90,35 @@ class AiIndexer:
         for l in learning.scalars().all():
             text = " ".join(filter(None, [l.title, l.provider, l.notes, l.item_type, l.status]))
             docs.append(IndexDocument("learning", l.id, l.title, text, f"/learning/{l.id}"))
+
+        concepts = await self.db.execute(
+            select(LearningConcept).where(LearningConcept.user_id == user_id)
+        )
+        for c in concepts.scalars().all():
+            text = " ".join(
+                filter(
+                    None,
+                    [c.title, c.summary, c.slug, c.artifact_url, f"week {c.week_number}" if c.week_number else None],
+                )
+            )
+            docs.append(
+                IndexDocument("learning_concept", c.id, c.title, text, f"/learning/concepts/{c.id}")
+            )
+
+        sessions = await self.db.execute(select(StudySession).where(StudySession.user_id == user_id))
+        for s in sessions.scalars().all():
+            if not s.notes:
+                continue
+            title = f"Study session {s.session_date}"
+            docs.append(
+                IndexDocument(
+                    "study_session",
+                    s.id,
+                    title,
+                    s.notes,
+                    f"/learning/concepts/{s.concept_id}" if s.concept_id else "/learning/today",
+                )
+            )
 
         projects = await self.db.execute(select(CareerProject).where(CareerProject.user_id == user_id))
         for p in projects.scalars().all():

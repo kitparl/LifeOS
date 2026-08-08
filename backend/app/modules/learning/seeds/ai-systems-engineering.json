@@ -1,0 +1,2797 @@
+{
+  "slug": "ai-systems-engineering",
+  "title": "AI Systems Engineering",
+  "description": "Backend Engineer → AI/GenAI Backend Engineer → Agentic AI Engineer → AI Systems / Platform Engineer. 24 weeks, ~11 hrs/week.",
+  "status": "active",
+  "start_date": "2026-08-08",
+  "target_date": "2027-01-23",
+  "weekly_hours_target": 11,
+  "sort_order": 1,
+  "phases": [
+    {
+      "slug": "p1-llm-foundations",
+      "title": "Phase 1 — LLM Foundations",
+      "item_type": "study_plan",
+      "sort_order": 1,
+      "summary": "Decode loop, tokenization, context window, sampling, embeddings intro",
+      "resources": [
+        {
+          "resource_type": "playlist",
+          "title": "Krish Naik — YouTube channel",
+          "url": "https://www.youtube.com/@krishnaik06",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube",
+          "author": "Krish Naik"
+        },
+        {
+          "resource_type": "repo",
+          "title": "Krish Naik — Roadmap To Learn Agentic AI",
+          "url": "https://github.com/krishnaik06/Roadmap-To-Learn-Agentic-AI",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "github",
+          "author": "Krish Naik"
+        },
+        {
+          "resource_type": "playlist",
+          "title": "freeCodeCamp — YouTube channel",
+          "url": "https://www.youtube.com/@freecodecamp",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube",
+          "author": "freeCodeCamp"
+        },
+        {
+          "resource_type": "docs",
+          "title": "DeepLearning.AI courses",
+          "url": "https://www.deeplearning.ai/courses/",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "deeplearning.ai"
+        },
+        {
+          "resource_type": "docs",
+          "title": "DeepLearning.AI short courses",
+          "url": "https://www.deeplearning.ai/short-courses/",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "deeplearning.ai"
+        },
+        {
+          "resource_type": "article",
+          "title": "DeepLearning.AI — The Batch",
+          "url": "https://www.deeplearning.ai/the-batch/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "deeplearning.ai"
+        },
+        {
+          "resource_type": "playlist",
+          "title": "Sheryians AI School",
+          "url": "https://www.youtube.com/@sheryiansai",
+          "priority": "optional",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube"
+        },
+        {
+          "resource_type": "playlist",
+          "title": "Krish Naik — Generative AI Tutorials",
+          "url": "https://www.youtube.com/playlist?list=PLA1lVIthbM1D5I6r5uY2K89X1KD2w5LNh",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube",
+          "author": "Krish Naik"
+        },
+        {
+          "resource_type": "docs",
+          "title": "OpenAI — Text generation & prompting",
+          "url": "https://platform.openai.com/docs/guides/text",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "openai"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "autoregressive-decode-loop",
+          "title": "The LLM as a stateless next-token function",
+          "week_number": 1,
+          "estimated_minutes": 90,
+          "summary": "Depth: explain the loop (prompt in, one token out, append, repeat) and why prefill vs decode have different cost curves. Skip the maths.",
+          "resources": [
+            {
+              "resource_type": "video",
+              "title": "Karpathy — Intro to Large Language Models",
+              "url": "https://www.youtube.com/watch?v=zjkBMFhNj_g",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Andrej Karpathy",
+              "duration_minutes": 60,
+              "sort_order": 1
+            },
+            {
+              "resource_type": "video",
+              "title": "3Blue1Brown — But what is a GPT?",
+              "url": "https://www.youtube.com/watch?v=wjZofJX0v4M",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "3Blue1Brown",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "video",
+              "title": "Karpathy — Deep Dive into LLMs like ChatGPT",
+              "url": "https://www.youtube.com/watch?v=7xTGNNLPyMI",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Andrej Karpathy",
+              "duration_minutes": 210,
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "tokenization",
+          "title": "Tokenization and the GPT tokenizer",
+          "week_number": 1,
+          "estimated_minutes": 75,
+          "summary": "Depth: predict roughly how many tokens a payload costs and explain why non-English text and JSON inflate token counts.",
+          "resources": [
+            {
+              "resource_type": "video",
+              "title": "Karpathy — Let's build the GPT Tokenizer",
+              "url": "https://www.youtube.com/watch?v=zduSFxRajkE",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Andrej Karpathy",
+              "duration_minutes": 60,
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenAI Tokenizer (hands-on)",
+              "url": "https://platform.openai.com/tokenizer",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "repo",
+              "title": "tiktoken — BPE tokenizer used by OpenAI models",
+              "url": "https://github.com/openai/tiktoken",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "attention-intuition",
+          "title": "Attention intuition (skip the derivation)",
+          "week_number": 1,
+          "estimated_minutes": 60,
+          "summary": "Depth: intuition for why cost grows with context length. Do NOT derive attention.",
+          "resources": [
+            {
+              "resource_type": "video",
+              "title": "3Blue1Brown — Attention in transformers",
+              "url": "https://www.youtube.com/watch?v=eMlx5fFNoYc",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "3Blue1Brown",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Jay Alammar — The Illustrated Transformer",
+              "url": "https://jalammar.github.io/illustrated-transformer/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "author": "Jay Alammar",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "video",
+              "title": "Karpathy — Let's build GPT: from scratch, in code",
+              "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Andrej Karpathy",
+              "duration_minutes": 116,
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "context-window",
+          "title": "Context window as a capacity-planning resource",
+          "week_number": 1,
+          "estimated_minutes": 45,
+          "summary": "Depth: treat context as a capacity budget — know what happens at the limit (truncation vs error) and how to plan a token budget per request.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Anthropic — Context windows",
+              "url": "https://docs.anthropic.com/en/docs/build-with-claude/context-windows",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Text generation & prompting",
+              "url": "https://platform.openai.com/docs/guides/text",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "sampling",
+          "title": "Sampling: temperature, top-p, and determinism trade-offs",
+          "week_number": 1,
+          "estimated_minutes": 45,
+          "summary": "Depth: know when temperature 0 is required (extraction, tool args) vs helpful (drafting), and why 'temperature 0' is still not deterministic.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Hugging Face — Text generation strategies",
+              "url": "https://huggingface.co/docs/transformers/generation_strategies",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "huggingface",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Chat Completions API (temperature, top_p)",
+              "url": "https://platform.openai.com/docs/api-reference/chat/create",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "embeddings-intro",
+          "title": "Embeddings intro — vectors as meaning",
+          "week_number": 1,
+          "estimated_minutes": 45,
+          "summary": "Depth: explain what a vector represents, why cosine similarity works, and that embedding models are not interchangeable across an index.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Embeddings guide",
+              "url": "https://platform.openai.com/docs/guides/embeddings",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Sentence Transformers (SBERT)",
+              "url": "https://sbert.net/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "playlist",
+              "title": "Krish Naik — Generative AI Tutorials",
+              "url": "https://www.youtube.com/playlist?list=PLA1lVIthbM1D5I6r5uY2K89X1KD2w5LNh",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Krish Naik",
+              "sort_order": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "p2-llm-application-engineering",
+      "title": "Phase 2 — LLM Application Engineering",
+      "item_type": "study_plan",
+      "sort_order": 2,
+      "resources": [
+        {
+          "resource_type": "docs",
+          "title": "OpenAI Cookbook",
+          "url": "https://cookbook.openai.com/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "openai"
+        },
+        {
+          "resource_type": "docs",
+          "title": "DeepLearning.AI short courses index",
+          "url": "https://www.deeplearning.ai/short-courses/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "deeplearning.ai"
+        },
+        {
+          "resource_type": "article",
+          "title": "Chip Huyen — engineering blog",
+          "url": "https://huyenchip.com/blog/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "author": "Chip Huyen"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "llm-apis-message-roles",
+          "title": "LLM APIs and message roles",
+          "week_number": 2,
+          "estimated_minutes": 60,
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Text generation & prompting",
+              "url": "https://platform.openai.com/docs/guides/text",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Anthropic — Messages API",
+              "url": "https://docs.anthropic.com/en/api/messages",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 2
+            }
+          ],
+          "summary": "Depth: know what belongs in system vs user vs assistant vs tool, and why untrusted data must never enter the system role."
+        },
+        {
+          "slug": "structured-outputs",
+          "title": "Structured outputs — replace regex JSON parsing",
+          "week_number": 2,
+          "estimated_minutes": 90,
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Structured Outputs",
+              "url": "https://platform.openai.com/docs/guides/structured-outputs",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Pydantic — models & validation",
+              "url": "https://docs.pydantic.dev/latest/concepts/models/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "pydantic",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "docs",
+              "title": "JSON Schema — Understanding JSON Schema",
+              "url": "https://json-schema.org/understanding-json-schema",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "sort_order": 3
+            }
+          ],
+          "summary": "Depth: replace regex JSON extraction with schema-enforced output; know the failure modes (refusals, schema too loose)."
+        },
+        {
+          "slug": "function-calling",
+          "title": "Function calling / tool schemas",
+          "week_number": 2,
+          "estimated_minutes": 90,
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Function calling",
+              "url": "https://platform.openai.com/docs/guides/function-calling",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Anthropic — Tool use",
+              "url": "https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "docs",
+              "title": "JSON Schema — Understanding JSON Schema",
+              "url": "https://json-schema.org/understanding-json-schema",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "sort_order": 3
+            }
+          ],
+          "summary": "Depth: design a tool schema the model can actually use; know that the model chooses, your code executes."
+        },
+        {
+          "slug": "streaming",
+          "title": "Streaming responses",
+          "week_number": 2,
+          "estimated_minutes": 45,
+          "summary": "Depth: stream tokens end-to-end and handle mid-stream failure, cancellation, and partial JSON.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Streaming API responses",
+              "url": "https://platform.openai.com/docs/guides/streaming-responses",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "MDN — Using server-sent events",
+              "url": "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "mdn",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "retries-timeouts",
+          "title": "Retries, timeouts, and backoff for LLM calls",
+          "week_number": 3,
+          "estimated_minutes": 60,
+          "summary": "Depth: pick per-call timeouts, exponential backoff with jitter, and a retry budget. Map directly to your payments retry work.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "AWS Builders' Library — Timeouts, retries and backoff with jitter",
+              "url": "https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "aws",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Rate limits",
+              "url": "https://platform.openai.com/docs/guides/rate-limits",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "circuit-breaker-fallback",
+          "title": "Circuit breaker and provider fallback",
+          "week_number": 3,
+          "estimated_minutes": 75,
+          "summary": "Depth: know when a fallback model makes things worse, and how a breaker prevents retry storms.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Martin Fowler — Circuit Breaker",
+              "url": "https://martinfowler.com/bliki/CircuitBreaker.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Martin Fowler",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "AWS Builders' Library — Avoiding fallback in distributed systems",
+              "url": "https://aws.amazon.com/builders-library/avoiding-fallback-in-distributed-systems/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "aws",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "model-routing",
+          "title": "Model routing across providers",
+          "week_number": 3,
+          "estimated_minutes": 60,
+          "summary": "Depth: route by task class and cost ceiling; keep a single request contract across providers.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Chip Huyen — Building A Generative AI Platform",
+              "url": "https://huyenchip.com/2024/07/25/genai-platform.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Chip Huyen",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LiteLLM — unified LLM gateway",
+              "url": "https://docs.litellm.ai/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "litellm",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "semantic-caching",
+          "title": "Semantic caching for LLM responses",
+          "week_number": 3,
+          "estimated_minutes": 60,
+          "summary": "Depth: know the correctness risk — a near-duplicate query is not the same query. Define a similarity threshold and an invalidation rule.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Chip Huyen — Building A Generative AI Platform",
+              "url": "https://huyenchip.com/2024/07/25/genai-platform.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Chip Huyen",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "repo",
+              "title": "GPTCache — semantic cache for LLM queries",
+              "url": "https://github.com/zilliztech/GPTCache",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "rate-limits-concurrency",
+          "title": "Rate limits, quotas, and concurrency control",
+          "week_number": 3,
+          "estimated_minutes": 60,
+          "summary": "Depth: implement provider quota plus per-tenant throttling; know the difference between RPM, TPM and concurrency limits.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Rate limits",
+              "url": "https://platform.openai.com/docs/guides/rate-limits",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Stripe — Rate limits (production pattern)",
+              "url": "https://docs.stripe.com/rate-limits",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "stripe",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "prompt-injection",
+          "title": "Prompt injection as a vulnerability class",
+          "week_number": 4,
+          "estimated_minutes": 90,
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OWASP Top 10 for LLM Applications",
+              "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "owasp",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Simon Willison — Prompt injection series",
+              "url": "https://simonwillison.net/series/prompt-injection/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Simon Willison",
+              "sort_order": 2
+            }
+          ],
+          "summary": "Depth: understand that retrieved and user content is data-that-becomes-code. Find the real injection surface in LifeOS's ai module."
+        },
+        {
+          "slug": "pii-secrets",
+          "title": "PII handling and secret leakage in prompts",
+          "week_number": 4,
+          "estimated_minutes": 60,
+          "summary": "Depth: redact before the call and before the log; know that prompts and traces are both leak paths.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Microsoft Presidio — PII detection & anonymization",
+              "url": "https://microsoft.github.io/presidio/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "microsoft",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OWASP Top 10 for LLM Applications",
+              "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "owasp",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "project1-llm-gateway",
+          "title": "Project 1: LLM Gateway & Router",
+          "week_number": 4,
+          "estimated_minutes": 180,
+          "summary": "Deliverable: multi-provider routing with fallback, semantic cache, per-tenant quota, streaming, structured output, token ledger and tracing. README leads with a latency/cost table.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Chip Huyen — Building A Generative AI Platform",
+              "url": "https://huyenchip.com/2024/07/25/genai-platform.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Chip Huyen",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LiteLLM — unified LLM gateway",
+              "url": "https://docs.litellm.ai/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "litellm",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Rate limits",
+              "url": "https://platform.openai.com/docs/guides/rate-limits",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "p3-embeddings-rag",
+      "title": "Phase 3 — Embeddings & RAG",
+      "item_type": "study_plan",
+      "sort_order": 3,
+      "resources": [
+        {
+          "resource_type": "course",
+          "title": "DeepLearning.AI — Retrieval Augmented Generation",
+          "url": "https://www.deeplearning.ai/courses/retrieval-augmented-generation",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "deeplearning.ai"
+        },
+        {
+          "resource_type": "video",
+          "title": "freeCodeCamp — Production RAG with LangChain & Vector Databases",
+          "url": "https://www.youtube.com/watch?v=mHxLXzYjQRE",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube",
+          "author": "freeCodeCamp",
+          "duration_minutes": 480
+        },
+        {
+          "resource_type": "article",
+          "title": "freeCodeCamp — companion write-up for Production RAG",
+          "url": "https://www.freecodecamp.org/news/production-rag-with-langchain-vector-databases/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "freecodecamp"
+        },
+        {
+          "resource_type": "video",
+          "title": "freeCodeCamp — RAG Fundamentals and Advanced Techniques",
+          "url": "https://www.youtube.com/watch?v=ea2W8IogX80",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube",
+          "author": "freeCodeCamp"
+        },
+        {
+          "resource_type": "playlist",
+          "title": "Krish Naik — MultiModal RAG",
+          "url": "https://www.youtube.com/playlist?list=PLQxDHpeGU14D6dm0rmAXhdLeLYlX2zk7p",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube",
+          "author": "Krish Naik"
+        },
+        {
+          "resource_type": "docs",
+          "title": "pgvector",
+          "url": "https://github.com/pgvector/pgvector",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "github"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "embedding-spaces",
+          "title": "Embedding spaces and cosine similarity",
+          "week_number": 5,
+          "estimated_minutes": 75,
+          "summary": "Depth: choose an embedding model on evidence, and know that changing it invalidates the whole index.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Embeddings guide",
+              "url": "https://platform.openai.com/docs/guides/embeddings",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "MTEB leaderboard — choosing an embedding model",
+              "url": "https://huggingface.co/spaces/mteb/leaderboard",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "huggingface",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "ann-indexes",
+          "title": "HNSW vs IVF vs flat indexes",
+          "week_number": 5,
+          "estimated_minutes": 75,
+          "summary": "Depth: explain HNSW vs IVF vs flat recall/latency/build-cost trade-offs, and when an O(n) scan is genuinely correct.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Pinecone — Vector indexes (flat, IVF, HNSW)",
+              "url": "https://www.pinecone.io/learn/series/faiss/vector-indexes/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "pinecone",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "paper",
+              "title": "HNSW — Efficient and robust ANN search",
+              "url": "https://arxiv.org/abs/1603.09320",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "arxiv",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "docs",
+              "title": "pgvector",
+              "url": "https://github.com/pgvector/pgvector",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "pgvector-migration",
+          "title": "Migrate embedding_json → pgvector",
+          "week_number": 5,
+          "estimated_minutes": 120,
+          "summary": "Depth: move from JSON-text vectors to a real vector column with an index; measure before/after latency.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "pgvector",
+              "url": "https://github.com/pgvector/pgvector",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "PostgreSQL — CREATE INDEX",
+              "url": "https://www.postgresql.org/docs/current/sql-createindex.html",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "postgresql",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "chunking-ingestion",
+          "title": "Chunking strategies and ingestion pipelines",
+          "week_number": 6,
+          "estimated_minutes": 90,
+          "summary": "Depth: pick a chunk size and overlap for a reason you can defend; know what breaks with tables and code.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Pinecone — Chunking strategies for LLM applications",
+              "url": "https://www.pinecone.io/learn/chunking-strategies/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "pinecone",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangChain — Text splitters",
+              "url": "https://python.langchain.com/docs/concepts/text_splitters/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "video",
+              "title": "freeCodeCamp — Production RAG with LangChain & Vector DBs",
+              "url": "https://www.youtube.com/watch?v=mHxLXzYjQRE",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "freeCodeCamp",
+              "duration_minutes": 480,
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "metadata-filtering",
+          "title": "Metadata filters on retrieval",
+          "week_number": 6,
+          "estimated_minutes": 45,
+          "summary": "Depth: combine filters with ANN search and know why pre- vs post-filtering changes recall.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "pgvector — Filtering",
+              "url": "https://github.com/pgvector/pgvector#filtering",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangChain — Retrieval concepts",
+              "url": "https://python.langchain.com/docs/concepts/retrieval/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "bm25-hybrid",
+          "title": "BM25 and hybrid search",
+          "week_number": 6,
+          "estimated_minutes": 75,
+          "summary": "Depth: know which queries lexical search wins (IDs, error codes, exact names) and why hybrid beats either alone.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Elastic — Practical BM25 (the algorithm and variables)",
+              "url": "https://www.elastic.co/blog/practical-bm25-part-2-the-bm25-algorithm-and-variables",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "elastic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "PostgreSQL — Full text search",
+              "url": "https://www.postgresql.org/docs/current/textsearch.html",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "postgresql",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "rrf",
+          "title": "Reciprocal Rank Fusion (replace ad-hoc score blends)",
+          "week_number": 6,
+          "estimated_minutes": 75,
+          "summary": "Depth: know why adding raw scores from two rankers is wrong and how rank-based fusion avoids score normalisation.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Elasticsearch — Reciprocal rank fusion",
+              "url": "https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "elastic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "paper",
+              "title": "Cormack et al. — Reciprocal Rank Fusion (original paper)",
+              "url": "https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "reranking",
+          "title": "Reranking retrieved candidates",
+          "week_number": 7,
+          "estimated_minutes": 75,
+          "summary": "Depth: retrieve wide, rerank narrow. Know the added latency and cost per query.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Cohere — Rerank overview",
+              "url": "https://docs.cohere.com/docs/rerank-overview",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "cohere",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Pinecone — Rerankers in RAG",
+              "url": "https://www.pinecone.io/learn/series/rag/rerankers/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "pinecone",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "query-rewriting",
+          "title": "Query rewriting and multi-query retrieval",
+          "week_number": 7,
+          "estimated_minutes": 75,
+          "summary": "Depth: multi-query and rewriting to fix vocabulary mismatch; know the latency cost and when it does not help.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "LangChain — Query transformations",
+              "url": "https://blog.langchain.dev/query-transformations/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "video",
+              "title": "freeCodeCamp — RAG Fundamentals and Advanced Techniques",
+              "url": "https://www.youtube.com/watch?v=ea2W8IogX80",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "freeCodeCamp",
+              "duration_minutes": 40,
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "parent-child-chunks",
+          "title": "Parent-child and contextual retrieval",
+          "week_number": 7,
+          "estimated_minutes": 90,
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Anthropic — Contextual Retrieval",
+              "url": "https://www.anthropic.com/news/contextual-retrieval",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangChain — ParentDocumentRetriever",
+              "url": "https://python.langchain.com/docs/how_to/parent_document_retriever/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "playlist",
+              "title": "Krish Naik — MultiModal RAG",
+              "url": "https://www.youtube.com/playlist?list=PLQxDHpeGU14D6dm0rmAXhdLeLYlX2zk7p",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Krish Naik",
+              "sort_order": 3
+            }
+          ],
+          "summary": "Depth: retrieve small, return large. Know why context around a hit improves faithfulness."
+        },
+        {
+          "slug": "incremental-indexing",
+          "title": "Incremental indexing via content hash",
+          "week_number": 7,
+          "estimated_minutes": 60,
+          "summary": "Depth: content-hash so re-indexing is cheap; kill the clear-and-rebuild pattern.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangChain — Indexing API (content hashing, dedup)",
+              "url": "https://python.langchain.com/docs/how_to/indexing/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            }
+          ]
+        },
+        {
+          "slug": "retrieval-metrics",
+          "title": "Retrieval metrics: recall@k, MRR, nDCG, faithfulness",
+          "week_number": 8,
+          "estimated_minutes": 120,
+          "summary": "Depth: compute recall@k, MRR, nDCG and faithfulness on your own corpus and publish the numbers.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "RAGAS — metrics concepts",
+              "url": "https://docs.ragas.io/en/stable/concepts/metrics/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "ragas",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "book",
+              "title": "Stanford IR Book — Evaluation in information retrieval",
+              "url": "https://nlp.stanford.edu/IR-book/html/htmledition/evaluation-in-information-retrieval-1.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "stanford",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "project2-ops-rag",
+          "title": "Project 2: Ops RAG + eval harness",
+          "week_number": 8,
+          "estimated_minutes": 240,
+          "summary": "Deliverable: RAG over runbooks with a published before/after ablation — recall@k, MRR, faithfulness, p95 latency and cost per query.",
+          "resources": [
+            {
+              "resource_type": "video",
+              "title": "freeCodeCamp — Production RAG with LangChain & Vector DBs",
+              "url": "https://www.youtube.com/watch?v=mHxLXzYjQRE",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "freeCodeCamp",
+              "duration_minutes": 480,
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "RAGAS — metrics concepts",
+              "url": "https://docs.ragas.io/en/stable/concepts/metrics/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "ragas",
+              "sort_order": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "p4-agentic-ai",
+      "title": "Phase 4 — Agentic AI",
+      "item_type": "study_plan",
+      "sort_order": 4,
+      "resources": [
+        {
+          "resource_type": "article",
+          "title": "Anthropic — Building Effective Agents",
+          "url": "https://www.anthropic.com/engineering/building-effective-agents",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "anthropic"
+        },
+        {
+          "resource_type": "article",
+          "title": "Lilian Weng — LLM Powered Autonomous Agents",
+          "url": "https://lilianweng.github.io/posts/2023-06-23-agent/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "author": "Lilian Weng"
+        },
+        {
+          "resource_type": "course",
+          "title": "DeepLearning.AI — Agentic AI",
+          "url": "https://www.deeplearning.ai/courses/agentic-ai",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "deeplearning.ai"
+        },
+        {
+          "resource_type": "course",
+          "title": "DeepLearning.AI — Agent Memory",
+          "url": "https://www.deeplearning.ai/courses/agent-memory-building-memory-aware-agents",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "deeplearning.ai"
+        },
+        {
+          "resource_type": "playlist",
+          "title": "Krish Naik — Agentic AI Tutorials",
+          "url": "https://www.youtube.com/playlist?list=PLZoTAELRMXVPFd7JdvB-rnTb_5V26NYNO",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube",
+          "author": "Krish Naik"
+        },
+        {
+          "resource_type": "playlist",
+          "title": "Krish Naik — Agentic AI with different frameworks",
+          "url": "https://www.youtube.com/playlist?list=PLZoTAELRMXVMBr14UQ30AFlnlQ7eL5wjl",
+          "priority": "optional",
+          "last_verified_at": "2026-08-08",
+          "provider": "youtube",
+          "author": "Krish Naik"
+        },
+        {
+          "resource_type": "repo",
+          "title": "Krish Naik — Roadmap To Learn Agentic AI",
+          "url": "https://github.com/krishnaik06/Roadmap-To-Learn-Agentic-AI",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "github",
+          "author": "Krish Naik"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "workflows-vs-agents",
+          "title": "Workflows vs agents — when to use which",
+          "week_number": 9,
+          "estimated_minutes": 60,
+          "summary": "Depth: default to a workflow; justify every loop. Read Anthropic's piece twice.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Anthropic — Building Effective Agents",
+              "url": "https://www.anthropic.com/engineering/building-effective-agents",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — A practical guide to building agents",
+              "url": "https://cdn.openai.com/business-guides-and-resources/a-practical-guide-to-building-agents.pdf",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "react-loop",
+          "title": "ReAct: reason/act loop",
+          "week_number": 9,
+          "estimated_minutes": 90,
+          "summary": "Depth: implement reason/act/observe by hand and know the failure modes (looping, tool thrash, context bloat).",
+          "resources": [
+            {
+              "resource_type": "paper",
+              "title": "ReAct — Synergizing Reasoning and Acting",
+              "url": "https://arxiv.org/abs/2210.03629",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "arxiv",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Lilian Weng — LLM Powered Autonomous Agents",
+              "url": "https://lilianweng.github.io/posts/2023-06-23-agent/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "author": "Lilian Weng",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "playlist",
+              "title": "Krish Naik — Agentic AI Tutorials",
+              "url": "https://www.youtube.com/playlist?list=PLZoTAELRMXVPFd7JdvB-rnTb_5V26NYNO",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Krish Naik",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "autonomy-degrees",
+          "title": "Degrees of autonomy and budgeting",
+          "week_number": 9,
+          "estimated_minutes": 60,
+          "summary": "Depth: set an autonomy budget — max steps, max tokens, max spend, and what forces a human check.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Anthropic — Building Effective Agents",
+              "url": "https://www.anthropic.com/engineering/building-effective-agents",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — A practical guide to building agents",
+              "url": "https://cdn.openai.com/business-guides-and-resources/a-practical-guide-to-building-agents.pdf",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "hand-rolled-agent",
+          "title": "Hand-rolled agent loop (no framework)",
+          "week_number": 9,
+          "estimated_minutes": 150,
+          "summary": "Deliverable: a working agent loop with no framework, so you know what a framework later replaces.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Anthropic — Building Effective Agents",
+              "url": "https://www.anthropic.com/engineering/building-effective-agents",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "playlist",
+              "title": "Krish Naik — Agentic AI Tutorials",
+              "url": "https://www.youtube.com/playlist?list=PLZoTAELRMXVPFd7JdvB-rnTb_5V26NYNO",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Krish Naik",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "tool-design",
+          "title": "Tool design and JSON schemas",
+          "week_number": 10,
+          "estimated_minutes": 75,
+          "summary": "Depth: name, description and schema are the prompt. Know why vague tool descriptions cause wrong tool selection.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Function calling",
+              "url": "https://platform.openai.com/docs/guides/function-calling",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Anthropic — Tool use overview",
+              "url": "https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "docs",
+              "title": "JSON Schema — Understanding JSON Schema",
+              "url": "https://json-schema.org/understanding-json-schema",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "tool-selection",
+          "title": "Tool selection and error handling",
+          "week_number": 10,
+          "estimated_minutes": 75,
+          "summary": "Depth: handle the wrong-tool and bad-arguments cases; return errors the model can recover from.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Anthropic — Tool use overview",
+              "url": "https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Anthropic — Building Effective Agents",
+              "url": "https://www.anthropic.com/engineering/building-effective-agents",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "tool-idempotency",
+          "title": "Idempotency for agent tool calls",
+          "week_number": 10,
+          "estimated_minutes": 60,
+          "summary": "Depth: agent steps get re-executed — every mutating tool needs an idempotency key. Reuse your payments model.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Stripe — Idempotent requests",
+              "url": "https://docs.stripe.com/api/idempotent_requests",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "stripe",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Microservices.io — Saga pattern",
+              "url": "https://microservices.io/patterns/data/saga.html",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "tool-using-agent",
+          "title": "Build a tool-using agent",
+          "week_number": 10,
+          "estimated_minutes": 150,
+          "summary": "Deliverable: agent that reliably calls 3+ real tools, with error recovery.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Function calling",
+              "url": "https://platform.openai.com/docs/guides/function-calling",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "playlist",
+              "title": "Krish Naik — Agentic AI Tutorials",
+              "url": "https://www.youtube.com/playlist?list=PLZoTAELRMXVPFd7JdvB-rnTb_5V26NYNO",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Krish Naik",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "agent-memory",
+          "title": "Short / long / episodic memory",
+          "week_number": 11,
+          "estimated_minutes": 90,
+          "summary": "Depth: distinguish short-term context, long-term store and episodic history; know what to write and what to forget.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Lilian Weng — LLM Powered Autonomous Agents",
+              "url": "https://lilianweng.github.io/posts/2023-06-23-agent/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "author": "Lilian Weng",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "paper",
+              "title": "MemGPT — Towards LLMs as operating systems",
+              "url": "https://arxiv.org/abs/2310.08560",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "arxiv",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "course",
+              "title": "DeepLearning.AI — Agent Memory",
+              "url": "https://www.deeplearning.ai/courses/agent-memory-building-memory-aware-agents",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "deeplearning.ai",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "checkpoints-recovery",
+          "title": "Persistence, checkpoints, and recovery",
+          "week_number": 11,
+          "estimated_minutes": 90,
+          "summary": "Depth: persist state per step so a crash resumes instead of restarting; map to your saga knowledge.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — persistence & checkpointers",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/persistence/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            }
+          ]
+        },
+        {
+          "slug": "stateful-agent",
+          "title": "Stateful agent surviving process restart",
+          "week_number": 11,
+          "estimated_minutes": 150,
+          "summary": "Deliverable: agent that survives a process restart mid-run and continues correctly.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — persistence & checkpointers",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/persistence/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "playlist",
+              "title": "Krish Naik — Agentic AI Tutorials",
+              "url": "https://www.youtube.com/playlist?list=PLZoTAELRMXVPFd7JdvB-rnTb_5V26NYNO",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Krish Naik",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "multi-agent-patterns",
+          "title": "Multi-agent: supervisor/worker, hierarchical",
+          "week_number": 12,
+          "estimated_minutes": 90,
+          "summary": "Depth: supervisor/worker and hierarchical; know that most 'multi-agent' problems are really one agent with better tools.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — multi-agent architectures",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/multi_agent/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Anthropic — Building Effective Agents",
+              "url": "https://www.anthropic.com/engineering/building-effective-agents",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "hitl-approval",
+          "title": "Human-in-the-loop and approval gates",
+          "week_number": 12,
+          "estimated_minutes": 90,
+          "summary": "Depth: approval gate with a durable pending state, timeout and rollback path.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — Human-in-the-loop",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Microservices.io — Saga pattern (compensation)",
+              "url": "https://microservices.io/patterns/data/saga.html",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "multi-agent-workflow",
+          "title": "Multi-agent + approval workflow",
+          "week_number": 12,
+          "estimated_minutes": 180,
+          "summary": "Deliverable: multi-agent run with an approval gate and an auditable decision trail.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — multi-agent architectures",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/multi_agent/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — Human-in-the-loop",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "p5-frameworks-mcp",
+      "title": "Phase 5 — Agent Frameworks + MCP",
+      "item_type": "study_plan",
+      "sort_order": 5,
+      "resources": [
+        {
+          "resource_type": "docs",
+          "title": "LangGraph",
+          "url": "https://langchain-ai.github.io/langgraph/",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "langchain"
+        },
+        {
+          "resource_type": "docs",
+          "title": "Model Context Protocol — spec & concepts",
+          "url": "https://modelcontextprotocol.io/",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "mcp"
+        },
+        {
+          "resource_type": "docs",
+          "title": "MCP — Architecture",
+          "url": "https://modelcontextprotocol.io/docs/concepts/architecture",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "mcp"
+        },
+        {
+          "resource_type": "docs",
+          "title": "CrewAI (skim only)",
+          "url": "https://docs.crewai.com/",
+          "priority": "optional",
+          "last_verified_at": "2026-08-08",
+          "provider": "crewai"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "langgraph-abstractions",
+          "title": "LangGraph — map every abstraction to own implementation",
+          "week_number": 13,
+          "estimated_minutes": 120,
+          "summary": "Depth: for each LangGraph concept, name the thing you already hand-wrote in weeks 9-12.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — Low-level concepts (state, nodes, edges)",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/low_level/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — persistence & checkpointers",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/persistence/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "port-agent-to-langgraph",
+          "title": "Port week 9–12 agent; document what the framework bought",
+          "week_number": 13,
+          "estimated_minutes": 180,
+          "summary": "Deliverable: ported agent plus a written note on exactly what the framework bought and cost.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangGraph documentation",
+              "url": "https://langchain-ai.github.io/langgraph/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "playlist",
+              "title": "Krish Naik — Agentic AI with different frameworks",
+              "url": "https://www.youtube.com/playlist?list=PLZoTAELRMXVMBr14UQ30AFlnlQ7eL5wjl",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Krish Naik",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "mcp-problem",
+          "title": "MCP: the problem it solves",
+          "week_number": 14,
+          "estimated_minutes": 60,
+          "summary": "Depth: articulate the N-times-M integration problem MCP is trying to remove.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "MCP — Specification",
+              "url": "https://modelcontextprotocol.io/specification",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "mcp",
+              "sort_order": 1
+            }
+          ]
+        },
+        {
+          "slug": "mcp-architecture-transport",
+          "title": "MCP architecture, transport, and security",
+          "week_number": 14,
+          "estimated_minutes": 90,
+          "summary": "Depth: host/client/server split, stdio vs HTTP transport, and the trust boundary each implies.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "MCP — Transports",
+              "url": "https://modelcontextprotocol.io/docs/concepts/transports",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "mcp",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "MCP — Architecture",
+              "url": "https://modelcontextprotocol.io/docs/concepts/architecture",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "mcp",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "mcp-when-direct-apis",
+          "title": "When direct APIs win over MCP",
+          "week_number": 14,
+          "estimated_minutes": 45,
+          "summary": "Depth: be able to argue for a plain SDK call over MCP. The wire spec will age; the problem will not.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "MCP — Specification",
+              "url": "https://modelcontextprotocol.io/specification",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "mcp",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Anthropic — Tool use overview",
+              "url": "https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "mcp-server-client",
+          "title": "One MCP server, one MCP client",
+          "week_number": 14,
+          "estimated_minutes": 150,
+          "summary": "Deliverable: one working MCP server and one client, exposing a real LifeOS capability.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "MCP — Build a server (quickstart)",
+              "url": "https://modelcontextprotocol.io/quickstart/server",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "mcp",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "MCP — Build a client (quickstart)",
+              "url": "https://modelcontextprotocol.io/quickstart/client",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "mcp",
+              "sort_order": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "p6-evaluation",
+      "title": "Phase 6 — Evaluation",
+      "item_type": "study_plan",
+      "sort_order": 6,
+      "resources": [
+        {
+          "resource_type": "course",
+          "title": "DeepLearning.AI — Building and Evaluating Data Agents",
+          "url": "https://www.deeplearning.ai/short-courses/building-and-evaluating-data-agents/",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "deeplearning.ai"
+        },
+        {
+          "resource_type": "docs",
+          "title": "RAGAS",
+          "url": "https://docs.ragas.io/",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "ragas"
+        },
+        {
+          "resource_type": "docs",
+          "title": "promptfoo",
+          "url": "https://www.promptfoo.dev/docs/intro/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "promptfoo"
+        },
+        {
+          "resource_type": "docs",
+          "title": "DeepEval",
+          "url": "https://docs.confident-ai.com/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "deepeval"
+        },
+        {
+          "resource_type": "docs",
+          "title": "LangSmith — evaluation",
+          "url": "https://docs.smith.langchain.com/evaluation",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "langsmith"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "golden-datasets",
+          "title": "Golden datasets for eval",
+          "week_number": 15,
+          "estimated_minutes": 90,
+          "summary": "Depth: build a small labelled set from real queries; know why 30 good cases beat 1000 synthetic ones.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangSmith — evaluation concepts",
+              "url": "https://docs.smith.langchain.com/evaluation/concepts",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langsmith",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "RAGAS — metrics concepts",
+              "url": "https://docs.ragas.io/en/stable/concepts/metrics/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "ragas",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "deterministic-tests",
+          "title": "Deterministic tests for LLM systems",
+          "week_number": 15,
+          "estimated_minutes": 60,
+          "summary": "Depth: assert on invariants and structure, not exact strings. This is the mental-model shift.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "promptfoo — Assertions & expected outputs",
+              "url": "https://www.promptfoo.dev/docs/configuration/expected-outputs/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "promptfoo",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "promptfoo — getting started",
+              "url": "https://www.promptfoo.dev/docs/intro/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "promptfoo",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "llm-as-judge",
+          "title": "LLM-as-judge and judge bias",
+          "week_number": 15,
+          "estimated_minutes": 90,
+          "summary": "Depth: know judge bias (position, verbosity, self-preference) and how to calibrate against human labels.",
+          "resources": [
+            {
+              "resource_type": "paper",
+              "title": "Judging LLM-as-a-Judge (MT-Bench, position bias)",
+              "url": "https://arxiv.org/abs/2306.05685",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "arxiv",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangSmith — evaluation concepts",
+              "url": "https://docs.smith.langchain.com/evaluation/concepts",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langsmith",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "course",
+              "title": "DeepLearning.AI — Building and Evaluating Data Agents",
+              "url": "https://www.deeplearning.ai/short-courses/building-and-evaluating-data-agents/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "deeplearning.ai",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "project2-golden-set",
+          "title": "Golden dataset for Project 2",
+          "week_number": 15,
+          "estimated_minutes": 120,
+          "summary": "Deliverable: golden dataset committed alongside Project 2, with baseline scores.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "RAGAS — metrics concepts",
+              "url": "https://docs.ragas.io/en/stable/concepts/metrics/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "ragas",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangSmith — evaluation concepts",
+              "url": "https://docs.smith.langchain.com/evaluation/concepts",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langsmith",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "trajectory-eval",
+          "title": "Trajectory eval and tool-call correctness",
+          "week_number": 16,
+          "estimated_minutes": 90,
+          "summary": "Depth: score the path, not just the answer — tool-call correctness, step count, wasted calls.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "DeepEval — LLM evaluation framework",
+              "url": "https://docs.confident-ai.com/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "deepeval",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangSmith — evaluation concepts",
+              "url": "https://docs.smith.langchain.com/evaluation/concepts",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langsmith",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "regression-testing",
+          "title": "Regression testing for prompts and agents",
+          "week_number": 16,
+          "estimated_minutes": 75,
+          "summary": "Depth: every prompt or model change runs the suite; track score deltas over time.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "promptfoo — getting started",
+              "url": "https://www.promptfoo.dev/docs/intro/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "promptfoo",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "promptfoo — Assertions & expected outputs",
+              "url": "https://www.promptfoo.dev/docs/configuration/expected-outputs/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "promptfoo",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "red-teaming",
+          "title": "Red teaming LLM applications",
+          "week_number": 16,
+          "estimated_minutes": 75,
+          "summary": "Depth: attack your own system — injection, exfiltration, jailbreak, tool abuse — and record what got through.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "promptfoo — LLM red teaming",
+              "url": "https://www.promptfoo.dev/docs/red-team/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "promptfoo",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OWASP Top 10 for LLM Applications",
+              "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "owasp",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "eval-gate-ci",
+          "title": "Eval gate in CI",
+          "week_number": 16,
+          "estimated_minutes": 120,
+          "summary": "Deliverable: CI job that fails the build when eval scores regress past a threshold.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "promptfoo — CI/CD integration",
+              "url": "https://www.promptfoo.dev/docs/integrations/ci-cd/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "promptfoo",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "GitHub Actions documentation",
+              "url": "https://docs.github.com/en/actions",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "p7-production-llmops",
+      "title": "Phase 7 — Production AI / LLMOps",
+      "item_type": "study_plan",
+      "sort_order": 7,
+      "resources": [
+        {
+          "resource_type": "docs",
+          "title": "OpenTelemetry — GenAI semantic conventions",
+          "url": "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "opentelemetry"
+        },
+        {
+          "resource_type": "docs",
+          "title": "Langfuse",
+          "url": "https://langfuse.com/docs",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "langfuse"
+        },
+        {
+          "resource_type": "article",
+          "title": "OWASP LLM Top 10 (revisit)",
+          "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "owasp"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "otel-tracing",
+          "title": "Tracing and structured logging for LLM calls",
+          "week_number": 17,
+          "estimated_minutes": 90,
+          "summary": "Depth: one trace per LLM request with spans for retrieve, rerank and generate, carrying token and cost attributes.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenTelemetry — GenAI semantic conventions",
+              "url": "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "opentelemetry",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenTelemetry — Python instrumentation",
+              "url": "https://opentelemetry.io/docs/languages/python/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "opentelemetry",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "token-cost-metrics",
+          "title": "Token/cost metrics and SLO design",
+          "week_number": 17,
+          "estimated_minutes": 75,
+          "summary": "Depth: define SLOs for p95 latency, cost per request and quality score. Know what you would page on.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenTelemetry — GenAI metrics",
+              "url": "https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-metrics/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "opentelemetry",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "book",
+              "title": "Google SRE Book — Service Level Objectives",
+              "url": "https://sre.google/sre-book/service-level-objectives/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "google",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "otel-across-projects",
+          "title": "OpenTelemetry across all projects",
+          "week_number": 17,
+          "estimated_minutes": 150,
+          "summary": "Deliverable: consistent tracing across Projects 1, 2 and 3 with one dashboard.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Langfuse — LLM observability",
+              "url": "https://langfuse.com/docs",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langfuse",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenTelemetry — Python instrumentation",
+              "url": "https://opentelemetry.io/docs/languages/python/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "opentelemetry",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "guardrails",
+          "title": "Guardrails and PII redaction",
+          "week_number": 18,
+          "estimated_minutes": 90,
+          "summary": "Depth: input and output guardrails as a layer, not scattered checks; know the false-positive cost.",
+          "resources": [
+            {
+              "resource_type": "repo",
+              "title": "NVIDIA NeMo Guardrails",
+              "url": "https://github.com/NVIDIA/NeMo-Guardrails",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Guardrails AI",
+              "url": "https://www.guardrailsai.com/docs",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "guardrailsai",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "audit-logs",
+          "title": "Audit logs for AI actions",
+          "week_number": 18,
+          "estimated_minutes": 60,
+          "summary": "Depth: log actor, action, before/after and correlation ID for every AI-initiated mutation.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OWASP — Logging cheat sheet",
+              "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "owasp",
+              "sort_order": 1
+            }
+          ]
+        },
+        {
+          "slug": "injection-defence",
+          "title": "Injection defence in production",
+          "week_number": 18,
+          "estimated_minutes": 75,
+          "summary": "Depth: delimit, least privilege on tools, and never let retrieved text choose an action unchecked.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Simon Willison — Prompt injection series",
+              "url": "https://simonwillison.net/series/prompt-injection/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Simon Willison",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OWASP Top 10 for LLM Applications",
+              "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "owasp",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "guardrail-layer",
+          "title": "Guardrail layer + audit trail",
+          "week_number": 18,
+          "estimated_minutes": 150,
+          "summary": "Deliverable: guardrail + PII redaction layer with an audit trail, applied to all three projects.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Microsoft Presidio — PII detection & anonymization",
+              "url": "https://microsoft.github.io/presidio/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "microsoft",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "repo",
+              "title": "NVIDIA NeMo Guardrails",
+              "url": "https://github.com/NVIDIA/NeMo-Guardrails",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "p10-flagship-project",
+      "title": "Phase 10 — Flagship: Payment Investigation Agent",
+      "item_type": "study_plan",
+      "sort_order": 8,
+      "concepts": [
+        {
+          "slug": "flagship-requirements",
+          "title": "Flagship: requirements → architecture",
+          "week_number": 19,
+          "estimated_minutes": 120,
+          "summary": "Deliverable: requirements and architecture for the Payment Investigation Agent, with the trade-offs written down.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Anthropic — Building Effective Agents",
+              "url": "https://www.anthropic.com/engineering/building-effective-agents",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anthropic",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Chip Huyen — Building A Generative AI Platform",
+              "url": "https://huyenchip.com/2024/07/25/genai-platform.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Chip Huyen",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "flagship-design-doc",
+          "title": "Project 3 design doc",
+          "week_number": 19,
+          "estimated_minutes": 180,
+          "summary": "Deliverable: design doc covering data access, tool surface, autonomy budget, HITL, eval and observability.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Chip Huyen — Building A Generative AI Platform",
+              "url": "https://huyenchip.com/2024/07/25/genai-platform.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Chip Huyen",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "LangGraph — multi-agent architectures",
+              "url": "https://langchain-ai.github.io/langgraph/concepts/multi_agent/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "flagship-build",
+          "title": "Flagship build — working agent end-to-end",
+          "week_number": 20,
+          "estimated_minutes": 300,
+          "summary": "Deliverable: end-to-end agent — investigate a transaction, hypothesise root cause, propose remediation, route for approval, execute idempotently.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "LangGraph documentation",
+              "url": "https://langchain-ai.github.io/langgraph/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "langchain",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "playlist",
+              "title": "Krish Naik — Agentic AI Tutorials",
+              "url": "https://www.youtube.com/playlist?list=PLZoTAELRMXVPFd7JdvB-rnTb_5V26NYNO",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "youtube",
+              "author": "Krish Naik",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "system-design-drills",
+          "title": "AI system design drills",
+          "week_number": 24,
+          "estimated_minutes": 120,
+          "summary": "Depth: whiteboard AI systems under time pressure — retrieval, routing, cost, failure, eval.",
+          "resources": [
+            {
+              "resource_type": "repo",
+              "title": "System Design Primer",
+              "url": "https://github.com/donnemartin/system-design-primer",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "Chip Huyen — Building A Generative AI Platform",
+              "url": "https://huyenchip.com/2024/07/25/genai-platform.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Chip Huyen",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "interview-prep",
+          "title": "Interview prep and mock system designs",
+          "week_number": 24,
+          "estimated_minutes": 120,
+          "summary": "Depth: rehearse the teardown of your own three projects, including what you would do differently.",
+          "resources": [
+            {
+              "resource_type": "book",
+              "title": "Chip Huyen — Machine Learning Interviews Book",
+              "url": "https://huyenchip.com/ml-interviews-book/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "author": "Chip Huyen",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "repo",
+              "title": "System Design Primer",
+              "url": "https://github.com/donnemartin/system-design-primer",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "github",
+              "sort_order": 2
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "resource_type": "article",
+          "title": "Chip Huyen — Building A Generative AI Platform",
+          "url": "https://huyenchip.com/2024/07/25/genai-platform.html",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "author": "Chip Huyen",
+          "sort_order": 1
+        },
+        {
+          "resource_type": "article",
+          "title": "Anthropic — Building Effective Agents",
+          "url": "https://www.anthropic.com/engineering/building-effective-agents",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "anthropic",
+          "sort_order": 2
+        },
+        {
+          "resource_type": "repo",
+          "title": "System Design Primer",
+          "url": "https://github.com/donnemartin/system-design-primer",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "github",
+          "sort_order": 3
+        },
+        {
+          "resource_type": "book",
+          "title": "Chip Huyen — Machine Learning Interviews Book",
+          "url": "https://huyenchip.com/ml-interviews-book/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "author": "Chip Huyen",
+          "sort_order": 4
+        }
+      ]
+    },
+    {
+      "slug": "p8-model-serving",
+      "title": "Phase 8 — Model Serving & Infrastructure",
+      "item_type": "study_plan",
+      "sort_order": 9,
+      "resources": [
+        {
+          "resource_type": "docs",
+          "title": "vLLM",
+          "url": "https://docs.vllm.ai/",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "vllm"
+        },
+        {
+          "resource_type": "docs",
+          "title": "vLLM — paged attention / KV cache",
+          "url": "https://docs.vllm.ai/en/latest/design/kernel/paged_attention.html",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "vllm"
+        },
+        {
+          "resource_type": "docs",
+          "title": "Ollama",
+          "url": "https://ollama.com/",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "ollama"
+        },
+        {
+          "resource_type": "docs",
+          "title": "Hugging Face — Text Generation Inference",
+          "url": "https://huggingface.co/docs/text-generation-inference",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "huggingface"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "batching-kv-cache",
+          "title": "Batching, continuous batching, KV cache",
+          "week_number": 21,
+          "estimated_minutes": 90,
+          "summary": "Depth: explain continuous batching and KV cache memory as the real constraint on throughput.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "Anyscale — Continuous batching for LLM inference",
+              "url": "https://www.anyscale.com/blog/continuous-batching-llm-inference",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "anyscale",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "vLLM — PagedAttention design",
+              "url": "https://docs.vllm.ai/en/latest/design/kernel/paged_attention.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "vllm",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "article",
+              "title": "NVIDIA — Mastering LLM inference optimization",
+              "url": "https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "nvidia",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "quantization",
+          "title": "Quantization and throughput vs latency",
+          "week_number": 21,
+          "estimated_minutes": 75,
+          "summary": "Depth: know the quality/latency/memory trade-off and how to measure the quality loss rather than assume it.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Hugging Face — Quantization",
+              "url": "https://huggingface.co/docs/transformers/main/en/quantization",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "huggingface",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "article",
+              "title": "NVIDIA — Mastering LLM inference optimization",
+              "url": "https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "nvidia",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "benchmark-local-model",
+          "title": "Benchmark a local model",
+          "week_number": 21,
+          "estimated_minutes": 120,
+          "summary": "Deliverable: reproducible benchmark — tokens/sec, p95 latency, memory, at several concurrency levels.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "vLLM documentation",
+              "url": "https://docs.vllm.ai/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "vllm",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Ollama",
+              "url": "https://ollama.com/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "ollama",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "vllm-ollama",
+          "title": "vLLM and Ollama in practice",
+          "week_number": 22,
+          "estimated_minutes": 90,
+          "summary": "Depth: know when a hosted API is the correct answer and what self-hosting actually costs.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "vLLM documentation",
+              "url": "https://docs.vllm.ai/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "vllm",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Ollama",
+              "url": "https://ollama.com/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "ollama",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "docs",
+              "title": "Hugging Face — Text Generation Inference",
+              "url": "https://huggingface.co/docs/text-generation-inference",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "huggingface",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "gpu-economics",
+          "title": "GPU economics and autoscaling",
+          "week_number": 22,
+          "estimated_minutes": 75,
+          "summary": "Depth: cost per million tokens self-hosted vs API, including idle time and autoscaling lag.",
+          "resources": [
+            {
+              "resource_type": "article",
+              "title": "NVIDIA — Mastering LLM inference optimization",
+              "url": "https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "nvidia",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Kubernetes — Horizontal Pod Autoscaling",
+              "url": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "kubernetes",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "k8s-aws-deploy",
+          "title": "K8s + AWS deploy of flagship",
+          "week_number": 22,
+          "estimated_minutes": 180,
+          "summary": "Deliverable: flagship deployed with health checks, autoscaling and rollback.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Kubernetes — Horizontal Pod Autoscaling",
+              "url": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "kubernetes",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "Amazon EKS — User guide",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "aws",
+              "sort_order": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "p9-fine-tuning",
+      "title": "Phase 9 — Fine-Tuning (decision-level only)",
+      "item_type": "study_plan",
+      "sort_order": 10,
+      "resources": [
+        {
+          "resource_type": "docs",
+          "title": "Hugging Face PEFT",
+          "url": "https://huggingface.co/docs/peft",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "huggingface"
+        },
+        {
+          "resource_type": "docs",
+          "title": "Hugging Face — LoRA conceptual guide",
+          "url": "https://huggingface.co/docs/peft/conceptual_guides/lora",
+          "priority": "primary",
+          "last_verified_at": "2026-08-08",
+          "provider": "huggingface"
+        },
+        {
+          "resource_type": "docs",
+          "title": "OpenAI — fine-tuning guide",
+          "url": "https://platform.openai.com/docs/guides/fine-tuning",
+          "priority": "supporting",
+          "last_verified_at": "2026-08-08",
+          "provider": "openai"
+        }
+      ],
+      "concepts": [
+        {
+          "slug": "rag-vs-finetune",
+          "title": "RAG vs fine-tuning decision framework",
+          "week_number": 23,
+          "estimated_minutes": 90,
+          "summary": "Depth: be able to say no to fine-tuning with reasons — data, cost, maintenance, eval burden.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Optimizing LLM accuracy (RAG vs fine-tune)",
+              "url": "https://platform.openai.com/docs/guides/optimizing-llm-accuracy",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Fine-tuning guide",
+              "url": "https://platform.openai.com/docs/guides/fine-tuning",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 2
+            }
+          ]
+        },
+        {
+          "slug": "lora-qlora-peft",
+          "title": "LoRA / QLoRA / PEFT — decision-level only",
+          "week_number": 23,
+          "estimated_minutes": 75,
+          "summary": "Depth: decision-level only. Know what LoRA changes and when it beats prompting plus retrieval.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "Hugging Face — LoRA conceptual guide",
+              "url": "https://huggingface.co/docs/peft/conceptual_guides/lora",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "huggingface",
+              "sort_order": 1
+            },
+            {
+              "resource_type": "paper",
+              "title": "LoRA — Low-Rank Adaptation of LLMs",
+              "url": "https://arxiv.org/abs/2106.09685",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "arxiv",
+              "sort_order": 2
+            },
+            {
+              "resource_type": "paper",
+              "title": "QLoRA — Efficient finetuning of quantized LLMs",
+              "url": "https://arxiv.org/abs/2305.14314",
+              "priority": "supporting",
+              "last_verified_at": "2026-08-08",
+              "provider": "arxiv",
+              "sort_order": 3
+            }
+          ]
+        },
+        {
+          "slug": "finetune-decision-doc",
+          "title": "Written fine-tuning decision framework",
+          "week_number": 23,
+          "estimated_minutes": 120,
+          "summary": "Deliverable: written decision framework, not a trained model.",
+          "resources": [
+            {
+              "resource_type": "docs",
+              "title": "OpenAI — Optimizing LLM accuracy (RAG vs fine-tune)",
+              "url": "https://platform.openai.com/docs/guides/optimizing-llm-accuracy",
+              "priority": "primary",
+              "last_verified_at": "2026-08-08",
+              "provider": "openai",
+              "sort_order": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

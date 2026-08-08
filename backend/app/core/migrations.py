@@ -77,6 +77,10 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("file_records", "visibility", "VARCHAR(16) DEFAULT 'private'"),
     ("file_records", "deleted_at", "TIMESTAMP"),
     ("file_records", "updated_at", "TIMESTAMP"),
+    # Learning: track membership + phase ordering (NULL track_id = standalone legacy item)
+    ("learning_items", "track_id", "VARCHAR(36)"),
+    ("learning_items", "slug", "VARCHAR(64)"),
+    ("learning_items", "sort_order", "INTEGER DEFAULT 0"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
@@ -91,6 +95,10 @@ _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
     ("wishlist_items", "status", "in_progress"),
     ("wishlist_items", "priority", "medium"),
     ("file_records", "visibility", "private"),
+]
+
+_INTEGER_DEFAULTS_TO_BACKFILL: list[tuple[str, str, int]] = [
+    ("learning_items", "sort_order", 0),
 ]
 
 # Columns removed from the ORM but still present on older databases.
@@ -139,6 +147,15 @@ async def ensure_columns(conn: AsyncConnection) -> None:
             logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
 
     for table, column, default in _STRING_DEFAULTS_TO_BACKFILL:
+        try:
+            await conn.execute(
+                text(f"UPDATE {table} SET {column} = :default WHERE {column} IS NULL"),
+                {"default": default},
+            )
+        except Exception as exc:
+            logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
+
+    for table, column, default in _INTEGER_DEFAULTS_TO_BACKFILL:
         try:
             await conn.execute(
                 text(f"UPDATE {table} SET {column} = :default WHERE {column} IS NULL"),

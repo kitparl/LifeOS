@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lifeos-learning-track-seed",
+  "title": "LifeOS Learning Track Seed",
+  "type": "object",
+  "required": ["slug", "title", "phases"],
+  "additionalProperties": false,
+  "properties": {
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": ["string", "null"] },
+    "status": { "type": "string", "enum": ["planned", "active", "completed", "paused"] },
+    "start_date": { "type": ["string", "null"], "format": "date" },
+    "target_date": { "type": ["string", "null"], "format": "date" },
+    "weekly_hours_target": { "type": "integer", "minimum": 1, "maximum": 80 },
+    "sort_order": { "type": "integer" },
+    "phases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/phase" }
+    }
+  },
+  "$defs": {
+    "phase": {
+      "type": "object",
+      "required": ["slug", "title"],
+      "properties": {
+        "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+        "title": { "type": "string", "minLength": 1 },
+        "item_type": { "const": "study_plan" },
+        "status": { "type": "string" },
+        "sort_order": { "type": "integer" },
+        "summary": { "type": "string" },
+        "notes": { "type": "string" },
+        "provider": { "type": "string" },
+        "url": { "type": "string" },
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/resource" }
+        },
+        "concepts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/concept" }
+        }
+      }
+    },
+    "concept": {
+      "type": "object",
+      "required": ["slug", "title"],
+      "properties": {
+        "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+        "title": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string" },
+        "week_number": { "type": "integer", "minimum": 1 },
+        "estimated_minutes": { "type": "integer", "minimum": 1 },
+        "sort_order": { "type": "integer" },
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/resource" }
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["title", "url"],
+      "properties": {
+        "resource_type": {
+          "type": "string",
+          "enum": ["video", "playlist", "article", "docs", "course", "paper", "repo", "book"]
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string" },
+        "author": { "type": "string" },
+        "duration_minutes": { "type": "integer", "minimum": 0 },
+        "priority": {
+          "type": "string",
+          "enum": ["primary", "supporting", "optional"]
+        },
+        "sort_order": { "type": "integer" },
+        "last_verified_at": { "type": "string", "format": "date" }
+      }
+    }
+  }
+}

@@ -13,6 +13,7 @@ from app.modules.communication.models import VocabularyWord
 from app.modules.goals.models import Goal
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
+from app.modules.learning.models import LearningConcept, LearningItem
 from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
 from app.modules.tasks.models import Task
@@ -28,6 +29,7 @@ EXPORT_MODULES = (
     "qa",
     "wishlist",
     "vocabulary",
+    "learning",
     "all",
 )
 
@@ -130,6 +132,27 @@ class ExportService:
             return [
                 {"id": w.id, "word": w.word, "meaning": w.meaning, "mastery": w.mastery}
                 for w in result.scalars().all()
+            ]
+        if module == "learning":
+            concepts = await self.db.execute(
+                select(LearningConcept).where(LearningConcept.user_id == user_id)
+            )
+            items = await self.db.execute(select(LearningItem).where(LearningItem.user_id == user_id))
+            item_map = {i.id: i for i in items.scalars().all()}
+            return [
+                {
+                    "id": c.id,
+                    "item_id": c.item_id,
+                    "item_title": item_map[c.item_id].title if c.item_id in item_map else None,
+                    "track_id": item_map[c.item_id].track_id if c.item_id in item_map else None,
+                    "slug": c.slug,
+                    "title": c.title,
+                    "week_number": c.week_number,
+                    "can_explain": c.can_explain,
+                    "confidence": c.confidence,
+                    "artifact_url": c.artifact_url,
+                }
+                for c in concepts.scalars().all()
             ]
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown export module")
 

@@ -12,7 +12,11 @@ import { LearningService } from './services/learning.service';
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h1 class="text-lg font-semibold">Learning</h1>
-        <a routerLink="/learning/new" class="btn-primary text-xs no-underline">New Item</a>
+        <div class="flex gap-2">
+          <a routerLink="/learning/tracks" class="input-field !w-auto inline-flex items-center no-underline text-xs">Tracks</a>
+          <a routerLink="/learning/today" class="input-field !w-auto inline-flex items-center no-underline text-xs">Today</a>
+          <a routerLink="/learning/new" class="btn-primary text-xs no-underline">New Item</a>
+        </div>
       </div>
       <form class="flex gap-2 text-sm" [formGroup]="filters" (ngSubmit)="load()">
         <select class="input-field !w-auto" formControlName="item_type">

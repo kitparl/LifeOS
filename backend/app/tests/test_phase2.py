@@ -20,9 +20,17 @@ async def test_learning_crud(client):
         json={"title": "Clean Code", "item_type": "book", "status": "in_progress", "progress": 10},
     )
     assert created.status_code == 201
-    item_id = created.json()["id"]
+    body = created.json()
+    item_id = body["id"]
+    assert body.get("track_id") is None
     listed = await client.get("/api/v1/learning/items", headers=h)
+    assert listed.status_code == 200
     assert len(listed.json()) == 1
+    assert listed.json()[0].get("track_id") is None
+    got = await client.get(f"/api/v1/learning/items/{item_id}", headers=h)
+    assert got.status_code == 200
+    assert got.json()["track_id"] is None
+    assert got.json()["progress"] == 10
 
 
 @pytest.mark.asyncio

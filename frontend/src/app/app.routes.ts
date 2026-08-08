@@ -361,6 +361,26 @@ export const routes: Routes = [
           import('./features/learning/learning-page.component').then((m) => m.LearningListComponent),
       },
       {
+        path: 'learning/tracks',
+        loadComponent: () =>
+          import('./features/learning/track-views.component').then((m) => m.LearningTracksComponent),
+      },
+      {
+        path: 'learning/tracks/:id',
+        loadComponent: () =>
+          import('./features/learning/track-views.component').then((m) => m.LearningTrackDetailComponent),
+      },
+      {
+        path: 'learning/today',
+        loadComponent: () =>
+          import('./features/learning/today-view.component').then((m) => m.LearningTodayComponent),
+      },
+      {
+        path: 'learning/concepts/:id',
+        loadComponent: () =>
+          import('./features/learning/concept-detail.component').then((m) => m.LearningConceptDetailComponent),
+      },
+      {
         path: 'learning/new',
         loadComponent: () =>
           import('./features/learning/learning-page.component').then((m) => m.LearningFormComponent),
