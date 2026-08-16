@@ -64,6 +64,13 @@ describe('CodeWorkspaceComponent', () => {
     expect(saved).toContain('saved');
   });
 
+  it('replaces document content when the input changes', () => {
+    component.currentContent = 'previous note';
+    fixture.componentRef.setInput('content', '');
+    fixture.detectChanges();
+    expect(component.currentContent).toBe('');
+  });
+
   it('emits run and shows output for javascript', fakeAsync(() => {
     const execution = TestBed.inject(CodeExecutionService);
     spyOn(execution, 'isExecutionSupported').and.returnValue(true);
@@ -108,6 +115,15 @@ describe('CodeWorkspaceComponent', () => {
     component.onViewModeChange('write');
     expect(component.shouldShowSplitView()).toBeFalse();
     expect(component.shouldShowPreview()).toBeFalse();
+  });
+
+  it('hides the editor in preview-only mode', () => {
+    component.isMobile = false;
+    fixture.componentRef.setInput('showPreview', true);
+    component.onViewModeChange('preview');
+    expect(component.shouldShowEditor()).toBeFalse();
+    expect(component.shouldShowPreview()).toBeTrue();
+    expect(component.shouldShowSplitView()).toBeFalse();
   });
 
   it('treats tablet like desktop so preview is reachable', () => {

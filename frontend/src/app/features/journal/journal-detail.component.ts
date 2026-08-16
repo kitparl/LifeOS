@@ -11,43 +11,41 @@ import { JournalService } from './services/journal.service';
   imports: [RouterLink, DatePipe, TitleCasePipe, MarkdownPipe],
   template: `
     @if (entry; as e) {
-      <div class="journal-writer space-y-4">
-        <div class="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h1 class="text-2xl font-bold">{{ e.title || (e.entry_type | titlecase) + ' Journal' }}</h1>
-            <p class="text-xs" style="color: var(--text-muted)">
-              {{ e.entry_date | date: 'fullDate' }} · {{ e.entry_type }}
-            </p>
-          </div>
+      <article class="journal-writer journal-reader">
+        <div class="journal-writer__bar">
+          <a routerLink="/journal" class="btn-ghost text-xs no-underline">← Journal</a>
           <div class="flex gap-2">
             <a [routerLink]="['/journal', e.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
             <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
           </div>
         </div>
 
+        <h1 class="journal-reader__title">{{ e.title || (e.entry_type | titlecase) + ' Journal' }}</h1>
+        <p class="journal-reader__meta">
+          {{ e.entry_date | date: 'fullDate' }} · {{ e.entry_type | titlecase }}
+        </p>
+
         <div class="markdown-body" [innerHTML]="e.content | markdown"></div>
 
         @if (e.gratitude) {
-          <div class="journal-section">
+          <section class="journal-section">
             <p class="journal-section__label">Gratitude</p>
             <div class="markdown-body" [innerHTML]="e.gratitude | markdown"></div>
-          </div>
+          </section>
         }
         @if (e.wins) {
-          <div class="journal-section">
+          <section class="journal-section">
             <p class="journal-section__label">Wins</p>
             <div class="markdown-body" [innerHTML]="e.wins | markdown"></div>
-          </div>
+          </section>
         }
         @if (e.lessons) {
-          <div class="journal-section">
+          <section class="journal-section">
             <p class="journal-section__label">Lessons Learned</p>
             <div class="markdown-body" [innerHTML]="e.lessons | markdown"></div>
-          </div>
+          </section>
         }
-
-        <a routerLink="/journal" class="link text-sm">Back to journal</a>
-      </div>
+      </article>
     } @else if (loading) {
       <p class="text-sm">Loading entry…</p>
     } @else {

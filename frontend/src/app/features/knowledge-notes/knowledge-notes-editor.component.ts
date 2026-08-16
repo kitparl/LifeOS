@@ -30,8 +30,9 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
   template: `
     <div class="space-y-2">
       @if (executableBlocks.length > 0) {
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="kn-python">
           @if (executionEnabled) {
+            <span class="kn-python__status">Python enabled</span>
             @for (block of executableBlocks; track block.id) {
               <button
                 type="button"
@@ -46,15 +47,16 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
               Disable run
             </button>
           } @else {
+            <span class="kn-python__status kn-python__status--off">Python disabled</span>
             <button type="button" class="btn-ghost text-xs" (click)="executionEnabled = true">
-              Enable run
+              Enable
             </button>
           }
         </div>
       }
 
       @if (editorReady) {
-        <div style="min-height: 320px; height: 52vh; overflow: hidden">
+        <div class="kn-editor-frame">
           <app-code-workspace
             [content]="editorContent"
             mode="markdown-code"
@@ -65,7 +67,7 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
             [showLanguageSelector]="false"
             [showOutput]="false"
             defaultViewMode="write"
-            [enableAutosave]="true"
+            [enableAutosave]="false"
             (contentChange)="onContentChange($event)"
             (save)="onSave($event)"
           />
@@ -92,6 +94,8 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
 
   @Output() contentChange = new EventEmitter<string>();
   @Output() sectionUpdated = new EventEmitter<KnowledgeSection>();
+  @Output() saveRequested = new EventEmitter<void>();
+  @Output() editorReadyChange = new EventEmitter<void>();
 
   editorReady = false;
   editorContent = '';
@@ -100,7 +104,6 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
   runningBlockId: string | null = null;
   lastResult: CodeExecutionResult | null = null;
 
-  private lastPersisted = '';
   private blockResults = new Map<string, CodeExecutionResult>();
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -121,27 +124,17 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
   }
 
   onContentChange(content: string): void {
+    if (!this.editorReady) {
+      return;
+    }
     this.editorContent = content;
     this.refreshBlocks(content);
     this.contentChange.emit(content);
   }
 
   onSave(document: EditorDocument): void {
-    if (!this.section || document.content === this.lastPersisted) {
-      return;
-    }
-    this.knowledgeNotes
-      .updateSection(this.section.id, { content: document.content })
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (updated) => {
-          this.lastPersisted = document.content;
-          this.sectionUpdated.emit(this.knowledgeNotes.enrichSection({
-            ...updated,
-            content: document.content,
-          }));
-        },
-      });
+    this.onContentChange(document.content);
+    this.saveRequested.emit();
   }
 
   clearOutput(): void {
@@ -193,11 +186,16 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
     this.runningBlockId = null;
 
     const prepared = this.knowledgeNotes.enrichSection(section);
-    this.editorContent = prepared.content;
-    this.lastPersisted = prepared.content;
-    this.refreshBlocks(prepared.content);
-    this.contentChange.emit(prepared.content);
-    this.editorReady = true;
+    this.editorContent = prepared.content ?? '';
+    this.refreshBlocks(this.editorContent);
+    this.contentChange.emit(this.editorContent);
+    queueMicrotask(() => {
+      if (this.section?.id !== section.id) {
+        return;
+      }
+      this.editorReady = true;
+      this.editorReadyChange.emit();
+    });
   }
 
   private refreshBlocks(content: string): void {

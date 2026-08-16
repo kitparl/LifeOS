@@ -313,18 +313,41 @@
   </div>
 
   <div class="toolbar-end">
-    <button
-      *ngIf="showViewModes"
-      type="button"
-      class="toolbar-button view-mode-button"
-      [class.active]="viewMode === 'split'"
-      [attr.aria-pressed]="viewMode === 'split'"
-      aria-label="Preview"
-      title="Show live preview"
-      (click)="togglePreviewBeside()"
-    >
-      Preview
-    </button>
+    <ng-container *ngIf="showViewModes">
+      <button
+        type="button"
+        class="toolbar-button view-mode-button"
+        [class.active]="viewMode === 'write'"
+        [attr.aria-pressed]="viewMode === 'write'"
+        aria-label="Edit"
+        title="Edit"
+        (click)="setViewMode('write')"
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        class="toolbar-button view-mode-button"
+        [class.active]="viewMode === 'split'"
+        [attr.aria-pressed]="viewMode === 'split'"
+        aria-label="Split"
+        title="Edit and preview together"
+        (click)="setViewMode('split')"
+      >
+        Split
+      </button>
+      <button
+        type="button"
+        class="toolbar-button view-mode-button"
+        [class.active]="viewMode === 'preview'"
+        [attr.aria-pressed]="viewMode === 'preview'"
+        aria-label="Preview"
+        title="Preview only"
+        (click)="setViewMode('preview')"
+      >
+        Preview
+      </button>
+    </ng-container>
 
     <ng-container *ngIf="showViewModes && viewMode === 'split'">
       <button

@@ -85,4 +85,43 @@ describe('KnowledgeNotesEditorComponent', () => {
     expect(component.lastResult).toBeNull();
     expect(fixture.nativeElement.querySelector('app-code-output')).toBeFalsy();
   });
+
+  it('shows Python enabled status and can disable run', () => {
+    expect(fixture.nativeElement.textContent).toContain('Python enabled');
+    component.executionEnabled = false;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Python disabled');
+    expect(fixture.nativeElement.textContent).toContain('Enable');
+  });
+
+  it('asks the parent to save instead of patching the section itself', () => {
+    const notes = TestBed.inject(KnowledgeNotesService) as unknown as NotesStub;
+    spyOn(notes, 'updateSection').and.callThrough();
+    const requested = jasmine.createSpy('saveRequested');
+    component.saveRequested.subscribe(requested);
+    component.onSave({
+      id: 's1',
+      title: 'Note',
+      content: 'edited',
+      format: 'markdown',
+      language: 'markdown',
+    });
+    expect(requested).toHaveBeenCalled();
+    expect(notes.updateSection).not.toHaveBeenCalled();
+  });
+
+  it('loads blank content when switching to a new section', async () => {
+    fixture.componentRef.setInput(
+      'section',
+      section('')
+    );
+    fixture.componentRef.setInput('section', {
+      ...section(''),
+      id: 's-new',
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.editorContent).toBe('');
+  });
 });

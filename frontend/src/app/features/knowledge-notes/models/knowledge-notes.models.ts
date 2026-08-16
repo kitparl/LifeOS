@@ -28,6 +28,7 @@ export interface KnowledgeSection {
   order_index: number;
   created_at: string;
   updated_at: string;
+  archived_at?: string | null;
   /** Client-only parsed metadata; content is always markdown. */
   format?: 'markdown';
   /** Client-only parsed fences; not persisted separately. */
@@ -63,6 +64,7 @@ export interface KnowledgeSubjectDetail {
   created_at: string;
   updated_at: string;
   chapters: KnowledgeChapter[];
+  archived_sections?: KnowledgeSection[];
 }
 
 export interface KnowledgeSearchHit {

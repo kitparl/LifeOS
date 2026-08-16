@@ -23,6 +23,7 @@ class SectionResponse(BaseModel):
     title: str
     content: str
     order_index: int
+    archived_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -84,6 +85,7 @@ class SubjectDetail(BaseModel):
     created_at: datetime
     updated_at: datetime
     chapters: list[ChapterResponse] = []
+    archived_sections: list[SectionResponse] = []
 
     model_config = {"from_attributes": True}
 

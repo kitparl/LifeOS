@@ -27,4 +27,11 @@ describe('MarkdownPreviewComponent', () => {
     expect(html).toContain('<ul');
     expect(html).toContain('<li>');
   });
+
+  it('applies journal-reader when variant is journal', () => {
+    fixture.componentRef.setInput('content', 'hello');
+    fixture.componentRef.setInput('variant', 'journal');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.journal-reader')).toBeTruthy();
+  });
 });

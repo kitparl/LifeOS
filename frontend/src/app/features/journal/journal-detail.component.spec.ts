@@ -48,6 +48,7 @@ describe('JournalDetailComponent', () => {
     expect(html).toContain('<li>');
     expect(html).toContain('one');
     expect(html).toContain('thanks');
+    expect(fixture.nativeElement.querySelector('.journal-reader')).toBeTruthy();
   });
 
   it('renders markdown emphasis for markdown entries', async () => {

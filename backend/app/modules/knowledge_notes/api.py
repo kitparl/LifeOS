@@ -153,3 +153,21 @@ async def delete_section(
     db: AsyncSession = Depends(get_db),
 ):
     await KnowledgeNotesService(db).delete_section(user.id, section_id)
+
+
+@router.post("/sections/{section_id}/archive", response_model=SectionResponse)
+async def archive_section(
+    section_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await KnowledgeNotesService(db).archive_section(user.id, section_id)
+
+
+@router.post("/sections/{section_id}/restore", response_model=SectionResponse)
+async def restore_section(
+    section_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await KnowledgeNotesService(db).restore_section(user.id, section_id)

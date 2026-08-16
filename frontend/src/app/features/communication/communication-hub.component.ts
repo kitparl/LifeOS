@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import {
   SPEAKING_CATEGORIES,
   SpeakingPractice,
@@ -92,7 +93,10 @@ import { CommunicationService } from './services/communication.service';
                   <a [routerLink]="['/communication/writing', w.id]" class="link">{{ w.title }}</a>
                   <p class="text-xs capitalize" style="color: var(--text-muted)">{{ w.category }}</p>
                 </div>
-                <a [routerLink]="['/communication/writing', w.id, 'edit']" class="text-xs underline">Edit</a>
+                <div class="flex items-center gap-2">
+                  <a [routerLink]="['/communication/writing', w.id, 'edit']" class="text-xs underline">Edit</a>
+                  <button type="button" class="text-xs underline" style="color: var(--danger)" (click)="removeWriting(w)">Delete</button>
+                </div>
               </li>
             }
           </ul>
@@ -122,6 +126,7 @@ import { CommunicationService } from './services/communication.service';
 export class CommunicationHubComponent implements OnInit {
   private readonly communication = inject(CommunicationService);
   private readonly fb = inject(FormBuilder);
+  private readonly confirm = inject(ConfirmService);
 
   writingCategories = WRITING_CATEGORIES;
   speakingCategories = SPEAKING_CATEGORIES;
@@ -155,5 +160,13 @@ export class CommunicationHubComponent implements OnInit {
   loadVocabulary(): void {
     const search = this.vocabFilter.getRawValue().search;
     this.communication.listVocabulary(search || undefined).subscribe({ next: (v) => (this.vocabulary = v) });
+  }
+
+  async removeWriting(item: WritingPractice): Promise<void> {
+    const ok = await this.confirm.confirm(`Delete writing "${item.title}" permanently?`, 'Delete writing');
+    if (!ok) return;
+    this.communication.deleteWriting(item.id).subscribe({
+      next: () => this.communication.listWriting().subscribe({ next: (w) => (this.writing = w) }),
+    });
   }
 }

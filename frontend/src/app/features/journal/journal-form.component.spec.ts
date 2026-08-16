@@ -80,19 +80,23 @@ describe('JournalFormComponent', () => {
       expect(component.form.controls.content.value).toBe('# Hello');
     });
 
-    it('toggles page Read without hiding gratitude', () => {
+    it('toggles page Read into a journal reading layout', () => {
       component.onContentChange('- item');
+      component.form.controls.gratitude.setValue('thanks');
       expect(fixture.nativeElement.querySelector('app-code-workspace')).toBeTruthy();
       component.togglePageMode();
       fixture.detectChanges();
       expect(component.previewOnly).toBeTrue();
       expect(fixture.nativeElement.querySelector('app-code-workspace')).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('.journal-reader')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('.markdown-body')).toBeTruthy();
       expect(fixture.nativeElement.textContent).toContain('item');
-      expect(fixture.nativeElement.querySelector('[formControlName="gratitude"]')).toBeTruthy();
+      expect(fixture.nativeElement.textContent).toContain('thanks');
+      expect(fixture.nativeElement.querySelector('[formControlName="gratitude"]')).toBeFalsy();
       component.togglePageMode();
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector('app-code-workspace')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[formControlName="gratitude"]')).toBeTruthy();
     });
   });
 

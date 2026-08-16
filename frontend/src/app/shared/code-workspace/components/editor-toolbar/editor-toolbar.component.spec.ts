@@ -33,11 +33,13 @@ describe('EditorToolbarComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('3');
   });
 
-  it('pins Preview and Fullscreen on the toolbar end', () => {
+  it('pins Edit, Split, Preview and Fullscreen on the toolbar end', () => {
     fixture.componentRef.setInput('showViewModes', true);
     fixture.detectChanges();
     const end = fixture.nativeElement.querySelector('.toolbar-end') as HTMLElement;
     expect(end).toBeTruthy();
+    expect(end.querySelector('[aria-label="Edit"]')).toBeTruthy();
+    expect(end.querySelector('[aria-label="Split"]')).toBeTruthy();
     expect(end.querySelector('[aria-label="Preview"]')).toBeTruthy();
     expect(end.querySelector('[aria-label="Fullscreen"]')).toBeTruthy();
   });
@@ -55,10 +57,20 @@ describe('EditorToolbarComponent', () => {
     expect(toggle).toBeTruthy();
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     toggle.click();
+    expect(modes).toEqual(['preview']);
+  });
+
+  it('emits viewModeChange for Split', () => {
+    const modes: string[] = [];
+    component.viewModeChange.subscribe((m) => modes.push(m));
+    fixture.componentRef.setInput('showViewModes', true);
+    fixture.componentRef.setInput('viewMode', 'write');
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[aria-label="Split"]') as HTMLButtonElement).click();
     expect(modes).toEqual(['split']);
   });
 
-  it('shows Vertical and Horizontal only after Preview is on', () => {
+  it('shows Vertical and Horizontal only after Split is on', () => {
     const orientations: string[] = [];
     component.splitOrientationChange.subscribe((o) => orientations.push(o));
     fixture.componentRef.setInput('showViewModes', true);

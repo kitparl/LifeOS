@@ -1,15 +1,17 @@
 import {
-  Component,
-  Input,
-  Output,
-  EventEmitter,
-  OnInit,
-  OnDestroy,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  HostListener,
-  ViewChild,
+  Component,
   ElementRef,
+  EventEmitter,
+  HostListener,
+  Input,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  Output,
+  SimpleChanges,
+  ViewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subject, debounceTime, takeUntil } from 'rxjs';
@@ -71,7 +73,7 @@ import {
     '[class.fullscreen]': 'fullscreen',
   },
 })
-export class CodeWorkspaceComponent implements OnInit, OnDestroy {
+export class CodeWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   // ========== INPUTS ==========
   
   @Input() content: string = '';
@@ -89,6 +91,7 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
   @Input() readOnly: boolean = false;
   @Input() theme: 'light' | 'dark' | 'system' = 'system';
   @Input() defaultViewMode: WorkspaceViewMode = 'write';
+  @Input() previewVariant: 'default' | 'journal' = 'default';
 
   // ========== OUTPUTS ==========
   
@@ -174,6 +177,20 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
       this.themeReady = true;
       this.cdr.markForCheck();
     });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['content'] || changes['content'].firstChange) {
+      return;
+    }
+    const next = this.content ?? '';
+    if (next === this.currentContent) {
+      return;
+    }
+    this.currentContent = next;
+    this.updateStats(next);
+    this.markdownEditor?.setContent(next);
+    this.cdr.markForCheck();
   }
 
   ngOnDestroy(): void {

@@ -119,8 +119,9 @@ export class EditorToolbarComponent {
     this.formatAction.emit(action);
   }
 
-  togglePreviewBeside(): void {
-    this.viewModeChange.emit(this.viewMode === 'split' ? 'write' : 'split');
+  setViewMode(mode: WorkspaceViewMode): void {
+    if (this.viewMode === mode) return;
+    this.viewModeChange.emit(mode);
   }
 
   setSplitOrientation(orientation: SplitOrientation): void {

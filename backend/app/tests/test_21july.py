@@ -277,3 +277,91 @@ async def test_knowledge_notes_full_flow(client):
     assert gone.status_code == 404
     orphan = await client.get(f"/api/v1/knowledge-notes/sections/{section_id}", headers=headers)
     assert orphan.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_knowledge_section_archive_restore_and_purge(client):
+    token = await _auth_token(client, "kn-archive@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    subject = await client.post(
+        "/api/v1/knowledge-notes/subjects",
+        headers=headers,
+        json={"title": "Archive Subject"},
+    )
+    subject_id = subject.json()["id"]
+    chapter = await client.post(
+        f"/api/v1/knowledge-notes/subjects/{subject_id}/chapters",
+        headers=headers,
+        json={"title": "One"},
+    )
+    chapter_id = chapter.json()["id"]
+    created = await client.post(
+        f"/api/v1/knowledge-notes/chapters/{chapter_id}/sections",
+        headers=headers,
+        json={"title": "Keep me", "content": "secret notes"},
+    )
+    assert created.json()["content"] == "secret notes"
+    blank = await client.post(
+        f"/api/v1/knowledge-notes/chapters/{chapter_id}/sections",
+        headers=headers,
+        json={"title": "Untitled", "content": ""},
+    )
+    assert blank.status_code == 201
+    assert blank.json()["content"] == ""
+    section_id = created.json()["id"]
+
+    archived = await client.post(
+        f"/api/v1/knowledge-notes/sections/{section_id}/archive",
+        headers=headers,
+    )
+    assert archived.status_code == 200
+    assert archived.json()["archived_at"] is not None
+
+    detail = await client.get(f"/api/v1/knowledge-notes/subjects/{subject_id}", headers=headers)
+    titles = [sec["title"] for sec in detail.json()["chapters"][0]["sections"]]
+    assert "Keep me" not in titles
+    assert any(sec["id"] == section_id for sec in detail.json()["archived_sections"])
+
+    search = await client.get("/api/v1/knowledge-notes/search?q=secret", headers=headers)
+    assert search.json() == []
+
+    restored = await client.post(
+        f"/api/v1/knowledge-notes/sections/{section_id}/restore",
+        headers=headers,
+    )
+    assert restored.status_code == 200
+    assert restored.json()["archived_at"] is None
+    detail = await client.get(f"/api/v1/knowledge-notes/subjects/{subject_id}", headers=headers)
+    titles = [sec["title"] for sec in detail.json()["chapters"][0]["sections"]]
+    assert "Keep me" in titles
+    assert detail.json()["archived_sections"] == []
+
+
+@pytest.mark.asyncio
+async def test_knowledge_section_archive_purges_after_ttl(client, monkeypatch):
+    monkeypatch.setattr("app.modules.knowledge_notes.service.ARCHIVE_TTL_DAYS", 0)
+    token = await _auth_token(client, "kn-purge@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    subject = await client.post(
+        "/api/v1/knowledge-notes/subjects",
+        headers=headers,
+        json={"title": "Purge Subject"},
+    )
+    subject_id = subject.json()["id"]
+    chapter = await client.post(
+        f"/api/v1/knowledge-notes/subjects/{subject_id}/chapters",
+        headers=headers,
+        json={"title": "One"},
+    )
+    created = await client.post(
+        f"/api/v1/knowledge-notes/chapters/{chapter.json()['id']}/sections",
+        headers=headers,
+        json={"title": "Old", "content": "gone"},
+    )
+    section_id = created.json()["id"]
+    await client.post(f"/api/v1/knowledge-notes/sections/{section_id}/archive", headers=headers)
+    detail = await client.get(f"/api/v1/knowledge-notes/subjects/{subject_id}", headers=headers)
+    assert detail.json()["archived_sections"] == []
+    gone = await client.get(f"/api/v1/knowledge-notes/sections/{section_id}", headers=headers)
+    assert gone.status_code == 404

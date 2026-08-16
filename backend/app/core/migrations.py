@@ -77,6 +77,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("file_records", "visibility", "VARCHAR(16) DEFAULT 'private'"),
     ("file_records", "deleted_at", "TIMESTAMP"),
     ("file_records", "updated_at", "TIMESTAMP"),
+    # Knowledge notes: section archive (7-day retention before purge)
+    ("knowledge_sections", "archived_at", "TIMESTAMP"),
     # Learning: track membership + phase ordering (NULL track_id = standalone legacy item)
     ("learning_items", "track_id", "VARCHAR(36)"),
     ("learning_items", "slug", "VARCHAR(64)"),

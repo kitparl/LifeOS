@@ -16,6 +16,8 @@ from app.modules.knowledge_notes.schemas import (
     SubjectUpdate,
 )
 
+ARCHIVE_TTL_DAYS = 7
+
 
 def _not_found(what: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{what} not found")
@@ -27,6 +29,7 @@ class KnowledgeNotesService:
 
     # ---- Subjects ----
     async def list_subjects(self, user_id: str) -> list[SubjectListItem]:
+        await self.repo.purge_expired_archives(user_id, ARCHIVE_TTL_DAYS)
         subjects = await self.repo.list_subjects(user_id)
         items: list[SubjectListItem] = []
         for s in subjects:
@@ -46,10 +49,43 @@ class KnowledgeNotesService:
         return items
 
     async def get_subject(self, user_id: str, subject_id: str) -> SubjectDetail:
+        await self.repo.purge_expired_archives(user_id, ARCHIVE_TTL_DAYS)
         subject = await self.repo.get_subject(user_id, subject_id)
         if subject is None:
             raise _not_found("Subject")
-        return SubjectDetail.model_validate(subject)
+        return self._subject_detail(subject)
+
+    def _subject_detail(self, subject) -> SubjectDetail:
+        archived: list[SectionResponse] = []
+        chapters: list[ChapterResponse] = []
+        for chapter in subject.chapters:
+            active: list[SectionResponse] = []
+            for section in chapter.sections:
+                item = SectionResponse.model_validate(section)
+                if section.archived_at is None:
+                    active.append(item)
+                else:
+                    archived.append(item)
+            chapters.append(
+                ChapterResponse(
+                    id=chapter.id,
+                    subject_id=chapter.subject_id,
+                    title=chapter.title,
+                    order_index=chapter.order_index,
+                    sections=active,
+                )
+            )
+        return SubjectDetail(
+            id=subject.id,
+            title=subject.title,
+            description=subject.description,
+            icon=subject.icon,
+            order_index=subject.order_index,
+            created_at=subject.created_at,
+            updated_at=subject.updated_at,
+            chapters=chapters,
+            archived_sections=archived,
+        )
 
     async def create_subject(self, user_id: str, data: SubjectCreate) -> SubjectDetail:
         subject = await self.repo.create_subject(user_id, data)
@@ -125,11 +161,26 @@ class KnowledgeNotesService:
             raise _not_found("Section")
         await self.repo.delete_section(section)
 
+    async def archive_section(self, user_id: str, section_id: str) -> SectionResponse:
+        section = await self.repo.get_section(user_id, section_id)
+        if section is None:
+            raise _not_found("Section")
+        updated = await self.repo.archive_section(section)
+        return SectionResponse.model_validate(updated)
+
+    async def restore_section(self, user_id: str, section_id: str) -> SectionResponse:
+        section = await self.repo.get_section(user_id, section_id)
+        if section is None:
+            raise _not_found("Section")
+        updated = await self.repo.restore_section(section)
+        return SectionResponse.model_validate(updated)
+
     # ---- Search ----
     async def search(self, user_id: str, query: str) -> list[SearchHit]:
         query = (query or "").strip()
         if not query:
             return []
+        await self.repo.purge_expired_archives(user_id, ARCHIVE_TTL_DAYS)
         rows = await self.repo.search_sections(user_id, query)
         hits: list[SearchHit] = []
         for section, chapter, subject in rows:

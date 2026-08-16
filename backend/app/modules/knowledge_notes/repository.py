@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -47,7 +49,10 @@ class KnowledgeNotesRepository:
         sections = await self.db.execute(
             select(func.count(KnowledgeSection.id))
             .join(KnowledgeChapter, KnowledgeSection.chapter_id == KnowledgeChapter.id)
-            .where(KnowledgeChapter.subject_id == subject_id)
+            .where(
+                KnowledgeChapter.subject_id == subject_id,
+                KnowledgeSection.archived_at.is_(None),
+            )
         )
         return chapters.scalar_one() or 0, sections.scalar_one() or 0
 
@@ -130,7 +135,8 @@ class KnowledgeNotesRepository:
         if order is None:
             max_order = await self.db.execute(
                 select(func.max(KnowledgeSection.order_index)).where(
-                    KnowledgeSection.chapter_id == chapter_id
+                    KnowledgeSection.chapter_id == chapter_id,
+                    KnowledgeSection.archived_at.is_(None),
                 )
             )
             order = (max_order.scalar_one() or 0) + 1
@@ -138,7 +144,7 @@ class KnowledgeNotesRepository:
             user_id=user_id,
             chapter_id=chapter_id,
             title=data.title,
-            content=data.content,
+            content=data.content or "",
             order_index=order,
         )
         self.db.add(section)
@@ -157,6 +163,34 @@ class KnowledgeNotesRepository:
         await self.db.delete(section)
         await self.db.flush()
 
+    async def archive_section(self, section: KnowledgeSection) -> KnowledgeSection:
+        section.archived_at = datetime.now(timezone.utc)
+        await self.db.flush()
+        await self.db.refresh(section)
+        return section
+
+    async def restore_section(self, section: KnowledgeSection) -> KnowledgeSection:
+        section.archived_at = None
+        await self.db.flush()
+        await self.db.refresh(section)
+        return section
+
+    async def purge_expired_archives(self, user_id: str, days: int = 7) -> int:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        result = await self.db.execute(
+            select(KnowledgeSection).where(
+                KnowledgeSection.user_id == user_id,
+                KnowledgeSection.archived_at.is_not(None),
+                KnowledgeSection.archived_at < cutoff,
+            )
+        )
+        rows = list(result.scalars().all())
+        for row in rows:
+            await self.db.delete(row)
+        if rows:
+            await self.db.flush()
+        return len(rows)
+
     # ---- Search ----
     async def search_sections(self, user_id: str, query: str) -> list[tuple]:
         pattern = f"%{query}%"
@@ -166,6 +200,7 @@ class KnowledgeNotesRepository:
             .join(KnowledgeSubject, KnowledgeChapter.subject_id == KnowledgeSubject.id)
             .where(
                 KnowledgeSection.user_id == user_id,
+                KnowledgeSection.archived_at.is_(None),
                 or_(
                     KnowledgeSection.title.ilike(pattern),
                     KnowledgeSection.content.ilike(pattern),

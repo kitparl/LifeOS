@@ -77,6 +77,14 @@ export class KnowledgeNotesService {
     return this.http.delete<void>(`${this.api}/sections/${id}`);
   }
 
+  archiveSection(id: string): Observable<KnowledgeSection> {
+    return this.http.post<KnowledgeSection>(`${this.api}/sections/${id}/archive`, {});
+  }
+
+  restoreSection(id: string): Observable<KnowledgeSection> {
+    return this.http.post<KnowledgeSection>(`${this.api}/sections/${id}/restore`, {});
+  }
+
   // Search
   search(q: string): Observable<KnowledgeSearchHit[]> {
     const params = new HttpParams().set('q', q);
