@@ -1,3 +1,25 @@
+export interface KnowledgeExecutionResult {
+  output: string;
+  error: string | null;
+  executionTime: number;
+  timestamp: Date;
+}
+
+export interface CodeBlock {
+  id: string;
+  language: string;
+  code: string;
+  lineStart: number;
+  lineEnd: number;
+  executionResult?: KnowledgeExecutionResult;
+}
+
+export interface KnowledgeSectionMetadata {
+  lastModified: Date;
+  wordCount: number;
+  hasExecutableCode: boolean;
+}
+
 export interface KnowledgeSection {
   id: string;
   chapter_id: string;
@@ -6,6 +28,11 @@ export interface KnowledgeSection {
   order_index: number;
   created_at: string;
   updated_at: string;
+  /** Client-only during HTML → Markdown transition. */
+  format?: 'markdown' | 'html';
+  /** Client-only parsed fences; not persisted separately. */
+  codeBlocks?: CodeBlock[];
+  metadata?: KnowledgeSectionMetadata;
 }
 
 export interface KnowledgeChapter {

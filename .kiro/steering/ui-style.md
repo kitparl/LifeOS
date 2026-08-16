@@ -1,0 +1,17 @@
+---
+inclusion: always
+---
+
+# UI Design Rules
+
+- Do not redesign the existing UI unless explicitly requested.
+- Reuse the project's existing design system, colors, spacing, typography, icons, and component patterns.
+- Keep the UI visually consistent with the current project.
+- If the project uses an Ubuntu-style theme, continue using Ubuntu-style components, colors, spacing, and interactions.
+- Do not introduce Material Design, iOS, Fluent, or other design languages unless requested.
+- Prefer modifying existing components over creating new ones.
+- Keep changes minimal and focused on the requested feature.
+- Do not over-engineer the implementation.
+- Do not add unnecessary animations, gradients, shadows, or decorative elements.
+- Follow the existing folder structure and coding conventions.
+- Ask before making any large UI or architecture changes.

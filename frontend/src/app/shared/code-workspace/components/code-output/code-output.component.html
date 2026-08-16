@@ -1,0 +1,96 @@
+<div class="code-output-container" [class.theme-dark]="theme === 'dark'" [class.theme-light]="theme === 'light'" *ngIf="result" role="log" aria-live="polite" aria-label="Code execution output">
+  <!-- Header -->
+  <div class="output-header">
+    <div class="output-header-left">
+      <button
+        type="button"
+        class="toggle-button"
+        (click)="toggleExpanded()"
+        [attr.aria-expanded]="expanded"
+        aria-label="Toggle output visibility"
+      >
+        <svg
+          class="chevron-icon"
+          [class.rotated]="!expanded"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+        <span class="header-title">Output</span>
+      </button>
+      
+      <span class="status-badge" [ngClass]="getStatusClass()">
+        {{ getStatusText() }}
+      </span>
+      
+      <span class="execution-time" *ngIf="result.executionTimeMs !== undefined">
+        {{ formatExecutionTime() }}
+      </span>
+    </div>
+
+    <div class="output-header-right">
+      <button
+        type="button"
+        class="icon-button"
+        (click)="copyOutput()"
+        title="Copy output"
+        aria-label="Copy output to clipboard"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+      </button>
+      
+      <button
+        type="button"
+        class="icon-button"
+        (click)="clearOutput()"
+        title="Clear output"
+        aria-label="Clear output"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Output Content -->
+  <div class="output-content" *ngIf="expanded && hasOutput()" [style.max-height.px]="maxHeight">
+    <!-- Stdout -->
+    <div class="output-section stdout-section" *ngIf="result.stdout">
+      <pre class="output-text">{{ result.stdout }}</pre>
+    </div>
+
+    <!-- Stderr -->
+    <div class="output-section stderr-section" *ngIf="result.stderr">
+      <div class="section-label">Errors</div>
+      <pre class="output-text error-text">{{ result.stderr }}</pre>
+    </div>
+
+    <!-- Error -->
+    <div class="output-section error-section" *ngIf="result.error">
+      <div class="section-label">Error</div>
+      <pre class="output-text error-text">{{ result.error }}</pre>
+    </div>
+
+    <!-- Exit Code -->
+    <div class="output-footer" *ngIf="result.exitCode !== undefined && result.exitCode !== 0">
+      <span class="exit-code">Exit code: {{ result.exitCode }}</span>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div class="output-content empty-state" *ngIf="expanded && !hasOutput()">
+    <p class="empty-message">No output</p>
+  </div>
+</div>

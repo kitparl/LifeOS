@@ -26,6 +26,7 @@ export class ThemeService {
   private visibilityHandler: (() => void) | null = null;
 
   readonly preference = signal<ThemePreference>('system');
+  readonly resolved = signal<'light' | 'dark'>('light');
 
   constructor(rendererFactory: RendererFactory2) {
     this.renderer = rendererFactory.createRenderer(null, null);
@@ -90,6 +91,7 @@ export class ThemeService {
     this.renderer.removeClass(root, 'light');
     this.renderer.removeClass(root, 'dark');
     const resolved = preference === 'system' ? this.resolveTimeOfDay() : preference;
+    this.resolved.set(resolved);
     this.renderer.addClass(root, resolved);
   }
 

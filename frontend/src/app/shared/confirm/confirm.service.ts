@@ -1,8 +1,8 @@
 import { Injectable, signal } from '@angular/core';
 
 /**
- * Phone (max-width 640px): native window.confirm.
- * Web + iPad: app-modal via ConfirmHostComponent in AppShell.
+ * In-app delete confirmation for web, iPad, and phone.
+ * On phone (max-width 640px) app-modal already becomes a full-screen sheet.
  */
 @Injectable({ providedIn: 'root' })
 export class ConfirmService {
@@ -13,9 +13,6 @@ export class ConfirmService {
   private pending: ((value: boolean) => void) | null = null;
 
   confirm(message: string, title = 'Confirm'): Promise<boolean> {
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches) {
-      return Promise.resolve(window.confirm(message));
-    }
     this.pending?.(false);
     return new Promise((resolve) => {
       this.pending = resolve;

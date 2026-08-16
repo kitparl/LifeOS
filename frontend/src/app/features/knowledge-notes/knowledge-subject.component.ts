@@ -1,9 +1,9 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { MarkdownEditorComponent } from '../../shared/markdown-editor/markdown-editor.component';
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { ModalComponent } from '../../shared/modal/modal.component';
+import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
 import {
   KnowledgeChapter,
   KnowledgeSection,
@@ -21,7 +21,7 @@ type PromptAction =
 @Component({
   selector: 'app-knowledge-subject',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, MarkdownEditorComponent, MarkdownPipe, ModalComponent],
+  imports: [ReactiveFormsModule, RouterLink, KnowledgeNotesEditorComponent, MarkdownPipe, ModalComponent],
   template: `
     @if (subject(); as s) {
       <div class="space-y-3">
@@ -87,7 +87,11 @@ type PromptAction =
                 @if (previewOnly()) {
                   <div class="markdown-body panel" [innerHTML]="form.controls.content.value | markdown"></div>
                 } @else {
-                  <app-markdown-editor formControlName="content" minHeight="52vh" placeholder="Write this section in Markdown…" />
+                  <app-knowledge-notes-editor
+                    [section]="sec"
+                    (contentChange)="onEditorContentChange($event)"
+                    (sectionUpdated)="patchSection($event)"
+                  />
                 }
               </form>
             } @else {
@@ -185,6 +189,10 @@ export class KnowledgeSubjectComponent implements OnInit {
     this.form.reset({ title: sec.title, content: sec.content });
   }
 
+  onEditorContentChange(content: string): void {
+    this.form.controls.content.setValue(content, { emitEvent: false });
+  }
+
   togglePreview(): void {
     this.previewOnly.set(!this.previewOnly());
   }
@@ -203,7 +211,7 @@ export class KnowledgeSubjectComponent implements OnInit {
     });
   }
 
-  private patchSection(updated: KnowledgeSection): void {
+  patchSection(updated: KnowledgeSection): void {
     const s = this.subject();
     if (!s) return;
     for (const c of s.chapters) {

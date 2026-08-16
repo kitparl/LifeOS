@@ -28,7 +28,7 @@ describe('AuthService', () => {
   });
 
   it('login stores token and sets authenticated', () => {
-    service.login({ email: 'a@b.com', password: 'password1' }).subscribe();
+    service.login({ identifier: 'a@b.com', password: 'password1' }).subscribe();
 
     const loginReq = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
     expect(loginReq.request.method).toBe('POST');

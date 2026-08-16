@@ -36,8 +36,7 @@ function isHtml(content: string): boolean {
             <!-- TipTap HTML content (sanitized) -->
             <div class="prose-content ProseMirror" [innerHTML]="safe(w.content)"></div>
           } @else {
-            <!-- Legacy plain-text content -->
-            <div class="text-sm whitespace-pre-wrap" style="color: var(--text)">{{ w.content }}</div>
+            <div class="prose-content" [innerHTML]="safeMarkdown(w.content)"></div>
           }
         </div>
 
@@ -67,6 +66,10 @@ export class WritingDetailComponent implements OnInit {
 
   safe(html: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(this.markdown.sanitize(html));
+  }
+
+  safeMarkdown(markdown: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(this.markdown.render(markdown));
   }
 
   ngOnInit(): void {

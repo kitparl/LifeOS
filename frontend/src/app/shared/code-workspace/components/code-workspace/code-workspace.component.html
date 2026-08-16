@@ -1,0 +1,127 @@
+<div
+  class="code-workspace-container"
+  [class.mobile]="isMobile"
+  [class.tablet]="isTablet"
+  [class.desktop]="isDesktop"
+  [class.theme-dark]="resolvedTheme === 'dark'"
+  [class.theme-light]="resolvedTheme === 'light'"
+  [class.theme-ready]="themeReady"
+>
+  <!-- Toolbar -->
+  <app-editor-toolbar
+    *ngIf="showToolbar"
+    [visible]="true"
+    [showStats]="showWordCount"
+    [stats]="editorStats"
+    [readOnly]="readOnly"
+    [mode]="mode"
+    [theme]="resolvedTheme"
+    (formatAction)="onFormatAction($event)"
+  ></app-editor-toolbar>
+
+  <!-- Language Selector & Run Button (Top Bar) -->
+  <div class="workspace-header" *ngIf="showLanguageSelector || showRunButton">
+    <app-language-selector
+      *ngIf="showLanguageSelector"
+      [selectedLanguage]="currentLanguage"
+      [disabled]="readOnly"
+      (languageChange)="onLanguageChange($event)"
+    ></app-language-selector>
+
+    <div class="header-actions">
+      <button
+        *ngIf="showRunButton && canExecute()"
+        type="button"
+        class="run-button"
+        [class.running]="isExecuting"
+        [disabled]="isRunButtonDisabled()"
+        (click)="isExecuting ? onStopExecution() : onRunCode()"
+      >
+        <svg
+          *ngIf="!isExecuting"
+          class="button-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+
+        <svg
+          *ngIf="isExecuting"
+          class="button-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="6" y="4" width="4" height="16"></rect>
+          <rect x="14" y="4" width="4" height="16"></rect>
+        </svg>
+
+        <span>{{ getRunButtonLabel() }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile Tabs -->
+  <app-workspace-tabs
+    *ngIf="shouldShowTabs()"
+    [activeTab]="currentView"
+    [showPreview]="showPreview"
+    [showOutput]="showOutput"
+    (tabChange)="onTabChange($event)"
+  ></app-workspace-tabs>
+
+  <!-- Main Content Area -->
+  <div class="workspace-content" [class.split-view]="shouldShowSplitView()">
+    <!-- Editor Panel -->
+    <div class="editor-panel" *ngIf="shouldShowEditor()">
+      <app-markdown-editor
+        [content]="currentContent"
+        [language]="currentLanguage"
+        [theme]="resolvedTheme"
+        [readOnly]="readOnly"
+        (contentChange)="onContentChange($event)"
+      ></app-markdown-editor>
+    </div>
+
+    <!-- Resizable Divider (Desktop only) -->
+    <div class="resize-divider" *ngIf="shouldShowSplitView()"></div>
+
+    <!-- Preview Panel -->
+    <div class="preview-panel" *ngIf="shouldShowPreview()">
+      <app-markdown-preview
+        [content]="currentContent"
+        [theme]="resolvedTheme"
+      ></app-markdown-preview>
+    </div>
+
+    <!-- Output Panel -->
+    <div class="output-panel" *ngIf="shouldShowOutput()">
+      <app-code-output
+        [result]="executionResult"
+        [theme]="resolvedTheme"
+        [expanded]="true"
+        [maxHeight]="400"
+      ></app-code-output>
+    </div>
+  </div>
+
+  <!-- Loading Indicator -->
+  <div class="loading-overlay" *ngIf="isExecuting">
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <span>Executing code...</span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,79 @@
+.workspace-tabs {
+  display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  color: var(--text-muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  min-height: 48px;
+  max-width: none;
+}
+
+.tab-button:hover:not(.active) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.tab-button.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 500;
+  animation: tab-activate 0.2s ease-out;
+}
+
+.tab-icon {
+  margin-bottom: 0.25rem;
+  flex-shrink: 0;
+}
+
+.tab-label {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .tab-label {
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .tab-button {
+    padding: 0.625rem 0.5rem;
+  }
+
+  .tab-icon {
+    margin-bottom: 0.125rem;
+  }
+}
+
+@keyframes tab-activate {
+  from {
+    border-bottom-color: transparent;
+  }
+  to {
+    border-bottom-color: currentColor;
+  }
+}
+
+.tab-button:active {
+  background: var(--surface-3);
+}
+
+@media (prefers-contrast: high) {
+  .tab-button.active {
+    border-bottom-width: 4px;
+  }
+}

@@ -34,7 +34,7 @@ import { CommunicationService } from './services/communication.service';
             @if (responseIsHtml(s.response)) {
               <div class="prose-content ProseMirror" [innerHTML]="safe(s.response)"></div>
             } @else {
-              <p class="whitespace-pre-wrap" style="color: var(--text)">{{ s.response }}</p>
+              <div class="prose-content" [innerHTML]="safeMarkdown(s.response)"></div>
             }
           </div>
         }
@@ -69,6 +69,10 @@ export class SpeakingDetailComponent implements OnInit {
 
   safe(html: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(this.markdown.sanitize(html));
+  }
+
+  safeMarkdown(markdown: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(this.markdown.render(markdown));
   }
 
   ngOnInit(): void {
