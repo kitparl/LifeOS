@@ -270,6 +270,35 @@ async def test_token_download(client, tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_content_headers_allow_unicode_filename(client, tmp_path, monkeypatch):
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path / "uploads"))
+
+    token = await _auth_token(client, "unicodefile@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    name = "Screenshot 16 at 9.51.00\u202fPM.txt"
+
+    upload = await client.post(
+        "/api/v1/files/upload",
+        headers=headers,
+        files={"file": (name, b"preview-bytes", "text/plain")},
+    )
+    assert upload.status_code == 201
+    file_id = upload.json()["id"]
+
+    minted = await client.post(f"/api/v1/files/{file_id}/download-token", headers=headers)
+    content = await client.get(f"/api/v1/files/{file_id}/content?token={minted.json()['token']}")
+    assert content.status_code == 200
+    assert content.content == b"preview-bytes"
+    disposition = content.headers["content-disposition"]
+    disposition.encode("latin-1")
+    assert "filename*=UTF-8''" in disposition
+    assert "\u202f" not in disposition
+
+
+@pytest.mark.asyncio
 async def test_soft_delete_then_purge(client, tmp_path, monkeypatch):
     from app.core.config import get_settings
     from app.modules.auth.models import User

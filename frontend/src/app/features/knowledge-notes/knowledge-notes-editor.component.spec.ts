@@ -142,10 +142,13 @@ describe('KnowledgeNotesEditorComponent', () => {
       })
     );
     const insert = jasmine.createSpy('insertAtCursor');
+    const filesChanged = jasmine.createSpy('filesChanged');
     component.workspace = { insertAtCursor: insert } as never;
+    component.filesChanged.subscribe(filesChanged);
     await component.onFilesPasted([new File(['x'], 'shot.png', { type: 'image/png' })]);
     expect(files.upload).toHaveBeenCalledWith(jasmine.any(File), 'knowledge_notes', 's1');
     expect(insert).toHaveBeenCalledWith('![shot.png](/api/v1/files/f1/content)');
+    expect(filesChanged).toHaveBeenCalled();
   });
 
   it('inserts a link for non-image pastes', async () => {

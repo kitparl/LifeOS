@@ -1,3 +1,5 @@
+import re
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +20,8 @@ from app.modules.knowledge_notes.schemas import (
 )
 
 ARCHIVE_TTL_DAYS = 7
+_INLINE_FILE_RE = re.compile(r"/files/([0-9a-f-]{36})/content", re.I)
+_SECTION_FILE_MODULES = ("knowledge_notes", "knowledge_notes_extra")
 
 
 def _not_found(what: str) -> HTTPException:
@@ -37,7 +41,20 @@ class KnowledgeNotesService:
     async def _cleanup_section_files(self, user_id: str, section_ids: list[str]) -> None:
         if not section_ids:
             return
-        await self.files.soft_delete_for_entities(user_id, "knowledge_notes", section_ids)
+        for module in _SECTION_FILE_MODULES:
+            await self.files.soft_delete_for_entities(user_id, module, section_ids)
+
+    async def _sync_inline_files(self, user_id: str, section_id: str, content: str) -> None:
+        referenced = set(_INLINE_FILE_RE.findall(content or ""))
+        rows, _ = await self.files.list_for_user(
+            user_id,
+            module="knowledge_notes",
+            entity_id=section_id,
+            limit=500,
+        )
+        for row in rows:
+            if row.id not in referenced:
+                await self.files.soft_delete(row)
 
     # ---- Subjects ----
     async def list_subjects(self, user_id: str) -> list[SubjectListItem]:
@@ -165,6 +182,8 @@ class KnowledgeNotesService:
             if target is None:
                 raise _not_found("Target chapter")
         updated = await self.repo.update_section(section, data)
+        if data.content is not None:
+            await self._sync_inline_files(user_id, section_id, updated.content)
         return SectionResponse.model_validate(updated)
 
     async def delete_section(self, user_id: str, section_id: str) -> None:

@@ -15,6 +15,7 @@ ALLOWED_MODULES = frozenset(
         "journal",
         "routines",
         "knowledge_notes",
+        "knowledge_notes_extra",
         "ocr",
         "running",
         "finance",

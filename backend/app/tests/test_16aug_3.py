@@ -36,12 +36,12 @@ async def _section(client, headers, email_tag="kn"):
     return subject_id, chapter_id, section.json()["id"]
 
 
-async def _upload(client, headers, section_id, name="note.txt", body=b"section-bytes"):
+async def _upload(client, headers, section_id, name="note.txt", body=b"section-bytes", module="knowledge_notes"):
     return await client.post(
         "/api/v1/files/upload",
         headers=headers,
         files={"file": (name, body, "text/plain")},
-        data={"module": "knowledge_notes", "entity_id": section_id},
+        data={"module": module, "entity_id": section_id},
     )
 
 
@@ -160,3 +160,59 @@ async def test_expired_archive_purge_soft_deletes_files(client, tmp_path, monkey
     assert missing.status_code == 404
     usage = await client.get("/api/v1/files/usage", headers=headers)
     assert usage.json()["file_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_additional_documents_are_separate_from_inline_files(client, tmp_path, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "upload_dir", str(tmp_path / "uploads"))
+    token = await _auth_token(client, "kn-extra@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    _, _, section_id = await _section(client, headers, "extra")
+
+    inline = await _upload(client, headers, section_id, "shot.txt", b"in-note")
+    extra = await _upload(
+        client, headers, section_id, "class-notes.txt", b"extra-pdf", module="knowledge_notes_extra"
+    )
+    assert inline.status_code == 201
+    assert extra.status_code == 201
+    inline_id = inline.json()["id"]
+    extra_id = extra.json()["id"]
+
+    await client.patch(
+        f"/api/v1/knowledge-notes/sections/{section_id}",
+        headers=headers,
+        json={"content": f"![shot](/api/v1/files/{inline_id}/content)"},
+    )
+
+    listed_inline = await client.get(
+        "/api/v1/files",
+        headers=headers,
+        params={"module": "knowledge_notes", "entity_id": section_id},
+    )
+    listed_extra = await client.get(
+        "/api/v1/files",
+        headers=headers,
+        params={"module": "knowledge_notes_extra", "entity_id": section_id},
+    )
+    assert [f["id"] for f in listed_inline.json()] == [inline_id]
+    assert [f["id"] for f in listed_extra.json()] == [extra_id]
+
+    await client.patch(
+        f"/api/v1/knowledge-notes/sections/{section_id}",
+        headers=headers,
+        json={"content": "no more image"},
+    )
+    listed_inline = await client.get(
+        "/api/v1/files",
+        headers=headers,
+        params={"module": "knowledge_notes", "entity_id": section_id},
+    )
+    listed_extra = await client.get(
+        "/api/v1/files",
+        headers=headers,
+        params={"module": "knowledge_notes_extra", "entity_id": section_id},
+    )
+    assert listed_inline.json() == []
+    assert [f["id"] for f in listed_extra.json()] == [extra_id]

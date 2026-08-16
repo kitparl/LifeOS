@@ -268,6 +268,13 @@ export class CodeWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
     this.onContentChange(next);
   }
 
+  setContent(content: string): void {
+    this.currentContent = content;
+    this.updateStats(content);
+    this.markdownEditor?.setContent(content);
+    this.cdr.markForCheck();
+  }
+
   onEditorPaste(event: ClipboardEvent): void {
     if (!this.enableFilePaste) return;
     const files = filesFromClipboard(event);

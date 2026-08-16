@@ -415,15 +415,16 @@ class FileService:
         return StreamingResponse(full(), media_type=content_type, headers=headers)
 
     def _content_disposition(self, record: FileRecord) -> str:
-        filename = record.filename.replace('"', "")
-        encoded = quote(filename)
+        filename = record.filename.replace('"', "").replace("\\", "")
+        encoded = quote(filename, safe="")
+        ascii_name = "".join(ch if 32 <= ord(ch) < 127 else "_" for ch in filename).strip("._") or "file"
         if record.content_type in NEVER_INLINE_TYPES:
             kind = "attachment"
         elif record.content_type in INLINE_SAFE_TYPES:
             kind = "inline"
         else:
             kind = "attachment"
-        return f"{kind}; filename=\"{filename}\"; filename*=UTF-8''{encoded}"
+        return f"{kind}; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}"
 
     @staticmethod
     def _parse_range(header: str, size: int) -> tuple[int, int]:

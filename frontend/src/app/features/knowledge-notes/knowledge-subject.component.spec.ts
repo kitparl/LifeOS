@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
-import { KnowledgeSubjectComponent } from './knowledge-subject.component';
+import { KnowledgeSubjectComponent, stripFileMarkdown } from './knowledge-subject.component';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
 import { FilesService } from '../files/services/files.service';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
@@ -143,10 +143,27 @@ describe('KnowledgeSubjectComponent', () => {
         {
           provide: FilesService,
           useValue: {
-            list: () => of([]),
+            list: (module?: string) =>
+              module === 'knowledge_notes'
+                ? of([
+                    {
+                      id: 'f1',
+                      filename: 'shot.png',
+                      content_type: 'image/png',
+                      size_bytes: 12,
+                      storage_backend: 'local',
+                      url: '/api/v1/files/f1/content',
+                      module: 'knowledge_notes',
+                      entity_id: 's1',
+                      created_at: now,
+                    },
+                  ])
+                : of([]),
             upload: () => of({}),
             delete: () => of(void 0),
-            tokenUrl: () => of(''),
+            tokenUrl: () => of('blob:preview'),
+            openInNewTab: () => undefined,
+            saveAsDownload: () => undefined,
           },
         },
         {
@@ -345,5 +362,41 @@ describe('KnowledgeSubjectComponent', () => {
     expect(component.sidebarWidth()).toBe(180);
     component.resetSidebarWidth();
     expect(component.sidebarWidth()).toBe(256);
+  });
+
+  it('shows document history and additional documents for the selected section', () => {
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Document history');
+    expect(text).toContain('Additional documents');
+    expect(text).toContain('Preview');
+    expect(text).toContain('shot.png');
+  });
+
+  it('removes file markdown from the note when a document is deleted', () => {
+    notes.updateSection.calls.reset();
+    const id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    component.form.controls.content.setValue(`See ![shot.png](/api/v1/files/${id}/content)\nmore`);
+    component.onDocumentRemoved({
+      id,
+      filename: 'shot.png',
+      content_type: 'image/png',
+      size_bytes: 12,
+      storage_backend: 'local',
+      url: `/api/v1/files/${id}/content`,
+      module: 'knowledge_notes',
+      entity_id: 's1',
+      created_at: now,
+    });
+    expect(component.form.controls.content.value).toBe('See\nmore');
+    expect(notes.updateSection).toHaveBeenCalledWith('s1', {
+      title: 'Test',
+      content: 'See\nmore',
+    });
+  });
+
+  it('strips image and link markdown for a file id', () => {
+    const id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const md = `Intro\n\n![shot.png](/api/v1/files/${id}/content)\n\n[notes.pdf](/api/v1/files/${id}/content)\n\nEnd`;
+    expect(stripFileMarkdown(md, id)).toBe('Intro\n\nEnd');
   });
 });

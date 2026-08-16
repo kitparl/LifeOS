@@ -115,6 +115,7 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
   @Output() sectionUpdated = new EventEmitter<KnowledgeSection>();
   @Output() saveRequested = new EventEmitter<void>();
   @Output() editorReadyChange = new EventEmitter<void>();
+  @Output() filesChanged = new EventEmitter<void>();
 
   editorReady = false;
   editorContent = '';
@@ -176,6 +177,13 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
       }
     }
     this.uploadStatus = '';
+    this.filesChanged.emit();
+  }
+
+  setContent(content: string): void {
+    this.editorContent = content;
+    this.refreshBlocks(content);
+    this.workspace?.setContent(content);
   }
 
   private markdownForRecord(record: FileRecord, file: File): string {

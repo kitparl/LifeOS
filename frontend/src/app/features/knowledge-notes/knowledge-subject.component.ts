@@ -17,6 +17,7 @@ import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { FileImageSrcDirective } from '../../shared/markdown/file-image-src.directive';
 import { AttachmentListComponent } from '../files/components/attachment-list.component';
+import { FileRecord } from '../files/models/file.models';
 import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
 import {
   KnowledgeChapter,
@@ -305,10 +306,26 @@ const SIDEBAR_MAX = 480;
                     (sectionUpdated)="onEditorSaved($event)"
                     (saveRequested)="save()"
                     (editorReadyChange)="onEditorReady()"
+                    (filesChanged)="onInlineFilesChanged()"
                   />
                 }
-                <div class="kn-attachments">
-                  <app-attachment-list module="knowledge_notes" [entityId]="sec.id" />
+                <div class="kn-attachments space-y-2">
+                  <app-attachment-list
+                    #historyList
+                    module="knowledge_notes"
+                    title="Document history"
+                    emptyText="Images and files used in this section."
+                    [entityId]="sec.id"
+                    [allowUpload]="false"
+                    [enablePreview]="true"
+                    (removed)="onDocumentRemoved($event)"
+                  />
+                  <app-attachment-list
+                    module="knowledge_notes_extra"
+                    title="Additional documents"
+                    emptyText="PDFs and extras for this section — not inserted into the note."
+                    [entityId]="sec.id"
+                  />
                 </div>
               </form>
             } @else {
@@ -338,6 +355,8 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 
   @ViewChild('layout') layoutRef?: ElementRef<HTMLElement>;
   @ViewChild('renameInput') renameInput?: ElementRef<HTMLInputElement>;
+  @ViewChild(KnowledgeNotesEditorComponent) editor?: KnowledgeNotesEditorComponent;
+  @ViewChild('historyList') historyList?: AttachmentListComponent;
 
   readonly subject = signal<KnowledgeSubjectDetail | null>(null);
   readonly selected = signal<KnowledgeSection | null>(null);
@@ -471,6 +490,21 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.lastSavedContent = updated.content;
     this.patchSection(updated);
     this.refreshSync();
+  }
+
+  onInlineFilesChanged(): void {
+    this.historyList?.load();
+  }
+
+  onDocumentRemoved(file: FileRecord): void {
+    const next = stripFileMarkdown(this.form.controls.content.value, file.id);
+    if (next === this.form.controls.content.value) return;
+    this.form.controls.content.setValue(next, { emitEvent: false });
+    const sec = this.selected();
+    if (sec) sec.content = next;
+    this.editor?.setContent(next);
+    this.refreshSync();
+    this.saveIfDirty();
   }
 
   togglePreview(): void {
@@ -804,3 +838,10 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 }
 
 const ARCHIVE_TTL_DAYS = 7;
+
+export function stripFileMarkdown(content: string, fileId: string): string {
+  if (!content || !fileId) return content;
+  const escaped = fileId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`!?\\[[^\\]]*\\]\\([^)]*\\/files\\/${escaped}\\/content[^)]*\\)`, 'gi');
+  return content.replace(re, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
