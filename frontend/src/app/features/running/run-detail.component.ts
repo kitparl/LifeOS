@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { Run, formatDuration, formatPace } from './models/running.models';
 import { RunningService } from './services/running.service';
 
@@ -72,6 +73,7 @@ export class RunDetailComponent implements OnInit {
   private readonly runningService = inject(RunningService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly confirm = inject(ConfirmService);
 
   readonly formatDuration = formatDuration;
   readonly formatPace = formatPace;
@@ -98,8 +100,10 @@ export class RunDetailComponent implements OnInit {
     });
   }
 
-  remove(): void {
-    if (!this.run || !confirm('Delete this run permanently?')) return;
+  async remove(): Promise<void> {
+    if (!this.run) return;
+    const ok = await this.confirm.confirm('Delete this run permanently?');
+    if (!ok) return;
     this.runningService.deleteRun(this.run.id).subscribe({
       next: () => this.router.navigate(['/running']),
     });

@@ -3,6 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
 import { Habit } from './models/habit.models';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { HabitsService } from './services/habits.service';
 
 interface HeatmapDay {
@@ -99,6 +100,7 @@ export class HabitDetailComponent implements OnInit {
   private readonly habitsService = inject(HabitsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly confirm = inject(ConfirmService);
 
   habit: Habit | null = null;
   loading = false;
@@ -132,8 +134,10 @@ export class HabitDetailComponent implements OnInit {
     req.subscribe({ next: () => this.load(this.habit!.id) });
   }
 
-  remove(): void {
-    if (!this.habit || !confirm('Delete this habit permanently?')) return;
+  async remove(): Promise<void> {
+    if (!this.habit) return;
+    const ok = await this.confirm.confirm('Delete this habit permanently?');
+    if (!ok) return;
     this.habitsService.delete(this.habit.id).subscribe({
       next: () => this.router.navigate(['/habits']),
     });

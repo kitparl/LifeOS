@@ -61,3 +61,19 @@ async def test_dashboard_habits_today(client):
     assert len(habits) == 1
     assert habits[0]["name"] == "Meditate"
     assert habits[0]["completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_delete_habit(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        "/api/v1/habits",
+        headers=headers,
+        json={"name": "To delete", "frequency": "daily"},
+    )
+    habit_id = create.json()["id"]
+    delete = await client.delete(f"/api/v1/habits/{habit_id}", headers=headers)
+    assert delete.status_code == 204
+    listing = await client.get("/api/v1/habits", headers=headers)
+    assert listing.json() == []

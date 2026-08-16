@@ -3,7 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.habits.models import Habit
-from app.modules.routines.models import Routine, RoutineBlock
+from app.modules.routines.models import (
+    Routine,
+    RoutineAreaOption,
+    RoutineBlock,
+    RoutineCategoryOption,
+)
 from app.modules.routines.schemas import RoutineBlockCreate, RoutineCreate, RoutineUpdate
 
 
@@ -16,7 +21,13 @@ class RoutineRepository:
             select(Routine)
             .where(Routine.user_id == user_id)
             .options(selectinload(Routine.blocks).selectinload(RoutineBlock.habits))
-            .order_by(Routine.name.asc())
+            .order_by(
+                Routine.start_date.is_(None).asc(),
+                Routine.start_date.desc(),
+                Routine.end_date.is_(None).asc(),
+                Routine.end_date.desc(),
+                Routine.name.asc(),
+            )
         )
         if active_only:
             q = q.where(Routine.is_active.is_(True))
@@ -66,6 +77,11 @@ class RoutineRepository:
             out.append(block)
         return out
 
+    async def _register_block_taxonomy(self, user_id: str, blocks: list[RoutineBlockCreate]) -> None:
+        for b in blocks:
+            await self.ensure_area(user_id, b.area)
+            await self.ensure_category(user_id, b.category)
+
     async def create(self, user_id: str, data: RoutineCreate) -> Routine:
         routine = Routine(
             user_id=user_id,
@@ -78,6 +94,7 @@ class RoutineRepository:
         routine.days_of_week = data.days_of_week
         routine.skip_dates = data.skip_dates or []
         routine.blocks = await self._make_blocks(user_id, data.blocks)
+        await self._register_block_taxonomy(user_id, data.blocks)
         self.db.add(routine)
         await self.db.flush()
         await self.db.refresh(routine, ["blocks"])
@@ -99,6 +116,7 @@ class RoutineRepository:
             routine.blocks.clear()
             await self.db.flush()
             routine.blocks = await self._make_blocks(routine.user_id, data.blocks or [])
+            await self._register_block_taxonomy(routine.user_id, data.blocks or [])
 
         await self.db.flush()
         await self.db.refresh(routine, ["blocks"])
@@ -106,4 +124,50 @@ class RoutineRepository:
 
     async def delete(self, routine: Routine) -> None:
         await self.db.delete(routine)
+        await self.db.flush()
+
+    async def list_active_all(self) -> list[Routine]:
+        result = await self.db.execute(select(Routine).where(Routine.is_active.is_(True)))
+        return list(result.scalars().all())
+
+    async def list_area_names(self, user_id: str) -> list[str]:
+        result = await self.db.execute(
+            select(RoutineAreaOption.name)
+            .where(RoutineAreaOption.user_id == user_id)
+            .order_by(RoutineAreaOption.name.asc())
+        )
+        return list(result.scalars().all())
+
+    async def ensure_area(self, user_id: str, name: str) -> None:
+        clean = (name or "").strip()
+        if not clean:
+            return
+        existing = await self.db.execute(
+            select(RoutineAreaOption).where(RoutineAreaOption.user_id == user_id)
+        )
+        for row in existing.scalars().all():
+            if row.name.lower() == clean.lower():
+                return
+        self.db.add(RoutineAreaOption(user_id=user_id, name=clean))
+        await self.db.flush()
+
+    async def list_category_names(self, user_id: str) -> list[str]:
+        result = await self.db.execute(
+            select(RoutineCategoryOption.name)
+            .where(RoutineCategoryOption.user_id == user_id)
+            .order_by(RoutineCategoryOption.name.asc())
+        )
+        return list(result.scalars().all())
+
+    async def ensure_category(self, user_id: str, name: str) -> None:
+        clean = (name or "").strip()
+        if not clean:
+            return
+        existing = await self.db.execute(
+            select(RoutineCategoryOption).where(RoutineCategoryOption.user_id == user_id)
+        )
+        for row in existing.scalars().all():
+            if row.name.lower() == clean.lower():
+                return
+        self.db.add(RoutineCategoryOption(user_id=user_id, name=clean))
         await self.db.flush()

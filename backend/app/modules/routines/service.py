@@ -1,10 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.schemas import EventListItem
+from app.modules.routines.expiry import period_is_outside_today
+from app.modules.routines.models import ROUTINE_AREAS, ROUTINE_CATEGORIES
 from app.modules.routines.repository import RoutineRepository
 from app.modules.routines.schemas import (
     LinkedHabitBrief,
@@ -90,8 +92,19 @@ class RoutineService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Routine block not found")
         return self._to_response(routine)
 
+    def _apply_expiry(self, routine, start=None, end=None, is_active: bool | None = True) -> bool:
+        start_date = start if start is not None else getattr(routine, "start_date", None)
+        end_date = end if end is not None else getattr(routine, "end_date", None)
+        if is_active is None:
+            is_active = bool(getattr(routine, "is_active", True))
+        if period_is_outside_today(start_date, end_date):
+            return False
+        return is_active
+
     async def create_routine(self, user_id: str, data: RoutineCreate) -> RoutineResponse:
         routine = await self.repo.create(user_id, data)
+        routine.is_active = self._apply_expiry(routine, data.start_date, data.end_date, True)
+        await self.db.flush()
         return self._to_response(routine)
 
     async def update_routine(self, user_id: str, routine_id: str, data: RoutineUpdate) -> RoutineResponse:
@@ -99,6 +112,11 @@ class RoutineService:
         if routine is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Routine not found")
         updated = await self.repo.update(routine, data)
+        start = data.start_date if "start_date" in data.model_fields_set else updated.start_date
+        end = data.end_date if "end_date" in data.model_fields_set else updated.end_date
+        desired = data.is_active if data.is_active is not None else updated.is_active
+        updated.is_active = self._apply_expiry(updated, start, end, desired)
+        await self.db.flush()
         return self._to_response(updated)
 
     async def delete_routine(self, user_id: str, routine_id: str) -> None:
@@ -106,6 +124,47 @@ class RoutineService:
         if routine is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Routine not found")
         await self.repo.delete(routine)
+
+    def _merge_taxonomy(self, suggested: tuple[str, ...], stored: list[str]) -> list[str]:
+        seen: dict[str, str] = {}
+        for name in [*suggested, *stored]:
+            key = name.strip().lower()
+            if key and key not in seen:
+                seen[key] = name.strip()
+        return sorted(seen.values(), key=str.lower)
+
+    async def list_areas(self, user_id: str) -> list[str]:
+        stored = await self.repo.list_area_names(user_id)
+        return self._merge_taxonomy(ROUTINE_AREAS, stored)
+
+    async def create_area(self, user_id: str, name: str) -> str:
+        clean = name.strip()
+        if not clean:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Area name required")
+        await self.repo.ensure_area(user_id, clean)
+        return clean
+
+    async def list_categories(self, user_id: str) -> list[str]:
+        stored = await self.repo.list_category_names(user_id)
+        return self._merge_taxonomy(ROUTINE_CATEGORIES, stored)
+
+    async def create_category(self, user_id: str, name: str) -> str:
+        clean = name.strip()
+        if not clean:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name required")
+        await self.repo.ensure_category(user_id, clean)
+        return clean
+
+    async def deactivate_expired(self, today: date | None = None) -> int:
+        today = today or date.today()
+        count = 0
+        for routine in await self.repo.list_active_all():
+            if period_is_outside_today(routine.start_date, routine.end_date, today):
+                routine.is_active = False
+                count += 1
+        if count:
+            await self.db.flush()
+        return count
 
     async def expand_for_calendar(
         self,
@@ -132,9 +191,9 @@ class RoutineService:
             for routine in routines:
                 if weekday not in routine.days_of_week:
                     continue
-                start_bound = getattr(routine, "start_date", None)
+                start_bound = getattr(routine, "start_date", None) or date.today()
                 end_bound = getattr(routine, "end_date", None)
-                if start_bound and day < start_bound:
+                if day < start_bound:
                     continue
                 if end_bound and day > end_bound:
                     continue

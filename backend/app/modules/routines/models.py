@@ -3,7 +3,7 @@ import uuid
 from datetime import date, datetime, time, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, Time
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -126,3 +126,29 @@ class RoutineBlock(Base):
         secondary=routine_block_habits,
         lazy="selectin",
     )
+
+
+class RoutineAreaOption(Base):
+    """User-defined reusable life-area labels for routine blocks."""
+
+    __tablename__ = "routine_areas"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_routine_areas_user_name"),)
+
+
+class RoutineCategoryOption(Base):
+    """User-defined reusable calendar categories for routine blocks."""
+
+    __tablename__ = "routine_categories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_routine_categories_user_name"),)

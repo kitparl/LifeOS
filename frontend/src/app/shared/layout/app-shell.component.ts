@@ -18,6 +18,7 @@ import { CommandPaletteService } from '../command-palette/command-palette.servic
 import { NavPreferencesService } from '../../core/services/nav-preferences.service';
 import { AssistantShellService } from '../../core/services/assistant-shell.service';
 import { LucideDynamicIcon } from '@lucide/angular';
+import { ConfirmHostComponent } from '../confirm/confirm-host.component';
 import { resolvePageTitle } from './nav-registry';
 
 const STORAGE_AI_OPEN    = 'lifeos-ai-panel-open';
@@ -34,9 +35,11 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
     CommandPaletteComponent,
     AiChatPanelComponent,
     LucideDynamicIcon,
+    ConfirmHostComponent,
   ],
   template: `
     <app-command-palette />
+    <app-confirm-host />
 
     <!-- Mobile overlays backdrop -->
     @if (drawerOpen() || assistantShell.mobileOpen()) {

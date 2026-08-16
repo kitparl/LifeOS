@@ -24,6 +24,7 @@ async def test_routine_crud_and_calendar_expansion(client):
             "name": "Weekday Focus",
             "days_of_week": [0, 1, 2, 3, 4, 5, 6],
             "timezone": "UTC",
+            "start_date": datetime.now(timezone.utc).date().isoformat(),
             "blocks": [
                 {
                     "title": "DSA",
@@ -136,3 +137,114 @@ async def test_routine_period_and_skip_dates(client):
     )
     assert cal2.status_code == 200
     assert not any(e["title"] == "Focus" for e in cal2.json())
+
+
+@pytest.mark.asyncio
+async def test_routine_start_date_required(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        "/api/v1/routines",
+        headers=headers,
+        json={
+            "name": "No start",
+            "days_of_week": [0],
+            "timezone": "UTC",
+            "blocks": [
+                {
+                    "title": "X",
+                    "start_time": "09:00:00",
+                    "end_time": "10:00:00",
+                }
+            ],
+        },
+    )
+    assert create.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_routine_list_sort_and_custom_taxonomy(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    today = datetime.now(timezone.utc).date()
+    older = await client.post(
+        "/api/v1/routines",
+        headers=headers,
+        json={
+            "name": "Older",
+            "days_of_week": [0],
+            "timezone": "UTC",
+            "start_date": (today - timedelta(days=20)).isoformat(),
+            "end_date": (today + timedelta(days=1)).isoformat(),
+            "blocks": [{"title": "A", "start_time": "09:00:00", "end_time": "10:00:00", "area": "yoga", "category": "wellness"}],
+        },
+    )
+    newer = await client.post(
+        "/api/v1/routines",
+        headers=headers,
+        json={
+            "name": "Newer",
+            "days_of_week": [0],
+            "timezone": "UTC",
+            "start_date": (today - timedelta(days=2)).isoformat(),
+            "end_date": (today + timedelta(days=10)).isoformat(),
+            "blocks": [{"title": "B", "start_time": "09:00:00", "end_time": "10:00:00"}],
+        },
+    )
+    assert older.status_code == 201, older.text
+    assert newer.status_code == 201, newer.text
+    assert older.json()["blocks"][0]["area"] == "yoga"
+
+    listing = await client.get("/api/v1/routines", headers=headers, params={"active_only": "false"})
+    names = [r["name"] for r in listing.json()]
+    assert names.index("Newer") < names.index("Older")
+
+    areas = await client.get("/api/v1/routines/areas", headers=headers)
+    assert "yoga" in areas.json()
+    cats = await client.get("/api/v1/routines/categories", headers=headers)
+    assert "wellness" in cats.json()
+
+
+@pytest.mark.asyncio
+async def test_expired_routine_saved_inactive(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    today = datetime.now(timezone.utc).date()
+    create = await client.post(
+        "/api/v1/routines",
+        headers=headers,
+        json={
+            "name": "Past",
+            "days_of_week": [0, 1, 2, 3, 4, 5, 6],
+            "timezone": "UTC",
+            "start_date": (today - timedelta(days=10)).isoformat(),
+            "end_date": (today - timedelta(days=1)).isoformat(),
+            "blocks": [{"title": "Old", "start_time": "09:00:00", "end_time": "10:00:00"}],
+        },
+    )
+    assert create.status_code == 201, create.text
+    assert create.json()["is_active"] is False
+
+
+@pytest.mark.asyncio
+async def test_routines_expire_job_registered():
+    from app.modules.integrations import scheduler as sched_mod
+
+    sched_mod.start_scheduler()
+    try:
+        assert sched_mod.get_scheduler().get_job("routines_expire") is not None
+    finally:
+        await sched_mod.shutdown_scheduler()
+
+
+def test_period_is_outside_today():
+    from datetime import date
+
+    from app.modules.routines.expiry import period_is_outside_today
+
+    today = date(2026, 8, 16)
+    assert period_is_outside_today(date(2026, 1, 1), date(2026, 8, 1), today) is True
+    assert period_is_outside_today(date(2026, 8, 1), date(2026, 8, 31), today) is False
+    assert period_is_outside_today(date(2026, 9, 1), None, today) is False
+    assert period_is_outside_today(None, date(2026, 8, 1), today) is True
+

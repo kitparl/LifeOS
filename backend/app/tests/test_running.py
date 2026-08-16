@@ -364,3 +364,50 @@ async def test_dashboard_running_progress(client):
     assert progress is not None
     assert progress["weekly_km"] == 8.0
     assert progress["goal_km"] == 50.0
+
+
+@pytest.mark.asyncio
+async def test_personal_best_includes_faster_race(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    await client.post(
+        "/api/v1/running/runs",
+        headers=headers,
+        json={"run_date": str(date.today()), "distance_km": 5.0, "duration_seconds": 1800},
+    )
+    race = await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "Park 5K",
+            "race_date": str(date.today()),
+            "distance_type": "5k",
+            "attended": True,
+            "finish_time_seconds": 1200,
+        },
+    )
+    assert race.status_code == 201
+    stats = await client.get("/api/v1/running/stats", headers=headers)
+    five_k = next(b for b in stats.json()["personal_bests"] if b["distance_type"] == "5k")
+    assert five_k["source"] == "race"
+    assert five_k["source_name"] == "Park 5K"
+    assert five_k["source_id"] == race.json()["id"]
+    assert five_k["run_id"] is None
+    assert stats.json()["distance_over_time"]
+    assert stats.json()["weekly_totals"]
+
+
+@pytest.mark.asyncio
+async def test_delete_log_run(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        "/api/v1/running/runs",
+        headers=headers,
+        json={"run_date": str(date.today()), "distance_km": 3.0, "duration_seconds": 900},
+    )
+    run_id = create.json()["id"]
+    delete = await client.delete(f"/api/v1/running/runs/{run_id}", headers=headers)
+    assert delete.status_code == 204
+    listing = await client.get("/api/v1/running/runs", headers=headers)
+    assert all(r["id"] != run_id for r in listing.json())

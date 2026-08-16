@@ -1,10 +1,6 @@
 from datetime import date, datetime, time
-from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-
-RoutineArea = Literal["dsa", "gym", "running", "learning", "communication", "book", "other"]
-RoutineCategory = Literal["personal", "task", "running", "bill", "learning"]
 
 
 class LinkedHabitBrief(BaseModel):
@@ -16,8 +12,8 @@ class RoutineBlockCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     start_time: time
     end_time: time
-    area: RoutineArea = "other"
-    category: RoutineCategory = "personal"
+    area: str = Field(default="other", min_length=1, max_length=32)
+    category: str = Field(default="personal", min_length=1, max_length=32)
     notes: str | None = None
     sort_order: int = 0
     habit_ids: list[str] = Field(default_factory=list)
@@ -33,8 +29,8 @@ class RoutineBlockUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     start_time: time | None = None
     end_time: time | None = None
-    area: RoutineArea | None = None
-    category: RoutineCategory | None = None
+    area: str | None = Field(default=None, min_length=1, max_length=32)
+    category: str | None = Field(default=None, min_length=1, max_length=32)
     notes: str | None = None
     sort_order: int | None = None
     habit_ids: list[str] | None = None
@@ -74,7 +70,7 @@ class RoutineCreate(BaseModel):
     description: str | None = None
     days_of_week: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
     timezone: str = Field(default="Asia/Kolkata", max_length=64)
-    start_date: date | None = None
+    start_date: date
     end_date: date | None = None
     skip_dates: list[str] = Field(default_factory=list)
     blocks: list[RoutineBlockCreate] = Field(default_factory=list)
@@ -94,7 +90,7 @@ class RoutineCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_window(self):
-        if self.start_date and self.end_date and self.end_date < self.start_date:
+        if self.end_date is not None and self.end_date < self.start_date:
             raise ValueError("end_date must be on or after start_date")
         return self
 
@@ -129,9 +125,15 @@ class RoutineUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_window(self):
+        if "start_date" in self.model_fields_set and self.start_date is None:
+            raise ValueError("start_date is required")
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValueError("end_date must be on or after start_date")
         return self
+
+
+class TaxonomyNameCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
 
 
 class RoutineListItem(BaseModel):

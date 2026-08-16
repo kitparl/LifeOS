@@ -7,6 +7,7 @@ import {
   formatTimeLabel,
   ROUTINE_AREAS,
 } from './models/routine.models';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { RoutinesService } from './services/routines.service';
 
 @Component({
@@ -121,6 +122,7 @@ export class RoutineDetailComponent implements OnInit {
   private readonly routinesService = inject(RoutinesService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly confirm = inject(ConfirmService);
 
   routine: Routine | null = null;
   loading = false;
@@ -161,8 +163,10 @@ export class RoutineDetailComponent implements OnInit {
     return names.length ? names.join(', ') : '—';
   }
 
-  remove(): void {
-    if (!this.routine || !confirm('Delete this routine permanently?')) return;
+  async remove(): Promise<void> {
+    if (!this.routine) return;
+    const ok = await this.confirm.confirm('Delete this routine permanently?');
+    if (!ok) return;
     this.routinesService.delete(this.routine.id).subscribe({
       next: () => this.router.navigate(['/routines']),
     });

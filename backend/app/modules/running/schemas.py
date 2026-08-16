@@ -154,6 +154,14 @@ class PersonalBest(BaseModel):
     distance_km: float | None
     pace_min_per_km: float | None
     duration_seconds: int | None
+    source: Literal["run", "race"] | None = None
+    source_id: str | None = None
+    source_name: str | None = None
+
+
+class ChartPoint(BaseModel):
+    label: str
+    value: float
 
 
 class ShoeTotal(BaseModel):
@@ -180,3 +188,5 @@ class RunningStatsResponse(BaseModel):
     event_total_km: float = 0.0
     event_year_km: float = 0.0
     event_year: int = 0
+    distance_over_time: list[ChartPoint] = []
+    weekly_totals: list[ChartPoint] = []

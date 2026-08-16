@@ -112,6 +112,14 @@ export interface PersonalBest {
   distance_km: number | null;
   pace_min_per_km: number | null;
   duration_seconds: number | null;
+  source?: 'run' | 'race' | null;
+  source_id?: string | null;
+  source_name?: string | null;
+}
+
+export interface ChartPoint {
+  label: string;
+  value: number;
 }
 
 export interface ShoeTotal {
@@ -138,6 +146,8 @@ export interface RunningStats {
   event_total_km: number;
   event_year_km: number;
   event_year: number;
+  distance_over_time?: ChartPoint[];
+  weekly_totals?: ChartPoint[];
 }
 
 export const RACE_DISTANCES: { value: RaceDistanceType; label: string }[] = [

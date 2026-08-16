@@ -12,6 +12,7 @@ from app.modules.running.repository import RunningRepository
 # Source-module key used for the reusable Calendar scheduling linkage.
 RUNNING_SOURCE_MODULE = "running"
 from app.modules.running.schemas import (
+    ChartPoint,
     PersonalBest,
     RaceCreate,
     RaceResponse,
@@ -27,10 +28,12 @@ from app.modules.running.schemas import (
 )
 from app.modules.running.stats import (
     _race_distance_km,
+    compute_distance_over_time,
     compute_event_stats,
     compute_pace,
     compute_personal_bests,
     compute_shoe_totals,
+    compute_weekly_totals,
     weekly_km,
 )
 
@@ -257,7 +260,7 @@ class RunningService:
         settings = await self.repo.get_settings(user_id)
         last_run = runs[0] if runs else None
         total_km = round(sum(r.distance_km for r in runs), 2)
-        bests = [PersonalBest(**b) for b in compute_personal_bests(runs)]
+        bests = [PersonalBest(**b) for b in compute_personal_bests(runs, races)]
         event_stats = compute_event_stats(races)
         return RunningStatsResponse(
             weekly_km=weekly_km(runs),
@@ -267,6 +270,8 @@ class RunningService:
             last_run_date=last_run.run_date if last_run else None,
             personal_bests=bests,
             shoe_totals=[ShoeTotal(**s) for s in compute_shoe_totals(runs, races)],
+            distance_over_time=[ChartPoint(**p) for p in compute_distance_over_time(runs, races)],
+            weekly_totals=[ChartPoint(**p) for p in compute_weekly_totals(runs, races)],
             **event_stats,
         )
 

@@ -154,6 +154,7 @@ async def test_routine_block_habit_linking(client: AsyncClient):
             "name": "Morning",
             "days_of_week": [0, 1, 2, 3, 4, 5, 6],
             "timezone": "Asia/Kolkata",
+            "start_date": "2026-01-01",
             "blocks": [
                 {
                     "title": "Focus",
@@ -182,6 +183,7 @@ async def test_routine_block_without_habits(client: AsyncClient):
             "name": "No habits",
             "days_of_week": [0, 1, 2, 3, 4],
             "timezone": "UTC",
+            "start_date": "2026-01-01",
             "blocks": [
                 {
                     "title": "Deep work",

@@ -39,4 +39,11 @@ describe('HabitsService', () => {
       logs: [],
     });
   });
+
+  it('should delete a habit', () => {
+    service.delete('1').subscribe((res) => expect(res).toBeNull());
+    const req = http.expectOne(`${environment.apiUrl}/habits/1`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
 });

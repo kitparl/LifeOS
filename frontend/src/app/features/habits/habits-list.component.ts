@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { HABIT_FREQUENCIES, HabitListItem } from './models/habit.models';
 import { HabitsService } from './services/habits.service';
 
@@ -31,7 +32,31 @@ import { HabitsService } from './services/habits.service';
           <a routerLink="/habits/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create habit</a>
         </div>
       } @else {
-        <div class="panel !p-0 overflow-hidden">
+        <div class="space-y-2 md:hidden">
+          @for (habit of habits; track habit.id) {
+            <article class="panel space-y-2">
+              <div class="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  class="mt-1"
+                  [checked]="habit.completed_today"
+                  (change)="toggleToday(habit, $event)"
+                />
+                <div class="min-w-0 flex-1">
+                  <a [routerLink]="['/habits', habit.id]" class="link font-medium">{{ habit.name }}</a>
+                  <p class="text-xs capitalize" style="color: var(--text-muted)">
+                    {{ habit.frequency }} · streak {{ habit.streak }} · {{ habit.completion_rate }}%
+                  </p>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <a [routerLink]="['/habits', habit.id, 'edit']" class="btn-ghost text-xs no-underline">Edit</a>
+                <button type="button" class="btn-ghost text-xs" style="color: var(--danger)" (click)="remove(habit)">Delete</button>
+              </div>
+            </article>
+          }
+        </div>
+        <div class="panel hidden !p-0 overflow-hidden md:block">
           <table class="w-full text-sm">
             <thead class="border-b border-[var(--xp-border)] bg-[var(--surface-2)] text-left">
               <tr>
@@ -60,7 +85,10 @@ import { HabitsService } from './services/habits.service';
                   <td class="px-3 py-2">{{ habit.streak }}</td>
                   <td class="px-3 py-2">{{ habit.completion_rate }}%</td>
                   <td class="px-3 py-2">
-                    <a [routerLink]="['/habits', habit.id, 'edit']" class="text-xs underline">Edit</a>
+                    <div class="flex flex-wrap gap-2">
+                      <a [routerLink]="['/habits', habit.id, 'edit']" class="text-xs underline">Edit</a>
+                      <button type="button" class="text-xs underline" style="color: var(--danger)" (click)="remove(habit)">Delete</button>
+                    </div>
                   </td>
                 </tr>
               }
@@ -74,6 +102,7 @@ import { HabitsService } from './services/habits.service';
 export class HabitsListComponent implements OnInit {
   private readonly habitsService = inject(HabitsService);
   private readonly fb = inject(FormBuilder);
+  private readonly confirm = inject(ConfirmService);
 
   frequencies = HABIT_FREQUENCIES;
   habits: HabitListItem[] = [];
@@ -106,5 +135,11 @@ export class HabitsListComponent implements OnInit {
       next: () => this.load(),
       error: () => this.load(),
     });
+  }
+
+  async remove(habit: HabitListItem): Promise<void> {
+    const ok = await this.confirm.confirm(`Delete habit "${habit.name}" permanently?`);
+    if (!ok) return;
+    this.habitsService.delete(habit.id).subscribe({ next: () => this.load() });
   }
 }

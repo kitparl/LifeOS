@@ -9,7 +9,7 @@ export class RoutinesService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/routines`;
 
-  list(activeOnly = false): Observable<RoutineListItem[]> {
+  list(activeOnly = true): Observable<RoutineListItem[]> {
     const params = new HttpParams().set('active_only', String(activeOnly));
     return this.http.get<RoutineListItem[]>(this.api, { params });
   }
@@ -32,5 +32,21 @@ export class RoutinesService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/${id}`);
+  }
+
+  listAreas(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.api}/areas`);
+  }
+
+  createArea(name: string): Observable<string[]> {
+    return this.http.post<string[]>(`${this.api}/areas`, { name });
+  }
+
+  listCategories(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.api}/categories`);
+  }
+
+  createCategory(name: string): Observable<string[]> {
+    return this.http.post<string[]>(`${this.api}/categories`, { name });
   }
 }

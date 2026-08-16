@@ -1,7 +1,10 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { BarChartComponent } from '../../shared/charts/bar-chart.component';
+import { LineChartComponent } from '../../shared/charts/line-chart.component';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import {
   RaceEvent,
   RunListItem,
@@ -14,13 +17,14 @@ import {
 } from './models/running.models';
 import { RunningService } from './services/running.service';
 
+type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
+
 @Component({
   selector: 'app-running-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, LineChartComponent, BarChartComponent],
   template: `
     <div class="space-y-4">
-      <!-- Page header -->
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h1 class="text-lg font-semibold" style="color: var(--text)">Running</h1>
         <div class="flex gap-2">
@@ -29,7 +33,6 @@ import { RunningService } from './services/running.service';
         </div>
       </div>
 
-      <!-- Stats row -->
       @if (stats) {
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="panel">
@@ -74,51 +77,17 @@ import { RunningService } from './services/running.service';
         </div>
       }
 
-      @if (stats?.shoe_totals?.length) {
-        <div class="panel !p-0 overflow-hidden">
-          <div class="title-bar rounded-none border-x-0 border-t-0">Distance by shoe</div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr>
-                  <th class="px-3 py-2 text-left">Shoe</th>
-                  <th class="px-3 py-2 text-left">Km</th>
-                  <th class="px-3 py-2 text-left">Runs</th>
-                  <th class="px-3 py-2 text-left">Last run</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (s of stats!.shoe_totals; track s.shoe) {
-                  <tr style="border-bottom: 1px solid var(--border)">
-                    <td class="px-3 py-2">
-                      <button type="button" class="link text-sm" (click)="filterByShoe(s.shoe)">{{ s.shoe }}</button>
-                    </td>
-                    <td class="px-3 py-2">{{ s.total_km }} km</td>
-                    <td class="px-3 py-2">{{ s.run_count }}</td>
-                    <td class="px-3 py-2 text-xs" style="color: var(--text-muted)">
-                      {{ s.last_run_date ? (s.last_run_date | date: 'mediumDate') : '—' }}
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-      }
-
-      <!-- Tabs -->
-      <div class="flex gap-0" style="border-bottom: 1px solid var(--border)">
+      <div class="flex gap-0 overflow-x-auto" style="border-bottom: 1px solid var(--border)">
         @for (tab of tabs; track tab.id) {
           <button
             type="button"
-            class="tab-btn"
+            class="tab-btn shrink-0"
             [class.tab-btn--active]="activeTab() === tab.id"
-            (click)="activeTab.set(tab.id)"
+            (click)="setTab(tab.id)"
           >{{ tab.label }}</button>
         }
       </div>
 
-      <!-- ===== Tab: Previous Runs ===== -->
       @if (activeTab() === 'runs') {
         <div class="flex flex-wrap items-center gap-2 text-sm">
           <label class="text-xs" style="color: var(--text-muted)">Filter by shoe</label>
@@ -145,7 +114,40 @@ import { RunningService } from './services/running.service';
               <a routerLink="/running/new" class="btn-primary text-xs no-underline mt-2">Log first run</a>
             </div>
           } @else {
-            <div class="overflow-x-auto">
+            <div class="space-y-2 p-3 md:hidden">
+              @for (run of runs; track run.id) {
+                <article class="rounded border border-[var(--xp-border)] p-3 space-y-2">
+                  <a
+                    [routerLink]="run.source === 'race' ? ['/running/races', run.id] : ['/running', run.id]"
+                    class="link font-medium"
+                  >
+                    {{ run.run_date | date: 'mediumDate' }}
+                  </a>
+                  @if (run.source === 'race') {
+                    <span class="badge badge--default ml-1">Event</span>
+                    @if (run.event_name) {
+                      <span class="text-xs ml-1" style="color: var(--text-muted)">{{ run.event_name }}</span>
+                    }
+                  }
+                  <p class="text-xs" style="color: var(--text-muted)">
+                    {{ run.distance_km }} km
+                    · {{ run.duration_seconds ? formatDuration(run.duration_seconds) : '—' }}
+                    · {{ run.pace_min_per_km ? formatPace(run.pace_min_per_km) : '—' }}
+                    @if (run.shoe) { · {{ run.shoe }} }
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <a
+                      [routerLink]="run.source === 'race' ? ['/running/races', run.id, 'edit'] : ['/running', run.id, 'edit']"
+                      class="btn-ghost text-xs no-underline"
+                    >Edit</a>
+                    @if (run.source !== 'race') {
+                      <button type="button" class="btn-ghost text-xs" style="color: var(--danger)" (click)="removeRun(run)">Delete</button>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+            <div class="hidden overflow-x-auto md:block">
               <table class="w-full text-sm" style="min-width: 520px">
                 <thead>
                   <tr>
@@ -187,10 +189,15 @@ import { RunningService } from './services/running.service';
                       <td class="px-3 py-2" style="color: var(--text-muted)">{{ run.location || '—' }}</td>
                       <td class="px-3 py-2 capitalize" style="color: var(--text-muted)">{{ run.weather ?? '—' }}</td>
                       <td class="px-3 py-2">
-                        <a
-                          [routerLink]="run.source === 'race' ? ['/running/races', run.id, 'edit'] : ['/running', run.id, 'edit']"
-                          class="link text-xs"
-                        >Edit</a>
+                        <div class="flex flex-wrap gap-2">
+                          <a
+                            [routerLink]="run.source === 'race' ? ['/running/races', run.id, 'edit'] : ['/running', run.id, 'edit']"
+                            class="link text-xs"
+                          >Edit</a>
+                          @if (run.source !== 'race') {
+                            <button type="button" class="link text-xs" style="color: var(--danger)" (click)="removeRun(run)">Delete</button>
+                          }
+                        </div>
                       </td>
                     </tr>
                   }
@@ -201,7 +208,6 @@ import { RunningService } from './services/running.service';
         </div>
       }
 
-      <!-- ===== Tab: Events & Competitions ===== -->
       @if (activeTab() === 'events') {
         <div class="space-y-2">
           @if (races.length === 0) {
@@ -246,7 +252,7 @@ import { RunningService } from './services/running.service';
                     </p>
                   }
                 </div>
-                <div class="shrink-0 flex gap-2">
+                <div class="shrink-0 flex flex-wrap gap-2">
                   <a [routerLink]="['/running/races', race.id, 'edit']" class="btn-ghost text-xs no-underline">Edit</a>
                   <button type="button" class="btn-ghost text-xs" style="color: var(--danger)" (click)="removeRace(race.id)">Delete</button>
                 </div>
@@ -256,37 +262,47 @@ import { RunningService } from './services/running.service';
         </div>
       }
 
-      <!-- ===== Tab: Personal Bests ===== -->
       @if (activeTab() === 'bests') {
         <div class="panel !p-0 overflow-hidden">
           @if (stats) {
-            <table class="w-full text-sm">
-              <thead>
-                <tr>
-                  <th class="px-3 py-2 text-left">Distance</th>
-                  <th class="px-3 py-2 text-left">Pace</th>
-                  <th class="px-3 py-2 text-left">Time</th>
-                  <th class="px-3 py-2 text-left">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (pb of stats.personal_bests; track pb.distance_type) {
-                  <tr style="border-bottom: 1px solid var(--border)">
-                    <td class="px-3 py-2 font-medium">{{ pb.label }}</td>
-                    <td class="px-3 py-2">{{ pb.pace_min_per_km ? formatPace(pb.pace_min_per_km) : '—' }}</td>
-                    <td class="px-3 py-2">{{ pb.duration_seconds ? formatDuration(pb.duration_seconds) : '—' }}</td>
-                    <td class="px-3 py-2" style="color: var(--text-muted)">
-                      {{ pb.run_date ? (pb.run_date | date: 'mediumDate') : '—' }}
-                    </td>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th class="px-3 py-2 text-left">Distance</th>
+                    <th class="px-3 py-2 text-left">Pace</th>
+                    <th class="px-3 py-2 text-left">Time</th>
+                    <th class="px-3 py-2 text-left">Date</th>
+                    <th class="px-3 py-2 text-left">Source</th>
                   </tr>
-                }
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  @for (pb of stats.personal_bests; track pb.distance_type) {
+                    <tr style="border-bottom: 1px solid var(--border)">
+                      <td class="px-3 py-2 font-medium">{{ pb.label }}</td>
+                      <td class="px-3 py-2">{{ pb.pace_min_per_km ? formatPace(pb.pace_min_per_km) : '—' }}</td>
+                      <td class="px-3 py-2">{{ pb.duration_seconds ? formatDuration(pb.duration_seconds) : '—' }}</td>
+                      <td class="px-3 py-2" style="color: var(--text-muted)">
+                        {{ pb.run_date ? (pb.run_date | date: 'mediumDate') : '—' }}
+                      </td>
+                      <td class="px-3 py-2">
+                        @if (pb.source === 'race' && pb.source_id) {
+                          <a [routerLink]="['/running/races', pb.source_id]" class="link text-sm">{{ pb.source_name || 'Event' }}</a>
+                        } @else if (pb.source === 'run' && pb.source_id) {
+                          <a [routerLink]="['/running', pb.source_id]" class="link text-sm">{{ pb.source_name || 'Log run' }}</a>
+                        } @else {
+                          —
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           }
         </div>
       }
 
-      <!-- ===== Tab: Goals ===== -->
       @if (activeTab() === 'goals') {
         <div class="panel !p-0 overflow-hidden" style="max-width: 400px">
           <div class="title-bar">Running Goals</div>
@@ -309,6 +325,61 @@ import { RunningService } from './services/running.service';
             </div>
             <button type="submit" class="btn-primary text-xs w-full" [disabled]="settingsForm.invalid">Save goals</button>
           </form>
+        </div>
+      }
+
+      @if (activeTab() === 'shoes') {
+        @if (stats?.shoe_totals?.length) {
+          <div class="panel !p-0 overflow-hidden">
+            <div class="title-bar rounded-none border-x-0 border-t-0">Distance by shoe</div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th class="px-3 py-2 text-left">Shoe</th>
+                    <th class="px-3 py-2 text-left">Km</th>
+                    <th class="px-3 py-2 text-left">Runs</th>
+                    <th class="px-3 py-2 text-left">Last run</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (s of stats!.shoe_totals; track s.shoe) {
+                    <tr style="border-bottom: 1px solid var(--border)">
+                      <td class="px-3 py-2">
+                        <button type="button" class="link text-sm" (click)="filterByShoe(s.shoe)">{{ s.shoe }}</button>
+                      </td>
+                      <td class="px-3 py-2">{{ s.total_km }} km</td>
+                      <td class="px-3 py-2">{{ s.run_count }}</td>
+                      <td class="px-3 py-2 text-xs" style="color: var(--text-muted)">
+                        {{ s.last_run_date ? (s.last_run_date | date: 'mediumDate') : '—' }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        } @else {
+          <div class="panel">
+            <p class="text-sm" style="color: var(--text-muted)">No shoe distance yet. Log a run or event with shoes selected.</p>
+          </div>
+        }
+      }
+
+      @if (activeTab() === 'stats') {
+        <div class="grid gap-3 lg:grid-cols-2">
+          <div class="panel !p-0 overflow-hidden">
+            <div class="title-bar rounded-none border-x-0 border-t-0">Distance over time</div>
+            <div class="p-3">
+              <app-line-chart [points]="stats?.distance_over_time || []" title="Distance over time" />
+            </div>
+          </div>
+          <div class="panel !p-0 overflow-hidden">
+            <div class="title-bar rounded-none border-x-0 border-t-0">Weekly totals</div>
+            <div class="p-3">
+              <app-bar-chart [points]="stats?.weekly_totals || []" title="Weekly totals" />
+            </div>
+          </div>
         </div>
       }
     </div>
@@ -381,19 +452,23 @@ export class RunningListComponent implements OnInit {
   private readonly runningService = inject(RunningService);
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly confirm = inject(ConfirmService);
 
   readonly Math = Math;
   readonly formatDuration = formatDuration;
   readonly formatPace = formatPace;
   readonly raceStatusLabel = raceStatusLabel;
 
-  activeTab = signal<'runs' | 'events' | 'bests' | 'goals'>('runs');
+  activeTab = signal<RunningTab>('events');
 
   tabs = [
     { id: 'runs', label: 'Previous Runs' },
     { id: 'events', label: 'Events & Competitions' },
     { id: 'bests', label: 'Personal Bests' },
     { id: 'goals', label: 'Goals' },
+    { id: 'shoes', label: 'Shoes Stats' },
+    { id: 'stats', label: 'Running Stats' },
   ] as const;
 
   runs: RunListItem[] = [];
@@ -412,10 +487,20 @@ export class RunningListComponent implements OnInit {
 
   ngOnInit(): void {
     const tab = this.route.snapshot.queryParamMap.get('tab');
-    if (tab === 'events' || tab === 'runs' || tab === 'bests' || tab === 'goals') {
+    if (tab === 'events' || tab === 'runs' || tab === 'bests' || tab === 'goals' || tab === 'shoes' || tab === 'stats') {
       this.activeTab.set(tab);
     }
     this.load();
+  }
+
+  setTab(id: RunningTab): void {
+    this.activeTab.set(id);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: id },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   load(): void {
@@ -449,7 +534,7 @@ export class RunningListComponent implements OnInit {
 
   filterByShoe(shoe: string): void {
     this.shoeFilter.set(shoe);
-    this.activeTab.set('runs');
+    this.setTab('runs');
     this.load();
   }
 
@@ -471,9 +556,17 @@ export class RunningListComponent implements OnInit {
       .subscribe({ next: () => this.load() });
   }
 
-  removeRace(id: string): void {
-    if (!confirm('Delete this race event?')) return;
+  async removeRace(id: string): Promise<void> {
+    const ok = await this.confirm.confirm('Delete this race event?');
+    if (!ok) return;
     this.runningService.deleteRace(id).subscribe({ next: () => this.load() });
+  }
+
+  async removeRun(run: RunListItem): Promise<void> {
+    if (run.source === 'race') return;
+    const ok = await this.confirm.confirm('Delete this run permanently?');
+    if (!ok) return;
+    this.runningService.deleteRun(run.id).subscribe({ next: () => this.load() });
   }
 
   raceLabel(race: RaceEvent): string {

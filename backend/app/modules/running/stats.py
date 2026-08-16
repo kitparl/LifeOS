@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
 from app.modules.running.models import Run
@@ -117,33 +118,124 @@ def compute_event_stats(races: list, ref: date | None = None) -> dict:
     }
 
 
-def compute_personal_bests(runs: list[Run]) -> list[dict]:
+@dataclass
+class _PbCandidate:
+    id: str
+    activity_date: date
+    distance_km: float
+    duration_seconds: int
+    source: str
+    name: str | None
+
+
+def _pb_candidates(runs: list[Run], races: list | None = None) -> list[_PbCandidate]:
+    out: list[_PbCandidate] = []
+    for r in runs:
+        if not r.duration_seconds or r.distance_km <= 0:
+            continue
+        out.append(
+            _PbCandidate(
+                id=r.id,
+                activity_date=r.run_date,
+                distance_km=r.distance_km,
+                duration_seconds=r.duration_seconds,
+                source="run",
+                name=None,
+            )
+        )
+    for race in races or []:
+        if getattr(race, "skipped", False):
+            continue
+        finish = getattr(race, "finish_time_seconds", None)
+        km = _race_distance_km(race)
+        if not finish or km <= 0:
+            continue
+        out.append(
+            _PbCandidate(
+                id=race.id,
+                activity_date=race.race_date,
+                distance_km=km,
+                duration_seconds=int(finish),
+                source="race",
+                name=getattr(race, "name", None),
+            )
+        )
+    return out
+
+
+def _empty_pb(key: str, label: str) -> dict:
+    return {
+        "distance_type": key,
+        "label": label,
+        "run_id": None,
+        "run_date": None,
+        "distance_km": None,
+        "pace_min_per_km": None,
+        "duration_seconds": None,
+        "source": None,
+        "source_id": None,
+        "source_name": None,
+    }
+
+
+def compute_personal_bests(runs: list[Run], races: list | None = None) -> list[dict]:
+    candidates = _pb_candidates(runs, races)
     results = []
     for key, (lo, hi, label) in DISTANCE_RANGES.items():
-        matching = [r for r in runs if lo <= r.distance_km <= hi]
+        matching = [c for c in candidates if lo <= c.distance_km <= hi]
         if not matching:
-            results.append(
-                {
-                    "distance_type": key,
-                    "label": label,
-                    "run_id": None,
-                    "run_date": None,
-                    "distance_km": None,
-                    "pace_min_per_km": None,
-                    "duration_seconds": None,
-                }
-            )
+            results.append(_empty_pb(key, label))
             continue
-        best = min(matching, key=lambda r: compute_pace(r.distance_km, r.duration_seconds))
+        best = min(matching, key=lambda c: compute_pace(c.distance_km, c.duration_seconds))
         results.append(
             {
                 "distance_type": key,
                 "label": label,
-                "run_id": best.id,
-                "run_date": best.run_date,
+                "run_id": best.id if best.source == "run" else None,
+                "run_date": best.activity_date,
                 "distance_km": best.distance_km,
                 "pace_min_per_km": compute_pace(best.distance_km, best.duration_seconds),
                 "duration_seconds": best.duration_seconds,
+                "source": best.source,
+                "source_id": best.id,
+                "source_name": best.name if best.source == "race" else "Log run",
             }
         )
     return results
+
+
+def compute_distance_over_time(runs: list[Run], races: list | None = None, limit: int = 30) -> list[dict]:
+    points: list[tuple[date, float]] = []
+    for r in runs:
+        points.append((r.run_date, float(r.distance_km)))
+    for race in races or []:
+        if not getattr(race, "attended", False):
+            continue
+        km = _race_distance_km(race)
+        if km > 0:
+            points.append((race.race_date, km))
+    points.sort(key=lambda p: p[0])
+    points = points[-limit:]
+    return [{"label": d.isoformat(), "value": round(km, 2)} for d, km in points]
+
+
+def compute_weekly_totals(runs: list[Run], races: list | None = None, weeks: int = 12) -> list[dict]:
+    buckets: dict[date, float] = {}
+
+    def add(d: date, km: float) -> None:
+        ws = _week_start(d)
+        buckets[ws] = buckets.get(ws, 0.0) + km
+
+    for r in runs:
+        add(r.run_date, float(r.distance_km))
+    for race in races or []:
+        if getattr(race, "attended", False):
+            add(race.race_date, _race_distance_km(race))
+
+    today = datetime.now(timezone.utc).date()
+    current = _week_start(today)
+    series = []
+    for i in range(weeks - 1, -1, -1):
+        ws = current - timedelta(days=7 * i)
+        series.append({"label": ws.isoformat(), "value": round(buckets.get(ws, 0.0), 2)})
+    return series

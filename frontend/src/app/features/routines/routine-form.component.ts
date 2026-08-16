@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import {
   FormArray,
   FormBuilder,
@@ -7,6 +7,7 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DateChipsComponent } from '../../shared/date-chips/date-chips.component';
+import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { HabitListItem } from '../habits/models/habit.models';
 import { HabitsService } from '../habits/services/habits.service';
 import {
@@ -21,12 +22,12 @@ import { RoutinesService } from './services/routines.service';
 @Component({
   selector: 'app-routine-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DateChipsComponent],
+  imports: [ReactiveFormsModule, RouterLink, DateChipsComponent, TypeSelectComponent],
   template: `
-    <div class="max-w-2xl">
+    <div class="max-w-2xl space-y-3">
       <div class="panel !p-0 overflow-hidden">
         <div class="title-bar rounded-none border-x-0 border-t-0">
-          {{ isEdit ? 'Edit Routine' : 'New Routine' }}
+          {{ isEdit ? 'Edit Routine' : 'New Routine' }} — Details
         </div>
         <form class="space-y-4 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
           <div>
@@ -50,7 +51,7 @@ import { RoutinesService } from './services/routines.service';
 
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
-              <label class="mb-1 block">Period start (optional)</label>
+              <label class="mb-1 block">Period start</label>
               <input class="input-field" type="date" formControlName="start_date" />
             </div>
             <div>
@@ -90,58 +91,74 @@ import { RoutinesService } from './services/routines.service';
             </label>
           }
 
-          <div>
-            <div class="mb-2 flex items-center justify-between">
-              <label class="block font-medium">Time blocks</label>
-              <button type="button" class="btn-secondary text-xs" (click)="addBlock()">+ Block</button>
-            </div>
+          <div class="flex gap-2">
+            <button type="submit" class="btn-primary" [disabled]="form.invalid || saving || !hasDays()">
+              {{ saving ? 'Saving…' : 'Save' }}
+            </button>
+            <a routerLink="/routines" class="btn-secondary no-underline">Cancel</a>
+          </div>
+          @if (error) {
+            <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
+          }
+        </form>
+      </div>
 
-            <div class="space-y-3" formArrayName="blocks">
-              @for (ctrl of blocks.controls; track $index; let i = $index) {
-                <div class="border border-[var(--xp-border)] p-3 space-y-2" [formGroupName]="i">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs" style="color: var(--text-muted)">Block {{ i + 1 }}</span>
-                    <button
-                      type="button"
-                      class="text-xs text-red-700 underline"
-                      (click)="removeBlock(i)"
-                      [disabled]="blocks.length <= 1"
-                    >
-                      Remove
-                    </button>
+      <div class="panel !p-0 overflow-hidden">
+        <div class="title-bar rounded-none border-x-0 border-t-0">Time blocks</div>
+        <div class="space-y-3 p-4 text-sm" [formGroup]="form">
+          <div class="mb-2 flex items-center justify-between">
+            <p class="text-xs" style="color: var(--text-muted)">One block by default — add more as needed.</p>
+            <button type="button" class="btn-secondary text-xs" (click)="addBlock()">+ Block</button>
+          </div>
+
+          <div class="space-y-3" formArrayName="blocks">
+            @for (ctrl of blocks.controls; track $index; let i = $index) {
+              <div class="border border-[var(--xp-border)] p-3 space-y-2" [formGroupName]="i">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs" style="color: var(--text-muted)">Block {{ i + 1 }}</span>
+                  <button
+                    type="button"
+                    class="text-xs text-red-700 underline"
+                    (click)="removeBlock(i)"
+                    [disabled]="blocks.length <= 1"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs">Title</label>
+                  <input class="input-field" formControlName="title" placeholder="DSA practice" />
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="mb-1 block text-xs">Start</label>
+                    <input class="input-field" type="time" formControlName="start_time" />
                   </div>
                   <div>
-                    <label class="mb-1 block text-xs">Title</label>
-                    <input class="input-field" formControlName="title" placeholder="DSA practice" />
+                    <label class="mb-1 block text-xs">End</label>
+                    <input class="input-field" type="time" formControlName="end_time" />
                   </div>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="mb-1 block text-xs">Start</label>
-                      <input class="input-field" type="time" formControlName="start_time" />
-                    </div>
-                    <div>
-                      <label class="mb-1 block text-xs">End</label>
-                      <input class="input-field" type="time" formControlName="end_time" />
-                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="mb-1 block text-xs">Area</label>
+                    <app-type-select
+                      formControlName="area"
+                      placeholder="Select or create area…"
+                      [options]="areaOptions()"
+                      (created)="onAreaCreated($event)"
+                    />
                   </div>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="mb-1 block text-xs">Area</label>
-                      <select class="input-field" formControlName="area" (change)="onAreaChange(i)">
-                        @for (a of areas; track a.value) {
-                          <option [value]="a.value">{{ a.label }}</option>
-                        }
-                      </select>
-                    </div>
-                    <div>
-                      <label class="mb-1 block text-xs">Calendar category</label>
-                      <select class="input-field" formControlName="category">
-                        @for (c of categories; track c.value) {
-                          <option [value]="c.value">{{ c.label }}</option>
-                        }
-                      </select>
-                    </div>
+                  <div>
+                    <label class="mb-1 block text-xs">Calendar category</label>
+                    <app-type-select
+                      formControlName="category"
+                      placeholder="Select or create category…"
+                      [options]="categoryOptions()"
+                      (created)="onCategoryCreated($event)"
+                    />
                   </div>
+                </div>
                   <div>
                     <label class="mb-1 block text-xs">Notes</label>
                     <input class="input-field" formControlName="notes" placeholder="Optional" />
@@ -218,19 +235,14 @@ import { RoutinesService } from './services/routines.service';
                 </div>
               }
             </div>
-          </div>
-
-          @if (error) {
-            <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
-          }
 
           <div class="flex gap-2">
-            <button type="submit" class="btn-primary" [disabled]="form.invalid || saving || !hasDays()">
+            <button type="button" class="btn-primary" [disabled]="form.invalid || saving || !hasDays()" (click)="submit()">
               {{ saving ? 'Saving…' : 'Save' }}
             </button>
             <a routerLink="/routines" class="btn-secondary no-underline">Cancel</a>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   `,
@@ -242,9 +254,9 @@ export class RoutineFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  areas = ROUTINE_AREAS;
-  categories = ROUTINE_CATEGORIES;
   weekdays = WEEKDAYS;
+  areaOptions = signal<string[]>(ROUTINE_AREAS.map((a) => a.value));
+  categoryOptions = signal<string[]>(ROUTINE_CATEGORIES.map((c) => c.value));
   availableHabits: HabitListItem[] = [];
   isEdit = false;
   routineId: string | null = null;
@@ -256,16 +268,11 @@ export class RoutineFormComponent implements OnInit {
     name: ['Weekday Focus', Validators.required],
     description: [''],
     timezone: ['Asia/Kolkata', Validators.required],
-    start_date: [''],
+    start_date: [new Date().toISOString().slice(0, 10), Validators.required],
     end_date: [''],
     skip_dates: [[] as string[]],
     is_active: [true],
-    blocks: this.fb.array([
-      this.newBlockGroup('DSA', '08:00', '10:00', 'dsa'),
-      this.newBlockGroup('Gym', '18:00', '19:00', 'gym'),
-      this.newBlockGroup('Communication', '19:30', '20:00', 'communication'),
-      this.newBlockGroup('Book', '21:00', '21:30', 'book'),
-    ]),
+    blocks: this.fb.array([this.newBlockGroup()]),
   });
 
   get blocks(): FormArray {
@@ -276,6 +283,8 @@ export class RoutineFormComponent implements OnInit {
     this.habitsService.list(true).subscribe({
       next: (habits) => (this.availableHabits = habits),
     });
+    this.routinesService.listAreas().subscribe({ next: (a) => this.areaOptions.set(a) });
+    this.routinesService.listCategories().subscribe({ next: (c) => this.categoryOptions.set(c) });
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id && url.endsWith('edit')) {
@@ -335,6 +344,16 @@ export class RoutineFormComponent implements OnInit {
       habit_ids: [habitIds as string[]],
       link_mode: [habitIds.length > 0 ? ('habits' as const) : ('custom' as const)],
     });
+  }
+
+  onAreaCreated(name: string): void {
+    this.areaOptions.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.routinesService.createArea(name).subscribe({ next: (a) => this.areaOptions.set(a) });
+  }
+
+  onCategoryCreated(name: string): void {
+    this.categoryOptions.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.routinesService.createCategory(name).subscribe({ next: (c) => this.categoryOptions.set(c) });
   }
 
   habitIdsAt(index: number): string[] {
@@ -416,7 +435,7 @@ export class RoutineFormComponent implements OnInit {
       description: raw.description || null,
       days_of_week: [...this.selectedDays].sort((a, b) => a - b),
       timezone: raw.timezone,
-      start_date: raw.start_date || null,
+      start_date: raw.start_date,
       end_date: raw.end_date || null,
       skip_dates: raw.skip_dates || [],
       blocks,

@@ -36,4 +36,11 @@ describe('RunningService', () => {
       updated_at: new Date().toISOString(),
     });
   });
+
+  it('should delete a run', () => {
+    service.deleteRun('1').subscribe((res) => expect(res).toBeNull());
+    const req = http.expectOne(`${environment.apiUrl}/running/runs/1`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
 });

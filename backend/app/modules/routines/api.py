@@ -4,7 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
-from app.modules.routines.schemas import RoutineCreate, RoutineListItem, RoutineResponse, RoutineUpdate
+from app.modules.routines.schemas import (
+    RoutineCreate,
+    RoutineListItem,
+    RoutineResponse,
+    RoutineUpdate,
+    TaxonomyNameCreate,
+)
 from app.modules.routines.service import RoutineService
 
 router = APIRouter(prefix="/routines", tags=["routines"])
@@ -17,6 +23,42 @@ async def list_routines(
     db: AsyncSession = Depends(get_db),
 ):
     return await RoutineService(db).list_routines(user.id, active_only=active_only)
+
+
+@router.get("/areas", response_model=list[str])
+async def list_routine_areas(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RoutineService(db).list_areas(user.id)
+
+
+@router.post("/areas", response_model=list[str], status_code=status.HTTP_201_CREATED)
+async def create_routine_area(
+    data: TaxonomyNameCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await RoutineService(db).create_area(user.id, data.name)
+    return await RoutineService(db).list_areas(user.id)
+
+
+@router.get("/categories", response_model=list[str])
+async def list_routine_categories(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RoutineService(db).list_categories(user.id)
+
+
+@router.post("/categories", response_model=list[str], status_code=status.HTTP_201_CREATED)
+async def create_routine_category(
+    data: TaxonomyNameCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await RoutineService(db).create_category(user.id, data.name)
+    return await RoutineService(db).list_categories(user.id)
 
 
 @router.post("", response_model=RoutineResponse, status_code=status.HTTP_201_CREATED)

@@ -1,13 +1,5 @@
-export type RoutineArea =
-  | 'dsa'
-  | 'gym'
-  | 'running'
-  | 'learning'
-  | 'communication'
-  | 'book'
-  | 'other';
-
-export type RoutineCategory = 'personal' | 'task' | 'running' | 'bill' | 'learning';
+export type RoutineArea = string;
+export type RoutineCategory = string;
 
 export interface RoutineBlock {
   id: string;
@@ -65,7 +57,7 @@ export interface RoutineCreate {
   description?: string | null;
   days_of_week: number[];
   timezone?: string;
-  start_date?: string | null;
+  start_date: string;
   end_date?: string | null;
   skip_dates?: string[];
   blocks: RoutineBlockInput[];
@@ -112,7 +104,7 @@ export const WEEKDAYS: { value: number; label: string; short: string }[] = [
 ];
 
 /** Map life area → default calendar category */
-export function defaultCategoryForArea(area: RoutineArea): RoutineCategory {
+export function defaultCategoryForArea(area: string): string {
   switch (area) {
     case 'dsa':
     case 'learning':

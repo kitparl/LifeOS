@@ -9,6 +9,7 @@ import {
   raceDistanceLabel,
   raceStatusLabel,
 } from './models/running.models';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { RunningService } from './services/running.service';
 
 @Component({
@@ -148,6 +149,7 @@ export class RaceEventDetailComponent implements OnInit {
   private readonly filesService = inject(FilesService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly confirm = inject(ConfirmService);
 
   readonly formatDuration = formatDuration;
   readonly raceStatusLabel = raceStatusLabel;
@@ -230,8 +232,10 @@ export class RaceEventDetailComponent implements OnInit {
     return match?.[1] ?? null;
   }
 
-  remove(): void {
-    if (!this.race || !confirm('Delete this race event permanently?')) return;
+  async remove(): Promise<void> {
+    if (!this.race) return;
+    const ok = await this.confirm.confirm('Delete this race event permanently?');
+    if (!ok) return;
     this.runningService.deleteRace(this.race.id).subscribe({
       next: () => this.router.navigate(['/running']),
     });

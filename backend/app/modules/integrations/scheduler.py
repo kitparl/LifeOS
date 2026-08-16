@@ -137,6 +137,21 @@ async def _run_outbox_drain() -> None:
     await dispatch_pending_notifications(limit=50)
 
 
+async def _run_routines_expire() -> None:
+    from datetime import date
+
+    from app.modules.routines.service import RoutineService
+
+    async with async_session_factory() as session:
+        try:
+            n = await RoutineService(session).deactivate_expired(date.today())
+            await session.commit()
+            logger.info("Expired %s routines", n)
+        except Exception:
+            await session.rollback()
+            logger.exception("Routine expiry job failed")
+
+
 def sync_user_jobs(
     user_id: str,
     prefs: TelegramPreferences,
@@ -279,9 +294,17 @@ def start_scheduler() -> AsyncIOScheduler:
         max_instances=1,
         misfire_grace_time=300,
     )
+    _scheduler.add_job(
+        _run_routines_expire,
+        trigger=CronTrigger(hour=0, minute=1, timezone=_safe_zone("Asia/Kolkata")),
+        id="routines_expire",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=3600,
+    )
     _scheduler.start()
     _install_after_commit_hook()
-    logger.info("APScheduler started (outbox 30s, reminders 10m)")
+    logger.info("APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST)")
     return _scheduler
 
 

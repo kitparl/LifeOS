@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { RoutineListItem, formatDaysLabel } from './models/routine.models';
 import { RoutinesService } from './services/routines.service';
 
@@ -40,7 +41,28 @@ import { RoutinesService } from './services/routines.service';
           </a>
         </div>
       } @else {
-        <div class="panel !p-0 overflow-hidden">
+        <div class="space-y-2 md:hidden">
+          @for (r of routines; track r.id) {
+            <article class="panel space-y-2">
+              <a [routerLink]="['/routines', r.id]" class="link font-medium">{{ r.name }}</a>
+              <p class="text-xs" style="color: var(--text-muted)">
+                {{ daysLabel(r.days_of_week) }} · {{ r.block_count }} blocks · {{ r.is_active ? 'Active' : 'Paused' }}
+              </p>
+              <p class="text-xs" style="color: var(--text-muted)">
+                @if (r.start_date || r.end_date) {
+                  {{ r.start_date || '…' }} → {{ r.end_date || '…' }}
+                } @else {
+                  —
+                }
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <a [routerLink]="['/routines', r.id, 'edit']" class="btn-ghost text-xs no-underline">Edit</a>
+                <button type="button" class="btn-ghost text-xs" style="color: var(--danger)" (click)="remove(r)">Delete</button>
+              </div>
+            </article>
+          }
+        </div>
+        <div class="panel hidden !p-0 overflow-hidden md:block">
           <table class="w-full text-sm">
             <thead class="border-b border-[var(--xp-border)] bg-[var(--surface-2)] text-left">
               <tr>
@@ -69,7 +91,10 @@ import { RoutinesService } from './services/routines.service';
                   <td class="px-3 py-2">{{ r.block_count }}</td>
                   <td class="px-3 py-2">{{ r.is_active ? 'Active' : 'Paused' }}</td>
                   <td class="px-3 py-2">
-                    <a [routerLink]="['/routines', r.id, 'edit']" class="text-xs underline">Edit</a>
+                    <div class="flex flex-wrap gap-2">
+                      <a [routerLink]="['/routines', r.id, 'edit']" class="text-xs underline">Edit</a>
+                      <button type="button" class="text-xs underline" style="color: var(--danger)" (click)="remove(r)">Delete</button>
+                    </div>
                   </td>
                 </tr>
               }
@@ -83,13 +108,15 @@ import { RoutinesService } from './services/routines.service';
 export class RoutinesListComponent implements OnInit {
   private readonly routinesService = inject(RoutinesService);
   private readonly fb = inject(FormBuilder);
+  private readonly confirm = inject(ConfirmService);
 
   routines: RoutineListItem[] = [];
   loading = false;
 
-  filters = this.fb.nonNullable.group({ active_only: false });
+  filters = this.fb.nonNullable.group({ active_only: true });
 
   ngOnInit(): void {
+    this.filters.controls.active_only.valueChanges.subscribe(() => this.load());
     this.load();
   }
 
@@ -107,5 +134,11 @@ export class RoutinesListComponent implements OnInit {
       },
       error: () => (this.loading = false),
     });
+  }
+
+  async remove(routine: RoutineListItem): Promise<void> {
+    const ok = await this.confirm.confirm(`Delete routine "${routine.name}" permanently?`);
+    if (!ok) return;
+    this.routinesService.delete(routine.id).subscribe({ next: () => this.load() });
   }
 }
