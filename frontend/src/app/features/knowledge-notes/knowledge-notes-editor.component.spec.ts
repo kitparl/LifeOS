@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
 import { CodeExecutionService } from '../../shared/code-workspace/services/code-execution.service';
+import { FilesService } from '../files/services/files.service';
 import { KnowledgeSection } from './models/knowledge-notes.models';
 
 const section = (content: string): KnowledgeSection => ({
@@ -123,5 +124,48 @@ describe('KnowledgeNotesEditorComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(component.editorContent).toBe('');
+  });
+
+  it('uploads pasted files against the section and inserts markdown', async () => {
+    const files = TestBed.inject(FilesService);
+    spyOn(files, 'upload').and.returnValue(
+      of({
+        id: 'f1',
+        filename: 'shot.png',
+        content_type: 'image/png',
+        size_bytes: 4,
+        storage_backend: 'local',
+        url: '/api/v1/files/f1/content',
+        module: 'knowledge_notes',
+        entity_id: 's1',
+        created_at: new Date().toISOString(),
+      })
+    );
+    const insert = jasmine.createSpy('insertAtCursor');
+    component.workspace = { insertAtCursor: insert } as never;
+    await component.onFilesPasted([new File(['x'], 'shot.png', { type: 'image/png' })]);
+    expect(files.upload).toHaveBeenCalledWith(jasmine.any(File), 'knowledge_notes', 's1');
+    expect(insert).toHaveBeenCalledWith('![shot.png](/api/v1/files/f1/content)');
+  });
+
+  it('inserts a link for non-image pastes', async () => {
+    const files = TestBed.inject(FilesService);
+    spyOn(files, 'upload').and.returnValue(
+      of({
+        id: 'f2',
+        filename: 'notes.pdf',
+        content_type: 'application/pdf',
+        size_bytes: 4,
+        storage_backend: 'local',
+        url: '/api/v1/files/f2/content',
+        module: 'knowledge_notes',
+        entity_id: 's1',
+        created_at: new Date().toISOString(),
+      })
+    );
+    const insert = jasmine.createSpy('insertAtCursor');
+    component.workspace = { insertAtCursor: insert } as never;
+    await component.onFilesPasted([new File(['x'], 'notes.pdf', { type: 'application/pdf' })]);
+    expect(insert).toHaveBeenCalledWith('[notes.pdf](/api/v1/files/f2/content)');
   });
 });

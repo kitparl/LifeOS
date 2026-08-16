@@ -6,6 +6,7 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
 import { KnowledgeSubjectComponent } from './knowledge-subject.component';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
+import { FilesService } from '../files/services/files.service';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
 import {
   KnowledgeChapter,
@@ -140,6 +141,15 @@ describe('KnowledgeSubjectComponent', () => {
           useValue: { confirm: () => Promise.resolve(true) },
         },
         {
+          provide: FilesService,
+          useValue: {
+            list: () => of([]),
+            upload: () => of({}),
+            delete: () => of(void 0),
+            tokenUrl: () => of(''),
+          },
+        },
+        {
           provide: BreakpointObserver,
           useValue: { observe: () => of({ breakpoints: {}, matches: true }) },
         },
@@ -229,17 +239,27 @@ describe('KnowledgeSubjectComponent', () => {
     ).toEqual(['1', '2']);
   });
 
-  it('archives a section from the list menu', async () => {
+  it('deletes a section from the list menu by archiving it', async () => {
     component.toggleMenu('section-row:s1', new Event('click'));
     fixture.detectChanges();
     const items = Array.from(fixture.nativeElement.querySelectorAll('.menu-item')) as HTMLButtonElement[];
-    expect(items.map((el) => el.textContent?.trim())).toEqual(['Rename', 'Archive', 'Delete']);
-    await component.archiveSection(component.subject()!.chapters[0].sections[0]);
+    expect(items.map((el) => el.textContent?.trim())).toEqual(['Rename', 'Delete']);
+    await component.deleteSection(component.subject()!.chapters[0].sections[0]);
     fixture.detectChanges();
     expect(notes.archiveSection).toHaveBeenCalledWith('s1');
+    expect(notes.deleteSection).not.toHaveBeenCalled();
     expect(component.subject()!.chapters[0].sections.find((s) => s.id === 's1')).toBeUndefined();
     expect(component.archivedSections().some((s) => s.id === 's1')).toBeTrue();
     expect(fixture.nativeElement.textContent).toContain('Archived');
+  });
+
+  it('permanently deletes from the archived panel', async () => {
+    await component.deleteSection(component.subject()!.chapters[0].sections[0]);
+    fixture.detectChanges();
+    notes.deleteSection.calls.reset();
+    const archived = component.archivedSections()[0];
+    await component.deletePermanently(archived);
+    expect(notes.deleteSection).toHaveBeenCalledWith('s1');
   });
 
   it('renames a chapter on double-click commit', () => {

@@ -101,7 +101,14 @@
     [style.grid-template-rows]="splitRows"
   >
     <!-- Editor Panel -->
-    <div class="editor-panel" *ngIf="shouldShowEditor()">
+    <div
+      class="editor-panel"
+      *ngIf="shouldShowEditor()"
+      (paste)="onEditorPaste($event)"
+      (dragover)="onEditorDragOver($event)"
+      (dragleave)="onEditorDragLeave($event)"
+      (drop)="onEditorDrop($event)"
+    >
       <app-markdown-editor
         [content]="currentContent"
         [language]="currentLanguage"

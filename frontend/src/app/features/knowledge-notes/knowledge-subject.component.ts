@@ -15,6 +15,8 @@ import { Subject, forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
+import { FileImageSrcDirective } from '../../shared/markdown/file-image-src.directive';
+import { AttachmentListComponent } from '../files/components/attachment-list.component';
 import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
 import {
   KnowledgeChapter,
@@ -39,6 +41,8 @@ const SIDEBAR_MAX = 480;
     RouterLink,
     KnowledgeNotesEditorComponent,
     MarkdownPipe,
+    FileImageSrcDirective,
+    AttachmentListComponent,
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
@@ -213,7 +217,6 @@ const SIDEBAR_MAX = 480;
                           @if (openMenu() === 'section-row:' + sec.id) {
                             <div class="menu kn-overflow__menu" role="menu" (click)="$event.stopPropagation()">
                               <button type="button" class="menu-item" role="menuitem" (click)="startRename('section', sec.id); closeMenu()">Rename</button>
-                              <button type="button" class="menu-item" role="menuitem" (click)="archiveSection(sec); closeMenu()">Archive</button>
                               <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteSection(sec); closeMenu()">Delete</button>
                             </div>
                           }
@@ -236,7 +239,7 @@ const SIDEBAR_MAX = 480;
                       <p class="kn-archived__meta">Deletes in {{ archiveDaysLeft(sec) }}d</p>
                     </div>
                     <button type="button" class="btn-ghost text-xs" (click)="restoreSection(sec)">Restore</button>
-                    <button type="button" class="btn-ghost text-xs" (click)="deleteSection(sec)">Delete</button>
+                    <button type="button" class="btn-ghost text-xs" (click)="deletePermanently(sec)">Delete</button>
                   </div>
                 }
               </div>
@@ -291,7 +294,6 @@ const SIDEBAR_MAX = 480;
                           <button type="button" class="menu-item" role="menuitem" (click)="togglePreview(); closeMenu()">
                             {{ previewOnly() ? 'Edit' : 'Read' }}
                           </button>
-                          <button type="button" class="menu-item" role="menuitem" (click)="archiveSection(sec); closeMenu()">Archive</button>
                           <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteSection(sec); closeMenu()">Delete</button>
                         </div>
                       }
@@ -299,7 +301,7 @@ const SIDEBAR_MAX = 480;
                   </div>
                 </div>
                 @if (previewOnly()) {
-                  <div class="markdown-body panel" [innerHTML]="form.controls.content.value | markdown"></div>
+                  <div class="markdown-body panel" appFileImageSrc [innerHTML]="form.controls.content.value | markdown"></div>
                 } @else {
                   <app-knowledge-notes-editor
                     [section]="sec"
@@ -309,6 +311,9 @@ const SIDEBAR_MAX = 480;
                     (editorReadyChange)="onEditorReady()"
                   />
                 }
+                <div class="kn-attachments">
+                  <app-attachment-list module="knowledge_notes" [entityId]="sec.id" />
+                </div>
               </form>
             } @else {
               <div class="empty-state">
@@ -684,17 +689,8 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 
   async deleteSection(sec: KnowledgeSection): Promise<void> {
     const ok = await this.confirm.confirm(
-      `Permanently delete “${sec.title}”? This cannot be undone.`,
+      `Delete “${sec.title}”? It moves to Archived and is permanently removed after ${ARCHIVE_TTL_DAYS} days.`,
       'Delete section'
-    );
-    if (!ok) return;
-    this.service.deleteSection(sec.id).subscribe({ next: () => this.reload() });
-  }
-
-  async archiveSection(sec: KnowledgeSection): Promise<void> {
-    const ok = await this.confirm.confirm(
-      `Archive “${sec.title}”? It stays recoverable for ${ARCHIVE_TTL_DAYS} days, then it is deleted.`,
-      'Archive section'
     );
     if (!ok) return;
     this.service.archiveSection(sec.id).subscribe({
@@ -709,6 +705,15 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
         if (this.selected()?.id === sec.id) this.restoreSelection();
       },
     });
+  }
+
+  async deletePermanently(sec: KnowledgeSection): Promise<void> {
+    const ok = await this.confirm.confirm(
+      `Permanently delete “${sec.title}”? This cannot be undone.`,
+      'Delete section'
+    );
+    if (!ok) return;
+    this.service.deleteSection(sec.id).subscribe({ next: () => this.reload() });
   }
 
   restoreSection(sec: KnowledgeSection): void {

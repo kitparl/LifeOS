@@ -136,6 +136,31 @@ class FileRepository:
         )
         return list(result.scalars().all())
 
+    async def soft_delete_for_entities(
+        self,
+        user_id: str,
+        module: str,
+        entity_ids: list[str],
+    ) -> int:
+        if not entity_ids:
+            return 0
+        now = datetime.now(timezone.utc)
+        result = await self.db.execute(
+            select(FileRecord).where(
+                FileRecord.user_id == user_id,
+                FileRecord.module == module,
+                FileRecord.entity_id.in_(entity_ids),
+                FileRecord.deleted_at.is_(None),
+            )
+        )
+        rows = list(result.scalars().all())
+        for row in rows:
+            row.deleted_at = now
+            row.updated_at = now
+        if rows:
+            await self.db.flush()
+        return len(rows)
+
     async def list_by_storage_backend(self, backend: str) -> list[FileRecord]:
         result = await self.db.execute(
             select(FileRecord).where(FileRecord.storage_backend == backend)

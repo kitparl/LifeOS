@@ -216,4 +216,41 @@ describe('CodeWorkspaceComponent', () => {
     expect(component.fullscreen).toBeTrue();
     dialog.remove();
   });
+
+  it('emits filesPasted when enableFilePaste and paste contains files', () => {
+    fixture.componentRef.setInput('enableFilePaste', true);
+    fixture.detectChanges();
+    const emitted: File[][] = [];
+    component.filesPasted.subscribe((files) => emitted.push(files));
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    const event = {
+      clipboardData: {
+        items: [{ kind: 'file', getAsFile: () => file }],
+        files: [file],
+      },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation'),
+    } as unknown as ClipboardEvent;
+    component.onEditorPaste(event);
+    expect(emitted.length).toBe(1);
+    expect(emitted[0][0].name).toBe('a.png');
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it('does not intercept paste when enableFilePaste is false', () => {
+    const emitted: File[][] = [];
+    component.filesPasted.subscribe((files) => emitted.push(files));
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    const event = {
+      clipboardData: {
+        items: [{ kind: 'file', getAsFile: () => file }],
+        files: [file],
+      },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation'),
+    } as unknown as ClipboardEvent;
+    component.onEditorPaste(event);
+    expect(emitted.length).toBe(0);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
 });

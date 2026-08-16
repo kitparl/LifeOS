@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.files.repository import FileRepository
 from app.modules.knowledge_notes.repository import KnowledgeNotesRepository
 from app.modules.knowledge_notes.schemas import (
     ChapterCreate,
@@ -25,11 +26,22 @@ def _not_found(what: str) -> HTTPException:
 
 class KnowledgeNotesService:
     def __init__(self, db: AsyncSession):
+        self.db = db
         self.repo = KnowledgeNotesRepository(db)
+        self.files = FileRepository(db)
+
+    async def _purge_expired(self, user_id: str) -> None:
+        ids = await self.repo.purge_expired_archives(user_id, ARCHIVE_TTL_DAYS)
+        await self._cleanup_section_files(user_id, ids)
+
+    async def _cleanup_section_files(self, user_id: str, section_ids: list[str]) -> None:
+        if not section_ids:
+            return
+        await self.files.soft_delete_for_entities(user_id, "knowledge_notes", section_ids)
 
     # ---- Subjects ----
     async def list_subjects(self, user_id: str) -> list[SubjectListItem]:
-        await self.repo.purge_expired_archives(user_id, ARCHIVE_TTL_DAYS)
+        await self._purge_expired(user_id)
         subjects = await self.repo.list_subjects(user_id)
         items: list[SubjectListItem] = []
         for s in subjects:
@@ -49,7 +61,7 @@ class KnowledgeNotesService:
         return items
 
     async def get_subject(self, user_id: str, subject_id: str) -> SubjectDetail:
-        await self.repo.purge_expired_archives(user_id, ARCHIVE_TTL_DAYS)
+        await self._purge_expired(user_id)
         subject = await self.repo.get_subject(user_id, subject_id)
         if subject is None:
             raise _not_found("Subject")
@@ -160,6 +172,7 @@ class KnowledgeNotesService:
         if section is None:
             raise _not_found("Section")
         await self.repo.delete_section(section)
+        await self._cleanup_section_files(user_id, [section_id])
 
     async def archive_section(self, user_id: str, section_id: str) -> SectionResponse:
         section = await self.repo.get_section(user_id, section_id)
@@ -180,7 +193,7 @@ class KnowledgeNotesService:
         query = (query or "").strip()
         if not query:
             return []
-        await self.repo.purge_expired_archives(user_id, ARCHIVE_TTL_DAYS)
+        await self._purge_expired(user_id)
         rows = await self.repo.search_sections(user_id, query)
         hits: list[SearchHit] = []
         for section, chapter, subject in rows:

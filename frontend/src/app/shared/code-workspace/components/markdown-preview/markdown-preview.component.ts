@@ -7,16 +7,18 @@ import {
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { MarkdownService } from '../../services/markdown.service';
+import { FileImageSrcDirective } from '../../../markdown/file-image-src.directive';
 
 @Component({
   selector: 'app-markdown-preview',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FileImageSrcDirective],
   template: `
     <div
       class="markdown-preview-container markdown-body"
       role="article"
       aria-label="Markdown preview"
+      appFileImageSrc
       [class.theme-light]="theme === 'light'"
       [class.theme-dark]="theme === 'dark'"
       [class.journal-reader]="variant === 'journal'"

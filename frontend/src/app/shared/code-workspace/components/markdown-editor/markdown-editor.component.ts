@@ -105,6 +105,12 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
     }
   }
 
+  insertAtCursor(text: string): void {
+    if (this.editorView && !this.readOnly) {
+      this.editorService.insertText(this.editorView, text);
+    }
+  }
+
   setContent(content: string): void {
     if (this.editorView) {
       this.editorService.setContent(this.editorView, content);

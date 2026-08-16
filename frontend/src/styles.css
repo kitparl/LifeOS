@@ -2104,6 +2104,10 @@ summary::-webkit-details-marker {
   overflow: hidden;
 }
 
+.kn-attachments {
+  margin-top: 0.75rem;
+}
+
 @media (max-width: 767px) {
   .kn-chapter__overflow,
   .kn-section__overflow,

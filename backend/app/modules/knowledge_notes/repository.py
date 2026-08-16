@@ -175,7 +175,7 @@ class KnowledgeNotesRepository:
         await self.db.refresh(section)
         return section
 
-    async def purge_expired_archives(self, user_id: str, days: int = 7) -> int:
+    async def purge_expired_archives(self, user_id: str, days: int = 7) -> list[str]:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         result = await self.db.execute(
             select(KnowledgeSection).where(
@@ -185,11 +185,12 @@ class KnowledgeNotesRepository:
             )
         )
         rows = list(result.scalars().all())
+        ids = [row.id for row in rows]
         for row in rows:
             await self.db.delete(row)
         if rows:
             await self.db.flush()
-        return len(rows)
+        return ids
 
     # ---- Search ----
     async def search_sections(self, user_id: str, query: str) -> list[tuple]:

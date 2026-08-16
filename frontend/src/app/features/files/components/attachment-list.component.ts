@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, Input, OnChanges, SimpleChanges, inject } from '@angular/core';
 import { filesFromClipboard, filesFromDataTransfer } from '../../../shared/file-upload/clipboard-files';
 import { fileFingerprint, sha256Hex } from '../../../shared/file-upload/file-hash';
+import { ConfirmService } from '../../../shared/confirm/confirm.service';
 import { FileRecord } from '../models/file.models';
 import { FilesService } from '../services/files.service';
 
@@ -90,6 +91,7 @@ import { FilesService } from '../services/files.service';
 })
 export class AttachmentListComponent implements OnChanges {
   private readonly filesService = inject(FilesService);
+  private readonly confirm = inject(ConfirmService);
 
   @Input({ required: true }) module!: string;
   @Input() entityId: string | null = null;
@@ -224,6 +226,16 @@ export class AttachmentListComponent implements OnChanges {
   }
 
   remove(id: string): void {
+    void this.removeConfirmed(id);
+  }
+
+  private async removeConfirmed(id: string): Promise<void> {
+    const file = this.files.find((f) => f.id === id);
+    const ok = await this.confirm.confirm(
+      `Delete “${file?.filename ?? 'this file'}”?`,
+      'Delete attachment'
+    );
+    if (!ok) return;
     this.filesService.delete(id).subscribe({ next: () => this.load() });
   }
 

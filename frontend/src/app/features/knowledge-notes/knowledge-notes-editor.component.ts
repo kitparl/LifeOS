@@ -6,9 +6,10 @@ import {
   OnDestroy,
   Output,
   SimpleChanges,
+  ViewChild,
   inject,
 } from '@angular/core';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, firstValueFrom, takeUntil } from 'rxjs';
 import {
   CodeOutputComponent,
   CodeWorkspaceComponent,
@@ -20,6 +21,8 @@ import {
   isExecutableLanguage,
   normalizeExecutableLanguage,
 } from '../../shared/code-workspace/utils/fenced-code-blocks';
+import { FilesService } from '../files/services/files.service';
+import { FileRecord } from '../files/models/file.models';
 import { CodeBlock, KnowledgeSection } from './models/knowledge-notes.models';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
 
@@ -55,6 +58,17 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
         </div>
       }
 
+      @if (uploadStatus || uploadError) {
+        <div class="kn-python">
+          @if (uploadStatus) {
+            <span class="kn-python__status">{{ uploadStatus }}</span>
+          }
+          @if (uploadError) {
+            <span class="kn-python__status" style="color: var(--danger)">{{ uploadError }}</span>
+          }
+        </div>
+      }
+
       @if (editorReady) {
         <div class="kn-editor-frame">
           <app-code-workspace
@@ -68,8 +82,10 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
             [showOutput]="false"
             defaultViewMode="write"
             [enableAutosave]="false"
+            [enableFilePaste]="true"
             (contentChange)="onContentChange($event)"
             (save)="onSave($event)"
+            (filesPasted)="onFilesPasted($event)"
           />
         </div>
       }
@@ -88,7 +104,10 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
 export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
   private readonly knowledgeNotes = inject(KnowledgeNotesService);
   private readonly execution = inject(CodeExecutionService);
+  private readonly filesService = inject(FilesService);
   private readonly destroy$ = new Subject<void>();
+
+  @ViewChild(CodeWorkspaceComponent) workspace?: CodeWorkspaceComponent;
 
   @Input({ required: true }) section!: KnowledgeSection;
 
@@ -103,6 +122,8 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
   executableBlocks: CodeBlock[] = [];
   runningBlockId: string | null = null;
   lastResult: CodeExecutionResult | null = null;
+  uploadStatus = '';
+  uploadError = '';
 
   private blockResults = new Map<string, CodeExecutionResult>();
 
@@ -135,6 +156,33 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
   onSave(document: EditorDocument): void {
     this.onContentChange(document.content);
     this.saveRequested.emit();
+  }
+
+  async onFilesPasted(files: File[]): Promise<void> {
+    if (!files.length || !this.section?.id) return;
+    this.uploadError = '';
+    this.uploadStatus = files.length === 1 ? 'Uploading…' : `Uploading ${files.length} files…`;
+    for (const file of files) {
+      try {
+        const record = await firstValueFrom(
+          this.filesService.upload(file, 'knowledge_notes', this.section.id)
+        );
+        this.workspace?.insertAtCursor(this.markdownForRecord(record, file));
+      } catch (err: unknown) {
+        const detail = (err as { error?: { detail?: string } })?.error?.detail;
+        this.uploadError = detail || 'Upload failed';
+        this.uploadStatus = '';
+        return;
+      }
+    }
+    this.uploadStatus = '';
+  }
+
+  private markdownForRecord(record: FileRecord, file: File): string {
+    const name = (record.filename || file.name || 'file').replace(/]/g, '');
+    const url = record.url || `/api/v1/files/${record.id}/content`;
+    const type = record.content_type || file.type || '';
+    return type.startsWith('image/') ? `![${name}](${url})` : `[${name}](${url})`;
   }
 
   clearOutput(): void {
@@ -184,6 +232,8 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
     this.lastResult = null;
     this.blockResults.clear();
     this.runningBlockId = null;
+    this.uploadStatus = '';
+    this.uploadError = '';
 
     const prepared = this.knowledgeNotes.enrichSection(section);
     this.editorContent = prepared.content ?? '';

@@ -34,6 +34,7 @@ import {
   normalizeExecutableLanguage,
   parseFencedCodeBlocks,
 } from '../../utils/fenced-code-blocks';
+import { filesFromClipboard, filesFromDataTransfer } from '../../../file-upload/clipboard-files';
 
 /**
  * Main container component for the Code Workspace.
@@ -92,12 +93,14 @@ export class CodeWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   @Input() theme: 'light' | 'dark' | 'system' = 'system';
   @Input() defaultViewMode: WorkspaceViewMode = 'write';
   @Input() previewVariant: 'default' | 'journal' = 'default';
+  @Input() enableFilePaste = false;
 
   // ========== OUTPUTS ==========
   
   @Output() contentChange = new EventEmitter<string>();
   @Output() run = new EventEmitter<CodeExecutionRequest>();
   @Output() save = new EventEmitter<EditorDocument>();
+  @Output() filesPasted = new EventEmitter<File[]>();
 
   // ========== STATE ==========
   
@@ -254,6 +257,48 @@ export class CodeWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
 
   // ========== TOOLBAR ACTIONS ==========
   
+  insertAtCursor(text: string): void {
+    if (this.markdownEditor) {
+      this.markdownEditor.insertAtCursor(text);
+      return;
+    }
+    const next = this.currentContent
+      ? `${this.currentContent}\n${text}`
+      : text;
+    this.onContentChange(next);
+  }
+
+  onEditorPaste(event: ClipboardEvent): void {
+    if (!this.enableFilePaste) return;
+    const files = filesFromClipboard(event);
+    if (!files.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.filesPasted.emit(files);
+  }
+
+  onEditorDragOver(event: DragEvent): void {
+    if (!this.enableFilePaste) return;
+    const types = event.dataTransfer?.types;
+    if (!types || !Array.from(types).includes('Files')) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  onEditorDragLeave(event: DragEvent): void {
+    if (!this.enableFilePaste) return;
+    event.preventDefault();
+  }
+
+  onEditorDrop(event: DragEvent): void {
+    if (!this.enableFilePaste) return;
+    const files = filesFromDataTransfer(event.dataTransfer);
+    if (!files.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.filesPasted.emit(files);
+  }
+
   onFormatAction(action: FormatAction): void {
     this.markdownEditor?.applyFormat(action);
   }
