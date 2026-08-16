@@ -1916,7 +1916,7 @@ summary::-webkit-details-marker {
 
 .kn-plus--row,
 .kn-chapter__overflow,
-.kn-section__overflow,
+.kn-section__delete,
 .kn-chapter__head > .kn-drag,
 .kn-section-row > .kn-drag {
   opacity: 0;
@@ -1930,12 +1930,33 @@ summary::-webkit-details-marker {
 .kn-chapter:focus-within .kn-chapter__head > .kn-drag,
 .kn-section-row:hover > .kn-drag,
 .kn-section-row:focus-within > .kn-drag,
-.kn-section-row:hover .kn-section__overflow,
-.kn-section-row:focus-within .kn-section__overflow,
+.kn-section-row:hover .kn-section__delete,
+.kn-section-row:focus-within .kn-section__delete,
 .kn-chapter__overflow.is-open,
-.kn-section__overflow.is-open,
-.kn-plus--row:focus-visible {
+.kn-plus--row:focus-visible,
+.kn-section__delete:focus-visible {
   opacity: 1;
+}
+
+.kn-section__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.kn-section__delete:hover,
+.kn-section__delete:focus-visible {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
 }
 
 .kn-section-row {
@@ -2110,7 +2131,7 @@ summary::-webkit-details-marker {
 
 @media (max-width: 767px) {
   .kn-chapter__overflow,
-  .kn-section__overflow,
+  .kn-section__delete,
   .kn-plus--row,
   .kn-chapter__head > .kn-drag,
   .kn-section-row > .kn-drag {

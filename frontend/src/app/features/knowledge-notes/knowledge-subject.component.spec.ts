@@ -239,12 +239,12 @@ describe('KnowledgeSubjectComponent', () => {
     ).toEqual(['1', '2']);
   });
 
-  it('deletes a section from the list menu by archiving it', async () => {
-    component.toggleMenu('section-row:s1', new Event('click'));
-    fixture.detectChanges();
-    const items = Array.from(fixture.nativeElement.querySelectorAll('.menu-item')) as HTMLButtonElement[];
-    expect(items.map((el) => el.textContent?.trim())).toEqual(['Rename', 'Delete']);
-    await component.deleteSection(component.subject()!.chapters[0].sections[0]);
+  it('deletes a section from the hover bin by archiving it', async () => {
+    expect(fixture.nativeElement.querySelector('[aria-label="Section list actions"]')).toBeFalsy();
+    const bin = fixture.nativeElement.querySelector('[aria-label="Delete section"]') as HTMLButtonElement;
+    expect(bin).toBeTruthy();
+    bin.click();
+    await fixture.whenStable();
     fixture.detectChanges();
     expect(notes.archiveSection).toHaveBeenCalledWith('s1');
     expect(notes.deleteSection).not.toHaveBeenCalled();
