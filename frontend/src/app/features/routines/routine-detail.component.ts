@@ -35,6 +35,11 @@ import { RoutinesService } from './services/routines.service';
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/routines', r.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
+            @if (r.is_active) {
+              <button type="button" class="btn-ghost text-xs" (click)="deactivate()">Deactivate</button>
+            } @else {
+              <button type="button" class="btn-ghost text-xs" (click)="activate()">Activate</button>
+            }
             <button type="button" class="input-field !w-auto text-xs text-red-700" (click)="remove()">
               Delete
             </button>
@@ -161,6 +166,20 @@ export class RoutineDetailComponent implements OnInit {
   habitNames(b: { habits?: { name: string }[] }): string {
     const names = b.habits?.map((h) => h.name) ?? [];
     return names.length ? names.join(', ') : '—';
+  }
+
+  deactivate(): void {
+    if (!this.routine) return;
+    this.routinesService.update(this.routine.id, { is_active: false }).subscribe({
+      next: (r) => (this.routine = r),
+    });
+  }
+
+  activate(): void {
+    if (!this.routine) return;
+    this.routinesService.update(this.routine.id, { is_active: true }).subscribe({
+      next: (r) => (this.routine = r),
+    });
   }
 
   async remove(): Promise<void> {

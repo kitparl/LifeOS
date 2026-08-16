@@ -57,6 +57,11 @@ import { RoutinesService } from './services/routines.service';
               </p>
               <div class="flex flex-wrap gap-2">
                 <a [routerLink]="['/routines', r.id, 'edit']" class="btn-ghost text-xs no-underline">Edit</a>
+                @if (r.is_active) {
+                  <button type="button" class="btn-ghost text-xs" (click)="deactivate(r)">Deactivate</button>
+                } @else {
+                  <button type="button" class="btn-ghost text-xs" (click)="activate(r)">Activate</button>
+                }
                 <button type="button" class="btn-ghost text-xs" style="color: var(--danger)" (click)="remove(r)">Delete</button>
               </div>
             </article>
@@ -93,6 +98,11 @@ import { RoutinesService } from './services/routines.service';
                   <td class="px-3 py-2">
                     <div class="flex flex-wrap gap-2">
                       <a [routerLink]="['/routines', r.id, 'edit']" class="text-xs underline">Edit</a>
+                      @if (r.is_active) {
+                        <button type="button" class="text-xs underline" (click)="deactivate(r)">Deactivate</button>
+                      } @else {
+                        <button type="button" class="text-xs underline" (click)="activate(r)">Activate</button>
+                      }
                       <button type="button" class="text-xs underline" style="color: var(--danger)" (click)="remove(r)">Delete</button>
                     </div>
                   </td>
@@ -134,6 +144,14 @@ export class RoutinesListComponent implements OnInit {
       },
       error: () => (this.loading = false),
     });
+  }
+
+  deactivate(routine: RoutineListItem): void {
+    this.routinesService.update(routine.id, { is_active: false }).subscribe({ next: () => this.load() });
+  }
+
+  activate(routine: RoutineListItem): void {
+    this.routinesService.update(routine.id, { is_active: true }).subscribe({ next: () => this.load() });
   }
 
   async remove(routine: RoutineListItem): Promise<void> {
