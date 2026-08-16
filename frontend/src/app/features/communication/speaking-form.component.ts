@@ -2,10 +2,6 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CodeWorkspaceComponent } from '../../shared/code-workspace';
-import {
-  ContentConverterService,
-  DataMigrationService,
-} from '../../shared/code-workspace/services/migration';
 import { SPEAKING_CATEGORIES, SpeakingCategory } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 
@@ -80,8 +76,6 @@ export class SpeakingFormComponent implements OnInit {
   private readonly communication = inject(CommunicationService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly converter = inject(ContentConverterService);
-  private readonly migration = inject(DataMigrationService);
 
   categories = SPEAKING_CATEGORIES;
   isEdit = false;
@@ -107,17 +101,16 @@ export class SpeakingFormComponent implements OnInit {
       this.itemId = id;
       this.communication.getSpeaking(id).subscribe({
         next: (s) => {
-          void this.loadResponse(s.response ?? '').then((response) => {
-            this.form.patchValue({
-              title: s.title,
-              category: s.category,
-              prompt: s.prompt,
-              response,
-              notes: s.notes ?? '',
-            });
-            this.editorContent = response;
-            this.editorReady = true;
+          const response = s.response ?? '';
+          this.form.patchValue({
+            title: s.title,
+            category: s.category,
+            prompt: s.prompt,
+            response,
+            notes: s.notes ?? '',
           });
+          this.editorContent = response;
+          this.editorReady = true;
         },
       });
     } else {
@@ -127,18 +120,6 @@ export class SpeakingFormComponent implements OnInit {
 
   onResponseChange(content: string): void {
     this.form.controls.response.setValue(content, { emitEvent: false });
-  }
-
-  private async loadResponse(content: string): Promise<string> {
-    if (!content.trimStart().startsWith('<')) {
-      return content;
-    }
-    const record = await this.migration.migrateComponent('SpeakingFormComponent', content);
-    if (record.status === 'completed' && record.convertedContent) {
-      return record.convertedContent;
-    }
-    const fallback = await this.converter.htmlToMarkdown(content);
-    return fallback.markdown || content;
   }
 
   submit(): void {

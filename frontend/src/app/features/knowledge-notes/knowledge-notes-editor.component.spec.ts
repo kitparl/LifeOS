@@ -32,14 +32,11 @@ class NotesStub {
     }
     return blocks;
   }
-  async migrateToMarkdown(s: KnowledgeSection) {
+  enrichSection(s: KnowledgeSection) {
     return { ...s, format: 'markdown' as const };
   }
   updateSection() {
     return of(section('saved'));
-  }
-  enrichSection(s: KnowledgeSection) {
-    return s;
   }
 }
 

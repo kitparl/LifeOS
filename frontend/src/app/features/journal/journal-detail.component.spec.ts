@@ -50,11 +50,10 @@ describe('JournalDetailComponent', () => {
     expect(html).toContain('thanks');
   });
 
-  it('sanitizes legacy TipTap HTML instead of treating it as markdown', async () => {
-    const fixture = await setup('<p>legacy <strong>html</strong></p>');
+  it('renders markdown emphasis for markdown entries', async () => {
+    const fixture = await setup('legacy **html**');
     const html = fixture.nativeElement.innerHTML as string;
     expect(html).toContain('legacy');
     expect(html).toContain('<strong>html</strong>');
-    expect(html).not.toContain('&lt;p&gt;');
   });
 });

@@ -112,7 +112,7 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
     if (!change.firstChange && previous?.id === this.section.id) {
       return;
     }
-    void this.prepareSection(this.section);
+    this.prepareSection(this.section);
   }
 
   ngOnDestroy(): void {
@@ -186,17 +186,17 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
     };
   }
 
-  private async prepareSection(section: KnowledgeSection): Promise<void> {
+  private prepareSection(section: KnowledgeSection): void {
     this.editorReady = false;
     this.lastResult = null;
     this.blockResults.clear();
     this.runningBlockId = null;
 
-    const migrated = await this.knowledgeNotes.migrateToMarkdown(section);
-    this.editorContent = migrated.content;
-    this.lastPersisted = migrated.content;
-    this.refreshBlocks(migrated.content);
-    this.contentChange.emit(migrated.content);
+    const prepared = this.knowledgeNotes.enrichSection(section);
+    this.editorContent = prepared.content;
+    this.lastPersisted = prepared.content;
+    this.refreshBlocks(prepared.content);
+    this.contentChange.emit(prepared.content);
     this.editorReady = true;
   }
 

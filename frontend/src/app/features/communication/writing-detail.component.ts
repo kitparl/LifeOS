@@ -6,11 +6,6 @@ import { MarkdownService } from '../../shared/markdown/markdown.service';
 import { WritingPractice } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 
-/** Detect if a string is HTML (from TipTap) or plain text (legacy) */
-function isHtml(content: string): boolean {
-  return content.trimStart().startsWith('<');
-}
-
 @Component({
   selector: 'app-writing-detail',
   standalone: true,
@@ -32,9 +27,6 @@ function isHtml(content: string): boolean {
         <div class="panel">
           @if (!w.content) {
             <p class="text-sm" style="color: var(--text-muted); font-style: italic">No content.</p>
-          } @else if (contentIsHtml(w.content)) {
-            <!-- TipTap HTML content (sanitized) -->
-            <div class="prose-content ProseMirror" [innerHTML]="safe(w.content)"></div>
           } @else {
             <div class="prose-content" [innerHTML]="safeMarkdown(w.content)"></div>
           }
@@ -61,12 +53,6 @@ export class WritingDetailComponent implements OnInit {
 
   item: WritingPractice | null = null;
   loading = false;
-
-  readonly contentIsHtml = isHtml;
-
-  safe(html: string): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(this.markdown.sanitize(html));
-  }
 
   safeMarkdown(markdown: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(this.markdown.render(markdown));

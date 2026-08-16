@@ -28,8 +28,8 @@ export interface KnowledgeSection {
   order_index: number;
   created_at: string;
   updated_at: string;
-  /** Client-only during HTML → Markdown transition. */
-  format?: 'markdown' | 'html';
+  /** Client-only parsed metadata; content is always markdown. */
+  format?: 'markdown';
   /** Client-only parsed fences; not persisted separately. */
   codeBlocks?: CodeBlock[];
   metadata?: KnowledgeSectionMetadata;

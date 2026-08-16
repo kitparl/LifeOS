@@ -29,10 +29,7 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": [],
-            "allowedCommonJsDependencies": [
-              "turndown"
-            ]
+            "scripts": []
           },
           "configurations": {
             "production": {

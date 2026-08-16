@@ -1,20 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CodeWorkspaceComponent } from '../../shared/code-workspace';
-import {
-  ContentConverterService,
-  DataMigrationService,
-} from '../../shared/code-workspace/services/migration';
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
-import { MarkdownService } from '../../shared/markdown/markdown.service';
 import { JOURNAL_TYPES, JournalType } from './models/journal.models';
 import { JournalService } from './services/journal.service';
-
-function isHtml(content: string): boolean {
-  return content.trimStart().startsWith('<');
-}
 
 @Component({
   selector: 'app-journal-form',
@@ -55,11 +45,7 @@ function isHtml(content: string): boolean {
       </div>
 
       @if (previewOnly) {
-        @if (contentIsHtml(form.controls.content.value)) {
-          <div class="markdown-body" [innerHTML]="safe(form.controls.content.value)"></div>
-        } @else {
-          <div class="markdown-body" [innerHTML]="form.controls.content.value | markdown"></div>
-        }
+        <div class="markdown-body" [innerHTML]="form.controls.content.value | markdown"></div>
       } @else if (editorReady) {
         <div
           style="min-height: 320px; height: 46vh; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-sm)"
@@ -113,10 +99,6 @@ export class JournalFormComponent implements OnInit {
   private readonly journalService = inject(JournalService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly converter = inject(ContentConverterService);
-  private readonly migration = inject(DataMigrationService);
-  private readonly markdown = inject(MarkdownService);
-  private readonly sanitizer = inject(DomSanitizer);
 
   types = JOURNAL_TYPES;
   isEdit = false;
@@ -126,8 +108,6 @@ export class JournalFormComponent implements OnInit {
   editorReady = false;
   editorContent = '';
   previewOnly = false;
-
-  readonly contentIsHtml = isHtml;
 
   form = this.fb.nonNullable.group({
     entry_date: [new Date().toISOString().slice(0, 10), Validators.required],
@@ -147,19 +127,18 @@ export class JournalFormComponent implements OnInit {
       this.entryId = id;
       this.journalService.get(id).subscribe({
         next: (entry) => {
-          void this.loadContent(entry.content).then((content) => {
-            this.form.patchValue({
-              entry_date: entry.entry_date.slice(0, 10),
-              entry_type: entry.entry_type,
-              title: entry.title ?? '',
-              content,
-              gratitude: entry.gratitude ?? '',
-              wins: entry.wins ?? '',
-              lessons: entry.lessons ?? '',
-            });
-            this.editorContent = content;
-            this.editorReady = true;
+          const content = entry.content ?? '';
+          this.form.patchValue({
+            entry_date: entry.entry_date.slice(0, 10),
+            entry_type: entry.entry_type,
+            title: entry.title ?? '',
+            content,
+            gratitude: entry.gratitude ?? '',
+            wins: entry.wins ?? '',
+            lessons: entry.lessons ?? '',
           });
+          this.editorContent = content;
+          this.editorReady = true;
         },
       });
     } else {
@@ -171,25 +150,9 @@ export class JournalFormComponent implements OnInit {
     this.previewOnly = !this.previewOnly;
   }
 
-  safe(html: string): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(this.markdown.sanitize(html));
-  }
-
   onContentChange(content: string): void {
     this.editorContent = content;
     this.form.controls.content.setValue(content, { emitEvent: false });
-  }
-
-  private async loadContent(content: string): Promise<string> {
-    if (!content.trimStart().startsWith('<')) {
-      return content;
-    }
-    const record = await this.migration.migrateComponent('JournalFormComponent', content);
-    if (record.status === 'completed' && record.convertedContent) {
-      return record.convertedContent;
-    }
-    const fallback = await this.converter.htmlToMarkdown(content);
-    return fallback.markdown || content;
   }
 
   submit(): void {

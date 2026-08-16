@@ -1,15 +1,9 @@
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
-import { MarkdownService } from '../../shared/markdown/markdown.service';
 import { JournalEntry } from './models/journal.models';
 import { JournalService } from './services/journal.service';
-
-function isHtml(content: string): boolean {
-  return content.trimStart().startsWith('<');
-}
 
 @Component({
   selector: 'app-journal-detail',
@@ -31,11 +25,7 @@ function isHtml(content: string): boolean {
           </div>
         </div>
 
-        @if (contentIsHtml(e.content)) {
-          <div class="markdown-body" [innerHTML]="safe(e.content)"></div>
-        } @else {
-          <div class="markdown-body" [innerHTML]="safeMarkdown(e.content)"></div>
-        }
+        <div class="markdown-body" [innerHTML]="e.content | markdown"></div>
 
         @if (e.gratitude) {
           <div class="journal-section">
@@ -69,21 +59,9 @@ export class JournalDetailComponent implements OnInit {
   private readonly journalService = inject(JournalService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly markdown = inject(MarkdownService);
-  private readonly sanitizer = inject(DomSanitizer);
 
   entry: JournalEntry | null = null;
   loading = false;
-
-  readonly contentIsHtml = isHtml;
-
-  safe(html: string): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(this.markdown.sanitize(html));
-  }
-
-  safeMarkdown(markdown: string): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(this.markdown.render(markdown));
-  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');

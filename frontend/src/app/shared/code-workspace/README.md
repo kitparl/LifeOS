@@ -364,8 +364,7 @@ constructor(private themes: ThemeIntegrationService) {
 | Issue | What to check |
 |---|---|
 | Editor has no height | Wrap `<app-code-workspace>` in a parent with an explicit height (`min-height: 240px; height: 280px`). The workspace is `height: 100%`. |
-| `[content]` did not apply | `content` is read in `ngOnInit`. Convert HTML → Markdown first, then create the editor (`*ngIf="editorReady"`). |
-| TipTap HTML still in the DB | Load paths call `DataMigrationService.migrateComponent`. Detail views treat `trimStart().startsWith('<')` as HTML. |
+| `[content]` did not apply | `content` is read in `ngOnInit`. Bind markdown, then create the editor (`*ngIf="editorReady"`). |
 | Run does nothing in markdown mode | Put the snippet in a fenced block (` ```javascript `) or set `mode="code"` with an executable `language`. |
 | Pyodide / SQL.js not loading | Those runtimes lazy-load from the CDN. Check the network tab. Timeouts: JS 10s, Python 30s, SQL 10s. |
 | Theme did not update | Confirm `ThemeService.init()` ran at app bootstrap. The workspace subscribes to `resolvedTheme$`. |

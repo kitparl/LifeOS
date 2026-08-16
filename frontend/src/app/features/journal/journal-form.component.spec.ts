@@ -5,7 +5,6 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
 import { JournalFormComponent } from './journal-form.component';
 import { JournalService } from './services/journal.service';
-import { DataMigrationService } from '../../shared/code-workspace/services/migration';
 import { JournalEntry } from './models/journal.models';
 
 const entry = (content: string): JournalEntry => ({
@@ -36,18 +35,9 @@ const testProviders = [
   {
     provide: JournalService,
     useValue: {
-      get: () => of(entry('<p>Hi</p>')),
+      get: () => of(entry('# Hello')),
       create: () => of(entry('md')),
       update: () => of(entry('md')),
-    },
-  },
-  {
-    provide: DataMigrationService,
-    useValue: {
-      migrateComponent: async () => ({
-        status: 'completed',
-        convertedContent: 'migrated markdown',
-      }),
     },
   },
   {
@@ -124,10 +114,10 @@ describe('JournalFormComponent', () => {
       fixture.detectChanges();
     });
 
-    it('migrates TipTap HTML when loading an edit', () => {
+    it('loads markdown content into the editor', () => {
       expect(component.editorReady).toBeTrue();
-      expect(component.editorContent).toBe('migrated markdown');
-      expect(component.form.controls.content.value).toBe('migrated markdown');
+      expect(component.editorContent).toBe('# Hello');
+      expect(component.form.controls.content.value).toBe('# Hello');
     });
   });
 });

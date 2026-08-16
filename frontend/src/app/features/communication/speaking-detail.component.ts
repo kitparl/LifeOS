@@ -31,11 +31,7 @@ import { CommunicationService } from './services/communication.service';
         @if (s.response) {
           <div class="panel text-sm">
             <p class="font-medium mb-1">Response</p>
-            @if (responseIsHtml(s.response)) {
-              <div class="prose-content ProseMirror" [innerHTML]="safe(s.response)"></div>
-            } @else {
-              <div class="prose-content" [innerHTML]="safeMarkdown(s.response)"></div>
-            }
+            <div class="prose-content" [innerHTML]="safeMarkdown(s.response)"></div>
           </div>
         }
         @if (s.notes) {
@@ -62,14 +58,6 @@ export class SpeakingDetailComponent implements OnInit {
 
   item: SpeakingPractice | null = null;
   loading = false;
-
-  responseIsHtml(content: string): boolean {
-    return content.trimStart().startsWith('<');
-  }
-
-  safe(html: string): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(this.markdown.sanitize(html));
-  }
 
   safeMarkdown(markdown: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(this.markdown.render(markdown));

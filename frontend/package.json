@@ -7,8 +7,7 @@
     "start:prod": "npx ng serve --configuration=production",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
-    "scan:tiptap": "node scripts/scan-tiptap.mjs"
+    "test": "ng test"
   },
   "private": true,
   "dependencies": {
@@ -54,7 +53,6 @@
     "rxjs": "~7.8.0",
     "sql.js": "^1.14.2",
     "tslib": "^2.3.0",
-    "turndown": "^7.2.4",
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
@@ -62,7 +60,6 @@
     "@angular/cli": "^19.2.27",
     "@angular/compiler-cli": "^19.2.0",
     "@types/jasmine": "~5.1.0",
-    "@types/turndown": "^5.0.6",
     "jasmine-core": "~5.6.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",

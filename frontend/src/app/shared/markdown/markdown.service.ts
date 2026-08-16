@@ -25,7 +25,7 @@ export class MarkdownService {
     return this.sanitize(rawHtml);
   }
 
-  /** Sanitize an arbitrary HTML string (also used for legacy TipTap HTML). */
+  /** Sanitize rendered HTML before binding with [innerHTML]. */
   sanitize(html: string): string {
     return DOMPurify.sanitize(html, {
       ADD_ATTR: ['target', 'rel'],

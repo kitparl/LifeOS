@@ -2,10 +2,6 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CodeWorkspaceComponent } from '../../shared/code-workspace';
-import {
-  ContentConverterService,
-  DataMigrationService,
-} from '../../shared/code-workspace/services/migration';
 import { WRITING_CATEGORIES, WritingCategory } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 
@@ -70,8 +66,6 @@ export class WritingFormComponent implements OnInit {
   private readonly communication = inject(CommunicationService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly converter = inject(ContentConverterService);
-  private readonly migration = inject(DataMigrationService);
 
   categories = WRITING_CATEGORIES;
   isEdit = false;
@@ -95,11 +89,10 @@ export class WritingFormComponent implements OnInit {
       this.itemId = id;
       this.communication.getWriting(id).subscribe({
         next: (w) => {
-          void this.loadContent(w.content).then((content) => {
-            this.form.patchValue({ title: w.title, category: w.category, content });
-            this.editorContent = content;
-            this.editorReady = true;
-          });
+          const content = w.content ?? '';
+          this.form.patchValue({ title: w.title, category: w.category, content });
+          this.editorContent = content;
+          this.editorReady = true;
         },
       });
     } else {
@@ -109,18 +102,6 @@ export class WritingFormComponent implements OnInit {
 
   onContentChange(content: string): void {
     this.form.controls.content.setValue(content, { emitEvent: false });
-  }
-
-  private async loadContent(content: string): Promise<string> {
-    if (!content.trimStart().startsWith('<')) {
-      return content;
-    }
-    const record = await this.migration.migrateComponent('WritingFormComponent', content);
-    if (record.status === 'completed' && record.convertedContent) {
-      return record.convertedContent;
-    }
-    const fallback = await this.converter.htmlToMarkdown(content);
-    return fallback.markdown || content;
   }
 
   submit(): void {

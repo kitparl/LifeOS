@@ -2,7 +2,6 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { ContentConverterService } from '../../../shared/code-workspace/services/migration';
 import {
   isExecutableLanguage,
   parseFencedCodeBlocks,
@@ -24,7 +23,6 @@ import {
 @Injectable({ providedIn: 'root' })
 export class KnowledgeNotesService {
   private readonly http = inject(HttpClient);
-  private readonly converter = inject(ContentConverterService);
   private readonly api = `${environment.apiUrl}/knowledge-notes`;
   private readonly codeBlockCache = new Map<string, CodeBlock[]>();
 
@@ -85,10 +83,6 @@ export class KnowledgeNotesService {
     return this.http.get<KnowledgeSearchHit[]>(`${this.api}/search`, { params });
   }
 
-  detectFormat(content: string): 'markdown' | 'html' {
-    return content.trimStart().startsWith('<') ? 'html' : 'markdown';
-  }
-
   parseCodeBlocks(markdown: string): CodeBlock[] {
     const cached = this.codeBlockCache.get(markdown);
     if (cached) {
@@ -111,14 +105,13 @@ export class KnowledgeNotesService {
   }
 
   enrichSection(section: KnowledgeSection): KnowledgeSection {
-    const format = section.format ?? this.detectFormat(section.content || '');
-    const codeBlocks = format === 'html' ? [] : this.parseCodeBlocks(section.content || '');
+    const codeBlocks = this.parseCodeBlocks(section.content || '');
     const wordCount = section.content?.trim()
       ? section.content.trim().split(/\s+/).length
       : 0;
     return {
       ...section,
-      format,
+      format: 'markdown',
       codeBlocks,
       metadata: {
         lastModified: new Date(section.updated_at),
@@ -140,18 +133,5 @@ export class KnowledgeNotesService {
         content: section.content,
       })
     );
-  }
-
-  async migrateToMarkdown(section: KnowledgeSection): Promise<KnowledgeSection> {
-    const format = this.detectFormat(section.content || '');
-    if (format !== 'html') {
-      return this.enrichSection({ ...section, format: 'markdown' });
-    }
-    const converted = await this.converter.htmlToMarkdown(section.content);
-    return this.enrichSection({
-      ...section,
-      content: converted.markdown || section.content,
-      format: 'markdown',
-    });
   }
 }
