@@ -1362,12 +1362,42 @@ summary::-webkit-details-marker {
 }
 
 .markdown-body ul,
-.markdown-body ol {
-  padding-left: 1.5rem;
+.prose-content ul {
+  list-style: disc outside;
+  list-style-type: disc;
+  list-style-position: outside;
+  padding-left: 1.75rem;
   margin: 0.5em 0;
 }
 
-.markdown-body li { margin-bottom: 0.25em; }
+.markdown-body ol,
+.prose-content ol {
+  list-style: decimal outside;
+  list-style-type: decimal;
+  list-style-position: outside;
+  padding-left: 1.75rem;
+  margin: 0.5em 0;
+}
+
+.markdown-body ul ul,
+.prose-content ul ul {
+  list-style-type: circle;
+}
+
+.markdown-body ul ul ul,
+.prose-content ul ul ul {
+  list-style-type: square;
+}
+
+.markdown-body ol ol,
+.prose-content ol ol {
+  list-style-type: decimal;
+}
+
+.markdown-body li,
+.prose-content li {
+  margin-bottom: 0.25em;
+}
 
 .markdown-body li > input[type='checkbox'] {
   margin-right: 0.4em;

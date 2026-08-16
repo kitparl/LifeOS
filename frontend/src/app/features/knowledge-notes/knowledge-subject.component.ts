@@ -191,6 +191,10 @@ export class KnowledgeSubjectComponent implements OnInit {
 
   onEditorContentChange(content: string): void {
     this.form.controls.content.setValue(content, { emitEvent: false });
+    const sec = this.selected();
+    if (sec) {
+      sec.content = content;
+    }
   }
 
   togglePreview(): void {

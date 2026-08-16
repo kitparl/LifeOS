@@ -33,4 +33,12 @@ describe('MarkdownEditorComponent', () => {
     component.applyFormat('bold');
     expect(component.getContent()).toContain('**');
   });
+
+  it('scrolls inside a bounded host instead of growing with the document', () => {
+    const css = (
+      MarkdownEditorComponent as unknown as { ɵcmp: { styles: string[] } }
+    ).ɵcmp?.styles?.join(' ') || '';
+    expect(css).toContain('height: 100%');
+    expect(css).toContain('overflow: hidden');
+  });
 });

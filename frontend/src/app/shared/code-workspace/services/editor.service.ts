@@ -278,6 +278,10 @@ export class EditorService {
         backgroundColor: 'var(--surface)',
         color: 'var(--text)',
         height: '100%',
+        minHeight: '0',
+      },
+      '.cm-scroller': {
+        overflow: 'auto',
       },
       '.cm-content': {
         caretColor: 'var(--text)',

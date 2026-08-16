@@ -16,7 +16,14 @@
     [readOnly]="readOnly"
     [mode]="mode"
     [theme]="resolvedTheme"
+    [showViewModes]="shouldShowViewModes()"
+    [viewMode]="viewMode"
+    [splitOrientation]="splitOrientation"
+    [fullscreen]="fullscreen"
     (formatAction)="onFormatAction($event)"
+    (viewModeChange)="onViewModeChange($event)"
+    (splitOrientationChange)="onSplitOrientationChange($event)"
+    (fullscreenToggle)="toggleFullscreen()"
   ></app-editor-toolbar>
 
   <!-- Language Selector & Run Button (Top Bar) -->
@@ -83,7 +90,16 @@
   ></app-workspace-tabs>
 
   <!-- Main Content Area -->
-  <div class="workspace-content" [class.split-view]="shouldShowSplitView()">
+  <div
+    #workspaceContent
+    class="workspace-content"
+    [class.split-view]="shouldShowSplitView()"
+    [class.split-vertical]="shouldShowSplitView() && splitOrientation === 'vertical'"
+    [class.split-horizontal]="shouldShowSplitView() && splitOrientation === 'horizontal'"
+    [class.is-resizing]="resizing"
+    [style.grid-template-columns]="splitColumns"
+    [style.grid-template-rows]="splitRows"
+  >
     <!-- Editor Panel -->
     <div class="editor-panel" *ngIf="shouldShowEditor()">
       <app-markdown-editor
@@ -96,7 +112,24 @@
     </div>
 
     <!-- Resizable Divider (Desktop only) -->
-    <div class="resize-divider" *ngIf="shouldShowSplitView()"></div>
+    <div
+      class="resize-divider"
+      *ngIf="shouldShowSplitView()"
+      role="separator"
+      tabindex="0"
+      [attr.aria-orientation]="splitOrientation === 'horizontal' ? 'vertical' : 'horizontal'"
+      [attr.aria-valuenow]="splitPercent"
+      aria-valuemin="20"
+      aria-valuemax="80"
+      aria-label="Resize editor and preview"
+      title="Drag to resize. Double-click to reset to 50/50."
+      (pointerdown)="onResizePointerDown($event)"
+      (pointermove)="onResizePointerMove($event)"
+      (pointerup)="onResizePointerUp($event)"
+      (pointercancel)="onResizePointerUp($event)"
+      (dblclick)="resetSplitRatio()"
+      (keydown)="onResizeKeydown($event)"
+    ></div>
 
     <!-- Preview Panel -->
     <div class="preview-panel" *ngIf="shouldShowPreview()">
@@ -113,6 +146,7 @@
         [theme]="resolvedTheme"
         [expanded]="true"
         [maxHeight]="400"
+        (cleared)="onOutputCleared()"
       ></app-code-output>
     </div>
   </div>

@@ -3,13 +3,10 @@ import {
   Input,
   OnChanges,
   SimpleChanges,
-  SecurityContext
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { MarkdownService } from '../../services/markdown.service';
-import { Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 @Component({
   selector: 'app-markdown-preview',
@@ -17,7 +14,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
   imports: [CommonModule],
   template: `
     <div
-      class="markdown-preview-container"
+      class="markdown-preview-container markdown-body"
       role="article"
       aria-label="Markdown preview"
       [class.theme-light]="theme === 'light'"
@@ -67,6 +64,24 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
     .markdown-preview-container :deep(ol) {
       margin: 1em 0;
       padding-left: 2em;
+    }
+
+    .markdown-preview-container :deep(ul) {
+      list-style-type: disc;
+      list-style-position: outside;
+    }
+
+    .markdown-preview-container :deep(ol) {
+      list-style-type: decimal;
+      list-style-position: outside;
+    }
+
+    .markdown-preview-container :deep(ul ul) {
+      list-style-type: circle;
+    }
+
+    .markdown-preview-container :deep(ul ul ul) {
+      list-style-type: square;
     }
 
     .markdown-preview-container :deep(li) {
@@ -150,36 +165,18 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 export class MarkdownPreviewComponent implements OnChanges {
   @Input() content = '';
   @Input() theme: 'light' | 'dark' | 'system' = 'light';
-  @Input() debounceTime = 300; // milliseconds
 
   renderedContent: SafeHtml = '';
-  private contentSubject = new Subject<string>();
 
   constructor(
     private markdownService: MarkdownService,
     private domSanitizer: DomSanitizer
-  ) {
-    this.setupDebounce();
-  }
+  ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['content']) {
-      this.contentSubject.next(this.content);
-    }
-    if (changes['theme'] && !changes['theme'].firstChange) {
+    if (changes['content'] || (changes['theme'] && !changes['theme'].firstChange)) {
       this.renderContent(this.content);
     }
-  }
-
-  private setupDebounce(): void {
-    this.contentSubject
-      .pipe(
-        debounceTime(this.debounceTime),
-        distinctUntilChanged()
-      )
-      .subscribe(content => {
-        this.renderContent(content);
-      });
   }
 
   private renderContent(markdown: string): void {

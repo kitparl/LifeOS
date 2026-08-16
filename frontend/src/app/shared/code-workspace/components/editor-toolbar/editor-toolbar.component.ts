@@ -9,6 +9,9 @@ export type FormatAction =
   | 'link' | 'image' | 'table'
   | 'undo' | 'redo' | 'find' | 'replace';
 
+export type WorkspaceViewMode = 'write' | 'split' | 'preview';
+export type SplitOrientation = 'vertical' | 'horizontal';
+
 export interface EditorStats {
   wordCount: number;
   charCount: number;
@@ -68,9 +71,45 @@ export class EditorToolbarComponent {
   @Input() mode: 'markdown' | 'code' | 'markdown-code' = 'markdown';
 
   /**
+   * Show Write / Split / Preview controls (wide layout + preview enabled).
+   */
+  @Input() showViewModes: boolean = false;
+
+  /**
+   * Current write / split / preview mode.
+   */
+  @Input() viewMode: WorkspaceViewMode = 'write';
+
+  /**
+   * Stacked (vertical) or side-by-side (horizontal) live preview.
+   * Used only while Preview is on.
+   */
+  @Input() splitOrientation: SplitOrientation = 'horizontal';
+
+  /**
+   * Whether the workspace is covering the viewport.
+   */
+  @Input() fullscreen: boolean = false;
+
+  /**
    * Emits when a formatting action is requested
    */
   @Output() formatAction = new EventEmitter<FormatAction>();
+
+  /**
+   * Emits when the user picks Write, Split, or Preview.
+   */
+  @Output() viewModeChange = new EventEmitter<WorkspaceViewMode>();
+
+  /**
+   * Emits when the user picks stacked or side-by-side preview.
+   */
+  @Output() splitOrientationChange = new EventEmitter<SplitOrientation>();
+
+  /**
+   * Emits when the user toggles fullscreen.
+   */
+  @Output() fullscreenToggle = new EventEmitter<void>();
 
   /**
    * Handle format button click
@@ -78,6 +117,15 @@ export class EditorToolbarComponent {
   onFormat(action: FormatAction): void {
     if (this.readOnly) return;
     this.formatAction.emit(action);
+  }
+
+  togglePreviewBeside(): void {
+    this.viewModeChange.emit(this.viewMode === 'split' ? 'write' : 'split');
+  }
+
+  setSplitOrientation(orientation: SplitOrientation): void {
+    if (this.splitOrientation === orientation) return;
+    this.splitOrientationChange.emit(orientation);
   }
 
   /**

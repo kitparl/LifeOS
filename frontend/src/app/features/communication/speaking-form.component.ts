@@ -41,7 +41,7 @@ import { CommunicationService } from './services/communication.service';
           <div>
             <label class="form-label" style="margin-bottom: 0.35rem; display: block">Your Response</label>
             @if (editorReady) {
-              <div style="min-height: 240px; height: 280px">
+              <div style="min-height: 240px; height: 280px; overflow: hidden">
                 <app-code-workspace
                   [content]="editorContent"
                   mode="markdown"
@@ -51,6 +51,7 @@ import { CommunicationService } from './services/communication.service';
                   [showRunButton]="false"
                   [showLanguageSelector]="false"
                   [showOutput]="false"
+                  defaultViewMode="write"
                   (contentChange)="onResponseChange($event)"
                 />
               </div>

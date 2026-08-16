@@ -1,4 +1,5 @@
 <div class="editor-toolbar" [class.theme-dark]="theme === 'dark'" [class.theme-light]="theme === 'light'" *ngIf="visible" role="toolbar" aria-label="Editor formatting toolbar">
+  <div class="toolbar-actions">
   <!-- Text Formatting Group -->
   <div class="toolbar-group">
     <button
@@ -309,9 +310,70 @@
       </svg>
     </button>
   </div>
+  </div>
 
-  <!-- Stats Display -->
-  <div class="toolbar-stats" *ngIf="showStats">
-    <span class="stats-text">{{ formatStats() }}</span>
+  <div class="toolbar-end">
+    <button
+      *ngIf="showViewModes"
+      type="button"
+      class="toolbar-button view-mode-button"
+      [class.active]="viewMode === 'split'"
+      [attr.aria-pressed]="viewMode === 'split'"
+      aria-label="Preview"
+      title="Show live preview"
+      (click)="togglePreviewBeside()"
+    >
+      Preview
+    </button>
+
+    <ng-container *ngIf="showViewModes && viewMode === 'split'">
+      <button
+        type="button"
+        class="toolbar-button view-mode-button"
+        [class.active]="splitOrientation === 'vertical'"
+        [attr.aria-pressed]="splitOrientation === 'vertical'"
+        aria-label="Vertical preview"
+        title="Stack preview below the editor"
+        (click)="setSplitOrientation('vertical')"
+      >
+        Vertical
+      </button>
+      <button
+        type="button"
+        class="toolbar-button view-mode-button"
+        [class.active]="splitOrientation === 'horizontal'"
+        [attr.aria-pressed]="splitOrientation === 'horizontal'"
+        aria-label="Horizontal preview"
+        title="Show preview beside the editor"
+        (click)="setSplitOrientation('horizontal')"
+      >
+        Horizontal
+      </button>
+    </ng-container>
+
+    <button
+      type="button"
+      class="toolbar-button"
+      [title]="fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'"
+      [attr.aria-label]="fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'"
+      (click)="fullscreenToggle.emit()"
+    >
+      <svg *ngIf="!fullscreen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 3 21 3 21 9"></polyline>
+        <polyline points="9 21 3 21 3 15"></polyline>
+        <line x1="21" y1="3" x2="14" y2="10"></line>
+        <line x1="3" y1="21" x2="10" y2="14"></line>
+      </svg>
+      <svg *ngIf="fullscreen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 14 10 14 10 20"></polyline>
+        <polyline points="20 10 14 10 14 4"></polyline>
+        <line x1="14" y1="10" x2="21" y2="3"></line>
+        <line x1="3" y1="21" x2="10" y2="14"></line>
+      </svg>
+    </button>
+
+    <div class="toolbar-stats" *ngIf="showStats">
+      <span class="stats-text">{{ formatStats() }}</span>
+    </div>
   </div>
 </div>

@@ -1,4 +1,4 @@
-import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CodeExecutionResult } from '../../models/code-execution.model';
 
@@ -40,6 +40,11 @@ export class CodeOutputComponent {
   @Input() maxHeight: number = 400;
 
   /**
+   * Emits when the user clears the output panel.
+   */
+  @Output() cleared = new EventEmitter<void>();
+
+  /**
    * Toggle expanded/collapsed state
    */
   toggleExpanded(): void {
@@ -47,64 +52,39 @@ export class CodeOutputComponent {
   }
 
   /**
-   * Copy output to clipboard
+   * Copy the visible output body (stdout / stderr / error text only).
    */
   async copyOutput(): Promise<void> {
     if (!this.result) return;
 
-    const output = this.getFullOutput();
-    
+    const output = this.getVisibleOutput();
+
     try {
       await navigator.clipboard.writeText(output);
-      // TODO: Show toast notification "Copied to clipboard"
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
-      // Fallback for older browsers
       this.fallbackCopy(output);
     }
   }
 
   /**
-   * Clear output (emit event to parent)
+   * Ask the parent to drop the bound result so the panel can disappear.
    */
   clearOutput(): void {
-    // This would typically emit an event to parent
-    // For now, we'll just set result to null (parent should handle this)
-    console.log('Clear output requested');
+    this.cleared.emit();
   }
 
   /**
-   * Get full output text (stdout + stderr)
+   * Text currently shown in the output body — no banners, labels, or metadata.
    */
-  private getFullOutput(): string {
+  getVisibleOutput(): string {
     if (!this.result) return '';
 
-    let output = '';
-
-    if (this.result.stdout) {
-      output += '=== Output ===\n';
-      output += this.result.stdout + '\n\n';
-    }
-
-    if (this.result.stderr) {
-      output += '=== Errors ===\n';
-      output += this.result.stderr + '\n\n';
-    }
-
-    if (this.result.error) {
-      output += '=== Error ===\n';
-      output += this.result.error + '\n\n';
-    }
-
-    if (this.result.executionTimeMs !== undefined) {
-      output += `\nExecution time: ${this.result.executionTimeMs}ms\n`;
-    }
-
-    if (this.result.exitCode !== undefined) {
-      output += `Exit code: ${this.result.exitCode}\n`;
-    }
-
-    return output;
+    const parts: string[] = [];
+    if (this.result.stdout) parts.push(this.result.stdout);
+    if (this.result.stderr) parts.push(this.result.stderr);
+    if (this.result.error) parts.push(this.result.error);
+    return parts.join('\n');
   }
 
   /**

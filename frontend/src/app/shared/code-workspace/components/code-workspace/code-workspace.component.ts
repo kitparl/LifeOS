@@ -7,6 +7,7 @@ import {
   OnDestroy,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  HostListener,
   ViewChild,
   ElementRef,
 } from '@angular/core';
@@ -14,7 +15,7 @@ import { CommonModule } from '@angular/common';
 import { Subject, debounceTime, takeUntil } from 'rxjs';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 
-import { EditorToolbarComponent, FormatAction, EditorStats } from '../editor-toolbar/editor-toolbar.component';
+import { EditorToolbarComponent, FormatAction, EditorStats, WorkspaceViewMode, SplitOrientation } from '../editor-toolbar/editor-toolbar.component';
 import { WorkspaceTabsComponent, WorkspaceTab } from '../workspace-tabs/workspace-tabs.component';
 import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.component';
 import { MarkdownPreviewComponent } from '../markdown-preview/markdown-preview.component';
@@ -67,6 +68,7 @@ import {
   host: {
     role: 'region',
     'aria-label': 'Code workspace',
+    '[class.fullscreen]': 'fullscreen',
   },
 })
 export class CodeWorkspaceComponent implements OnInit, OnDestroy {
@@ -86,6 +88,7 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
   @Input() enableFileExport: boolean = false;
   @Input() readOnly: boolean = false;
   @Input() theme: 'light' | 'dark' | 'system' = 'system';
+  @Input() defaultViewMode: WorkspaceViewMode = 'write';
 
   // ========== OUTPUTS ==========
   
@@ -98,6 +101,12 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
   currentContent: string = '';
   currentLanguage: string = 'markdown';
   currentView: WorkspaceTab = 'edit';
+  viewMode: WorkspaceViewMode = 'write';
+  splitOrientation: SplitOrientation = 'horizontal';
+  /** Editor share of the split (0.2–0.8). Default is 50/50. */
+  splitRatio = 0.5;
+  resizing = false;
+  fullscreen = false;
   editorStats: EditorStats = {
     wordCount: 0,
     charCount: 0,
@@ -118,7 +127,11 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
   private contentChange$ = new Subject<string>();
 
   @ViewChild('editorContainer') editorContainer?: ElementRef;
+  @ViewChild('workspaceContent') workspaceContent?: ElementRef<HTMLElement>;
   @ViewChild(MarkdownEditorComponent) markdownEditor?: MarkdownEditorComponent;
+
+  private readonly splitMin = 0.2;
+  private readonly splitMax = 0.8;
 
   constructor(
     private breakpointObserver: BreakpointObserver,
@@ -131,22 +144,13 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.currentContent = this.content;
     this.currentLanguage = this.language;
+    this.viewMode = this.defaultViewMode;
     this.updateStats(this.currentContent);
 
     // Setup responsive breakpoints
     this.setupBreakpoints();
 
-    // Setup content change debouncing
-    this.contentChange$
-      .pipe(
-        debounceTime(300),
-        takeUntil(this.destroy$)
-      )
-      .subscribe((content) => {
-        this.updateStats(content);
-        this.contentChange.emit(content);
-      });
-
+    // Autosave after idle (stats and contentChange are updated immediately)
     this.contentChange$
       .pipe(
         debounceTime(1500),
@@ -192,11 +196,11 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
       .subscribe((result) => {
         const breakpoints = result.breakpoints;
         
-        this.isMobile = breakpoints[Breakpoints.HandsetPortrait] || 
-                        breakpoints[Breakpoints.HandsetLandscape];
+        this.isMobile = breakpoints[Breakpoints.HandsetPortrait];
         
         this.isTablet = breakpoints[Breakpoints.TabletPortrait] || 
-                        breakpoints[Breakpoints.TabletLandscape];
+                        breakpoints[Breakpoints.TabletLandscape] ||
+                        breakpoints[Breakpoints.HandsetLandscape];
         
         this.isDesktop = breakpoints[Breakpoints.Web];
 
@@ -213,6 +217,8 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
   
   onContentChange(content: string): void {
     this.currentContent = content;
+    this.updateStats(content);
+    this.contentChange.emit(content);
     this.contentChange$.next(content);
   }
 
@@ -233,6 +239,110 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
   
   onFormatAction(action: FormatAction): void {
     this.markdownEditor?.applyFormat(action);
+  }
+
+  onViewModeChange(mode: WorkspaceViewMode): void {
+    this.viewMode = mode;
+    this.cdr.markForCheck();
+  }
+
+  onSplitOrientationChange(orientation: SplitOrientation): void {
+    this.splitOrientation = orientation;
+    this.cdr.markForCheck();
+  }
+
+  get splitColumns(): string | null {
+    if (!this.shouldShowSplitView() || this.splitOrientation !== 'horizontal') return null;
+    return `minmax(0, ${this.splitRatio}fr) auto minmax(0, ${1 - this.splitRatio}fr)`;
+  }
+
+  get splitRows(): string | null {
+    if (!this.shouldShowSplitView() || this.splitOrientation !== 'vertical') return null;
+    return `minmax(0, ${this.splitRatio}fr) auto minmax(0, ${1 - this.splitRatio}fr) auto`;
+  }
+
+  get splitPercent(): number {
+    return Math.round(this.splitRatio * 100);
+  }
+
+  resetSplitRatio(): void {
+    this.resizing = false;
+    this.splitRatio = 0.5;
+    this.cdr.markForCheck();
+  }
+
+  updateSplitFromPointer(clientPos: number, start: number, end: number): void {
+    const total = end - start;
+    if (total <= 0) return;
+    this.splitRatio = Math.min(this.splitMax, Math.max(this.splitMin, (clientPos - start) / total));
+    this.cdr.markForCheck();
+  }
+
+  onResizePointerDown(event: PointerEvent): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    event.preventDefault();
+    this.resizing = true;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    this.cdr.markForCheck();
+  }
+
+  onResizePointerMove(event: PointerEvent): void {
+    if (!this.resizing) return;
+    const root = this.workspaceContent?.nativeElement;
+    const editor = root?.querySelector('.editor-panel') as HTMLElement | null;
+    const preview = root?.querySelector('.preview-panel') as HTMLElement | null;
+    if (!editor || !preview) return;
+    const editorRect = editor.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    if (this.splitOrientation === 'horizontal') {
+      this.updateSplitFromPointer(event.clientX, editorRect.left, previewRect.right);
+    } else {
+      this.updateSplitFromPointer(event.clientY, editorRect.top, previewRect.bottom);
+    }
+  }
+
+  onResizePointerUp(event: PointerEvent): void {
+    if (!this.resizing) return;
+    this.resizing = false;
+    const target = event.currentTarget as HTMLElement;
+    if (target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
+    this.cdr.markForCheck();
+  }
+
+  onResizeKeydown(event: KeyboardEvent): void {
+    const step = 0.05;
+    if (event.key === 'Home') {
+      event.preventDefault();
+      this.resetSplitRatio();
+      return;
+    }
+    const shrink = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
+    const grow = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+    if (!shrink && !grow) return;
+    event.preventDefault();
+    this.splitRatio = Math.min(
+      this.splitMax,
+      Math.max(this.splitMin, this.splitRatio + (grow ? step : -step))
+    );
+    this.cdr.markForCheck();
+  }
+
+  toggleFullscreen(): void {
+    this.fullscreen = !this.fullscreen;
+    this.cdr.markForCheck();
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscape(event?: KeyboardEvent): void {
+    if (!this.fullscreen) return;
+    if (event?.defaultPrevented) return;
+    const target = event?.target as HTMLElement | null;
+    if (target?.closest('dialog, [role="dialog"], .modal, app-modal')) return;
+    if (document.querySelector('.modal-backdrop, [role="dialog"]')) return;
+    this.fullscreen = false;
+    this.cdr.markForCheck();
   }
 
   // ========== LANGUAGE SELECTION ==========
@@ -329,6 +439,11 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
     }
   }
 
+  onOutputCleared(): void {
+    this.executionResult = null;
+    this.cdr.markForCheck();
+  }
+
   canExecute(): boolean {
     return this.resolveRunnableSnippet() !== null;
   }
@@ -366,18 +481,24 @@ export class CodeWorkspaceComponent implements OnInit, OnDestroy {
     return this.isMobile;
   }
 
+  shouldShowViewModes(): boolean {
+    return this.showPreview && !this.isMobile;
+  }
+
   shouldShowSplitView(): boolean {
-    return this.isDesktop && this.showPreview;
+    return !this.isMobile && this.showPreview && this.viewMode === 'split';
   }
 
   shouldShowEditor(): boolean {
-    return !this.isMobile || this.currentView === 'edit';
+    if (this.isMobile) return this.currentView === 'edit';
+    if (!this.showPreview) return true;
+    return this.viewMode !== 'preview';
   }
 
   shouldShowPreview(): boolean {
     if (!this.showPreview) return false;
     if (this.isMobile) return this.currentView === 'preview';
-    return this.isDesktop;
+    return this.viewMode !== 'write';
   }
 
   shouldShowOutput(): boolean {

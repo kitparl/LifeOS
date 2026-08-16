@@ -78,4 +78,14 @@ describe('KnowledgeNotesEditorComponent', () => {
     tick();
     expect(component.lastResult?.stdout).toBe('1');
   }));
+
+  it('hides the output panel when cleared', () => {
+    component.lastResult = { success: true, stdout: '1', stderr: '', exitCode: 0 };
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-code-output')).toBeTruthy();
+    component.clearOutput();
+    fixture.detectChanges();
+    expect(component.lastResult).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-code-output')).toBeFalsy();
+  });
 });

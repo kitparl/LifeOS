@@ -54,7 +54,7 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
       }
 
       @if (editorReady) {
-        <div style="min-height: 320px; height: 52vh">
+        <div style="min-height: 320px; height: 52vh; overflow: hidden">
           <app-code-workspace
             [content]="editorContent"
             mode="markdown-code"
@@ -64,6 +64,7 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
             [showRunButton]="false"
             [showLanguageSelector]="false"
             [showOutput]="false"
+            defaultViewMode="write"
             [enableAutosave]="true"
             (contentChange)="onContentChange($event)"
             (save)="onSave($event)"
@@ -72,7 +73,12 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
       }
 
       @if (lastResult) {
-        <app-code-output [result]="lastResult" [expanded]="true" [maxHeight]="240" />
+        <app-code-output
+          [result]="lastResult"
+          [expanded]="true"
+          [maxHeight]="240"
+          (cleared)="clearOutput()"
+        />
       }
     </div>
   `,
@@ -136,6 +142,10 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
           }));
         },
       });
+  }
+
+  clearOutput(): void {
+    this.lastResult = null;
   }
 
   onRunCode(block: CodeBlock): void {

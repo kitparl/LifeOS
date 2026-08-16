@@ -24,7 +24,8 @@ import { FormatAction } from '../editor-toolbar/editor-toolbar.component';
     .editor-container {
       height: 100%;
       width: 100%;
-      overflow: auto;
+      overflow: hidden;
+      min-height: 0;
       touch-action: pan-x pan-y;
     }
     
@@ -37,6 +38,16 @@ import { FormatAction } from '../editor-toolbar/editor-toolbar.component';
       display: block;
       height: 100%;
       width: 100%;
+      min-height: 0;
+    }
+
+    .editor-container :deep(.cm-editor) {
+      height: 100%;
+      min-height: 0;
+    }
+
+    .editor-container :deep(.cm-scroller) {
+      overflow: auto;
     }
   `]
 })

@@ -42,19 +42,19 @@ describe('CodeWorkspaceComponent', () => {
     expect(component.showPreview).toBeFalse();
   });
 
-  it('emits contentChange after debounce', fakeAsync(() => {
+  it('updates stats immediately and emits contentChange', () => {
     const local = TestBed.createComponent(CodeWorkspaceComponent);
     const cmp = local.componentInstance;
     local.detectChanges();
     const values: string[] = [];
     cmp.contentChange.subscribe((v) => values.push(v));
-    cmp.onContentChange('next');
-    tick(299);
-    expect(values.length).toBe(0);
-    tick(1);
-    expect(values).toEqual(['next']);
+    cmp.onContentChange('hello world');
+    expect(values).toEqual(['hello world']);
+    expect(cmp.editorStats.wordCount).toBe(2);
+    expect(cmp.editorStats.charCount).toBe(11);
+    expect(cmp.editorStats.lineCount).toBe(1);
     local.destroy();
-  }));
+  });
 
   it('emits save documents', () => {
     const saved: string[] = [];
@@ -81,4 +81,123 @@ describe('CodeWorkspaceComponent', () => {
     expect(runs).toContain('javascript');
     expect(component.executionResult?.stdout).toBe('1');
   }));
+
+  it('defaults to write on wide layout; split only after Preview', () => {
+    component.isMobile = false;
+    component.isTablet = false;
+    component.isDesktop = true;
+    fixture.componentRef.setInput('showPreview', true);
+    expect(component.viewMode).toBe('write');
+    expect(component.splitOrientation).toBe('horizontal');
+    expect(component.shouldShowSplitView()).toBeFalse();
+    expect(component.shouldShowEditor()).toBeTrue();
+    expect(component.shouldShowPreview()).toBeFalse();
+    expect(component.shouldShowViewModes()).toBeTrue();
+
+    component.onViewModeChange('split');
+    expect(component.shouldShowSplitView()).toBeTrue();
+    expect(component.splitOrientation).toBe('horizontal');
+    expect(component.shouldShowEditor()).toBeTrue();
+    expect(component.shouldShowPreview()).toBeTrue();
+
+    component.onSplitOrientationChange('vertical');
+    expect(component.splitOrientation).toBe('vertical');
+    expect(component.shouldShowSplitView()).toBeTrue();
+    expect(component.splitRatio).toBe(0.5);
+
+    component.onViewModeChange('write');
+    expect(component.shouldShowSplitView()).toBeFalse();
+    expect(component.shouldShowPreview()).toBeFalse();
+  });
+
+  it('treats tablet like desktop so preview is reachable', () => {
+    component.isMobile = false;
+    component.isTablet = true;
+    component.isDesktop = false;
+    fixture.componentRef.setInput('showPreview', true);
+    expect(component.shouldShowTabs()).toBeFalse();
+    expect(component.shouldShowViewModes()).toBeTrue();
+    expect(component.shouldShowSplitView()).toBeFalse();
+    component.onViewModeChange('split');
+    expect(component.shouldShowSplitView()).toBeTrue();
+    expect(component.shouldShowPreview()).toBeTrue();
+  });
+
+  it('keeps mobile tabs and does not force split', () => {
+    component.isMobile = true;
+    component.currentView = 'edit';
+    fixture.componentRef.setInput('showPreview', true);
+    expect(component.shouldShowTabs()).toBeTrue();
+    expect(component.shouldShowSplitView()).toBeFalse();
+    expect(component.shouldShowViewModes()).toBeFalse();
+    expect(component.shouldShowEditor()).toBeTrue();
+    expect(component.shouldShowPreview()).toBeFalse();
+    component.currentView = 'preview';
+    expect(component.shouldShowPreview()).toBeTrue();
+    expect(component.shouldShowEditor()).toBeFalse();
+  });
+
+  it('defaults the editor/preview split to 50/50 and lets it be resized', () => {
+    expect(component.splitRatio).toBe(0.5);
+    expect(component.splitPercent).toBe(50);
+
+    component.updateSplitFromPointer(300, 0, 400);
+    expect(component.splitRatio).toBe(0.75);
+
+    component.updateSplitFromPointer(10, 0, 400);
+    expect(component.splitRatio).toBe(0.2);
+
+    component.updateSplitFromPointer(390, 0, 400);
+    expect(component.splitRatio).toBe(0.8);
+
+    component.resetSplitRatio();
+    expect(component.splitRatio).toBe(0.5);
+
+    component.splitRatio = 0.5;
+    component.onResizeKeydown(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(component.splitRatio).toBeCloseTo(0.55);
+    component.onResizeKeydown(new KeyboardEvent('keydown', { key: 'Home' }));
+    expect(component.splitRatio).toBe(0.5);
+  });
+
+  it('clears execution output when the panel emits cleared', () => {
+    component.executionResult = { success: true, stdout: '1', stderr: '', exitCode: 0 };
+    component.onOutputCleared();
+    expect(component.executionResult).toBeNull();
+  });
+
+  it('fills the parent height', () => {
+    const css = (
+      CodeWorkspaceComponent as unknown as { ɵcmp: { styles: string[] } }
+    ).ɵcmp?.styles?.join(' ') || '';
+    expect(css).toContain('height: 100%');
+    expect(css).toContain('min-height: 0');
+  });
+
+  it('covers the viewport in fullscreen and exits on Escape', () => {
+    const css = (
+      CodeWorkspaceComponent as unknown as { ɵcmp: { styles: string[] } }
+    ).ɵcmp?.styles?.join(' ') || '';
+    expect(css).toContain('position: fixed');
+    expect(css).toContain('inset: 0');
+
+    expect(component.fullscreen).toBeFalse();
+    component.toggleFullscreen();
+    expect(component.fullscreen).toBeTrue();
+    expect(component.viewMode).toBe('write');
+    component.onViewModeChange('split');
+    component.onEscape(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(component.fullscreen).toBeFalse();
+    expect(component.viewMode).toBe('split');
+  });
+
+  it('does not steal Escape from an open dialog', () => {
+    component.toggleFullscreen();
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    document.body.appendChild(dialog);
+    component.onEscape(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(component.fullscreen).toBeTrue();
+    dialog.remove();
+  });
 });
