@@ -53,6 +53,7 @@ async def lifespan(app: FastAPI):
     import app.modules.files.models  # noqa: F401 — FileRecord
     import app.modules.integrations.outbox_models  # noqa: F401
     import app.modules.integrations.report_models  # noqa: F401
+    import app.modules.integrations.github_sync_models  # noqa: F401
     import app.modules.routines.models  # noqa: F401
     import app.modules.preferences.models  # noqa: F401
     import app.modules.tasks.models  # noqa: F401 — Task + assignment/history/collab tables

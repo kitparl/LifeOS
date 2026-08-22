@@ -23,7 +23,9 @@ import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { FileImageSrcDirective } from '../../shared/markdown/file-image-src.directive';
 import { AttachmentListComponent } from '../files/components/attachment-list.component';
 import { FileRecord } from '../files/models/file.models';
+import { IntegrationsService } from '../integrations/services/integrations.service';
 import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
+import { GitHubSyncButtonComponent } from './github-sync-button.component';
 import { ModalComponent } from '../../shared/modal/modal.component';
 import {
   KnowledgeChapter,
@@ -57,6 +59,7 @@ const SIDEBAR_MAX = 480;
     AttachmentListComponent,
     MarkdownImportButtonComponent,
     MarkdownExportButtonComponent,
+    GitHubSyncButtonComponent,
     ModalComponent,
     CdkDropList,
     CdkDrag,
@@ -371,6 +374,17 @@ const SIDEBAR_MAX = 480;
                       [filename]="form.controls.title.value || 'section'"
                       (exportError)="onMarkdownImportError($event)"
                     />
+                    <app-github-sync-button
+                      [sectionId]="sec.id"
+                      [configured]="githubConfigured()"
+                      [disabled]="syncState() === 'saving'"
+                      [beforeSync]="saveBeforeGitHubSync.bind(this)"
+                      (syncSuccess)="onGitHubSyncSuccess($event)"
+                      (syncError)="onMarkdownImportError($event)"
+                    />
+                    @if (githubMessage()) {
+                      <span class="text-xs" style="color: var(--success)">{{ githubMessage() }}</span>
+                    }
                     @if (previewOnly()) {
                       <button type="button" class="btn-primary text-xs" (click)="enterEditMode()">Edit</button>
                     } @else {
@@ -486,6 +500,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly confirm = inject(ConfirmService);
+  private readonly integrations = inject(IntegrationsService);
 
   @ViewChild('layout') layoutRef?: ElementRef<HTMLElement>;
   @ViewChild('renameInput') renameInput?: ElementRef<HTMLInputElement>;
@@ -498,6 +513,8 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   readonly previewOnly = signal(false);
   readonly syncState = signal<SyncState>('synced');
   readonly importError = signal('');
+  readonly githubConfigured = signal(false);
+  readonly githubMessage = signal<string | null>(null);
   readonly renaming = signal<RenameTarget | null>(null);
   readonly openMenu = signal<string | null>(null);
   readonly detailsOpen = signal(false);
@@ -563,6 +580,12 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.pendingSectionId = this.route.snapshot.queryParamMap.get('section');
     const id = this.route.snapshot.paramMap.get('id');
     if (id) this.load(id);
+
+    this.integrations.getGitHub().subscribe({
+      next: (status) =>
+        this.githubConfigured.set(!!(status.configured && status.enabled)),
+      error: () => this.githubConfigured.set(false),
+    });
 
     this.dirty$
       .pipe(debounceTime(1500), takeUntilDestroyed(this.destroyRef))
@@ -702,6 +725,37 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 
   onMarkdownImportError(message: string): void {
     this.importError.set(message);
+  }
+
+  onGitHubSyncSuccess(message: string): void {
+    this.importError.set('');
+    this.githubMessage.set(message);
+  }
+
+  saveBeforeGitHubSync(): Promise<void> {
+    const sec = this.selected();
+    if (!sec || this.form.invalid) {
+      return Promise.reject(new Error('Fix validation errors before syncing'));
+    }
+    if (this.syncState() === 'saving') {
+      return Promise.reject(new Error('Wait for save to finish'));
+    }
+    const raw = this.form.getRawValue();
+    if (raw.title === this.lastSavedTitle && raw.content === this.lastSavedContent) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      this.service.updateSection(sec.id, { title: raw.title, content: raw.content }).subscribe({
+        next: (updated) => {
+          this.lastSavedTitle = raw.title;
+          this.lastSavedContent = raw.content;
+          this.patchSection({ ...updated, title: raw.title, content: raw.content });
+          this.syncState.set('synced');
+          resolve();
+        },
+        error: () => reject(new Error('Save failed — sync aborted')),
+      });
+    });
   }
 
   exportSectionMarkdown(): void {

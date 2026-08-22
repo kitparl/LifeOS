@@ -87,6 +87,10 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("learning_items", "track_id", "VARCHAR(36)"),
     ("learning_items", "slug", "VARCHAR(64)"),
     ("learning_items", "sort_order", "INTEGER DEFAULT 0"),
+    # GitHub notes sync v2 status fields
+    ("github_sync_state", "remote_commit_sha", "VARCHAR(64)"),
+    ("github_sync_state", "sync_status", "VARCHAR(16) DEFAULT 'never_synced'"),
+    ("github_sync_state", "last_error", "TEXT"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [

@@ -169,3 +169,44 @@ class DigestResponse(BaseModel):
     sent: bool
     detail: str
     sections: dict[str, int] = Field(default_factory=dict)
+
+
+class GitHubConfigUpdate(BaseModel):
+    token: str | None = Field(default=None, max_length=200)
+    repo: str | None = Field(default=None, max_length=200)
+    branch: str | None = Field(default=None, max_length=64)
+    base_path: str | None = Field(default=None, max_length=200)
+    enabled: bool | None = None
+    notify_github_sync_in_app: bool | None = None
+    notify_github_sync_telegram: bool | None = None
+
+
+class GitHubConfigStatus(BaseModel):
+    connection_id: str
+    provider: str = "github"
+    enabled: bool
+    status: str
+    configured: bool
+    token_masked: str | None = None
+    repo: str | None = None
+    branch: str = "main"
+    base_path: str = "notes"
+    notify_github_sync_in_app: bool = False
+    notify_github_sync_telegram: bool = False
+    last_sync_at: datetime | None = None
+
+
+class GitHubTestResponse(BaseModel):
+    ok: bool
+    detail: str
+    repo_full_name: str | None = None
+    branch: str | None = None
+    can_push: bool | None = None
+
+
+class GitHubSyncResponse(BaseModel):
+    status: str
+    message: str
+    md_path: str | None = None
+    synced_at: datetime | None = None
+    remote_commit_sha: str | None = None

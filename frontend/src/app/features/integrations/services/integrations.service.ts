@@ -135,6 +135,47 @@ export interface TelegramWebhookRegisterResponse {
   webhook_url: string | null;
 }
 
+export interface GitHubConfigStatus {
+  connection_id: string;
+  provider: string;
+  enabled: boolean;
+  status: string;
+  configured: boolean;
+  token_masked: string | null;
+  repo: string | null;
+  branch: string;
+  base_path: string;
+  notify_github_sync_in_app: boolean;
+  notify_github_sync_telegram: boolean;
+  last_sync_at: string | null;
+}
+
+export interface GitHubConfigUpdate {
+  token?: string | null;
+  repo?: string | null;
+  branch?: string | null;
+  base_path?: string | null;
+  enabled?: boolean | null;
+  notify_github_sync_in_app?: boolean | null;
+  notify_github_sync_telegram?: boolean | null;
+}
+
+export interface GitHubTestResponse {
+  ok: boolean;
+  detail: string;
+  repo_full_name: string | null;
+  branch?: string | null;
+  can_push?: boolean | null;
+}
+
+export interface GitHubSyncResponse {
+  status: string;
+  message: string;
+  md_path: string | null;
+  synced_at: string | null;
+  remote_commit_sha?: string | null;
+}
+
 export const TELEGRAM_EVENT_OPTIONS: { key: string; label: string }[] = [
   { key: 'task_created', label: 'New task' },
   { key: 'race_added', label: 'New race' },
@@ -214,5 +255,21 @@ export class IntegrationsService {
 
   deleteWebhook(): Observable<TelegramWebhookRegisterResponse> {
     return this.http.delete<TelegramWebhookRegisterResponse>(`${this.api}/telegram/webhook`);
+  }
+
+  getGitHub(): Observable<GitHubConfigStatus> {
+    return this.http.get<GitHubConfigStatus>(`${this.api}/github`);
+  }
+
+  saveGitHubConfig(body: GitHubConfigUpdate): Observable<GitHubConfigStatus> {
+    return this.http.put<GitHubConfigStatus>(`${this.api}/github/config`, body);
+  }
+
+  testGitHub(): Observable<GitHubTestResponse> {
+    return this.http.post<GitHubTestResponse>(`${this.api}/github/test`, {});
+  }
+
+  syncSectionToGitHub(sectionId: string): Observable<GitHubSyncResponse> {
+    return this.http.post<GitHubSyncResponse>(`${this.api}/github/sync/section/${sectionId}`, {});
   }
 }

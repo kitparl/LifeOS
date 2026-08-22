@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 import app.modules.habits.models  # noqa: F401
 import app.modules.goals.models  # noqa: F401
 import app.modules.integrations.report_models  # noqa: F401
+import app.modules.integrations.github_sync_models  # noqa: F401
 import app.modules.routines.models  # noqa: F401
 import app.modules.wishlist.models  # noqa: F401
 import app.modules.tasks.models  # noqa: F401

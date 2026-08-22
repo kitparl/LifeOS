@@ -9,6 +9,10 @@ from app.modules.integrations.schemas import (
     DetectChatIdRequest,
     DetectChatIdResponse,
     DigestResponse,
+    GitHubConfigStatus,
+    GitHubConfigUpdate,
+    GitHubSyncResponse,
+    GitHubTestResponse,
     IntegrationCreate,
     IntegrationProviderInfo,
     IntegrationResponse,
@@ -21,6 +25,7 @@ from app.modules.integrations.schemas import (
     TelegramWebhookRegisterResponse,
     TelegramWebhookStatus,
 )
+from app.modules.integrations.github_sync_service import GitHubSyncService
 from app.modules.integrations.service import IntegrationService, list_integration_providers
 from app.modules.integrations.webhook_service import TelegramWebhookService
 
@@ -55,6 +60,41 @@ async def save_telegram_config(
     db: AsyncSession = Depends(get_db),
 ):
     return await IntegrationService(db).save_telegram_config(user.id, data)
+
+
+@router.get("/github", response_model=GitHubConfigStatus)
+async def get_github_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await IntegrationService(db).get_github_status(user.id)
+
+
+@router.put("/github/config", response_model=GitHubConfigStatus)
+async def save_github_config(
+    data: GitHubConfigUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await IntegrationService(db).save_github_config(user.id, data)
+
+
+@router.post("/github/test", response_model=GitHubTestResponse)
+async def test_github(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await IntegrationService(db).test_github(user.id)
+
+
+@router.post("/github/sync/section/{section_id}", response_model=GitHubSyncResponse)
+async def sync_github_section(
+    section_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await GitHubSyncService(db).sync_section(user.id, section_id)
+    return GitHubSyncResponse(**result)
 
 
 @router.post("/telegram/digest", response_model=DigestResponse)

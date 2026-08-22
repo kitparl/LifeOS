@@ -1,3 +1,4 @@
+import logging
 import re
 
 from fastapi import HTTPException, status
@@ -22,6 +23,8 @@ from app.modules.knowledge_notes.schemas import (
 ARCHIVE_TTL_DAYS = 7
 _INLINE_FILE_RE = re.compile(r"/files/([0-9a-f-]{36})/content", re.I)
 _SECTION_FILE_MODULES = ("knowledge_notes", "knowledge_notes_extra")
+
+logger = logging.getLogger(__name__)
 
 
 def _not_found(what: str) -> HTTPException:
@@ -193,6 +196,12 @@ class KnowledgeNotesService:
             raise _not_found("Section")
         await self.repo.delete_section(section)
         await self._cleanup_section_files(user_id, [section_id])
+        try:
+            from app.modules.integrations.github_sync_service import GitHubSyncService
+
+            await GitHubSyncService(self.db).delete_section_remote(user_id, section_id)
+        except Exception:
+            logger.exception("GitHub sync cleanup failed for section=%s", section_id)
 
     async def archive_section(self, user_id: str, section_id: str) -> SectionResponse:
         section = await self.repo.get_section(user_id, section_id)
