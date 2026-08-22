@@ -19,6 +19,7 @@ import { NavPreferencesService } from '../../core/services/nav-preferences.servi
 import { AssistantShellService } from '../../core/services/assistant-shell.service';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { ConfirmHostComponent } from '../confirm/confirm-host.component';
+import { MarkdownImportChoiceHostComponent } from '../markdown/markdown-import-choice-host.component';
 import { resolvePageTitle } from './nav-registry';
 
 const STORAGE_AI_OPEN    = 'lifeos-ai-panel-open';
@@ -36,10 +37,12 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
     AiChatPanelComponent,
     LucideDynamicIcon,
     ConfirmHostComponent,
+    MarkdownImportChoiceHostComponent,
   ],
   template: `
     <app-command-palette />
     <app-confirm-host />
+    <app-markdown-import-choice-host />
 
     <!-- Mobile overlays backdrop -->
     @if (drawerOpen() || assistantShell.mobileOpen()) {

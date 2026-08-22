@@ -15,6 +15,10 @@ import { Subject, forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { LucideCircle, LucideCircleCheck, LucideDynamicIcon, provideLucideIcons } from '@lucide/angular';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { MarkdownImportButtonComponent } from '../../shared/markdown/markdown-import-button.component';
+import { MarkdownImportResult } from '../../shared/markdown/markdown-import.service';
+import { MarkdownExportButtonComponent } from '../../shared/markdown/markdown-export-button.component';
+import { downloadMarkdown } from '../../shared/markdown/markdown-export';
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { FileImageSrcDirective } from '../../shared/markdown/file-image-src.directive';
 import { AttachmentListComponent } from '../files/components/attachment-list.component';
@@ -50,6 +54,8 @@ const SIDEBAR_MAX = 480;
     MarkdownPipe,
     FileImageSrcDirective,
     AttachmentListComponent,
+    MarkdownImportButtonComponent,
+    MarkdownExportButtonComponent,
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
@@ -343,6 +349,20 @@ const SIDEBAR_MAX = 480;
                     <input class="kn-section-title" formControlName="title" placeholder="Section title" />
                   }
                   <div class="kn-docbar__actions">
+                    @if (importError()) {
+                      <span class="text-xs" style="color: var(--danger)">{{ importError() }}</span>
+                    }
+                    <app-markdown-import-button
+                      [currentContent]="form.controls.content.value"
+                      [currentTitle]="form.controls.title.value"
+                      (imported)="onMarkdownImported($event)"
+                      (importError)="onMarkdownImportError($event)"
+                    />
+                    <app-markdown-export-button
+                      [content]="form.controls.content.value"
+                      [filename]="form.controls.title.value || 'section'"
+                      (exportError)="onMarkdownImportError($event)"
+                    />
                     @if (previewOnly()) {
                       <button type="button" class="btn-primary text-xs" (click)="enterEditMode()">Edit</button>
                     } @else {
@@ -372,6 +392,7 @@ const SIDEBAR_MAX = 480;
                       >⋯</button>
                       @if (openMenu() === 'section') {
                         <div class="menu kn-overflow__menu" role="menu" (click)="$event.stopPropagation()">
+                          <button type="button" class="menu-item" role="menuitem" (click)="exportSectionMarkdown(); closeMenu()">Export to MD</button>
                           @if (sec.closed_at) {
                             <button type="button" class="menu-item" role="menuitem" (click)="toggleSectionClosed(sec, false); closeMenu()">Reopen section</button>
                           } @else {
@@ -449,6 +470,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   readonly loading = signal(false);
   readonly previewOnly = signal(false);
   readonly syncState = signal<SyncState>('synced');
+  readonly importError = signal('');
   readonly renaming = signal<RenameTarget | null>(null);
   readonly openMenu = signal<string | null>(null);
   readonly resizing = signal(false);
@@ -620,6 +642,44 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 
   enterEditMode(): void {
     this.previewOnly.set(false);
+  }
+
+  onMarkdownImported(result: MarkdownImportResult): void {
+    const sec = this.selected();
+    if (!sec) return;
+    this.importError.set('');
+
+    if (result.title) {
+      this.form.controls.title.setValue(result.title, { emitEvent: false });
+      sec.title = result.title;
+    }
+
+    this.form.controls.content.setValue(result.content, { emitEvent: false });
+    sec.content = result.content;
+
+    if (this.previewOnly()) {
+      this.enterEditMode();
+    }
+
+    this.editor?.setContent(result.content);
+    this.refreshSync();
+    this.scheduleSave();
+  }
+
+  onMarkdownImportError(message: string): void {
+    this.importError.set(message);
+  }
+
+  exportSectionMarkdown(): void {
+    try {
+      downloadMarkdown(
+        this.form.controls.content.value,
+        this.form.controls.title.value || 'section'
+      );
+      this.importError.set('');
+    } catch {
+      this.importError.set('Export failed.');
+    }
   }
 
   cancelEdit(): void {

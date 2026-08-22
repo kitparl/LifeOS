@@ -3,6 +3,9 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CodeWorkspaceComponent } from '../../shared/code-workspace';
+import { MarkdownImportButtonComponent } from '../../shared/markdown/markdown-import-button.component';
+import { MarkdownImportResult } from '../../shared/markdown/markdown-import.service';
+import { MarkdownExportButtonComponent } from '../../shared/markdown/markdown-export-button.component';
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { JOURNAL_TYPES, JournalType } from './models/journal.models';
 import { JournalService } from './services/journal.service';
@@ -10,12 +13,23 @@ import { JournalService } from './services/journal.service';
 @Component({
   selector: 'app-journal-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, CodeWorkspaceComponent, MarkdownPipe, DatePipe, TitleCasePipe],
+  imports: [ReactiveFormsModule, RouterLink, CodeWorkspaceComponent, MarkdownPipe, DatePipe, TitleCasePipe, MarkdownImportButtonComponent, MarkdownExportButtonComponent],
   template: `
     <form class="journal-writer" [formGroup]="form" (ngSubmit)="submit()">
       <div class="journal-writer__bar">
         <a routerLink="/journal" class="btn-ghost text-xs no-underline">← Journal</a>
         <div class="flex items-center gap-2">
+          <app-markdown-import-button
+            [currentContent]="form.controls.content.value"
+            [currentTitle]="form.controls.title.value"
+            (imported)="onMarkdownImported($event)"
+            (importError)="error = $event"
+          />
+          <app-markdown-export-button
+            [content]="form.controls.content.value"
+            [filename]="form.controls.title.value || 'journal-entry'"
+            (exportError)="error = $event"
+          />
           @if (error) {
             <span class="text-xs" style="color: var(--danger)">{{ error }}</span>
           }
@@ -182,6 +196,18 @@ export class JournalFormComponent implements OnInit {
   onContentChange(content: string): void {
     this.editorContent = content;
     this.form.controls.content.setValue(content, { emitEvent: false });
+  }
+
+  onMarkdownImported(result: MarkdownImportResult): void {
+    this.error = '';
+    if (this.previewOnly) {
+      this.previewOnly = false;
+    }
+    this.editorContent = result.content;
+    this.form.controls.content.setValue(result.content, { emitEvent: false });
+    if (result.title) {
+      this.form.controls.title.setValue(result.title, { emitEvent: false });
+    }
   }
 
   submit(): void {

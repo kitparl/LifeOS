@@ -2,17 +2,35 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CodeWorkspaceComponent } from '../../shared/code-workspace';
+import { MarkdownImportButtonComponent } from '../../shared/markdown/markdown-import-button.component';
+import { MarkdownImportResult } from '../../shared/markdown/markdown-import.service';
+import { MarkdownExportButtonComponent } from '../../shared/markdown/markdown-export-button.component';
 import { WRITING_CATEGORIES, WritingCategory } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 
 @Component({
   selector: 'app-writing-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, CodeWorkspaceComponent],
+  imports: [ReactiveFormsModule, RouterLink, CodeWorkspaceComponent, MarkdownImportButtonComponent, MarkdownExportButtonComponent],
   template: `
     <div style="max-width: 760px">
       <div class="panel !p-0 overflow-hidden">
-        <div class="title-bar">{{ isEdit ? 'Edit Writing' : 'New Writing' }}</div>
+        <div class="title-bar flex items-center justify-between gap-2">
+          <span>{{ isEdit ? 'Edit Writing' : 'New Writing' }}</span>
+          <div class="flex items-center gap-1">
+            <app-markdown-import-button
+              [currentContent]="form.controls.content.value"
+              [currentTitle]="form.controls.title.value"
+              (imported)="onMarkdownImported($event)"
+              (importError)="error = $event"
+            />
+            <app-markdown-export-button
+              [content]="form.controls.content.value"
+              [filename]="form.controls.title.value || 'writing'"
+              (exportError)="error = $event"
+            />
+          </div>
+        </div>
         <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
           <div class="grid grid-cols-2 gap-3">
             <div class="col-span-2 sm:col-span-1">
@@ -101,7 +119,17 @@ export class WritingFormComponent implements OnInit {
   }
 
   onContentChange(content: string): void {
+    this.editorContent = content;
     this.form.controls.content.setValue(content, { emitEvent: false });
+  }
+
+  onMarkdownImported(result: MarkdownImportResult): void {
+    this.error = '';
+    this.editorContent = result.content;
+    this.form.controls.content.setValue(result.content, { emitEvent: false });
+    if (result.title) {
+      this.form.controls.title.setValue(result.title, { emitEvent: false });
+    }
   }
 
   submit(): void {
