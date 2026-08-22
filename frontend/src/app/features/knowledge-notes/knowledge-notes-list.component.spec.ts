@@ -57,30 +57,34 @@ describe('KnowledgeNotesListComponent', () => {
     expect(text).toContain('adfas');
   });
 
-  it('saves inline title edits', () => {
-    component.startEdit('title', 'sub1', new MouseEvent('dblclick', { bubbles: true }));
+  it('opens edit modal from card edit icon and saves changes', () => {
+    const editBtn = fixture.nativeElement.querySelector('[aria-label="Edit subject"]') as HTMLButtonElement;
+    expect(editBtn).toBeTruthy();
+    editBtn.click();
     fixture.detectChanges();
-    const input = fixture.nativeElement.querySelector('[aria-label="Edit subject title"]') as HTMLInputElement;
-    expect(input).toBeTruthy();
-    input.value = 'AI Masterclass';
-    input.dispatchEvent(new Event('blur'));
-    fixture.detectChanges();
-    expect(notes.updateSubject).toHaveBeenCalledWith('sub1', { title: 'AI Masterclass' });
-  });
 
-  it('saves inline description edits', () => {
-    const desc = (Array.from(fixture.nativeElement.querySelectorAll('p')) as HTMLElement[]).find((el) =>
-      el.textContent?.includes('adfas')
-    );
-    expect(desc).toBeTruthy();
-    desc!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    const titleInput = fixture.nativeElement.querySelector('input[formcontrolname="title"]') as HTMLInputElement;
+    const iconInput = fixture.nativeElement.querySelector('input[formcontrolname="icon"]') as HTMLInputElement;
+    const descInput = fixture.nativeElement.querySelector('textarea[formcontrolname="description"]') as HTMLTextAreaElement;
+    expect(titleInput.value).toBe('AI Class');
+    expect(iconInput.value).toBe('📘');
+    expect(descInput.value).toBe('adfas');
+
+    titleInput.value = 'AI Masterclass';
+    titleInput.dispatchEvent(new Event('input'));
+    iconInput.value = '🧠';
+    iconInput.dispatchEvent(new Event('input'));
+    descInput.value = 'Updated description';
+    descInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    const textarea = fixture.nativeElement.querySelector(
-      '[aria-label="Edit subject description"]'
-    ) as HTMLTextAreaElement;
-    textarea.value = 'AI Masterclass';
-    textarea.dispatchEvent(new Event('blur'));
+
+    component.submitForm();
     fixture.detectChanges();
-    expect(notes.updateSubject).toHaveBeenCalledWith('sub1', { description: 'AI Masterclass' });
+
+    expect(notes.updateSubject).toHaveBeenCalledWith('sub1', {
+      title: 'AI Masterclass',
+      icon: '🧠',
+      description: 'Updated description',
+    });
   });
 });

@@ -28,8 +28,9 @@ export class MarkdownExportButtonComponent {
   exportMd(): void {
     try {
       downloadMarkdown(this.content, this.filename);
-    } catch {
-      this.exportError.emit('Export failed.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed.';
+      this.exportError.emit(message);
     }
   }
 }

@@ -6,7 +6,19 @@ export function sanitizeMarkdownFilename(title: string, fallback = 'export'): st
   return trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
 }
 
+export function validateMarkdownExport(content: string): string | null {
+  if (!content.trim()) {
+    return 'Nothing to export.';
+  }
+  return null;
+}
+
 export function downloadMarkdown(content: string, filename: string): void {
+  const validationError = validateMarkdownExport(content);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
   const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

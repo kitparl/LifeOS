@@ -7,6 +7,11 @@ describe('markdown-export', () => {
     expect(sanitizeMarkdownFilename('notes.md')).toBe('notes.md');
   });
 
+  it('downloadMarkdown rejects empty content', () => {
+    expect(() => downloadMarkdown('', 'test')).toThrowError('Nothing to export.');
+    expect(() => downloadMarkdown('   \n  ', 'test')).toThrowError('Nothing to export.');
+  });
+
   it('downloadMarkdown triggers a download link', () => {
     const clickSpy = jasmine.createSpy('click');
     const link = document.createElement('a');

@@ -24,6 +24,7 @@ import { FileImageSrcDirective } from '../../shared/markdown/file-image-src.dire
 import { AttachmentListComponent } from '../files/components/attachment-list.component';
 import { FileRecord } from '../files/models/file.models';
 import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
+import { ModalComponent } from '../../shared/modal/modal.component';
 import {
   KnowledgeChapter,
   KnowledgeSearchHit,
@@ -56,6 +57,7 @@ const SIDEBAR_MAX = 480;
     AttachmentListComponent,
     MarkdownImportButtonComponent,
     MarkdownExportButtonComponent,
+    ModalComponent,
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
@@ -70,6 +72,11 @@ const SIDEBAR_MAX = 480;
           <nav class="kn-breadcrumb__nav" aria-label="Notes">
             <a routerLink="/knowledge" class="kn-breadcrumb__link">← Notes</a>
             <span class="kn-breadcrumb__sep" aria-hidden="true">/</span>
+            <span
+              class="text-lg leading-none shrink-0"
+              title="Double-click to edit icon"
+              (dblclick)="openSubjectDetails($event)"
+            >{{ s.icon || '📘' }}</span>
             @if (renaming()?.kind === 'subject') {
               <input
                 #renameInput
@@ -135,6 +142,7 @@ const SIDEBAR_MAX = 480;
             @if (openMenu() === 'subject') {
               <div class="menu kn-overflow__menu" role="menu" (click)="$event.stopPropagation()">
                 <button type="button" class="menu-item" role="menuitem" (click)="startRename('subject', s.id); closeMenu()">Rename</button>
+                <button type="button" class="menu-item" role="menuitem" (click)="openSubjectDetails(); closeMenu()">Edit details</button>
                 <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteSubject(); closeMenu()">Delete</button>
               </div>
             }
@@ -445,6 +453,25 @@ const SIDEBAR_MAX = 480;
           </section>
         </div>
       </div>
+
+      <app-modal [open]="detailsOpen()" title="Edit subject" (closed)="detailsOpen.set(false)">
+        <form [formGroup]="subjectDetailsForm" class="space-y-3 text-sm" body (ngSubmit)="saveSubjectDetails()">
+          <div>
+            <label class="mb-1 block">Icon (emoji, optional)</label>
+            <input class="input-field" formControlName="icon" placeholder="📘" maxlength="4" />
+          </div>
+          <div>
+            <label class="mb-1 block">Description (optional)</label>
+            <textarea class="input-field min-h-[70px]" formControlName="description"></textarea>
+          </div>
+        </form>
+        <div footer class="flex justify-end gap-3">
+          <button type="button" class="btn-secondary text-xs" (click)="detailsOpen.set(false)">Cancel</button>
+          <button type="button" class="btn-primary text-xs" [disabled]="savingDetails()" (click)="saveSubjectDetails()">
+            {{ savingDetails() ? 'Saving…' : 'Save' }}
+          </button>
+        </div>
+      </app-modal>
     } @else if (loading()) {
       <p class="text-sm">Loading…</p>
     } @else {
@@ -473,6 +500,8 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   readonly importError = signal('');
   readonly renaming = signal<RenameTarget | null>(null);
   readonly openMenu = signal<string | null>(null);
+  readonly detailsOpen = signal(false);
+  readonly savingDetails = signal(false);
   readonly resizing = signal(false);
   readonly sidebarWidth = signal(KnowledgeSubjectComponent.readSidebarWidth());
   readonly sectionListIds = computed(() =>
@@ -511,6 +540,11 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   form = this.fb.nonNullable.group({
     title: ['', Validators.required],
     content: [''],
+  });
+
+  subjectDetailsForm = this.fb.nonNullable.group({
+    icon: [''],
+    description: [''],
   });
 
   private pendingSectionId: string | null = null;
@@ -677,8 +711,9 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
         this.form.controls.title.value || 'section'
       );
       this.importError.set('');
-    } catch {
-      this.importError.set('Export failed.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed.';
+      this.importError.set(message);
     }
   }
 
@@ -1191,6 +1226,39 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     );
     if (!ok) return;
     this.service.deleteChapter(c.id).subscribe({ next: () => this.reload() });
+  }
+
+  openSubjectDetails(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const s = this.subject();
+    if (!s) return;
+    this.subjectDetailsForm.reset({
+      icon: s.icon ?? '',
+      description: s.description ?? '',
+    });
+    this.detailsOpen.set(true);
+  }
+
+  saveSubjectDetails(): void {
+    const s = this.subject();
+    if (!s || this.savingDetails()) return;
+    const raw = this.subjectDetailsForm.getRawValue();
+    const icon = raw.icon.trim() || null;
+    const description = raw.description.trim() || null;
+    if (icon === (s.icon ?? null) && description === (s.description ?? null)) {
+      this.detailsOpen.set(false);
+      return;
+    }
+    this.savingDetails.set(true);
+    this.service.updateSubject(s.id, { icon, description }).subscribe({
+      next: () => {
+        this.subject.set({ ...s, icon, description });
+        this.savingDetails.set(false);
+        this.detailsOpen.set(false);
+      },
+      error: () => this.savingDetails.set(false),
+    });
   }
 
   async deleteSubject(): Promise<void> {

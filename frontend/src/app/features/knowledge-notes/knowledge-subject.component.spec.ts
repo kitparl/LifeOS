@@ -330,11 +330,11 @@ describe('KnowledgeSubjectComponent', () => {
     expect(notes.updateSection).toHaveBeenCalledWith('s1', { closed: false });
   });
 
-  it('opens subject rename and delete from the overflow menu', () => {
+  it('opens subject rename, edit details, and delete from the overflow menu', () => {
     (fixture.nativeElement.querySelector('[aria-label="Subject actions"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     const items = Array.from(fixture.nativeElement.querySelectorAll('.menu-item')) as HTMLButtonElement[];
-    expect(items.map((el) => el.textContent?.trim())).toEqual(['Rename', 'Delete']);
+    expect(items.map((el) => el.textContent?.trim())).toEqual(['Rename', 'Edit details', 'Delete']);
   });
 
   it('keeps chapter rename/delete behind the chapter overflow', () => {
