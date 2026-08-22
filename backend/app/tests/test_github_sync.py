@@ -55,9 +55,12 @@ def test_build_paths():
         content="hello",
         order_index=0,
     )
-    md_path, assets_dir = build_paths(subject, chapter, section, "notes")
-    assert md_path == "notes/python/variables/intro.md"
-    assert assets_dir == "notes/python/variables/assets"
+    md_path, assets_dir = build_paths(subject, chapter, section, "")
+    assert md_path == "python/variables/intro.md"
+    assert assets_dir == "python/variables/assets"
+
+    nested = build_paths(subject, chapter, section, "notes")
+    assert nested[0] == "notes/python/variables/intro.md"
 
 
 def test_content_hash_stable():
@@ -95,7 +98,7 @@ def test_github_config_legacy_notify_toggle():
             "token_enc": "",
             "repo": "user/repo",
             "branch": "main",
-            "base_path": "notes",
+            "base_path": "",
             "notify_github_sync": True,
         }
     )
@@ -178,7 +181,7 @@ async def test_sync_section_unchanged_skips_commit():
         return_value=MagicMock(section=section, chapter=chapter, subject=subject)
     )
 
-    md_path, _ = build_paths(subject, chapter, section, "notes")
+    md_path, _ = build_paths(subject, chapter, section, "")
     content_hash = _content_hash("plain text", {})
     state = MagicMock()
     state.md_path = md_path

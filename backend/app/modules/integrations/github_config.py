@@ -13,7 +13,8 @@ from app.core.crypto import decrypt, encrypt
 logger = logging.getLogger(__name__)
 
 DEFAULT_BRANCH = "main"
-DEFAULT_BASE_PATH = "notes"
+# Empty = repo root (subjects like python/ at top level, no wrapper folder).
+DEFAULT_BASE_PATH = ""
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
@@ -91,9 +92,14 @@ def _normalize_branch(raw: str | None, default: str = DEFAULT_BRANCH) -> str:
 
 
 def _normalize_base_path(raw: str | None, default: str = DEFAULT_BASE_PATH) -> str:
-    value = (raw or default).strip().strip("/\\") or default
+    """Normalize base path. Empty string means repo root (no wrapper folder)."""
+    if raw is None:
+        return default
+    value = raw.strip().strip("/\\")
+    if not value:
+        return ""
     parts = [p for p in value.replace("\\", "/").split("/") if p and p not in (".", "..")]
-    return "/".join(parts) or default
+    return "/".join(parts)
 
 
 def serialize_config(
@@ -173,7 +179,9 @@ def parse_config(config_json: str | None) -> DecryptedGitHubConfig | None:
         token=token.strip(),
         repo=repo,
         branch=_normalize_branch(str(data.get("branch") or DEFAULT_BRANCH)),
-        base_path=_normalize_base_path(str(data.get("base_path") or DEFAULT_BASE_PATH)),
+        base_path=_normalize_base_path(
+            None if "base_path" not in data else str(data.get("base_path") or "")
+        ),
     )
 
 
@@ -181,7 +189,10 @@ def mask_config(config_json: str | None) -> MaskedGitHubConfig:
     parsed = parse_config(config_json)
     data = _load_json(config_json)
     branch = _normalize_branch(str(data.get("branch") or DEFAULT_BRANCH))
-    base_path = _normalize_base_path(str(data.get("base_path") or DEFAULT_BASE_PATH))
+    if "base_path" in data:
+        base_path = _normalize_base_path(str(data.get("base_path") or ""))
+    else:
+        base_path = DEFAULT_BASE_PATH
     repo_public = _normalize_repo(str(data.get("repo") or "")) or None
     prefs = parse_preferences(config_json)
 

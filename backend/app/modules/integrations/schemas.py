@@ -190,7 +190,7 @@ class GitHubConfigStatus(BaseModel):
     token_masked: str | None = None
     repo: str | None = None
     branch: str = "main"
-    base_path: str = "notes"
+    base_path: str = ""
     notify_github_sync_in_app: bool = False
     notify_github_sync_telegram: bool = False
     last_sync_at: datetime | None = None

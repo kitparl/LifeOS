@@ -399,7 +399,15 @@ import {
                   </div>
                   <div class="flex flex-col gap-1">
                     <label class="form-label" for="gh-base">Base path</label>
-                    <input id="gh-base" class="input-field" [(ngModel)]="githubBasePathInput" placeholder="notes" />
+                    <input
+                      id="gh-base"
+                      class="input-field"
+                      [(ngModel)]="githubBasePathInput"
+                      placeholder="(empty = repo root)"
+                    />
+                    <p class="text-xs" style="color: var(--text-muted)">
+                      Leave blank to sync as <code>python/</code>, <code>system-design/</code> at the repo root.
+                    </p>
                   </div>
                   <label class="flex items-center gap-2 text-xs mt-1">
                     <input type="checkbox" [(ngModel)]="githubEnabled" />
@@ -485,7 +493,7 @@ export class IntegrationsPageComponent implements OnInit {
   githubTokenInput = '';
   githubRepoInput = '';
   githubBranchInput = 'main';
-  githubBasePathInput = 'notes';
+  githubBasePathInput = '';
   githubEnabled = false;
   githubNotifyInApp = false;
   githubNotifyTelegram = false;
@@ -583,7 +591,7 @@ export class IntegrationsPageComponent implements OnInit {
     this.github.set(status);
     this.githubRepoInput = status.repo ?? '';
     this.githubBranchInput = status.branch || 'main';
-    this.githubBasePathInput = status.base_path || 'notes';
+    this.githubBasePathInput = status.base_path ?? '';
     this.githubEnabled = status.enabled;
     this.githubNotifyInApp = status.notify_github_sync_in_app ?? false;
     this.githubNotifyTelegram = status.notify_github_sync_telegram ?? false;
@@ -620,7 +628,7 @@ export class IntegrationsPageComponent implements OnInit {
       enabled: this.githubEnabled,
       repo: this.githubRepoInput.trim() || null,
       branch: this.githubBranchInput.trim() || null,
-      base_path: this.githubBasePathInput.trim() || null,
+      base_path: this.githubBasePathInput.trim(),
       notify_github_sync_in_app: this.githubNotifyInApp,
       notify_github_sync_telegram: this.githubNotifyTelegram,
     };
