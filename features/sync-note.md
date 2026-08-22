@@ -31,7 +31,7 @@ Credentials (PAT) are stored encrypted. All GitHub calls run on the **backend** 
 
 1. Open **Integrations** → **GitHub**.
 2. Paste **Personal Access Token** (masked; use 👁 to reveal when editing).
-3. Set **Repository** as `owner/repo`, **Branch** (default `main`), **Base path** leave blank for repo root (`python/`, `system-design/` …).
+3. Set **Repository** as `owner/repo` or a clone URL (`https://github.com/owner/repo.git`), **Branch** (default `main`), **Base path** leave blank for repo root (`python/`, `system-design/` …).
 4. Enable **GitHub sync**.
 5. Optionally:
    - **Notify in-app on GitHub sync**

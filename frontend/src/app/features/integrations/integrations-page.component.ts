@@ -390,7 +390,7 @@ import {
                       id="gh-repo"
                       class="input-field"
                       [(ngModel)]="githubRepoInput"
-                      placeholder="your-user/lifeos-notes"
+                      placeholder="kitparl/engineering-notes or https://github.com/…"
                     />
                   </div>
                   <div class="flex flex-col gap-1">

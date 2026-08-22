@@ -173,7 +173,7 @@ class DigestResponse(BaseModel):
 
 class GitHubConfigUpdate(BaseModel):
     token: str | None = Field(default=None, max_length=200)
-    repo: str | None = Field(default=None, max_length=200)
+    repo: str | None = Field(default=None, max_length=400)
     branch: str | None = Field(default=None, max_length=64)
     base_path: str | None = Field(default=None, max_length=200)
     enabled: bool | None = None

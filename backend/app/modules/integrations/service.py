@@ -22,13 +22,17 @@ from app.modules.integrations.schemas import (
     TelegramTestResponse,
 )
 from app.modules.integrations.github_client import GitHubClient, GitHubClientError
-from app.modules.integrations.github_config import mask_config, parse_config, serialize_config
+from app.modules.integrations.github_config import (
+    mask_config as mask_github_config,
+    parse_config as parse_github_config,
+    serialize_config as serialize_github_config,
+)
 from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
 from app.modules.integrations.telegram_config import (
-    mask_config,
-    parse_config,
+    mask_config as mask_telegram_config,
+    parse_config as parse_telegram_config,
     parse_preferences,
-    serialize_config,
+    serialize_config as serialize_telegram_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,7 +155,7 @@ class IntegrationService:
         self, user_id: str, *, scheduler_warning: str | None = None
     ) -> TelegramConfigStatus:
         conn = await self.get_or_create_telegram(user_id)
-        masked = mask_config(conn.config_json)
+        masked = mask_telegram_config(conn.config_json)
         prefs = parse_preferences(conn.config_json)
         webhook_secret = getattr(conn, "webhook_secret", None)
 
@@ -229,7 +233,7 @@ class IntegrationService:
         if data.enabled is None and not has_secret and not has_prefs:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
 
-        new_json = serialize_config(
+        new_json = serialize_telegram_config(
             bot_token=data.bot_token,
             chat_id=data.chat_id,
             existing_json=conn.config_json,
@@ -258,12 +262,12 @@ class IntegrationService:
         update = IntegrationUpdate(config_json=new_json)
         if data.enabled is not None:
             update.enabled = data.enabled
-        elif parse_config(new_json) is not None:
+        elif parse_telegram_config(new_json) is not None:
             # Auto-enable when credentials become complete unless explicitly disabled
             update.enabled = True
 
         updated = await self.repo.update(conn, update)
-        if parse_config(updated.config_json) is not None and updated.enabled:
+        if parse_telegram_config(updated.config_json) is not None and updated.enabled:
             updated.status = "connected"
             await self.repo.db.flush()
 
@@ -296,7 +300,7 @@ class IntegrationService:
         if conn.provider != "telegram":
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Test is only supported for Telegram")
 
-        cfg = parse_config(conn.config_json)
+        cfg = parse_telegram_config(conn.config_json)
         if cfg is None:
             return TelegramTestResponse(ok=False, detail="Telegram not configured")
 
@@ -339,7 +343,7 @@ class IntegrationService:
 
         token = (bot_token_override or "").strip()
         if not token:
-            cfg = parse_config(conn.config_json)
+            cfg = parse_telegram_config(conn.config_json)
             if cfg is None:
                 return DetectChatIdResponse(
                     candidates=[],
@@ -395,7 +399,7 @@ class IntegrationService:
 
     async def get_github_status(self, user_id: str) -> GitHubConfigStatus:
         conn = await self.get_or_create_github(user_id)
-        masked = mask_config(conn.config_json)
+        masked = mask_github_config(conn.config_json)
         return GitHubConfigStatus(
             connection_id=conn.id,
             enabled=conn.enabled,
@@ -426,7 +430,7 @@ class IntegrationService:
         if data.enabled is None and not has_secret and not has_prefs:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
 
-        new_json = serialize_config(
+        new_json = serialize_github_config(
             token=data.token,
             repo=data.repo,
             branch=data.branch,
@@ -439,11 +443,11 @@ class IntegrationService:
         update = IntegrationUpdate(config_json=new_json)
         if data.enabled is not None:
             update.enabled = data.enabled
-        elif parse_config(new_json) is not None:
+        elif parse_github_config(new_json) is not None:
             update.enabled = True
 
         updated = await self.repo.update(conn, update)
-        if parse_config(updated.config_json) is not None and updated.enabled:
+        if parse_github_config(updated.config_json) is not None and updated.enabled:
             updated.status = "connected"
             await self.repo.db.flush()
 
@@ -453,7 +457,7 @@ class IntegrationService:
         conn = await self.repo.get_by_provider(user_id, "github")
         if conn is None:
             return GitHubTestResponse(ok=False, detail="GitHub not connected")
-        cfg = parse_config(conn.config_json)
+        cfg = parse_github_config(conn.config_json)
         if cfg is None:
             return GitHubTestResponse(ok=False, detail="GitHub not configured")
 

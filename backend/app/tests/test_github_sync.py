@@ -9,7 +9,13 @@ from app.modules.integrations.github_client import (
     GitHubClientError,
     user_facing_github_error,
 )
-from app.modules.integrations.github_config import mask_config, parse_config, parse_preferences, serialize_config
+from app.modules.integrations.github_config import (
+    _normalize_repo,
+    mask_config,
+    parse_config,
+    parse_preferences,
+    serialize_config,
+)
 from app.modules.integrations.github_slug import slugify
 from app.modules.integrations.github_sync_planner import build_sync_plan
 from app.modules.integrations.github_sync_service import (
@@ -25,6 +31,23 @@ from app.modules.knowledge_notes.models import KnowledgeChapter, KnowledgeSectio
 def test_slugify():
     assert slugify("Python Basics") == "python-basics"
     assert slugify("  ") == "untitled"
+
+
+def test_normalize_repo_accepts_urls():
+    assert _normalize_repo("kitparl/engineering-notes") == "kitparl/engineering-notes"
+    assert (
+        _normalize_repo("https://github.com/kitparl/engineering-notes.git")
+        == "kitparl/engineering-notes"
+    )
+    assert (
+        _normalize_repo("https://github.com/kitparl/engineering-notes")
+        == "kitparl/engineering-notes"
+    )
+    assert (
+        _normalize_repo("git@github.com:kitparl/engineering-notes.git")
+        == "kitparl/engineering-notes"
+    )
+    assert _normalize_repo("not a repo") == ""
 
 
 def test_extract_file_ids():

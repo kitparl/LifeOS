@@ -80,8 +80,34 @@ def _load_json(config_json: str | None) -> dict[str, Any]:
 
 
 def _normalize_repo(raw: str | None) -> str:
+    """Accept owner/repo or a GitHub clone URL; store as owner/repo."""
     value = (raw or "").strip()
-    if not value or not _REPO_RE.match(value):
+    if not value:
+        return ""
+
+    # https://github.com/owner/repo(.git)?  or http://
+    m = re.match(
+        r"^https?://(?:www\.)?github\.com/([^/\s]+)/([^/\s#?]+?)(?:\.git)?/?$",
+        value,
+        re.IGNORECASE,
+    )
+    if m:
+        value = f"{m.group(1)}/{m.group(2)}"
+    else:
+        # git@github.com:owner/repo.git
+        m = re.match(
+            r"^git@github\.com:([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+            value,
+            re.IGNORECASE,
+        )
+        if m:
+            value = f"{m.group(1)}/{m.group(2)}"
+        else:
+            # Strip accidental .git on plain owner/repo.git
+            if value.lower().endswith(".git"):
+                value = value[:-4]
+
+    if not _REPO_RE.match(value):
         return ""
     return value
 
