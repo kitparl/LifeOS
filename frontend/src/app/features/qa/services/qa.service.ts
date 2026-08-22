@@ -1,14 +1,15 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { QAEntry, QAListItem } from '../models/qa.models';
+import { QAEntry, QAListItem, QAListOptions, QAListResult } from '../models/qa.models';
 
 interface QAWritePayload {
   question?: string;
   answer?: string;
   type?: string | null;
   tags?: string[];
+  is_deep_personal?: boolean;
   linked_goal_id?: string | null;
 }
 
@@ -18,11 +19,23 @@ export class QAService {
   private readonly base = `${environment.apiUrl}/qa`;
   private readonly api = `${this.base}/entries`;
 
-  list(search?: string, type?: string): Observable<QAListItem[]> {
+  list(opts?: QAListOptions): Observable<QAListResult> {
     let params = new HttpParams();
-    if (search) params = params.set('search', search);
-    if (type) params = params.set('type', type);
-    return this.http.get<QAListItem[]>(this.api, { params });
+    if (opts?.search) params = params.set('search', opts.search);
+    if (opts?.type) params = params.set('type', opts.type);
+    if (opts?.tag) params = params.set('tag', opts.tag);
+    if (opts?.deep_personal === true) params = params.set('deep_personal', 'true');
+    if (opts?.deep_personal === false) params = params.set('deep_personal', 'false');
+    if (opts?.sort_by) params = params.set('sort_by', opts.sort_by);
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    if (opts?.include_answer === false) params = params.set('include_answer', 'false');
+    return this.http.get<QAListItem[]>(this.api, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<QAListItem[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   get(id: string): Observable<QAEntry> {
@@ -41,7 +54,6 @@ export class QAService {
     return this.http.delete<void>(`${this.api}/${id}`);
   }
 
-  /** Extensible type registry (suggested defaults + user-created). */
   listTypes(): Observable<string[]> {
     return this.http.get<string[]>(`${this.base}/types`);
   }

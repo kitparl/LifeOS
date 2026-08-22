@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,13 +12,15 @@ class QAService:
     def __init__(self, db: AsyncSession):
         self.repo = QARepository(db)
 
-    def _to_list_item(self, entry) -> QAListItem:
+    def _to_list_item(self, entry, *, include_answer: bool = True) -> QAListItem:
         return QAListItem(
             id=entry.id,
             question=entry.question,
-            current_answer=entry.current_answer,
+            current_answer=entry.current_answer if include_answer else None,
             type=entry.type,
             tags=entry.tags,
+            is_deep_personal=entry.is_deep_personal,
+            created_at=entry.created_at,
             updated_at=entry.updated_at,
         )
 
@@ -28,6 +32,7 @@ class QAService:
             current_answer=entry.current_answer,
             type=entry.type,
             tags=entry.tags,
+            is_deep_personal=entry.is_deep_personal,
             linked_goal_id=entry.linked_goal_id,
             linked_journal_id=entry.linked_journal_id,
             ai_summary=entry.ai_summary,
@@ -37,10 +42,32 @@ class QAService:
         )
 
     async def list_entries(
-        self, user_id: str, search: str | None = None, type_filter: str | None = None
-    ) -> list[QAListItem]:
-        entries = await self.repo.list_entries(user_id, search=search, type_filter=type_filter)
-        return [self._to_list_item(e) for e in entries]
+        self,
+        user_id: str,
+        search: str | None = None,
+        type_filter: str | None = None,
+        tag: str | None = None,
+        deep_personal: bool | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        sort_by: str = "updated_at",
+        limit: int | None = None,
+        offset: int = 0,
+        include_answer: bool = True,
+    ) -> tuple[list[QAListItem], int]:
+        entries, total = await self.repo.list_entries(
+            user_id,
+            search=search,
+            type_filter=type_filter,
+            tag=tag,
+            deep_personal=deep_personal,
+            created_from=created_from,
+            created_to=created_to,
+            sort_by=sort_by,
+            limit=limit,
+            offset=offset,
+        )
+        return [self._to_list_item(e, include_answer=include_answer) for e in entries], total
 
     async def list_types(self, user_id: str) -> list[str]:
         """Return the reusable type registry: suggested defaults + user-created,

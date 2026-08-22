@@ -34,6 +34,10 @@ import { QAService } from './services/qa.service';
             <label class="mb-1 block">Tags (comma-separated)</label>
             <input class="input-field" formControlName="tags" />
           </div>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" formControlName="is_deep_personal" />
+            Deep Personal
+          </label>
           @if (error) {
             <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
           }
@@ -63,6 +67,7 @@ export class QAFormComponent implements OnInit {
     answer: ['', Validators.required],
     type: [''],
     tags: [''],
+    is_deep_personal: [false],
   });
 
   ngOnInit(): void {
@@ -80,6 +85,7 @@ export class QAFormComponent implements OnInit {
             answer: e.current_answer,
             type: e.type ?? '',
             tags: e.tags.join(', '),
+            is_deep_personal: e.is_deep_personal,
           }),
       });
     }
@@ -104,6 +110,7 @@ export class QAFormComponent implements OnInit {
       answer: raw.answer,
       type: raw.type || null,
       tags,
+      is_deep_personal: raw.is_deep_personal,
     };
     const req =
       this.isEdit && this.entryId

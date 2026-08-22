@@ -8,6 +8,7 @@ class QACreate(BaseModel):
     answer: str = Field(min_length=1)
     type: str | None = Field(default=None, max_length=64)
     tags: list[str] = []
+    is_deep_personal: bool = False
     linked_goal_id: str | None = None
     linked_journal_id: str | None = None
 
@@ -17,6 +18,7 @@ class QAUpdate(BaseModel):
     answer: str | None = Field(default=None, min_length=1)
     type: str | None = Field(default=None, max_length=64)
     tags: list[str] | None = None
+    is_deep_personal: bool | None = None
     linked_goal_id: str | None = None
     linked_journal_id: str | None = None
 
@@ -37,9 +39,11 @@ class QAVersionResponse(BaseModel):
 class QAListItem(BaseModel):
     id: str
     question: str
-    current_answer: str
+    current_answer: str | None = None
     type: str | None = None
     tags: list[str]
+    is_deep_personal: bool = False
+    created_at: datetime
     updated_at: datetime
 
 
@@ -49,6 +53,7 @@ class QAResponse(BaseModel):
     current_answer: str
     type: str | None = None
     tags: list[str]
+    is_deep_personal: bool = False
     linked_goal_id: str | None
     linked_journal_id: str | None
     ai_summary: str | None

@@ -110,7 +110,13 @@ class ExportService:
         if module == "qa":
             result = await self.db.execute(select(QAEntry).where(QAEntry.user_id == user_id))
             return [
-                {"id": e.id, "question": e.question, "answer": e.current_answer, "tags": e.tags_json}
+                {
+                    "id": e.id,
+                    "question": e.question,
+                    "answer": e.current_answer,
+                    "tags": e.tags_json,
+                    "is_deep_personal": e.is_deep_personal,
+                }
                 for e in result.scalars().all()
             ]
         if module == "wishlist":

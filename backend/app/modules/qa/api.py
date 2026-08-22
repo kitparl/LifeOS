@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Query, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -19,12 +21,35 @@ router = APIRouter(prefix="/qa", tags=["qa"])
 
 @router.get("/entries", response_model=list[QAListItem])
 async def list_qa_entries(
+    response: Response,
     search: str | None = Query(default=None),
     type: str | None = Query(default=None),
+    tag: str | None = Query(default=None),
+    deep_personal: bool | None = Query(default=None),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    sort_by: str = Query(default="updated_at", pattern="^(created_at|updated_at)$"),
+    limit: int | None = Query(default=None, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    include_answer: bool = Query(default=True),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await QAService(db).list_entries(user.id, search=search, type_filter=type)
+    items, total = await QAService(db).list_entries(
+        user.id,
+        search=search,
+        type_filter=type,
+        tag=tag,
+        deep_personal=deep_personal,
+        created_from=created_from,
+        created_to=created_to,
+        sort_by=sort_by,
+        limit=limit,
+        offset=offset,
+        include_answer=include_answer,
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.get("/types", response_model=list[str])
