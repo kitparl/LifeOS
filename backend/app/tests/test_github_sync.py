@@ -219,12 +219,71 @@ async def test_sync_section_unchanged_skips_commit():
     svc.sync_repo.set_status = AsyncMock(return_value=state)
     svc.sync_repo.upsert = AsyncMock(return_value=state)
     svc._apply_plan_atomic = AsyncMock()
+    svc._client = MagicMock(
+        return_value=MagicMock(get_file=AsyncMock(return_value=MagicMock(sha="remote")))
+    )
 
     result = await svc.sync_section("u1", "sec1")
 
     assert result["status"] == "unchanged"
     assert "Already up to date" in result["message"]
     svc._apply_plan_atomic.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sync_section_recreates_when_remote_file_missing(monkeypatch):
+    from app.modules.integrations import github_sync_service as sync_mod
+    from app.modules.integrations.github_sync_service import GitHubSyncService
+
+    monkeypatch.setattr(sync_mod, "notify_github_sync_result", AsyncMock())
+
+    subject = KnowledgeSubject(id="s1", user_id="u1", title="Python", order_index=0)
+    chapter = KnowledgeChapter(id="c1", user_id="u1", subject_id="s1", title="Ch1", order_index=0)
+    section = KnowledgeSection(
+        id="sec1",
+        user_id="u1",
+        chapter_id="c1",
+        title="Intro",
+        content="plain text",
+        order_index=0,
+    )
+
+    db = MagicMock()
+    db.flush = AsyncMock()
+    svc = GitHubSyncService(db)
+    svc.integrations = MagicMock()
+    conn = MagicMock()
+    conn.enabled = True
+    conn.config_json = serialize_config(token="tok", repo="user/repo")
+    conn.last_sync_at = None
+    conn.status = "connected"
+    svc.integrations.get_by_provider = AsyncMock(return_value=conn)
+
+    svc._load_section_context = AsyncMock(
+        return_value=MagicMock(section=section, chapter=chapter, subject=subject)
+    )
+
+    md_path, _ = build_paths(subject, chapter, section, "")
+    content_hash = _content_hash("plain text", {})
+    state = MagicMock()
+    state.md_path = md_path
+    state.content_hash = content_hash
+    state.assets_json = "[]"
+    state.md_sha = "mdsha"
+    state.remote_commit_sha = "commit1"
+    svc.sync_repo.get_by_section = AsyncMock(return_value=state)
+    svc.sync_repo.set_status = AsyncMock(return_value=state)
+    svc.sync_repo.upsert = AsyncMock(return_value=state)
+    svc._apply_plan_atomic = AsyncMock(return_value=("newcommit", {md_path: "blob"}))
+    svc._client = MagicMock(return_value=MagicMock(get_file=AsyncMock(return_value=None)))
+
+    result = await svc.sync_section("u1", "sec1")
+
+    assert result["status"] == "synced"
+    assert result["message"] == "Pushed"
+    svc._apply_plan_atomic.assert_awaited_once()
+    plan = svc._apply_plan_atomic.await_args.args[2]
+    assert any(f.action == "create" and f.path == md_path for f in plan.files)
 
 
 @pytest.mark.asyncio
@@ -258,3 +317,55 @@ async def test_apply_plan_atomic_creates_blobs_and_commit():
     assert client.create_blob.await_count == 2
     tree_entries = client.commit_tree_changes.await_args.args[1]
     assert any(e.path == "notes/a/b/old.md" and e.sha is None for e in tree_entries)
+
+
+@pytest.mark.asyncio
+async def test_commit_tree_changes_skips_missing_deletes():
+    from app.modules.integrations.github_client import GitHubClient, TreeEntry
+
+    client = GitHubClient("tok", "o", "r", branch="main")
+    client.get_branch_ref = AsyncMock(return_value={"object": {"sha": "parent"}})
+    client._request = AsyncMock(
+        side_effect=[
+            {"tree": {"sha": "basetree"}},  # get commit
+        ]
+    )
+    client.list_tree_blob_paths = AsyncMock(return_value={"keep.md"})
+    client.create_tree = AsyncMock(return_value="newtree")
+    client.create_commit = AsyncMock(return_value="newcommit")
+    client.update_ref = AsyncMock()
+
+    result = await client.commit_tree_changes(
+        "msg",
+        [
+            TreeEntry(path="keep.md", sha="blob1"),
+            TreeEntry(path="already-gone.md", sha=None),
+            TreeEntry(path="also-gone.md", sha=None),
+        ],
+    )
+    assert result.commit_sha == "newcommit"
+    sent = client.create_tree.await_args.args[1]
+    assert [e.path for e in sent] == ["keep.md"]
+    assert all(e.sha is not None for e in sent)
+
+
+@pytest.mark.asyncio
+async def test_commit_tree_changes_noop_when_only_missing_deletes():
+    from app.modules.integrations.github_client import GitHubClient, TreeEntry
+
+    client = GitHubClient("tok", "o", "r", branch="main")
+    client.get_branch_ref = AsyncMock(return_value={"object": {"sha": "parent"}})
+    client._request = AsyncMock(return_value={"tree": {"sha": "basetree"}})
+    client.list_tree_blob_paths = AsyncMock(return_value=set())
+    client.create_tree = AsyncMock()
+    client.create_commit = AsyncMock()
+    client.update_ref = AsyncMock()
+
+    result = await client.commit_tree_changes(
+        "msg",
+        [TreeEntry(path="gone.md", sha=None)],
+    )
+    assert result.commit_sha == "parent"
+    client.create_tree.assert_not_called()
+    client.create_commit.assert_not_called()
+    client.update_ref.assert_not_called()

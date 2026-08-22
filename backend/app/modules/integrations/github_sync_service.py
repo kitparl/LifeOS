@@ -289,27 +289,40 @@ class GitHubSyncService:
                 )
 
                 if plan.is_noop:
-                    now = datetime.now(timezone.utc)
-                    conn.last_sync_at = now
-                    await self.sync_repo.upsert(
-                        user_id=user_id,
-                        section_id=section_id,
+                    # Local hash matches, but file may have been deleted on GitHub.
+                    remote = await client.get_file(md_path)
+                    if remote is not None:
+                        now = datetime.now(timezone.utc)
+                        conn.last_sync_at = now
+                        await self.sync_repo.upsert(
+                            user_id=user_id,
+                            section_id=section_id,
+                            md_path=md_path,
+                            md_sha=state.md_sha if state else None,
+                            content_hash=content_hash,
+                            assets_json=state.assets_json if state and state.assets_json else "[]",
+                            remote_commit_sha=state.remote_commit_sha if state else None,
+                            sync_status=SYNC_STATUS_UNCHANGED,
+                            last_error=None,
+                        )
+                        await self.db.flush()
+                        return {
+                            "status": "unchanged",
+                            "message": "Already up to date",
+                            "md_path": md_path,
+                            "synced_at": now,
+                            "remote_commit_sha": state.remote_commit_sha if state else None,
+                        }
+                    # Recreate from scratch (ignore stale local sync state).
+                    plan = build_sync_plan(
                         md_path=md_path,
-                        md_sha=state.md_sha if state else None,
+                        rewritten_md=rewritten,
                         content_hash=content_hash,
-                        assets_json=state.assets_json if state and state.assets_json else "[]",
-                        remote_commit_sha=state.remote_commit_sha if state else None,
-                        sync_status=SYNC_STATUS_UNCHANGED,
-                        last_error=None,
+                        assets=asset_payloads,
+                        previous_md_path=None,
+                        previous_content_hash=None,
+                        previous_assets=[],
                     )
-                    await self.db.flush()
-                    return {
-                        "status": "unchanged",
-                        "message": "Already up to date",
-                        "md_path": md_path,
-                        "synced_at": now,
-                        "remote_commit_sha": state.remote_commit_sha if state else None,
-                    }
 
                 commit_msg = f"LifeOS: sync {ctx.section.title}"
                 commit_sha, path_to_sha = await self._apply_plan_atomic(client, commit_msg, plan)

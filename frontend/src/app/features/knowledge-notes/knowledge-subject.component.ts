@@ -379,10 +379,10 @@ const SIDEBAR_MAX = 480;
                       [configured]="githubConfigured()"
                       [disabled]="syncState() === 'saving'"
                       [beforeSync]="saveBeforeGitHubSync.bind(this)"
-                      (syncSuccess)="onGitHubSyncSuccess($event)"
-                      (syncError)="onMarkdownImportError($event)"
+                      (syncSuccess)="onGitHubSyncSuccess($event, sec.id)"
+                      (syncError)="onGitHubSyncError($event)"
                     />
-                    @if (githubMessage()) {
+                    @if (githubMessage() && githubMessageSectionId() === sec.id) {
                       <span class="text-xs" style="color: var(--success)">{{ githubMessage() }}</span>
                     }
                     @if (previewOnly()) {
@@ -515,6 +515,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   readonly importError = signal('');
   readonly githubConfigured = signal(false);
   readonly githubMessage = signal<string | null>(null);
+  readonly githubMessageSectionId = signal<string | null>(null);
   readonly renaming = signal<RenameTarget | null>(null);
   readonly openMenu = signal<string | null>(null);
   readonly detailsOpen = signal(false);
@@ -694,6 +695,9 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.lastSavedTitle = sec.title;
     this.lastSavedContent = sec.content;
     this.syncState.set('synced');
+    this.importError.set('');
+    this.githubMessage.set(null);
+    this.githubMessageSectionId.set(null);
     this.suppressDirty = false;
   }
 
@@ -727,9 +731,16 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.importError.set(message);
   }
 
-  onGitHubSyncSuccess(message: string): void {
+  onGitHubSyncSuccess(message: string, sectionId: string): void {
     this.importError.set('');
     this.githubMessage.set(message);
+    this.githubMessageSectionId.set(sectionId);
+  }
+
+  onGitHubSyncError(message: string): void {
+    this.githubMessage.set(null);
+    this.githubMessageSectionId.set(null);
+    this.importError.set(message);
   }
 
   saveBeforeGitHubSync(): Promise<void> {

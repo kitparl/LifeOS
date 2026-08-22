@@ -280,6 +280,27 @@ class GitHubClient:
             raise GitHubClientError("GitHub did not return tree sha")
         return data["sha"]
 
+    async def list_tree_blob_paths(self, tree_sha: str) -> set[str]:
+        """Return blob paths in a tree (recursive). Used to skip deletes of missing files."""
+        data = await self._request(
+            "GET",
+            self._repo_url(f"/git/trees/{tree_sha}"),
+            params={"recursive": "1"},
+            allow_404=False,
+        )
+        if not data:
+            return set()
+        paths: set[str] = set()
+        for item in data.get("tree") or []:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") != "blob":
+                continue
+            path = item.get("path")
+            if isinstance(path, str) and path:
+                paths.add(path)
+        return paths
+
     async def create_commit(self, message: str, tree_sha: str, parent_sha: str) -> str:
         data = await self._request(
             "POST",
@@ -309,7 +330,11 @@ class GitHubClient:
         message: str,
         entries: list[TreeEntry],
     ) -> AtomicCommitResult:
-        """Create blobs (caller supplies entry.sha) then one tree+commit+ref update."""
+        """Create blobs (caller supplies entry.sha) then one tree+commit+ref update.
+
+        Deletes for paths that no longer exist on the remote tip are skipped so
+        manual GitHub deletions / renames do not 422 the whole sync.
+        """
         if not entries:
             raise GitHubClientError("No tree changes to commit", code="validation")
 
@@ -327,7 +352,17 @@ class GitHubClient:
         if not isinstance(base_tree, str):
             raise GitHubClientError("Could not resolve base tree", code="not_found")
 
-        new_tree = await self.create_tree(base_tree, entries)
+        deletes = [e for e in entries if e.sha is None]
+        writes = [e for e in entries if e.sha is not None]
+        if deletes:
+            existing = await self.list_tree_blob_paths(base_tree)
+            deletes = [e for e in deletes if e.path in existing]
+        filtered = writes + deletes
+        if not filtered:
+            # Only deletes of paths already gone on GitHub — nothing to commit.
+            return AtomicCommitResult(commit_sha=parent_sha, tree_sha=base_tree)
+
+        new_tree = await self.create_tree(base_tree, filtered)
         commit_sha = await self.create_commit(message, new_tree, parent_sha)
         await self.update_ref(commit_sha)
         return AtomicCommitResult(commit_sha=commit_sha, tree_sha=new_tree)
