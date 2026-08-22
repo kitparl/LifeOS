@@ -156,8 +156,9 @@ async def _read_file_bytes(db: AsyncSession, user_id: str, file_id: str) -> tupl
     if record is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"File {file_id} not found")
     backend = resolve_backend(record.storage_backend)
+    stream = await backend.open(record.storage_key)
     chunks: list[bytes] = []
-    async for chunk in backend.open(record.storage_key):
+    async for chunk in stream:
         chunks.append(chunk)
     return b"".join(chunks), record
 
