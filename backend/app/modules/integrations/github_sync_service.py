@@ -339,7 +339,7 @@ class GitHubSyncService:
 
                 result = {
                     "status": "synced",
-                    "message": f"Pushed to {cfg.repo}:{cfg.branch}/{md_path}",
+                    "message": "Pushed",
                     "md_path": md_path,
                     "synced_at": now,
                     "remote_commit_sha": commit_sha or None,

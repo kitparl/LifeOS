@@ -31,6 +31,9 @@ from app.modules.knowledge_notes.models import KnowledgeChapter, KnowledgeSectio
 def test_slugify():
     assert slugify("Python Basics") == "python-basics"
     assert slugify("  ") == "untitled"
+    assert slugify("Variable, Types, Expressions") == "variable-types-expressions"
+    assert slugify("Data Types: Numeric and Boolean") == "data-types-numeric-and-boolean"
+    assert slugify("C++ / Basics!!!") == "c-basics"
 
 
 def test_normalize_repo_accepts_urls():

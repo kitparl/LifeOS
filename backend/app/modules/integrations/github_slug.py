@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import re
 
-_UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+# Keep letters, digits, hyphen; turn everything else into a separator.
+_NON_SLUG = re.compile(r"[^a-z0-9]+")
+_MULTI_HYPHEN = re.compile(r"-{2,}")
 
 
 def slugify(title: str, fallback: str = "untitled") -> str:
-    base = (title or "").strip()
-    base = _UNSAFE.sub("", base)
-    base = re.sub(r"\s+", "-", base)
-    base = base.strip("-") or fallback
-    return base.lower()
+    """Turn a note/chapter title into a clean path segment.
+
+    "Variable, Types, Expressions" → variable-types-expressions
+    "Data Types: Numeric and Boolean" → data-types-numeric-and-boolean
+    """
+    base = (title or "").strip().lower()
+    base = _NON_SLUG.sub("-", base)
+    base = _MULTI_HYPHEN.sub("-", base).strip("-")
+    return base or fallback
