@@ -21,6 +21,7 @@ from app.modules.tasks.schemas import (
     TaskCreate,
     TaskListItem,
     TaskResponse,
+    TaskStatsResponse,
     TaskUpdate,
     WatcherCreate,
     WatcherResponse,
@@ -38,6 +39,11 @@ async def list_tasks(
     priority: str | None = Query(default=None),
     category: str | None = Query(default=None),
     due_today: bool = Query(default=False),
+    has_due_date: bool | None = Query(default=None),
+    overdue: bool = Query(default=False),
+    due_later: bool = Query(default=False),
+    exclude_due_today: bool = Query(default=False),
+    incomplete_only: bool = Query(default=False),
     search: str | None = Query(default=None),
     scope: str = Query(default="owned", pattern="^(owned|assigned_to_me|all)$"),
     include_archived: bool = Query(default=False),
@@ -52,6 +58,11 @@ async def list_tasks(
         priority=priority,
         category=category,
         due_today=due_today,
+        has_due_date=has_due_date,
+        overdue=overdue,
+        due_later=due_later,
+        exclude_due_today=exclude_due_today,
+        incomplete_only=incomplete_only,
         search=search,
         scope=scope,
         include_archived=include_archived,
@@ -60,6 +71,15 @@ async def list_tasks(
     )
     response.headers["X-Total-Count"] = str(total)
     return items
+
+
+@router.get("/stats", response_model=TaskStatsResponse)
+async def task_stats(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    completed_today, streak_days = await TaskService(db).get_stats(user.id)
+    return TaskStatsResponse(completed_today=completed_today, streak_days=streak_days)
 
 
 @router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)

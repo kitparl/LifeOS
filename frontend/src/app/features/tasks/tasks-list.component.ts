@@ -1,19 +1,51 @@
-import { DatePipe } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
-import { TASK_PRIORITIES, TASK_STATUSES, TaskListItem, TaskScope } from './models/task.models';
+import { forkJoin, Observable, tap } from 'rxjs';
+import { TaskListSectionComponent } from './task-list-section.component';
+import { combineDueDate, localDateInputValue } from './task-due-date.util';
+import { TaskListItem, TaskScope } from './models/task.models';
 import { TasksService } from './services/tasks.service';
+
+type TaskListKey = 'today' | 'overdue' | 'nodate' | 'upcoming';
+type TaskTab = 'today' | 'all';
+
+interface ListViewConfig {
+  key: TaskListKey;
+  title: string;
+  hint: string;
+  emptyMessage: string;
+  variant: 'today' | 'overdue' | 'nodate' | 'upcoming';
+  query: Record<string, boolean>;
+  showCreateLink?: boolean;
+}
+
+interface TaskListState {
+  items: TaskListItem[];
+  total: number;
+  page: number;
+  loading: boolean;
+}
 
 @Component({
   selector: 'app-tasks-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, ListPaginatorComponent],
+  imports: [NgTemplateOutlet, ReactiveFormsModule, FormsModule, RouterLink, TaskListSectionComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Tasks</h1>
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 class="text-lg font-semibold">Tasks</h1>
+          @if (scope === 'owned') {
+            <p class="text-xs mt-0.5" style="color: var(--text-muted)">
+              {{ stats.completedToday }} done today
+              @if (stats.streakDays > 0) {
+                · {{ stats.streakDays }}-day streak
+              }
+            </p>
+          }
+        </div>
         <a routerLink="/tasks/new" class="btn-primary text-xs no-underline">New Task</a>
       </div>
 
@@ -31,200 +63,400 @@ import { TasksService } from './services/tasks.service';
         }
       </div>
 
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
-        <input class="input-field !w-auto min-w-[10rem] flex-1" formControlName="search" placeholder="Search…" />
-        <select class="input-field !w-auto" formControlName="status">
-          <option value="">All statuses</option>
-          @for (s of statuses; track s.value) {
-            <option [value]="s.value">{{ s.label }}</option>
-          }
-        </select>
-        <select class="input-field !w-auto" formControlName="priority">
-          <option value="">All priorities</option>
-          @for (p of priorities; track p.value) {
-            <option [value]="p.value">{{ p.label }}</option>
-          }
-        </select>
-        <label class="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-          <input type="checkbox" formControlName="due_today" />
-          Due today
-        </label>
-        <button type="submit" class="btn-primary text-xs">Filter</button>
-      </form>
-
-      @if (loading) {
-        <p class="text-sm" style="color: var(--text-muted)">Loading tasks…</p>
-      } @else if (tasks.length === 0) {
-        <div class="panel">
-          <p class="text-sm" style="color: var(--text-muted)">
-            {{
-              scope === 'assigned_to_me'
-                ? 'No tasks from others assigned to you.'
-                : 'No tasks yet.'
-            }}
-          </p>
-          @if (scope === 'owned') {
-            <a routerLink="/tasks/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create task</a>
-          }
-        </div>
-      } @else {
-        <div class="space-y-2 md:hidden">
-          @for (task of pagedTasks; track task.id) {
-            <article class="panel space-y-2 !py-3">
-              <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <a [routerLink]="['/tasks', task.id]" class="link font-medium">{{ task.title }}</a>
-                  <div class="mt-1.5 flex flex-wrap gap-1">
-                    <span class="chip text-xs capitalize">{{ task.priority }}</span>
-                    <span class="chip text-xs capitalize">{{ task.status.replace('_', ' ') }}</span>
-                    @if (task.assignment_status === 'pending') {
-                      <span class="chip text-xs" style="color: var(--warning, #b45309)">Pending accept</span>
-                    }
-                  </div>
-                  <p class="mt-1 text-xs" style="color: var(--text-muted)">
-                    {{ task.due_date ? (task.due_date | date: 'mediumDate') : 'No due date' }}
-                    · {{ task.completed_subtasks }}/{{ task.subtask_count }} subtasks
-                  </p>
-                </div>
-                @if (task.status !== 'completed') {
-                  <button type="button" class="btn-primary shrink-0 px-2 text-xs" (click)="complete(task.id)">
-                    Done
-                  </button>
-                }
-              </div>
-            </article>
-          }
-          <app-list-paginator
-            [total]="tasks.length"
-            [pageSize]="pageSize"
-            [currentPage]="currentPage"
-            (pageChange)="setPage($event)"
+      @if (scope === 'owned') {
+        <form class="flex gap-2" (ngSubmit)="addQuickTask()">
+          <input
+            class="input-field flex-1"
+            [(ngModel)]="quickTitle"
+            [ngModelOptions]="{ standalone: true }"
+            placeholder="Add a task (no date)…"
+            maxlength="200"
           />
-        </div>
+          <button type="submit" class="btn-primary text-xs shrink-0" [disabled]="!quickTitle.trim() || quickAdding">
+            Add
+          </button>
+        </form>
+      }
 
-        <div class="panel hidden !p-0 overflow-hidden md:block">
-          <table class="w-full text-sm">
-            <thead class="border-b border-[var(--xp-border)] bg-[var(--xp-silver)] text-left text-xs">
-              <tr>
-                <th class="px-3 py-2 font-medium">Title</th>
-                <th class="px-3 py-2 font-medium">Priority</th>
-                <th class="px-3 py-2 font-medium">Status</th>
-                <th class="px-3 py-2 font-medium">Due</th>
-                <th class="px-3 py-2 font-medium">Subtasks</th>
-                <th class="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (task of pagedTasks; track task.id) {
-                <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
-                  <td class="px-3 py-2">
-                    <a [routerLink]="['/tasks', task.id]" class="link font-medium">{{ task.title }}</a>
-                    @if (task.assignment_status === 'pending') {
-                      <span class="chip ml-2 text-xs" style="color: var(--warning, #b45309)">Pending</span>
-                    }
-                  </td>
-                  <td class="px-3 py-2 capitalize text-xs">{{ task.priority }}</td>
-                  <td class="px-3 py-2">
-                    <span class="chip text-xs capitalize">{{ task.status.replace('_', ' ') }}</span>
-                  </td>
-                  <td class="px-3 py-2 text-xs" style="color: var(--text-muted)">
-                    {{ task.due_date ? (task.due_date | date: 'mediumDate') : '—' }}
-                  </td>
-                  <td class="px-3 py-2 text-xs">{{ task.completed_subtasks }}/{{ task.subtask_count }}</td>
-                  <td class="px-3 py-2 text-right">
-                    @if (task.status !== 'completed') {
-                      <button type="button" class="btn-ghost text-xs" (click)="complete(task.id)">Done</button>
-                    }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-          <app-list-paginator
-            [total]="tasks.length"
-            [pageSize]="pageSize"
-            [currentPage]="currentPage"
-            (pageChange)="setPage($event)"
-          />
+      <div class="flex flex-wrap gap-2 text-xs">
+        @if (lists.today.total > 0) {
+          <span class="chip">{{ lists.today.total }} today</span>
+        }
+        @if (lists.overdue.total > 0) {
+          <span class="chip" style="color: var(--warning, #b45309)">{{ lists.overdue.total }} overdue</span>
+        }
+        @if (lists.nodate.total > 0) {
+          <span class="chip">{{ lists.nodate.total }} no date</span>
+        }
+        @if (lists.upcoming.total > 0) {
+          <span class="chip">{{ lists.upcoming.total }} upcoming</span>
+        }
+      </div>
+
+      <div class="flex gap-1 text-xs md:hidden">
+        @for (tab of viewTabs; track tab.id) {
+          <button
+            type="button"
+            class="rounded-lg border px-3 py-1.5 flex-1"
+            [class.bg-[var(--primary-soft)]]="activeTab === tab.id"
+            [style.border-color]="'var(--xp-border)'"
+            (click)="activeTab = tab.id"
+          >
+            {{ tab.label }}
+            @if (tab.id === 'today') {
+              ({{ lists.today.total }})
+            } @else {
+              ({{ allTasksTotal }})
+            }
+          </button>
+        }
+      </div>
+
+      @if (scheduleTaskId) {
+        <div class="panel space-y-2 !py-3">
+          <p class="text-sm font-medium">Set due date</p>
+          <div class="flex flex-wrap gap-2">
+            <input class="input-field flex-1 min-w-[10rem]" type="date" [(ngModel)]="scheduleDate" [ngModelOptions]="{ standalone: true }" />
+            <input class="input-field !w-auto" type="time" [(ngModel)]="scheduleTime" [ngModelOptions]="{ standalone: true }" aria-label="Time (optional)" />
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="btn-primary text-xs" (click)="confirmSchedule()">Save</button>
+            <button type="button" class="btn-ghost text-xs" (click)="clearScheduleDate()">Remove date</button>
+            <button type="button" class="btn-ghost text-xs" (click)="cancelSchedule()">Cancel</button>
+          </div>
         </div>
       }
+
+      <div class="md:hidden">
+        @if (activeTab === 'today') {
+          <ng-container *ngTemplateOutlet="sectionToday" />
+        } @else {
+          <ng-container *ngTemplateOutlet="sectionAll" />
+        }
+      </div>
+
+      <div class="hidden md:block space-y-4">
+        <ng-container *ngTemplateOutlet="sectionToday" />
+        <ng-container *ngTemplateOutlet="sectionAll" />
+      </div>
     </div>
+
+    <ng-template #sectionToday>
+      <app-task-list-section
+        title="Today"
+        hint="Due today — tap Done or swipe right on mobile"
+        variant="today"
+        [tasks]="lists.today.items"
+        [total]="lists.today.total"
+        [pageSize]="pageSize"
+        [currentPage]="lists.today.page"
+        [loading]="lists.today.loading"
+        emptyMessage="Nothing due today."
+        (pageChange)="setPage('today', $event)"
+        (complete)="complete($event)"
+      />
+    </ng-template>
+
+    <ng-template #sectionAll>
+      <div class="space-y-4">
+        <p class="text-xs font-medium uppercase tracking-wide" style="color: var(--text-muted)">All other tasks</p>
+
+        @if (lists.overdue.total > 0 || lists.overdue.loading) {
+          <app-task-list-section
+            title="Overdue"
+            hint="Past due — tackle these first"
+            variant="overdue"
+            [showTodayAction]="canSchedule"
+            [showDateAction]="canSchedule"
+            [tasks]="lists.overdue.items"
+            [total]="lists.overdue.total"
+            [pageSize]="pageSize"
+            [currentPage]="lists.overdue.page"
+            [loading]="lists.overdue.loading"
+            emptyMessage="Nothing overdue."
+            (pageChange)="setPage('overdue', $event)"
+            (complete)="complete($event)"
+            (scheduleToday)="scheduleForToday($event)"
+            (scheduleDate)="openSchedule($event)"
+          />
+        }
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <app-task-list-section
+            title="No date"
+            hint="Not scheduled — add when ready"
+            variant="nodate"
+            [showTodayAction]="canSchedule"
+            [showDateAction]="canSchedule"
+            [tasks]="lists.nodate.items"
+            [total]="lists.nodate.total"
+            [pageSize]="pageSize"
+            [currentPage]="lists.nodate.page"
+            [loading]="lists.nodate.loading"
+            [emptyMessage]="scope === 'assigned_to_me' ? 'No unscheduled tasks.' : 'No unscheduled tasks.'"
+            [showCreateLink]="scope === 'owned'"
+            (pageChange)="setPage('nodate', $event)"
+            (complete)="complete($event)"
+            (scheduleToday)="scheduleForToday($event)"
+            (scheduleDate)="openSchedule($event)"
+          />
+
+          <app-task-list-section
+            title="Upcoming"
+            hint="Scheduled for future days"
+            variant="upcoming"
+            [showTodayAction]="canSchedule"
+            [showDateAction]="canSchedule"
+            [tasks]="lists.upcoming.items"
+            [total]="lists.upcoming.total"
+            [pageSize]="pageSize"
+            [currentPage]="lists.upcoming.page"
+            [loading]="lists.upcoming.loading"
+            emptyMessage="Nothing scheduled ahead."
+            (pageChange)="setPage('upcoming', $event)"
+            (complete)="complete($event)"
+            (scheduleToday)="scheduleForToday($event)"
+            (scheduleDate)="openSchedule($event)"
+          />
+        </div>
+      </div>
+    </ng-template>
   `,
 })
 export class TasksListComponent implements OnInit {
   private readonly tasksService = inject(TasksService);
   private readonly fb = inject(FormBuilder);
 
-  priorities = TASK_PRIORITIES;
-  statuses = TASK_STATUSES;
   scopeTabs: { value: TaskScope; label: string }[] = [
     { value: 'owned', label: 'My tasks' },
     { value: 'assigned_to_me', label: 'Assigned to me' },
   ];
-  tasks: TaskListItem[] = [];
-  loading = false;
-  currentPage = 1;
+  viewTabs: { id: TaskTab; label: string }[] = [
+    { id: 'today', label: 'Today' },
+    { id: 'all', label: 'All tasks' },
+  ];
+
   scope: TaskScope = 'owned';
+  activeTab: TaskTab = 'today';
   readonly pageSize = 12;
+
+  stats = { completedToday: 0, streakDays: 0 };
+  quickTitle = '';
+  quickAdding = false;
+  scheduleTaskId: string | null = null;
+  scheduleDate = '';
+  scheduleTime = '';
+
+  readonly otherViews: ListViewConfig[] = [
+    {
+      key: 'overdue',
+      title: 'Overdue',
+      hint: '',
+      emptyMessage: '',
+      variant: 'overdue',
+      query: { overdue: true },
+    },
+    {
+      key: 'nodate',
+      title: 'No date',
+      hint: '',
+      emptyMessage: '',
+      variant: 'nodate',
+      query: { has_due_date: false },
+    },
+    {
+      key: 'upcoming',
+      title: 'Upcoming',
+      hint: '',
+      emptyMessage: '',
+      variant: 'upcoming',
+      query: { due_later: true },
+    },
+  ];
+
+  lists: Record<TaskListKey, TaskListState> = {
+    today: { items: [], total: 0, page: 1, loading: false },
+    overdue: { items: [], total: 0, page: 1, loading: false },
+    nodate: { items: [], total: 0, page: 1, loading: false },
+    upcoming: { items: [], total: 0, page: 1, loading: false },
+  };
 
   filters = this.fb.nonNullable.group({
     search: '',
     status: '',
     priority: '',
-    due_today: false,
   });
 
-  ngOnInit(): void {
-    this.load();
+  get canSchedule(): boolean {
+    return this.scope === 'owned';
   }
 
-  get pagedTasks(): TaskListItem[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.tasks.slice(start, start + this.pageSize);
+  get allTasksTotal(): number {
+    return this.lists.overdue.total + this.lists.nodate.total + this.lists.upcoming.total;
+  }
+
+  ngOnInit(): void {
+    this.refresh();
   }
 
   setScope(scope: TaskScope): void {
     this.scope = scope;
-    this.currentPage = 1;
-    this.load();
+    this.resetPages();
+    this.refresh();
   }
 
-  applyFilters(): void {
-    this.currentPage = 1;
-    this.load();
-  }
-
-  load(): void {
-    this.loading = true;
-    const raw = this.filters.getRawValue();
-    this.tasksService
-      .list({
-        search: raw.search || undefined,
-        status: raw.status || undefined,
-        priority: raw.priority || undefined,
-        due_today: raw.due_today || undefined,
-        scope: this.scope,
-      })
-      .subscribe({
-        next: (data) => {
-          this.tasks = data;
-          this.clampPage();
-          this.loading = false;
-        },
-        error: () => (this.loading = false),
-      });
+  setPage(key: TaskListKey, page: number): void {
+    this.lists[key].page = page;
+    this.loadList(key);
   }
 
   complete(id: string): void {
-    this.tasksService.complete(id).subscribe({ next: () => this.load() });
+    this.tasksService.complete(id).subscribe({
+      next: () => {
+        if (this.scope === 'owned') {
+          this.stats.completedToday += 1;
+          if (this.stats.streakDays === 0) {
+            this.stats.streakDays = 1;
+          }
+        }
+        this.refresh(false);
+      },
+    });
   }
 
-  setPage(page: number): void {
-    this.currentPage = page;
+  scheduleForToday(id: string): void {
+    const due = new Date();
+    due.setHours(12, 0, 0, 0);
+    this.tasksService.update(id, { due_date: due.toISOString() }).subscribe({ next: () => this.refresh() });
   }
 
-  private clampPage(): void {
-    const totalPages = Math.max(1, Math.ceil(this.tasks.length / this.pageSize));
-    this.currentPage = Math.min(this.currentPage, totalPages);
+  openSchedule(id: string): void {
+    this.scheduleTaskId = id;
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    this.scheduleDate = localDateInputValue(d);
+    this.scheduleTime = '';
+  }
+
+  confirmSchedule(): void {
+    if (!this.scheduleTaskId || !this.scheduleDate) {
+      return;
+    }
+    const iso = combineDueDate(this.scheduleDate, this.scheduleTime);
+    if (!iso) {
+      return;
+    }
+    this.tasksService.update(this.scheduleTaskId, { due_date: iso }).subscribe({
+      next: () => {
+        this.cancelSchedule();
+        this.refresh();
+      },
+    });
+  }
+
+  clearScheduleDate(): void {
+    if (!this.scheduleTaskId) {
+      return;
+    }
+    this.tasksService.update(this.scheduleTaskId, { due_date: null }).subscribe({
+      next: () => {
+        this.cancelSchedule();
+        this.refresh();
+      },
+    });
+  }
+
+  cancelSchedule(): void {
+    this.scheduleTaskId = null;
+    this.scheduleDate = '';
+    this.scheduleTime = '';
+  }
+
+  addQuickTask(): void {
+    const title = this.quickTitle.trim();
+    if (!title || this.quickAdding) {
+      return;
+    }
+    this.quickAdding = true;
+    this.tasksService.create({ title }).subscribe({
+      next: () => {
+        this.quickTitle = '';
+        this.quickAdding = false;
+        this.activeTab = 'all';
+        this.refresh();
+      },
+      error: () => {
+        this.quickAdding = false;
+      },
+    });
+  }
+
+  private refresh(reloadStats = true): void {
+    const jobs: Observable<unknown>[] = [
+      this.fetchList('today'),
+      ...this.otherViews.map((v) => this.fetchList(v.key)),
+    ];
+    if (reloadStats && this.scope === 'owned') {
+      jobs.push(
+        this.tasksService.stats().pipe(
+          tap((s) => {
+            this.stats = { completedToday: s.completed_today, streakDays: s.streak_days };
+          }),
+        ),
+      );
+    }
+    forkJoin(jobs).subscribe();
+  }
+
+  private resetPages(): void {
+    (['today', 'overdue', 'nodate', 'upcoming'] as TaskListKey[]).forEach((key) => {
+      this.lists[key].page = 1;
+    });
+  }
+
+  private loadList(key: TaskListKey): void {
+    this.fetchList(key).subscribe();
+  }
+
+  private fetchList(key: TaskListKey): Observable<unknown> {
+    const state = this.lists[key];
+    state.loading = true;
+    const raw = this.filters.getRawValue();
+    const offset = (state.page - 1) * this.pageSize;
+    const viewQuery =
+      key === 'today'
+        ? { due_today: true, incomplete_only: true }
+        : { ...this.otherViews.find((v) => v.key === key)!.query };
+
+    if (!raw.status) {
+      viewQuery['incomplete_only'] = true;
+    }
+
+    return this.tasksService
+      .list({
+        ...viewQuery,
+        search: raw.search || undefined,
+        status: raw.status || undefined,
+        priority: raw.priority || undefined,
+        scope: this.scope,
+        limit: this.pageSize,
+        offset,
+      })
+      .pipe(
+        tap({
+          next: (result) => {
+            state.items = result.items;
+            state.total = result.total;
+            const totalPages = Math.max(1, Math.ceil(result.total / this.pageSize));
+            if (state.page > totalPages) {
+              state.page = totalPages;
+            }
+            state.loading = false;
+          },
+          error: () => {
+            state.loading = false;
+          },
+        }),
+      );
   }
 }

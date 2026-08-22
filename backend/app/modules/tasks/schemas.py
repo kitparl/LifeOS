@@ -262,3 +262,8 @@ class TagResponse(BaseModel):
 
 class TagAttachRequest(BaseModel):
     name: str = Field(min_length=1, max_length=64)
+
+
+class TaskStatsResponse(BaseModel):
+    completed_today: int
+    streak_days: int

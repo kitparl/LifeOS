@@ -1,6 +1,6 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import {
   ActivityLogEntry,
@@ -16,6 +16,16 @@ import {
   TaskWatcher,
 } from '../models/task.models';
 
+export interface TaskListResult {
+  items: TaskListItem[];
+  total: number;
+}
+
+export interface TaskStats {
+  completed_today: number;
+  streak_days: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TasksService {
   private readonly http = inject(HttpClient);
@@ -26,23 +36,45 @@ export class TasksService {
     priority?: string;
     category?: string;
     due_today?: boolean;
+    has_due_date?: boolean;
+    overdue?: boolean;
+    due_later?: boolean;
+    exclude_due_today?: boolean;
+    incomplete_only?: boolean;
     search?: string;
     scope?: TaskScope;
     include_archived?: boolean;
     limit?: number;
     offset?: number;
-  }): Observable<TaskListItem[]> {
+  }): Observable<TaskListResult> {
     let params = new HttpParams();
     if (opts?.status) params = params.set('status', opts.status);
     if (opts?.priority) params = params.set('priority', opts.priority);
     if (opts?.category) params = params.set('category', opts.category);
     if (opts?.due_today) params = params.set('due_today', 'true');
+    if (opts?.has_due_date === true) params = params.set('has_due_date', 'true');
+    if (opts?.has_due_date === false) params = params.set('has_due_date', 'false');
+    if (opts?.overdue) params = params.set('overdue', 'true');
+    if (opts?.due_later) params = params.set('due_later', 'true');
+    if (opts?.exclude_due_today) params = params.set('exclude_due_today', 'true');
+    if (opts?.incomplete_only) params = params.set('incomplete_only', 'true');
     if (opts?.search) params = params.set('search', opts.search);
     if (opts?.scope) params = params.set('scope', opts.scope);
     if (opts?.include_archived) params = params.set('include_archived', 'true');
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
-    return this.http.get<TaskListItem[]>(this.api, { params });
+    return this.http
+      .get<TaskListItem[]>(this.api, { params, observe: 'response' })
+      .pipe(
+        map((response: HttpResponse<TaskListItem[]>) => ({
+          items: response.body ?? [],
+          total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+        })),
+      );
+  }
+
+  stats(): Observable<TaskStats> {
+    return this.http.get<TaskStats>(`${this.api}/stats`);
   }
 
   get(id: string): Observable<Task> {

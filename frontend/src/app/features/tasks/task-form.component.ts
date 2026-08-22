@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { PublicUser } from '../../core/models/auth.models';
 import { UserPickerComponent } from './components/user-picker.component';
 import { TASK_PRIORITIES, TASK_RECURRENCE, TASK_STATUSES, TaskPriority, TaskRecurrence, TaskStatus } from './models/task.models';
+import { combineDueDate, localDateInputValue, splitDueDate } from './task-due-date.util';
 import { TasksService } from './services/tasks.service';
 
 @Component({
@@ -67,7 +68,12 @@ import { TasksService } from './services/tasks.service';
           </div>
           <div>
             <label class="mb-1 block">Due date</label>
-            <input class="input-field" type="datetime-local" formControlName="due_date" />
+            <div class="flex flex-wrap items-center gap-2">
+              <input class="input-field min-w-[10rem] flex-1" type="date" formControlName="due_date" />
+              <input class="input-field !w-auto" type="time" formControlName="due_time" aria-label="Due time (optional)" />
+              <button type="button" class="btn-ghost text-xs shrink-0" (click)="clearDueDate()">Clear</button>
+            </div>
+            <p class="mt-1 text-xs" style="color: var(--text-muted)">Defaults to today. Add a time only if you need one.</p>
           </div>
           @if (error) {
             <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
@@ -106,7 +112,8 @@ export class TaskFormComponent implements OnInit {
     category: [''],
     tags: [''],
     description: [''],
-    due_date: [''],
+    due_date: [localDateInputValue()],
+    due_time: [''],
   });
 
   ngOnInit(): void {
@@ -117,6 +124,7 @@ export class TaskFormComponent implements OnInit {
       this.taskId = id;
       this.tasksService.get(id).subscribe({
         next: (task) => {
+          const due = splitDueDate(task.due_date);
           this.form.patchValue({
             title: task.title,
             priority: task.priority,
@@ -125,11 +133,16 @@ export class TaskFormComponent implements OnInit {
             category: task.category ?? '',
             tags: task.tags.join(', '),
             description: task.description ?? '',
-            due_date: task.due_date ? task.due_date.slice(0, 16) : '',
+            due_date: due.date,
+            due_time: due.time,
           });
         },
       });
     }
+  }
+
+  clearDueDate(): void {
+    this.form.patchValue({ due_date: '', due_time: '' });
   }
 
   onAssignee(user: PublicUser | null): void {
@@ -153,7 +166,7 @@ export class TaskFormComponent implements OnInit {
       category: raw.category || null,
       tags,
       description: raw.description || null,
-      due_date: raw.due_date ? new Date(raw.due_date).toISOString() : null,
+      due_date: combineDueDate(raw.due_date, raw.due_time),
     };
     if (!this.isEdit && this.assigneeUsername) {
       payload['assignee_username'] = this.assigneeUsername;

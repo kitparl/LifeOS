@@ -44,12 +44,35 @@ describe('TasksService', () => {
   });
 
   it('should list assigned_to_me scope', () => {
-    service.list({ scope: 'assigned_to_me' }).subscribe((rows) => {
-      expect(rows.length).toBe(0);
+    service.list({ scope: 'assigned_to_me' }).subscribe((result) => {
+      expect(result.items.length).toBe(0);
+      expect(result.total).toBe(0);
     });
     const req = http.expectOne((r) => r.url === `${environment.apiUrl}/tasks` && r.params.get('scope') === 'assigned_to_me');
     expect(req.request.method).toBe('GET');
-    req.flush([]);
+    req.flush([], { headers: { 'X-Total-Count': '0' } });
+  });
+
+  it('should pass list filters and read total count', () => {
+    service
+      .list({ has_due_date: false, overdue: true, incomplete_only: true, limit: 12, offset: 0 })
+      .subscribe((result) => {
+        expect(result.items.length).toBe(1);
+        expect(result.total).toBe(3);
+      });
+    const req = http.expectOne(
+      (r) =>
+        r.url === `${environment.apiUrl}/tasks` &&
+        r.params.get('has_due_date') === 'false' &&
+        r.params.get('overdue') === 'true' &&
+        r.params.get('incomplete_only') === 'true' &&
+        r.params.get('limit') === '12' &&
+        r.params.get('offset') === '0',
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush([{ id: '1', title: 'One', status: 'pending', priority: 'low', category: null, tags: [], due_date: null, updated_at: new Date().toISOString(), subtask_count: 0, completed_subtasks: 0 }], {
+      headers: { 'X-Total-Count': '3' },
+    });
   });
 
   it('should assign a task', () => {

@@ -8,6 +8,8 @@ from app.modules.tasks.models import Task, TaskAssignment
 from app.modules.tasks.schemas import TaskCreate, TaskUpdate
 from app.modules.tasks.status_utils import normalize_task_status
 
+_INCOMPLETE_STATUSES = ("pending", "in_progress", "hold", "delayed")
+
 
 class TaskRepository:
     def __init__(self, db: AsyncSession):
@@ -23,6 +25,11 @@ class TaskRepository:
         priority: str | None = None,
         category: str | None = None,
         due_today: bool = False,
+        has_due_date: bool | None = None,
+        overdue: bool = False,
+        due_later: bool = False,
+        exclude_due_today: bool = False,
+        incomplete_only: bool = False,
         search: str | None = None,
         parent_only: bool = True,
         scope: str = "owned",
@@ -70,6 +77,31 @@ class TaskRepository:
                 Task.due_date >= today_start,
                 Task.due_date <= today_end,
             )
+        if has_due_date is True:
+            q = q.where(Task.due_date.is_not(None))
+        elif has_due_date is False:
+            q = q.where(Task.due_date.is_(None))
+        if overdue:
+            today_start, _ = self._today_bounds()
+            q = q.where(
+                Task.due_date.is_not(None),
+                Task.due_date < today_start,
+                Task.status.in_(_INCOMPLETE_STATUSES),
+            )
+        if due_later:
+            _, today_end = self._today_bounds()
+            q = q.where(Task.due_date.is_not(None), Task.due_date > today_end)
+        if exclude_due_today:
+            today_start, today_end = self._today_bounds()
+            q = q.where(
+                or_(
+                    Task.due_date.is_(None),
+                    Task.due_date < today_start,
+                    Task.due_date > today_end,
+                )
+            )
+        if incomplete_only:
+            q = q.where(Task.status.in_(_INCOMPLETE_STATUSES))
         if search:
             term = f"%{search.lower()}%"
             q = q.where(or_(Task.title.ilike(term), Task.description.ilike(term)))
@@ -201,3 +233,41 @@ class TaskRepository:
         start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
         end = datetime.combine(now.date(), time.max, tzinfo=timezone.utc)
         return start, end
+
+    async def get_stats(self, user_id: str) -> tuple[int, int]:
+        from datetime import date, timedelta
+
+        today_start, today_end = self._today_bounds()
+        base = (
+            Task.user_id == user_id,
+            Task.parent_id.is_(None),
+            self._not_deleted(),
+            Task.completed_at.is_not(None),
+        )
+
+        completed_today = (
+            await self.db.execute(
+                select(func.count()).select_from(Task).where(
+                    *base,
+                    Task.completed_at >= today_start,
+                    Task.completed_at <= today_end,
+                )
+            )
+        ).scalar_one()
+
+        rows = await self.db.execute(
+            select(Task.completed_at).where(*base).order_by(Task.completed_at.desc()).limit(500)
+        )
+        completion_dates: set[date] = set()
+        for (completed_at,) in rows.all():
+            if completed_at is not None:
+                completion_dates.add(completed_at.date())
+
+        today = today_start.date()
+        streak = 0
+        cursor = today if today in completion_dates else today - timedelta(days=1)
+        while cursor in completion_dates:
+            streak += 1
+            cursor -= timedelta(days=1)
+
+        return int(completed_today), streak

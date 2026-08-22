@@ -67,6 +67,11 @@ class TaskService:
         priority: str | None = None,
         category: str | None = None,
         due_today: bool = False,
+        has_due_date: bool | None = None,
+        overdue: bool = False,
+        due_later: bool = False,
+        exclude_due_today: bool = False,
+        incomplete_only: bool = False,
         search: str | None = None,
         scope: str = "owned",
         include_archived: bool = False,
@@ -79,6 +84,11 @@ class TaskService:
             priority=priority,
             category=category,
             due_today=due_today,
+            has_due_date=has_due_date,
+            overdue=overdue,
+            due_later=due_later,
+            exclude_due_today=exclude_due_today,
+            incomplete_only=incomplete_only,
             search=search,
             scope=scope,
             include_archived=include_archived,
@@ -108,6 +118,9 @@ class TaskService:
                 )
             )
         return items, total
+
+    async def get_stats(self, user_id: str) -> tuple[int, int]:
+        return await self.repo.get_stats(user_id)
 
     async def get_task(self, user_id: str, task_id: str) -> TaskResponse:
         task = await load_task_for_actor(self.db, task_id, user_id)
