@@ -15,6 +15,7 @@ class SectionUpdate(BaseModel):
     content: str | None = None
     order_index: int | None = None
     chapter_id: str | None = None
+    closed: bool | None = None
 
 
 class SectionResponse(BaseModel):
@@ -24,6 +25,7 @@ class SectionResponse(BaseModel):
     content: str
     order_index: int
     archived_at: datetime | None = None
+    closed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -39,6 +41,7 @@ class ChapterCreate(BaseModel):
 class ChapterUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     order_index: int | None = None
+    closed: bool | None = None
 
 
 class ChapterResponse(BaseModel):
@@ -46,6 +49,7 @@ class ChapterResponse(BaseModel):
     subject_id: str
     title: str
     order_index: int
+    closed_at: datetime | None = None
     sections: list[SectionResponse] = []
 
     model_config = {"from_attributes": True}

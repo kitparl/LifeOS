@@ -110,7 +110,11 @@ class KnowledgeNotesRepository:
         return await self.get_chapter(user_id, chapter.id)
 
     async def update_chapter(self, chapter: KnowledgeChapter, data: ChapterUpdate) -> KnowledgeChapter:
-        for key, value in data.model_dump(exclude_unset=True).items():
+        payload = data.model_dump(exclude_unset=True)
+        closed = payload.pop("closed", None)
+        if closed is not None:
+            chapter.closed_at = datetime.now(timezone.utc) if closed else None
+        for key, value in payload.items():
             setattr(chapter, key, value)
         await self.db.flush()
         return await self.get_chapter(chapter.user_id, chapter.id)
@@ -153,7 +157,11 @@ class KnowledgeNotesRepository:
         return section
 
     async def update_section(self, section: KnowledgeSection, data: SectionUpdate) -> KnowledgeSection:
-        for key, value in data.model_dump(exclude_unset=True).items():
+        payload = data.model_dump(exclude_unset=True)
+        closed = payload.pop("closed", None)
+        if closed is not None:
+            section.closed_at = datetime.now(timezone.utc) if closed else None
+        for key, value in payload.items():
             setattr(section, key, value)
         await self.db.flush()
         await self.db.refresh(section)
@@ -193,9 +201,11 @@ class KnowledgeNotesRepository:
         return ids
 
     # ---- Search ----
-    async def search_sections(self, user_id: str, query: str) -> list[tuple]:
+    async def search_sections(
+        self, user_id: str, query: str, subject_id: str | None = None
+    ) -> list[tuple]:
         pattern = f"%{query}%"
-        result = await self.db.execute(
+        stmt = (
             select(KnowledgeSection, KnowledgeChapter, KnowledgeSubject)
             .join(KnowledgeChapter, KnowledgeSection.chapter_id == KnowledgeChapter.id)
             .join(KnowledgeSubject, KnowledgeChapter.subject_id == KnowledgeSubject.id)
@@ -209,7 +219,10 @@ class KnowledgeNotesRepository:
                     KnowledgeSubject.title.ilike(pattern),
                 ),
             )
-            .order_by(KnowledgeSection.updated_at.desc())
-            .limit(50)
+        )
+        if subject_id:
+            stmt = stmt.where(KnowledgeSubject.id == subject_id)
+        result = await self.db.execute(
+            stmt.order_by(KnowledgeSection.updated_at.desc()).limit(50)
         )
         return list(result.all())

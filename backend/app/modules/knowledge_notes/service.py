@@ -101,6 +101,7 @@ class KnowledgeNotesService:
                     subject_id=chapter.subject_id,
                     title=chapter.title,
                     order_index=chapter.order_index,
+                    closed_at=chapter.closed_at,
                     sections=active,
                 )
             )
@@ -208,12 +209,14 @@ class KnowledgeNotesService:
         return SectionResponse.model_validate(updated)
 
     # ---- Search ----
-    async def search(self, user_id: str, query: str) -> list[SearchHit]:
+    async def search(
+        self, user_id: str, query: str, subject_id: str | None = None
+    ) -> list[SearchHit]:
         query = (query or "").strip()
         if not query:
             return []
         await self._purge_expired(user_id)
-        rows = await self.repo.search_sections(user_id, query)
+        rows = await self.repo.search_sections(user_id, query, subject_id)
         hits: list[SearchHit] = []
         for section, chapter, subject in rows:
             hits.append(

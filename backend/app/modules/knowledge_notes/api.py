@@ -26,10 +26,11 @@ router = APIRouter(prefix="/knowledge-notes", tags=["knowledge-notes"])
 @router.get("/search", response_model=list[SearchHit])
 async def search_notes(
     q: str = Query(default=""),
+    subject_id: str | None = Query(default=None),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await KnowledgeNotesService(db).search(user.id, q)
+    return await KnowledgeNotesService(db).search(user.id, q, subject_id)
 
 
 # ---- Subjects ----

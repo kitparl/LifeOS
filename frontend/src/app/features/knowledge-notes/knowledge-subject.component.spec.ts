@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
-import { KnowledgeSubjectComponent, stripFileMarkdown } from './knowledge-subject.component';
+import { KnowledgeSubjectComponent, stripFileMarkdown, resolveDefaultSection, isSectionComplete } from './knowledge-subject.component';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
 import { FilesService } from '../files/services/files.service';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
@@ -68,9 +68,11 @@ describe('KnowledgeSubjectComponent', () => {
     deleteSection: jasmine.Spy;
     deleteChapter: jasmine.Spy;
     deleteSubject: jasmine.Spy;
+    search: jasmine.Spy;
   };
 
   beforeEach(async () => {
+    localStorage.clear();
     notes = {
       getSubject: jasmine.createSpy('getSubject').and.callFake(() => of(structuredClone(subject))),
       parseCodeBlocks: jasmine.createSpy('parseCodeBlocks').and.returnValue([]),
@@ -124,6 +126,7 @@ describe('KnowledgeSubjectComponent', () => {
       deleteSection: jasmine.createSpy('deleteSection').and.returnValue(of(void 0)),
       deleteChapter: jasmine.createSpy('deleteChapter').and.returnValue(of(void 0)),
       deleteSubject: jasmine.createSpy('deleteSubject').and.returnValue(of(void 0)),
+      search: jasmine.createSpy('search').and.returnValue(of([])),
     };
 
     await TestBed.configureTestingModule({
@@ -185,11 +188,146 @@ describe('KnowledgeSubjectComponent', () => {
     expect(text).toContain('Notes');
     expect(text).toContain('System Design');
     expect(text).toContain('Test');
-    expect(text).toContain('Save');
+    expect(text).toContain('Edit');
     expect(fixture.nativeElement.querySelector('[aria-label="Subject actions"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[aria-label="Section actions"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[aria-label="Chapter actions"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.btn-danger')).toBeFalsy();
+  });
+
+  it('opens existing sections in read mode by default', () => {
+    expect(component.previewOnly()).toBeTrue();
+    expect(fixture.nativeElement.querySelector('.kn-section-title-read')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.kn-section-title')).toBeFalsy();
+  });
+
+  it('opens newly created sections in edit mode', () => {
+    (fixture.nativeElement.querySelector('[aria-label="New section"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(component.previewOnly()).toBeFalse();
+    expect(fixture.nativeElement.querySelector('.kn-section-title')).toBeTruthy();
+  });
+
+  it('returns to read mode after saving existing content', () => {
+    component.enterEditMode();
+    fixture.detectChanges();
+    component.form.controls.title.setValue('Changed title');
+    component.save();
+    fixture.detectChanges();
+    expect(component.previewOnly()).toBeTrue();
+  });
+
+  it('stays in edit mode after auto-save while writing', () => {
+    component.enterEditMode();
+    fixture.detectChanges();
+    component.form.controls.content.setValue('Draft in progress');
+    (component as unknown as { saveIfDirty: (r: boolean) => void }).saveIfDirty(false);
+    fixture.detectChanges();
+    expect(component.previewOnly()).toBeFalse();
+  });
+
+  it('collapses and expands chapters from the chevron', () => {
+    expect(component.isExpanded('c1')).toBeTrue();
+    component.toggleChapter(component.subject()!.chapters[0], new Event('click'));
+    fixture.detectChanges();
+    expect(component.isExpanded('c1')).toBeFalse();
+    expect(fixture.nativeElement.querySelector('.kn-section-list')).toBeFalsy();
+    component.toggleChapter(component.subject()!.chapters[0], new Event('click'));
+    fixture.detectChanges();
+    expect(component.isExpanded('c1')).toBeTrue();
+  });
+
+  it('remembers the last visited section per chapter', () => {
+    const chapter = component.subject()!.chapters[0];
+    const extra: KnowledgeSection = {
+      id: 's9',
+      chapter_id: 'c1',
+      title: 'Other',
+      content: 'more',
+      order_index: 1,
+      created_at: now,
+      updated_at: now,
+    };
+    chapter.sections.push(extra);
+    component.selectSection(extra, chapter);
+    component.toggleChapter(chapter, new Event('click'));
+    component.toggleChapter(chapter, new Event('click'));
+    expect(component.selected()?.id).toBe('s9');
+  });
+
+  it('opens the first incomplete section when reopening a subject', () => {
+    localStorage.clear();
+    const multi = structuredClone(subject);
+    multi.chapters[0].sections[0].closed_at = now;
+    multi.chapters.push({
+      id: 'c3',
+      subject_id: 'sub1',
+      title: 'Third',
+      order_index: 2,
+      sections: [
+        {
+          id: 's3',
+          chapter_id: 'c3',
+          title: 'Todo',
+          content: 'work',
+          order_index: 0,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+    });
+    notes.getSubject.and.returnValue(of(multi));
+    component.subject.set(multi);
+    component.selected.set(null);
+    (component as unknown as { restoreSelection: () => void }).restoreSelection();
+    expect(component.selected()?.id).toBe('s3');
+    expect(component.previewOnly()).toBeTrue();
+  });
+
+  it('opens first chapter first section when everything is completed', () => {
+    localStorage.clear();
+    const done = structuredClone(subject);
+    done.chapters[0].sections[0].closed_at = now;
+    done.chapters[0].closed_at = now;
+    const resolved = resolveDefaultSection(done, 's1');
+    expect(resolved?.section.id).toBe('s1');
+    expect(isSectionComplete(done.chapters[0], done.chapters[0].sections[0])).toBeTrue();
+  });
+
+  it('prefers last edited incomplete section over earlier incomplete sections', () => {
+    const multi = structuredClone(subject);
+    multi.chapters.push({
+      id: 'c3',
+      subject_id: 'sub1',
+      title: 'Third',
+      order_index: 2,
+      sections: [
+        {
+          id: 's3',
+          chapter_id: 'c3',
+          title: 'Later',
+          content: 'work',
+          order_index: 0,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+    });
+    const resolved = resolveDefaultSection(multi, 's3');
+    expect(resolved?.section.id).toBe('s3');
+  });
+
+  it('marks a section completed and reopens it', () => {
+    notes.updateSection.and.returnValue(
+      of({ ...structuredClone(subject.chapters[0].sections[0]), closed_at: now })
+    );
+    component.toggleSectionClosed(component.subject()!.chapters[0].sections[0], true);
+    expect(notes.updateSection).toHaveBeenCalledWith('s1', { closed: true });
+    notes.updateSection.and.returnValue(
+      of({ ...structuredClone(subject.chapters[0].sections[0]), closed_at: null })
+    );
+    component.toggleSectionClosed(component.subject()!.chapters[0].sections[0], false);
+    expect(notes.updateSection).toHaveBeenCalledWith('s1', { closed: false });
   });
 
   it('opens subject rename and delete from the overflow menu', () => {
@@ -203,7 +341,11 @@ describe('KnowledgeSubjectComponent', () => {
     component.toggleMenu('chapter:c1', new Event('click'));
     fixture.detectChanges();
     const items = Array.from(fixture.nativeElement.querySelectorAll('.menu-item')) as HTMLButtonElement[];
-    expect(items.map((el) => el.textContent?.trim())).toEqual(['Rename', 'Delete']);
+    expect(items.map((el) => el.textContent?.trim())).toEqual([
+      'Rename',
+      'Mark chapter completed',
+      'Delete',
+    ]);
   });
 
   it('adds a chapter from the plus control and enters inline rename', () => {
@@ -328,6 +470,8 @@ describe('KnowledgeSubjectComponent', () => {
   });
 
   it('shows a quiet sync state and skips Save when already synced', () => {
+    component.enterEditMode();
+    fixture.detectChanges();
     expect(component.syncState()).toBe('synced');
     expect(fixture.nativeElement.textContent).toContain('Synced');
     const save = Array.from(fixture.nativeElement.querySelectorAll('button') as HTMLButtonElement[]).find(
@@ -340,6 +484,8 @@ describe('KnowledgeSubjectComponent', () => {
   });
 
   it('saves only after the document is dirty', () => {
+    component.enterEditMode();
+    fixture.detectChanges();
     notes.updateSection.calls.reset();
     component.form.controls.title.setValue('Changed title');
     fixture.detectChanges();
@@ -351,6 +497,7 @@ describe('KnowledgeSubjectComponent', () => {
       content: 'hello',
     });
     expect(component.syncState()).toBe('synced');
+    expect(component.previewOnly()).toBeTrue();
   });
 
   it('resizes the sidebar and clamps width', () => {

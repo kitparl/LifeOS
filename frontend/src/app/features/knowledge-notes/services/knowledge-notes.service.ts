@@ -52,7 +52,7 @@ export class KnowledgeNotesService {
     return this.http.post<KnowledgeChapter>(`${this.api}/subjects/${subjectId}/chapters`, data);
   }
 
-  updateChapter(id: string, data: { title?: string; order_index?: number }): Observable<KnowledgeChapter> {
+  updateChapter(id: string, data: { title?: string; order_index?: number; closed?: boolean }): Observable<KnowledgeChapter> {
     return this.http.patch<KnowledgeChapter>(`${this.api}/chapters/${id}`, data);
   }
 
@@ -86,8 +86,11 @@ export class KnowledgeNotesService {
   }
 
   // Search
-  search(q: string): Observable<KnowledgeSearchHit[]> {
-    const params = new HttpParams().set('q', q);
+  search(q: string, subjectId?: string): Observable<KnowledgeSearchHit[]> {
+    let params = new HttpParams().set('q', q);
+    if (subjectId) {
+      params = params.set('subject_id', subjectId);
+    }
     return this.http.get<KnowledgeSearchHit[]>(`${this.api}/search`, { params });
   }
 

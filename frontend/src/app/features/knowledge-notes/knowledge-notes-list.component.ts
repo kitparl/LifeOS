@@ -1,4 +1,12 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import {
+  AfterViewChecked,
+  Component,
+  ElementRef,
+  OnInit,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ModalComponent } from '../../shared/modal/modal.component';
@@ -7,6 +15,8 @@ import {
   KnowledgeSubjectListItem,
 } from './models/knowledge-notes.models';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
+
+type CardEditTarget = { kind: 'title' | 'description'; id: string };
 
 @Component({
   selector: 'app-knowledge-notes-list',
@@ -71,9 +81,44 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
               <div class="flex items-start gap-2">
                 <span class="text-2xl leading-none">{{ s.icon || '📘' }}</span>
                 <div class="min-w-0 flex-1">
-                  <p class="truncate font-semibold">{{ s.title }}</p>
-                  @if (s.description) {
-                    <p class="mt-0.5 line-clamp-2 text-xs" style="color: var(--text-muted)">{{ s.description }}</p>
+                  @if (editing()?.kind === 'title' && editing()?.id === s.id) {
+                    <input
+                      #editInput
+                      type="text"
+                      class="kn-inline-input w-full font-semibold"
+                      [value]="s.title"
+                      aria-label="Edit subject title"
+                      (click)="$event.preventDefault(); $event.stopPropagation()"
+                      (keydown.enter)="commitEdit($event, s)"
+                      (keydown.escape)="cancelEdit($event)"
+                      (blur)="commitEdit($event, s)"
+                    />
+                  } @else {
+                    <p
+                      class="truncate font-semibold"
+                      title="Double-click to rename"
+                      (dblclick)="startEdit('title', s.id, $event)"
+                    >{{ s.title }}</p>
+                  }
+                  @if (editing()?.kind === 'description' && editing()?.id === s.id) {
+                    <textarea
+                      #editInput
+                      class="kn-inline-input mt-0.5 w-full min-h-[2.5rem] text-xs"
+                      [value]="s.description ?? ''"
+                      placeholder="Add a description…"
+                      aria-label="Edit subject description"
+                      (click)="$event.preventDefault(); $event.stopPropagation()"
+                      (keydown.escape)="cancelEdit($event)"
+                      (blur)="commitEdit($event, s)"
+                    ></textarea>
+                  } @else {
+                    <p
+                      class="mt-0.5 line-clamp-2 text-xs"
+                      style="color: var(--text-muted)"
+                      [class.italic]="!s.description"
+                      title="Double-click to edit description"
+                      (dblclick)="startEdit('description', s.id, $event)"
+                    >{{ s.description || 'Add description…' }}</p>
                   }
                   <p class="mt-2 text-xs" style="color: var(--text-faint)">
                     {{ s.chapter_count }} chapters · {{ s.section_count }} sections
@@ -110,16 +155,21 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
     </app-modal>
   `,
 })
-export class KnowledgeNotesListComponent implements OnInit {
+export class KnowledgeNotesListComponent implements OnInit, AfterViewChecked {
   private readonly service = inject(KnowledgeNotesService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+
+  @ViewChild('editInput') editInput?: ElementRef<HTMLInputElement | HTMLTextAreaElement>;
 
   readonly subjects = signal<KnowledgeSubjectListItem[]>([]);
   readonly hits = signal<KnowledgeSearchHit[] | null>(null);
   readonly loading = signal(false);
   readonly createOpen = signal(false);
   readonly saving = signal(false);
+  readonly editing = signal<CardEditTarget | null>(null);
+
+  private focusEdit = false;
 
   readonly searchControl = this.fb.nonNullable.control('');
   createForm = this.fb.nonNullable.group({
@@ -132,6 +182,17 @@ export class KnowledgeNotesListComponent implements OnInit {
     this.load();
   }
 
+  ngAfterViewChecked(): void {
+    if (!this.focusEdit) return;
+    const el = this.editInput?.nativeElement;
+    if (!el) return;
+    this.focusEdit = false;
+    el.focus({ preventScroll: true });
+    if (el instanceof HTMLInputElement) {
+      el.select();
+    }
+  }
+
   load(): void {
     this.loading.set(true);
     this.service.listSubjects().subscribe({
@@ -140,6 +201,52 @@ export class KnowledgeNotesListComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  startEdit(kind: CardEditTarget['kind'], id: string, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.editing.set({ kind, id });
+    this.focusEdit = true;
+  }
+
+  cancelEdit(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.editing.set(null);
+  }
+
+  commitEdit(event: Event, subject: KnowledgeSubjectListItem): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const target = this.editing();
+    this.editing.set(null);
+    if (!target || target.id !== subject.id) return;
+
+    const el = event.target as HTMLInputElement | HTMLTextAreaElement;
+    const value = el.value.trim();
+
+    if (target.kind === 'title') {
+      if (!value || value === subject.title) return;
+      this.service.updateSubject(subject.id, { title: value }).subscribe({
+        next: () => {
+          this.subjects.update((list) =>
+            list.map((s) => (s.id === subject.id ? { ...s, title: value } : s))
+          );
+        },
+      });
+      return;
+    }
+
+    const desc = value || null;
+    if (desc === (subject.description ?? null)) return;
+    this.service.updateSubject(subject.id, { description: desc }).subscribe({
+      next: () => {
+        this.subjects.update((list) =>
+          list.map((s) => (s.id === subject.id ? { ...s, description: desc } : s))
+        );
+      },
     });
   }
 

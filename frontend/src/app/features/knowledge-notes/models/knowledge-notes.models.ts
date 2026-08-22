@@ -29,6 +29,7 @@ export interface KnowledgeSection {
   created_at: string;
   updated_at: string;
   archived_at?: string | null;
+  closed_at?: string | null;
   /** Client-only parsed metadata; content is always markdown. */
   format?: 'markdown';
   /** Client-only parsed fences; not persisted separately. */
@@ -41,6 +42,7 @@ export interface KnowledgeChapter {
   subject_id: string;
   title: string;
   order_index: number;
+  closed_at?: string | null;
   sections: KnowledgeSection[];
 }
 
@@ -106,4 +108,5 @@ export interface SectionUpdate {
   content?: string;
   order_index?: number;
   chapter_id?: string;
+  closed?: boolean;
 }

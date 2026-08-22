@@ -13,6 +13,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
+import { LucideCircle, LucideCircleCheck, LucideDynamicIcon, provideLucideIcons } from '@lucide/angular';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { FileImageSrcDirective } from '../../shared/markdown/file-image-src.directive';
@@ -21,6 +22,7 @@ import { FileRecord } from '../files/models/file.models';
 import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
 import {
   KnowledgeChapter,
+  KnowledgeSearchHit,
   KnowledgeSection,
   KnowledgeSubjectDetail,
 } from './models/knowledge-notes.models';
@@ -28,8 +30,12 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
 
 type SyncState = 'synced' | 'unsaved' | 'saving';
 type RenameTarget = { kind: 'chapter' | 'section' | 'subject'; id: string };
+type SearchGroup = { chapter_id: string; chapter_title: string; sections: KnowledgeSearchHit[] };
 
 const SIDEBAR_KEY = 'lifeos.kn.sidebarWidth';
+const EXPANDED_PREFIX = 'lifeos.kn.expanded.';
+const LAST_SECTION_PREFIX = 'lifeos.kn.lastSection.';
+const LAST_EDITED_PREFIX = 'lifeos.kn.lastEdited.';
 const SIDEBAR_DEFAULT = 256;
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 480;
@@ -48,7 +54,9 @@ const SIDEBAR_MAX = 480;
     CdkDrag,
     CdkDragHandle,
     CdkDragPlaceholder,
+    LucideDynamicIcon,
   ],
+  providers: [provideLucideIcons(LucideCircleCheck, LucideCircle)],
   template: `
     @if (subject(); as s) {
       <div class="space-y-2">
@@ -75,7 +83,41 @@ const SIDEBAR_MAX = 480;
               >{{ s.title }}</span>
             }
           </nav>
-          <div class="kn-overflow">
+          <div class="kn-breadcrumb__tools">
+            <div class="kn-subject-search">
+              <input
+                type="search"
+                class="kn-subject-search__input input-field text-xs"
+                placeholder="Search notes…"
+                [value]="searchQuery()"
+                aria-label="Search notes in this subject"
+                (input)="onSearchInput($event)"
+                (focus)="searchOpen.set(true)"
+                (keydown.escape)="closeSearch()"
+              />
+              @if (searchOpen() && searchQuery().trim() && groupedSearchHits().length > 0) {
+                <div class="kn-subject-search__results" role="listbox">
+                  @for (group of groupedSearchHits(); track group.chapter_id) {
+                    <div class="kn-subject-search__group">
+                      <p class="kn-subject-search__chapter">{{ group.chapter_title }}</p>
+                      @for (hit of group.sections; track hit.section_id) {
+                        <button
+                          type="button"
+                          class="kn-subject-search__hit"
+                          role="option"
+                          (click)="openSearchHit(hit)"
+                        >{{ hit.section_title }}</button>
+                      }
+                    </div>
+                  }
+                </div>
+              } @else if (searchOpen() && searchQuery().trim() && searchLoaded()) {
+                <div class="kn-subject-search__results kn-subject-search__results--empty">
+                  <p class="text-xs" style="color: var(--text-muted)">No matches</p>
+                </div>
+              }
+            </div>
+            <div class="kn-overflow">
             <button
               type="button"
               class="btn-ghost kn-overflow__btn"
@@ -90,6 +132,7 @@ const SIDEBAR_MAX = 480;
                 <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteSubject(); closeMenu()">Delete</button>
               </div>
             }
+          </div>
           </div>
         </div>
 
@@ -121,10 +164,24 @@ const SIDEBAR_MAX = 480;
               (cdkDropListDropped)="onChapterDrop($event)"
             >
               @for (c of s.chapters; track c.id; let ci = $index) {
-                <div class="kn-chapter" cdkDrag [cdkDragDisabled]="!!renaming()">
+                <div class="kn-chapter" cdkDrag [cdkDragDisabled]="!!renaming()" [class.kn-chapter--closed]="!!c.closed_at">
                   <div class="kn-chapter__head">
                     <span class="kn-drag" title="Drag to reorder" aria-hidden="true" cdkDragHandle>⋮⋮</span>
+                    <button
+                      type="button"
+                      class="kn-chapter__chevron"
+                      [attr.aria-expanded]="isExpanded(c.id)"
+                      [attr.aria-label]="isExpanded(c.id) ? 'Collapse chapter' : 'Expand chapter'"
+                      (click)="toggleChapter(c, $event)"
+                    >{{ isExpanded(c.id) ? '▼' : '▶' }}</button>
                     <span class="kn-index kn-index--chapter" aria-hidden="true">{{ ci + 1 }}</span>
+                    <span class="kn-status-slot" aria-hidden="true">
+                      @if (chapterStatus(c) === 'done') {
+                        <svg class="kn-status-icon kn-status-icon--done" lucideIcon="circle-check" title="Completed"></svg>
+                      } @else if (chapterStatus(c) === 'ongoing') {
+                        <svg class="kn-status-icon kn-status-icon--ongoing" lucideIcon="circle" title="In progress"></svg>
+                      }
+                    </span>
                     @if (renaming()?.kind === 'chapter' && renaming()?.id === c.id) {
                       <input
                         #renameInput
@@ -140,7 +197,9 @@ const SIDEBAR_MAX = 480;
                     } @else {
                       <span
                         class="kn-chapter__title truncate"
-                        title="Double-click to rename"
+                        [class.kn-closed]="!!c.closed_at"
+                        title="Click to expand · double-click to rename"
+                        (click)="onChapterClick(c, $event)"
                         (dblclick)="startRename('chapter', c.id, $event)"
                       >{{ c.title }}</span>
                     }
@@ -163,11 +222,17 @@ const SIDEBAR_MAX = 480;
                       @if (openMenu() === 'chapter:' + c.id) {
                         <div class="menu kn-overflow__menu" role="menu" (click)="$event.stopPropagation()">
                           <button type="button" class="menu-item" role="menuitem" (click)="startRename('chapter', c.id); closeMenu()">Rename</button>
+                          @if (c.closed_at) {
+                            <button type="button" class="menu-item" role="menuitem" (click)="toggleChapterClosed(c, false); closeMenu()">Reopen chapter</button>
+                          } @else {
+                            <button type="button" class="menu-item" role="menuitem" (click)="toggleChapterClosed(c, true); closeMenu()">Mark chapter completed</button>
+                          }
                           <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteChapter(c); closeMenu()">Delete</button>
                         </div>
                       }
                     </div>
                   </div>
+                  @if (isExpanded(c.id)) {
                   <div
                     class="kn-section-list"
                     cdkDropList
@@ -182,8 +247,16 @@ const SIDEBAR_MAX = 480;
                         cdkDrag
                         [cdkDragDisabled]="!!renaming()"
                         [class.active]="selected()?.id === sec.id"
+                        [class.kn-section-row--closed]="!!sec.closed_at"
                       >
                         <span class="kn-drag" title="Drag to reorder" aria-hidden="true" cdkDragHandle>⋮⋮</span>
+                        <span class="kn-status-slot" aria-hidden="true">
+                          @if (sectionStatus(c, sec) === 'done') {
+                            <svg class="kn-status-icon kn-status-icon--done" lucideIcon="circle-check" title="Completed"></svg>
+                          } @else if (sectionStatus(c, sec) === 'ongoing') {
+                            <svg class="kn-status-icon kn-status-icon--ongoing" lucideIcon="circle" title="In progress"></svg>
+                          }
+                        </span>
                         @if (renaming()?.kind === 'section' && renaming()?.id === sec.id) {
                           <input
                             #renameInput
@@ -201,8 +274,9 @@ const SIDEBAR_MAX = 480;
                             type="button"
                             class="kn-section-link"
                             [class.active]="selected()?.id === sec.id"
+                            [class.kn-closed]="!!sec.closed_at"
                             title="Double-click to rename"
-                            (click)="selectSection(sec)"
+                            (click)="selectSection(sec, c)"
                             (dblclick)="startRename('section', sec.id, $event)"
                           >{{ sec.title }}</button>
                         }
@@ -222,6 +296,7 @@ const SIDEBAR_MAX = 480;
                       </div>
                     }
                   </div>
+                  }
                   <div *cdkDragPlaceholder class="kn-drag-placeholder kn-drag-placeholder--chapter"></div>
                 </div>
               }
@@ -262,21 +337,30 @@ const SIDEBAR_MAX = 480;
             @if (selected(); as sec) {
               <form [formGroup]="form" class="space-y-2">
                 <div class="kn-docbar">
-                  <input class="kn-section-title" formControlName="title" placeholder="Section title" />
+                  @if (previewOnly()) {
+                    <h2 class="kn-section-title-read">{{ form.controls.title.value }}</h2>
+                  } @else {
+                    <input class="kn-section-title" formControlName="title" placeholder="Section title" />
+                  }
                   <div class="kn-docbar__actions">
-                    <span class="kn-sync" [attr.data-state]="syncState()" aria-live="polite">
-                      @switch (syncState()) {
-                        @case ('saving') { Saving… }
-                        @case ('unsaved') { Unsaved }
-                        @default { Synced }
-                      }
-                    </span>
-                    <button
-                      type="button"
-                      class="btn-primary text-xs"
-                      [disabled]="syncState() !== 'unsaved'"
-                      (click)="save()"
-                    >Save</button>
+                    @if (previewOnly()) {
+                      <button type="button" class="btn-primary text-xs" (click)="enterEditMode()">Edit</button>
+                    } @else {
+                      <span class="kn-sync" [attr.data-state]="syncState()" aria-live="polite">
+                        @switch (syncState()) {
+                          @case ('saving') { Saving… }
+                          @case ('unsaved') { Unsaved }
+                          @default { Synced }
+                        }
+                      </span>
+                      <button
+                        type="button"
+                        class="btn-primary text-xs"
+                        [disabled]="syncState() !== 'unsaved'"
+                        (click)="save()"
+                      >Save</button>
+                      <button type="button" class="btn-secondary text-xs" (click)="cancelEdit()">Cancel</button>
+                    }
                     <div class="kn-overflow">
                       <button
                         type="button"
@@ -288,9 +372,11 @@ const SIDEBAR_MAX = 480;
                       >⋯</button>
                       @if (openMenu() === 'section') {
                         <div class="menu kn-overflow__menu" role="menu" (click)="$event.stopPropagation()">
-                          <button type="button" class="menu-item" role="menuitem" (click)="togglePreview(); closeMenu()">
-                            {{ previewOnly() ? 'Edit' : 'Read' }}
-                          </button>
+                          @if (sec.closed_at) {
+                            <button type="button" class="menu-item" role="menuitem" (click)="toggleSectionClosed(sec, false); closeMenu()">Reopen section</button>
+                          } @else {
+                            <button type="button" class="menu-item" role="menuitem" (click)="toggleSectionClosed(sec, true); closeMenu()">Mark section completed</button>
+                          }
                           <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteSection(sec); closeMenu()">Delete</button>
                         </div>
                       }
@@ -371,8 +457,34 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     (this.subject()?.chapters ?? []).map((c) => this.sectionListId(c.id))
   );
   readonly archivedSections = computed(() => this.subject()?.archived_sections ?? []);
+  readonly searchQuery = signal('');
+  readonly searchHits = signal<KnowledgeSearchHit[]>([]);
+  readonly searchOpen = signal(false);
+  readonly searchLoaded = signal(false);
+  readonly groupedSearchHits = computed<SearchGroup[]>(() => {
+    const hits = this.searchHits();
+    const groups = new Map<string, SearchGroup>();
+    for (const hit of hits) {
+      const existing = groups.get(hit.chapter_id);
+      if (existing) {
+        existing.sections.push(hit);
+      } else {
+        groups.set(hit.chapter_id, {
+          chapter_id: hit.chapter_id,
+          chapter_title: hit.chapter_title,
+          sections: [hit],
+        });
+      }
+    }
+    return Array.from(groups.values());
+  });
   readonly noConnectedLists: string[] = [];
   private focusRename = false;
+  private expandedChapterIds = new Set<string>();
+  private lastSectionByChapter: Record<string, string> = {};
+  private lastEditedSectionId: string | null = null;
+  private newlyCreatedSectionIds = new Set<string>();
+  private searchTimer?: ReturnType<typeof setTimeout>;
 
   form = this.fb.nonNullable.group({
     title: ['', Validators.required],
@@ -388,6 +500,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   @HostListener('document:click')
   onDocumentClick(): void {
     this.closeMenu();
+    this.closeSearch();
   }
 
   ngOnInit(): void {
@@ -438,10 +551,15 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 
   private load(id: string): void {
     this.loading.set(true);
+    this.selected.set(null);
+    this.loadExpandedState(id);
+    this.loadLastSections(id);
+    this.loadLastEdited(id);
     this.service.getSubject(id).subscribe({
       next: (s) => {
         this.subject.set(s);
         this.loading.set(false);
+        this.initExpandedDefaults(s);
         this.restoreSelection();
       },
       error: () => this.loading.set(false),
@@ -452,25 +570,265 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     const s = this.subject();
     if (!s) return;
     const all = s.chapters.flatMap((c) => c.sections);
-    const target =
+    let target =
       (this.pendingSectionId && all.find((sec) => sec.id === this.pendingSectionId)) ||
       (this.selected() && all.find((sec) => sec.id === this.selected()!.id)) ||
-      all[0] ||
       null;
+
+    if (!target) {
+      const resolved = resolveDefaultSection(s, this.lastEditedSectionId);
+      target = resolved?.section ?? null;
+    }
+
     this.pendingSectionId = null;
-    if (target) this.selectSection(target);
-    else this.selected.set(null);
+    if (target) {
+      const chapter = s.chapters.find((c) => c.sections.some((sec) => sec.id === target!.id));
+      if (chapter) this.expandChapter(chapter.id);
+      this.selectSection(target, chapter);
+    } else {
+      this.selected.set(null);
+    }
   }
 
-  selectSection(sec: KnowledgeSection): void {
+  chapterStatus(chapter: KnowledgeChapter): 'done' | 'ongoing' | null {
+    if (chapter.sections.length === 0) return null;
+    return isChapterComplete(chapter) ? 'done' : 'ongoing';
+  }
+
+  sectionStatus(chapter: KnowledgeChapter, sec: KnowledgeSection): 'done' | 'ongoing' {
+    return isSectionComplete(chapter, sec) ? 'done' : 'ongoing';
+  }
+
+  selectSection(sec: KnowledgeSection, chapter?: KnowledgeChapter): void {
+    const s = this.subject();
+    const parent =
+      chapter ?? s?.chapters.find((c) => c.sections.some((item) => item.id === sec.id));
+    if (parent) {
+      this.expandChapter(parent.id);
+      this.rememberSection(parent.id, sec.id);
+    }
+
     this.suppressDirty = true;
     this.selected.set(sec);
-    this.previewOnly.set(false);
+    this.previewOnly.set(!this.shouldOpenInEditMode(sec, parent));
     this.form.reset({ title: sec.title, content: sec.content });
     this.lastSavedTitle = sec.title;
     this.lastSavedContent = sec.content;
     this.syncState.set('synced');
     this.suppressDirty = false;
+  }
+
+  enterEditMode(): void {
+    this.previewOnly.set(false);
+  }
+
+  cancelEdit(): void {
+    const sec = this.selected();
+    if (!sec) return;
+    this.suppressDirty = true;
+    this.form.reset({ title: this.lastSavedTitle, content: this.lastSavedContent });
+    sec.title = this.lastSavedTitle;
+    sec.content = this.lastSavedContent;
+    this.syncState.set('synced');
+    this.suppressDirty = false;
+    this.previewOnly.set(true);
+  }
+
+  private shouldOpenInEditMode(sec: KnowledgeSection, chapter?: KnowledgeChapter): boolean {
+    if (this.newlyCreatedSectionIds.has(sec.id)) return true;
+    if (sec.closed_at || chapter?.closed_at) return false;
+    return false;
+  }
+
+  isExpanded(chapterId: string): boolean {
+    return this.expandedChapterIds.has(chapterId);
+  }
+
+  toggleChapter(chapter: KnowledgeChapter, event: Event): void {
+    event.stopPropagation();
+    if (this.isExpanded(chapter.id)) {
+      this.expandedChapterIds.delete(chapter.id);
+    } else {
+      this.expandChapter(chapter.id);
+      const sec = this.resolveSectionForChapter(chapter);
+      if (sec) this.selectSection(sec, chapter);
+    }
+    this.persistExpandedState();
+  }
+
+  onChapterClick(chapter: KnowledgeChapter, event: Event): void {
+    event.stopPropagation();
+    if (!this.isExpanded(chapter.id)) {
+      this.expandChapter(chapter.id);
+      const sec = this.resolveSectionForChapter(chapter);
+      if (sec) this.selectSection(sec, chapter);
+      this.persistExpandedState();
+      return;
+    }
+    this.toggleChapter(chapter, event);
+  }
+
+  private expandChapter(chapterId: string): void {
+    this.expandedChapterIds.add(chapterId);
+  }
+
+  private initExpandedDefaults(subject: KnowledgeSubjectDetail): void {
+    if (this.expandedChapterIds.size > 0) return;
+    const selectedId =
+      this.pendingSectionId ??
+      this.selected()?.id ??
+      resolveDefaultSection(subject, this.lastEditedSectionId)?.section.id;
+    if (selectedId) {
+      const chapter = subject.chapters.find((c) => c.sections.some((s) => s.id === selectedId));
+      if (chapter) {
+        this.expandChapter(chapter.id);
+        return;
+      }
+    }
+    if (subject.chapters[0]) {
+      this.expandChapter(subject.chapters[0].id);
+    }
+  }
+
+  private resolveSectionForChapter(chapter: KnowledgeChapter): KnowledgeSection | undefined {
+    const remembered = this.lastSectionByChapter[chapter.id];
+    if (remembered) {
+      const match = chapter.sections.find((s) => s.id === remembered);
+      if (match) return match;
+    }
+    return chapter.sections[0];
+  }
+
+  private rememberSection(chapterId: string, sectionId: string): void {
+    this.lastSectionByChapter[chapterId] = sectionId;
+    this.persistLastSections();
+    this.rememberLastEdited(sectionId);
+  }
+
+  private rememberLastEdited(sectionId: string): void {
+    this.lastEditedSectionId = sectionId;
+    this.persistLastEdited();
+  }
+
+  private loadLastEdited(subjectId: string): void {
+    this.lastEditedSectionId = localStorage.getItem(LAST_EDITED_PREFIX + subjectId);
+  }
+
+  private persistLastEdited(): void {
+    const subjectId = this.subject()?.id;
+    if (!subjectId || !this.lastEditedSectionId) return;
+    localStorage.setItem(LAST_EDITED_PREFIX + subjectId, this.lastEditedSectionId);
+  }
+
+  private loadExpandedState(subjectId: string): void {
+    try {
+      const raw = localStorage.getItem(EXPANDED_PREFIX + subjectId);
+      this.expandedChapterIds = new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      this.expandedChapterIds = new Set();
+    }
+  }
+
+  private persistExpandedState(): void {
+    const subjectId = this.subject()?.id;
+    if (!subjectId) return;
+    localStorage.setItem(
+      EXPANDED_PREFIX + subjectId,
+      JSON.stringify(Array.from(this.expandedChapterIds))
+    );
+  }
+
+  private loadLastSections(subjectId: string): void {
+    try {
+      const raw = localStorage.getItem(LAST_SECTION_PREFIX + subjectId);
+      this.lastSectionByChapter = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    } catch {
+      this.lastSectionByChapter = {};
+    }
+  }
+
+  private persistLastSections(): void {
+    const subjectId = this.subject()?.id;
+    if (!subjectId) return;
+    localStorage.setItem(LAST_SECTION_PREFIX + subjectId, JSON.stringify(this.lastSectionByChapter));
+  }
+
+  onSearchInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.searchQuery.set(value);
+    this.searchOpen.set(true);
+    this.searchLoaded.set(false);
+    clearTimeout(this.searchTimer);
+    const q = value.trim();
+    if (!q) {
+      this.searchHits.set([]);
+      this.searchLoaded.set(true);
+      return;
+    }
+    const subjectId = this.subject()?.id;
+    if (!subjectId) return;
+    this.searchTimer = setTimeout(() => {
+      this.service.search(q, subjectId).subscribe({
+        next: (hits) => {
+          this.searchHits.set(hits);
+          this.searchLoaded.set(true);
+        },
+        error: () => {
+          this.searchHits.set([]);
+          this.searchLoaded.set(true);
+        },
+      });
+    }, 300);
+  }
+
+  closeSearch(): void {
+    this.searchOpen.set(false);
+  }
+
+  openSearchHit(hit: KnowledgeSearchHit): void {
+    const s = this.subject();
+    if (!s) return;
+    const chapter = s.chapters.find((c) => c.id === hit.chapter_id);
+    const section = chapter?.sections.find((sec) => sec.id === hit.section_id);
+    if (!chapter || !section) return;
+    this.expandChapter(chapter.id);
+    this.persistExpandedState();
+    this.selectSection(section, chapter);
+    this.closeSearch();
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { section: section.id },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  toggleSectionClosed(sec: KnowledgeSection, closed: boolean): void {
+    this.service.updateSection(sec.id, { closed }).subscribe({
+      next: (updated) => {
+        sec.closed_at = updated.closed_at ?? null;
+        this.patchSection({ ...sec, closed_at: updated.closed_at ?? null });
+        if (closed && this.selected()?.id === sec.id) {
+          this.previewOnly.set(true);
+        }
+      },
+    });
+  }
+
+  toggleChapterClosed(chapter: KnowledgeChapter, closed: boolean): void {
+    this.service.updateChapter(chapter.id, { closed }).subscribe({
+      next: (updated) => {
+        chapter.closed_at = updated.closed_at ?? null;
+        this.subject.set({ ...this.subject()!, chapters: [...this.subject()!.chapters] });
+        if (closed && this.selected()) {
+          const selectedChapter = this.subject()?.chapters.find((c) =>
+            c.sections.some((s) => s.id === this.selected()!.id)
+          );
+          if (selectedChapter?.id === chapter.id) {
+            this.previewOnly.set(true);
+          }
+        }
+      },
+    });
   }
 
   onEditorContentChange(content: string): void {
@@ -507,19 +865,15 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.saveIfDirty();
   }
 
-  togglePreview(): void {
-    this.previewOnly.set(!this.previewOnly());
-  }
-
   save(): void {
-    this.saveIfDirty();
+    this.saveIfDirty(true);
   }
 
   private scheduleSave(): void {
     if (this.syncState() === 'unsaved') this.dirty$.next();
   }
 
-  private saveIfDirty(): void {
+  private saveIfDirty(returnToRead = false): void {
     const sec = this.selected();
     if (!sec || this.form.invalid || this.syncState() === 'saving') return;
     const raw = this.form.getRawValue();
@@ -527,6 +881,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
       this.syncState.set('synced');
       return;
     }
+    const wasNew = this.newlyCreatedSectionIds.has(sec.id);
     this.syncState.set('saving');
     this.service.updateSection(sec.id, { title: raw.title, content: raw.content }).subscribe({
       next: (updated) => {
@@ -539,6 +894,12 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
           this.scheduleSave();
         } else {
           this.syncState.set('synced');
+          if (returnToRead) {
+            if (wasNew) {
+              this.newlyCreatedSectionIds.delete(sec.id);
+            }
+            this.previewOnly.set(true);
+          }
         }
       },
       error: () => this.syncState.set('unsaved'),
@@ -584,9 +945,11 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
       next: (sec) => {
         chapter.sections = [...chapter.sections, sec];
         this.subject.set({ ...this.subject()! });
-        this.pendingSectionId = sec.id;
+        this.expandChapter(chapter.id);
+        this.persistExpandedState();
+        this.newlyCreatedSectionIds.add(sec.id);
         sec.content = '';
-        this.selectSection(sec);
+        this.selectSection(sec, chapter);
         this.startRename('section', sec.id);
       },
     });
@@ -838,6 +1201,41 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 }
 
 const ARCHIVE_TTL_DAYS = 7;
+
+export function isSectionComplete(chapter: KnowledgeChapter, sec: KnowledgeSection): boolean {
+  return !!(chapter.closed_at || sec.closed_at);
+}
+
+export function isChapterComplete(chapter: KnowledgeChapter): boolean {
+  if (chapter.closed_at) return true;
+  return chapter.sections.length > 0 && chapter.sections.every((s) => !!s.closed_at);
+}
+
+export function resolveDefaultSection(
+  subject: KnowledgeSubjectDetail,
+  lastEditedSectionId: string | null
+): { section: KnowledgeSection; chapter: KnowledgeChapter } | null {
+  const pairs: { section: KnowledgeSection; chapter: KnowledgeChapter }[] = [];
+  for (const chapter of subject.chapters) {
+    for (const section of chapter.sections) {
+      pairs.push({ section, chapter });
+    }
+  }
+  if (pairs.length === 0) return null;
+
+  const incomplete = pairs.filter(({ section, chapter }) => !isSectionComplete(chapter, section));
+
+  if (incomplete.length === 0) {
+    return pairs[0];
+  }
+
+  if (lastEditedSectionId) {
+    const lastEdited = incomplete.find(({ section }) => section.id === lastEditedSectionId);
+    if (lastEdited) return lastEdited;
+  }
+
+  return incomplete[0];
+}
 
 export function stripFileMarkdown(content: string, fileId: string): string {
   if (!content || !fileId) return content;
