@@ -24,3 +24,4 @@ __pycache__/
 # Local file storage (see docs/FILE_STORAGE.md)
 backend/uploads/
 uploads/
+bulbul/

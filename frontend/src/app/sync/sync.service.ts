@@ -1,10 +1,13 @@
-import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { lifeosDb } from './lifeos-db';
 import { SyncOperationRecord, SyncStatus } from './sync.models';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const MAX_RETRIES = 15;
+/** Client errors that replay will not fix by retrying. */
+const NON_RETRYABLE_STATUSES = new Set([400, 404, 405, 409, 422]);
 
 @Injectable({ providedIn: 'root' })
 export class SyncService {
@@ -13,11 +16,24 @@ export class SyncService {
   readonly online = signal(typeof navigator !== 'undefined' ? navigator.onLine : true);
   readonly syncing = signal(false);
   readonly pendingCount = signal(0);
+  readonly lastFlushError = signal<string | null>(null);
+  readonly pendingSummary = signal<string | null>(null);
 
   readonly status = computed<SyncStatus>(() => {
     if (!this.online()) return 'offline';
     if (this.syncing() || this.pendingCount() > 0) return 'syncing';
     return 'synced';
+  });
+
+  readonly statusDetail = computed(() => {
+    const pending = this.pendingCount();
+    if (pending <= 0) {
+      return this.lastFlushError();
+    }
+    const summary = this.pendingSummary();
+    const err = this.lastFlushError();
+    if (summary && err) return `${summary} — ${err}`;
+    return summary ?? err;
   });
 
   private flushTimer?: ReturnType<typeof setInterval>;
@@ -92,8 +108,12 @@ export class SyncService {
   }
 
   async refreshPendingCount(): Promise<void> {
-    const count = await lifeosDb.syncOperations.count();
-    this.pendingCount.set(count);
+    const ops = await lifeosDb.syncOperations.orderBy('createdAt').toArray();
+    this.pendingCount.set(ops.length);
+    this.pendingSummary.set(ops.length > 0 ? this.describeOp(ops[0]) : null);
+    if (ops.length === 0) {
+      this.lastFlushError.set(null);
+    }
   }
 
   async flush(): Promise<void> {
@@ -114,7 +134,18 @@ export class SyncService {
             }),
           );
           await lifeosDb.syncOperations.delete(op.id);
-        } catch {
+          this.lastFlushError.set(null);
+        } catch (err) {
+          const message = this.formatFlushError(op, err);
+          this.lastFlushError.set(message);
+          console.warn('[LifeOS sync]', message);
+
+          if (this.shouldDropOperation(op, err)) {
+            console.warn('[LifeOS sync] Dropping non-retryable operation:', this.describeOp(op));
+            await lifeosDb.syncOperations.delete(op.id);
+            continue;
+          }
+
           await lifeosDb.syncOperations.update(op.id, { retries: op.retries + 1 });
           break;
         }
@@ -127,5 +158,32 @@ export class SyncService {
 
   asHttpResponse<T>(body: T, status = 200): HttpResponse<T> {
     return new HttpResponse({ body, status });
+  }
+
+  private shouldDropOperation(op: SyncOperationRecord, err: unknown): boolean {
+    if (err instanceof HttpErrorResponse && NON_RETRYABLE_STATUSES.has(err.status)) {
+      return true;
+    }
+    return op.retries + 1 >= MAX_RETRIES;
+  }
+
+  private describeOp(op: SyncOperationRecord): string {
+    const path = op.url.replace(/^https?:\/\/[^/]+/, '');
+    return `${op.method} ${path}`;
+  }
+
+  private formatFlushError(op: SyncOperationRecord, err: unknown): string {
+    const action = this.describeOp(op);
+    if (err instanceof HttpErrorResponse) {
+      const detail =
+        typeof err.error === 'object' && err.error && 'detail' in err.error
+          ? String((err.error as { detail: unknown }).detail)
+          : err.statusText || 'Request failed';
+      return `${action} failed (${err.status || 0}): ${detail}`;
+    }
+    if (err instanceof Error) {
+      return `${action} failed: ${err.message}`;
+    }
+    return `${action} failed`;
   }
 }

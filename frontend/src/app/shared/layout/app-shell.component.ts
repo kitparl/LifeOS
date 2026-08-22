@@ -171,11 +171,16 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
         <!-- Sticky header bar -->
         <header class="shrink-0 flex items-center justify-between gap-2"
                 style="padding: 0 1rem; min-height: 48px; background: var(--header-bg); border-bottom: 1px solid var(--border);">
-          <!-- Left: Mobile menu + title -->
+          <!-- Left: sidebar menu + title -->
           <div class="flex items-center gap-2 min-w-0">
-            <button type="button" class="btn-ghost !px-2 lg:hidden" (click)="toggleDrawer()">☰</button>
-            <!-- Desktop sidebar toggle: matches mobile open/close behaviour -->
-            <button type="button" class="btn-ghost !px-2 hidden lg:inline-flex" (click)="toggleSidebarHidden()" [title]="sidebarHidden() ? 'Show sidebar' : 'Hide sidebar'">☰</button>
+            <button
+              type="button"
+              class="btn-ghost !px-2"
+              (click)="toggleSidebarMenu()"
+              [title]="sidebarMenuTitle()"
+            >
+              ☰
+            </button>
             <div class="min-w-0">
               <p class="truncate text-sm font-semibold" style="color: var(--text)">{{ currentTitle() }}</p>
             </div>
@@ -184,7 +189,11 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
           <!-- Right: actions -->
           <div class="flex items-center gap-1.5 shrink-0">
             @if (syncLabel(); as label) {
-              <span class="hidden items-center gap-1 text-xs sm:flex" style="color: var(--text-muted)">
+              <span
+                class="hidden items-center gap-1 text-xs sm:flex"
+                style="color: var(--text-muted)"
+                [title]="sync.statusDetail() ?? ''"
+              >
                 <span class="inline-block h-2 w-2 rounded-full" [style.background]="syncDotColor()"></span>
                 {{ label }}
               </span>
@@ -195,14 +204,15 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
             <button type="button" class="btn-ghost !px-2 text-xs hidden sm:inline-flex" (click)="cycleTheme()" style="color: var(--text-muted)">
               {{ theme.label() }}
             </button>
-            <!-- Desktop AI toggle -->
-            <button
-              type="button"
-              class="btn-secondary text-xs hidden lg:inline-flex"
-              (click)="toggleAiPanel()"
-            >
-              {{ aiPanelOpen() ? 'Hide Assistant' : 'Assistant' }}
-            </button>
+            @if (desktopLayout()) {
+              <button
+                type="button"
+                class="btn-secondary text-xs"
+                (click)="toggleAiPanel()"
+              >
+                {{ aiPanelOpen() ? 'Hide Assistant' : 'Assistant' }}
+              </button>
+            }
           </div>
         </header>
 
@@ -573,9 +583,19 @@ export class AppShellComponent implements OnInit, OnDestroy {
   readonly sidebarHidden = signal(this.readStorage(STORAGE_HIDDEN, false));
   readonly currentTitle = signal('Dashboard');
   readonly fullHeightRoute = signal(false);
+  readonly desktopLayout = signal(
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true,
+  );
+
+  private readonly desktopMediaQuery =
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)') : null;
+  private readonly onDesktopLayoutChange = (): void => {
+    this.desktopLayout.set(this.desktopMediaQuery?.matches ?? true);
+  };
 
   ngOnInit(): void {
     this.updateRoute(this.router.url);
+    this.desktopMediaQuery?.addEventListener('change', this.onDesktopLayoutChange);
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe((e) => {
       this.updateRoute((e as NavigationEnd).urlAfterRedirects);
       this.closeOverlays();
@@ -583,6 +603,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.desktopMediaQuery?.removeEventListener('change', this.onDesktopLayoutChange);
     this.document.body.style.overflow = '';
   }
 
@@ -604,6 +625,21 @@ export class AppShellComponent implements OnInit, OnDestroy {
   openSearch(): void {
     this.closeOverlays();
     this.palette.open();
+  }
+
+  toggleSidebarMenu(): void {
+    if (this.isDesktopLayout()) {
+      this.toggleSidebarHidden();
+    } else {
+      this.toggleDrawer();
+    }
+  }
+
+  sidebarMenuTitle(): string {
+    if (this.isDesktopLayout()) {
+      return this.sidebarHidden() ? 'Show sidebar' : 'Hide sidebar';
+    }
+    return this.drawerOpen() ? 'Close menu' : 'Open menu';
   }
 
   toggleDrawer(): void {
@@ -678,6 +714,11 @@ export class AppShellComponent implements OnInit, OnDestroy {
 
   onLogout(): void {
     this.auth.logout().subscribe();
+  }
+
+  /** Matches Tailwind `lg` breakpoint used throughout the shell layout. */
+  private isDesktopLayout(): boolean {
+    return this.desktopLayout();
   }
 
   private updateRoute(url: string): void {
