@@ -1,9 +1,31 @@
 import { Injectable } from '@angular/core';
-import { EditorView, basicSetup } from 'codemirror';
+import {
+  EditorView,
+  lineNumbers,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  drawSelection,
+  dropCursor,
+  rectangularSelection,
+  crosshairCursor,
+  highlightActiveLine,
+  keymap,
+} from '@codemirror/view';
 import { EditorState, Compartment, Extension } from '@codemirror/state';
-import { keymap } from '@codemirror/view';
+import {
+  foldGutter,
+  indentOnInput,
+  syntaxHighlighting,
+  defaultHighlightStyle,
+  bracketMatching,
+  foldKeymap,
+} from '@codemirror/language';
 import { defaultKeymap, history, historyKeymap, redo, undo } from '@codemirror/commands';
-import { openSearchPanel, search, searchKeymap } from '@codemirror/search';
+import { openSearchPanel, search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete';
+import { lintKeymap } from '@codemirror/lint';
+import { vim, getCM } from '@replit/codemirror-vim';
+import { vimInsertFatCursor } from './vim-insert-fat-cursor';
 import { markdown } from '@codemirror/lang-markdown';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -27,6 +49,49 @@ export class EditorService {
   private languageCompartment = new Compartment();
   private themeCompartment = new Compartment();
   private readOnlyCompartment = new Compartment();
+  private vimCompartment = new Compartment();
+  private keymapCompartment = new Compartment();
+
+  private vimExtensions(): Extension[] {
+    return [vim(), vimInsertFatCursor()];
+  }
+
+  private buildKeymapExtension(keymapMode: 'default' | 'vim'): Extension {
+    const bindings = [
+      ...closeBracketsKeymap,
+      ...(keymapMode === 'default' ? defaultKeymap : []),
+      ...searchKeymap,
+      ...historyKeymap,
+      ...foldKeymap,
+      ...completionKeymap,
+      ...lintKeymap,
+    ];
+    return keymap.of(bindings);
+  }
+
+  /** basicSetup equivalent, but keymaps live in a compartment so Vim mode can omit defaultKeymap. */
+  private workspaceBaseSetup(keymapMode: 'default' | 'vim'): Extension[] {
+    return [
+      lineNumbers(),
+      highlightActiveLineGutter(),
+      highlightSpecialChars(),
+      history(),
+      foldGutter(),
+      drawSelection(),
+      dropCursor(),
+      EditorState.allowMultipleSelections.of(true),
+      indentOnInput(),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      bracketMatching(),
+      closeBrackets(),
+      autocompletion(),
+      rectangularSelection(),
+      crosshairCursor(),
+      highlightActiveLine(),
+      highlightSelectionMatches(),
+      this.keymapCompartment.of(this.buildKeymapExtension(keymapMode)),
+    ];
+  }
 
   createEditor(
     container: HTMLElement,
@@ -36,6 +101,7 @@ export class EditorService {
     const {
       language = 'markdown',
       theme = 'light',
+      keymap: keymapMode = 'default',
       readOnly = false,
       lineNumbers = true,
       lineWrapping = true,
@@ -46,9 +112,8 @@ export class EditorService {
     const state = EditorState.create({
       doc: '',
       extensions: [
-        basicSetup,
-        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
-        history(),
+        this.vimCompartment.of(keymapMode === 'vim' ? this.vimExtensions() : []),
+        ...this.workspaceBaseSetup(keymapMode),
         search(),
         this.languageCompartment.of(this.getLanguageExtension(language)),
         this.themeCompartment.of(this.getThemeExtension(theme)),
@@ -122,6 +187,45 @@ export class EditorService {
         EditorState.readOnly.of(readOnly)
       )
     });
+  }
+
+  setKeymapMode(view: EditorView, keymapMode: 'default' | 'vim'): void {
+    view.dispatch({
+      effects: [
+        this.vimCompartment.reconfigure(keymapMode === 'vim' ? this.vimExtensions() : []),
+        this.keymapCompartment.reconfigure(this.buildKeymapExtension(keymapMode)),
+      ],
+    });
+  }
+
+  onVimModeChange(
+    view: EditorView,
+    keymapMode: 'default' | 'vim',
+    callback: (mode: 'normal' | 'insert' | 'visual' | 'replace' | null) => void,
+  ): () => void {
+    if (keymapMode === 'default') {
+      callback(null);
+      return () => undefined;
+    }
+
+    const cm = getCM(view);
+    if (!cm) {
+      callback(null);
+      return () => undefined;
+    }
+
+    const handler = (event: { mode: string }) => {
+      callback(event.mode as 'normal' | 'insert' | 'visual' | 'replace');
+    };
+
+    cm.on('vim-mode-change', handler);
+
+    const vimState = (cm as { state?: { vim?: { mode?: string } } }).state?.vim;
+    callback((vimState?.mode as 'normal' | 'insert' | 'visual' | 'replace') ?? 'normal');
+
+    return () => {
+      cm.off('vim-mode-change', handler);
+    };
   }
 
   insertText(view: EditorView, text: string, at: 'cursor' | 'selection' = 'cursor'): void {
@@ -288,6 +392,24 @@ export class EditorService {
       },
       '.cm-cursor, .cm-dropCursor': {
         borderLeftColor: 'var(--text)',
+      },
+      /* Hide native thin caret; insert fat cursor layer draws instead */
+      '&.cm-vimInsertMode > .cm-scroller > .cm-cursorLayer:not(.cm-vimInsertCursorLayer)': {
+        display: 'none',
+      },
+      '&.cm-vimInsertMode .cm-line': {
+        caretColor: 'transparent !important',
+      },
+      '&.cm-vimInsertMode .cm-line ::selection': {
+        backgroundColor: 'transparent !important',
+      },
+      /* Vim block cursor: no blink (normal + insert) */
+      '&.cm-focused > .cm-scroller > .cm-cursorLayer.cm-vimCursorLayer': {
+        animation: 'none !important',
+      },
+      '.cm-fat-cursor': {
+        animation: 'none !important',
+        opacity: '1 !important',
       },
       '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
         backgroundColor: 'var(--primary-soft)',

@@ -7,21 +7,37 @@ import {
   OnDestroy,
   ElementRef,
   ViewChild,
-  AfterViewInit
+  AfterViewInit,
+  effect,
+  inject,
+  signal,
 } from '@angular/core';
 import { EditorView } from 'codemirror';
 import { EditorService } from '../../services/editor.service';
 import { EditorConfig } from '../../models';
 import { FormatAction } from '../editor-toolbar/editor-toolbar.component';
+import { EditorPreferencesService } from '../../../../core/services/editor-preferences.service';
+
+type VimModeLabel = 'NORMAL' | 'INSERT' | 'VISUAL' | 'REPLACE';
 
 @Component({
   selector: 'app-markdown-editor',
   standalone: true,
   template: `
-    <div #editorContainer class="editor-container" [class.read-only]="readOnly"></div>
+    <div
+      #editorContainer
+      class="editor-container"
+      [class.read-only]="readOnly"
+      [class.vim-keymap-active]="editorPrefs.keymap() === 'vim'"
+    >
+      @if (vimModeLabel()) {
+        <span class="vim-mode-badge">{{ vimModeLabel() }}</span>
+      }
+    </div>
   `,
   styles: [`
     .editor-container {
+      position: relative;
       height: 100%;
       width: 100%;
       overflow: hidden;
@@ -49,6 +65,23 @@ import { FormatAction } from '../editor-toolbar/editor-toolbar.component';
     .editor-container :deep(.cm-scroller) {
       overflow: auto;
     }
+
+    .vim-mode-badge {
+      position: absolute;
+      right: 0.5rem;
+      bottom: 0.375rem;
+      z-index: 2;
+      padding: 0.125rem 0.375rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      pointer-events: none;
+      user-select: none;
+    }
   `]
 })
 export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -63,10 +96,25 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
   @Output() contentChange = new EventEmitter<string>();
 
   private editorView?: EditorView;
+  private vimModeCleanup?: () => void;
+  private activeKeymap: 'default' | 'vim' | null = null;
 
-  constructor(
-    private editorService: EditorService
-  ) {}
+  readonly editorService = inject(EditorService);
+  readonly editorPrefs = inject(EditorPreferencesService);
+
+  readonly vimModeLabel = signal<VimModeLabel | null>(null);
+
+  constructor() {
+    effect(() => {
+      const keymap = this.editorPrefs.keymap();
+      if (!this.editorView || this.activeKeymap === keymap) {
+        return;
+      }
+      this.activeKeymap = keymap;
+      this.editorService.setKeymapMode(this.editorView, keymap);
+      this.bindVimModeListener(keymap);
+    });
+  }
 
   ngOnInit(): void {}
 
@@ -75,6 +123,7 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   ngOnDestroy(): void {
+    this.vimModeCleanup?.();
     if (this.editorView) {
       this.editorService.destroyEditor(this.editorView);
     }
@@ -85,7 +134,8 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
       language: this.language,
       theme: this.theme,
       readOnly: this.readOnly,
-      ...this.config
+      keymap: this.editorPrefs.keymap(),
+      ...this.config,
     };
 
     this.editorView = this.editorService.createEditor(
@@ -94,9 +144,29 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
       (content) => this.contentChange.emit(content)
     );
 
+    this.activeKeymap = this.editorPrefs.keymap();
+
     if (this.content) {
       this.editorService.setContent(this.editorView, this.content);
     }
+
+    this.bindVimModeListener(this.editorPrefs.keymap());
+  }
+
+  private bindVimModeListener(keymap: 'default' | 'vim'): void {
+    this.vimModeCleanup?.();
+    if (!this.editorView) {
+      this.vimModeLabel.set(null);
+      return;
+    }
+
+    this.vimModeCleanup = this.editorService.onVimModeChange(
+      this.editorView,
+      keymap,
+      (mode) => {
+        this.vimModeLabel.set(mode ? (mode.toUpperCase() as VimModeLabel) : null);
+      },
+    );
   }
 
   applyFormat(action: FormatAction): void {

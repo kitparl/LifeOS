@@ -6,6 +6,7 @@ import { ProfileComponent } from '../profile/profile.component';
 import { SettingsAppSectionComponent } from './settings-app-section.component';
 import { SettingsIntegrationsSectionComponent } from './settings-integrations-section.component';
 import { SettingsSidebarSectionComponent } from './settings-sidebar-section.component';
+import { SettingsEditorSectionComponent } from './settings-editor-section.component';
 import { SettingsChangePasswordComponent } from './settings-change-password.component';
 
 @Component({
@@ -17,6 +18,7 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
     SettingsIntegrationsSectionComponent,
     ExportPageComponent,
     SettingsSidebarSectionComponent,
+    SettingsEditorSectionComponent,
     SettingsChangePasswordComponent,
     SettingsAppSectionComponent,
   ],
@@ -64,6 +66,11 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
         <app-settings-sidebar-section />
       </section>
 
+      <section id="editor" class="scroll-mt-24 space-y-3">
+        <h2 class="text-base font-semibold">Editor</h2>
+        <app-settings-editor-section />
+      </section>
+
       <section id="app" class="scroll-mt-24 space-y-3">
         <h2 class="text-base font-semibold">App updates</h2>
         <app-settings-app-section />
@@ -80,6 +87,7 @@ export class SettingsHubComponent implements OnInit {
     { id: 'integrations', label: 'Integrations' },
     { id: 'export', label: 'Export' },
     { id: 'sidebar', label: 'Sidebar' },
+    { id: 'editor', label: 'Editor' },
     { id: 'app', label: 'App updates' },
   ];
 

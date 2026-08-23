@@ -51,4 +51,28 @@ describe('EditorService', () => {
     expect(changes[changes.length - 1]).toBe('abc');
     service.destroyEditor(view);
   });
+
+  it('creates editor with default keymap without vim extension', () => {
+    const view = service.createEditor(host, { language: 'markdown', keymap: 'default' });
+    service.setContent(view, 'plain');
+    expect(service.getContent(view)).toBe('plain');
+    service.destroyEditor(view);
+  });
+
+  it('creates editor with vim keymap', () => {
+    const view = service.createEditor(host, { language: 'markdown', keymap: 'vim' });
+    service.setContent(view, 'vim text');
+    expect(service.getContent(view)).toBe('vim text');
+    service.destroyEditor(view);
+  });
+
+  it('preserves content when switching keymap mode', () => {
+    const view = service.createEditor(host, { language: 'markdown', keymap: 'default' });
+    service.setContent(view, 'keep me');
+    service.setKeymapMode(view, 'vim');
+    expect(service.getContent(view)).toBe('keep me');
+    service.setKeymapMode(view, 'default');
+    expect(service.getContent(view)).toBe('keep me');
+    service.destroyEditor(view);
+  });
 });
