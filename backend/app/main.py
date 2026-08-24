@@ -51,6 +51,8 @@ async def lifespan(app: FastAPI):
     # Register models with Base.metadata BEFORE create_all so new tables exist.
     import app.modules.auth.models  # noqa: F401 — User + UsernameHistory
     import app.modules.files.models  # noqa: F401 — FileRecord
+    import app.modules.ai.models  # noqa: F401 — ContentEmbedding + use-case model selection
+    import app.modules.communication.models  # noqa: F401 — WritingEvaluation + AIRun
     import app.modules.integrations.outbox_models  # noqa: F401
     import app.modules.integrations.report_models  # noqa: F401
     import app.modules.integrations.github_sync_models  # noqa: F401

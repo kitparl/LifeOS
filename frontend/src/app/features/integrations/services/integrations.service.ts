@@ -176,6 +176,27 @@ export interface GitHubSyncResponse {
   remote_commit_sha?: string | null;
 }
 
+export interface SarvamConfigStatus {
+  connection_id: string;
+  provider: string;
+  enabled: boolean;
+  status: string;
+  configured: boolean;
+  api_key_masked: string | null;
+  last_sync_at: string | null;
+}
+
+export interface SarvamConfigUpdate {
+  api_key?: string | null;
+  enabled?: boolean | null;
+}
+
+export interface SarvamTestResponse {
+  ok: boolean;
+  detail: string;
+  model?: string | null;
+}
+
 export const TELEGRAM_EVENT_OPTIONS: { key: string; label: string }[] = [
   { key: 'task_created', label: 'New task' },
   { key: 'race_added', label: 'New race' },
@@ -271,5 +292,17 @@ export class IntegrationsService {
 
   syncSectionToGitHub(sectionId: string): Observable<GitHubSyncResponse> {
     return this.http.post<GitHubSyncResponse>(`${this.api}/github/sync/section/${sectionId}`, {});
+  }
+
+  getSarvam(): Observable<SarvamConfigStatus> {
+    return this.http.get<SarvamConfigStatus>(`${this.api}/sarvam`);
+  }
+
+  saveSarvamConfig(body: SarvamConfigUpdate): Observable<SarvamConfigStatus> {
+    return this.http.put<SarvamConfigStatus>(`${this.api}/sarvam/config`, body);
+  }
+
+  testSarvam(): Observable<SarvamTestResponse> {
+    return this.http.post<SarvamTestResponse>(`${this.api}/sarvam/test`, {});
   }
 }

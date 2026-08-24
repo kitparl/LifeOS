@@ -17,6 +17,9 @@ from app.modules.integrations.schemas import (
     IntegrationResponse,
     IntegrationSyncResponse,
     IntegrationUpdate,
+    SarvamConfigStatus,
+    SarvamConfigUpdate,
+    SarvamTestResponse,
     TelegramConfigStatus,
     TelegramConfigUpdate,
     TelegramTestResponse,
@@ -26,6 +29,11 @@ from app.modules.integrations.github_config import (
     mask_config as mask_github_config,
     parse_config as parse_github_config,
     serialize_config as serialize_github_config,
+)
+from app.modules.integrations.sarvam_config import (
+    mask_config as mask_sarvam_config,
+    parse_config as parse_sarvam_config,
+    serialize_config as serialize_sarvam_config,
 )
 from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
 from app.modules.integrations.telegram_config import (
@@ -48,6 +56,7 @@ PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
     IntegrationProviderInfo(provider="email", display_name="Email", description="Digest and reminders", oauth_required=False),
     IntegrationProviderInfo(provider="openai", display_name="OpenAI", description="AI chat and embeddings", oauth_required=False),
     IntegrationProviderInfo(provider="gemini", display_name="Gemini", description="Alternative AI provider", oauth_required=False),
+    IntegrationProviderInfo(provider="sarvam", display_name="Sarvam AI", description="Writing feedback (sarvam-105b)", oauth_required=False),
 ]
 
 
@@ -62,6 +71,8 @@ def _safe_response(conn) -> IntegrationResponse:
         # Encrypted config is not useful to the client; omit secrets entirely.
         resp.config_json = None
     if conn.provider == "github":
+        resp.config_json = None
+    if conn.provider == "sarvam":
         resp.config_json = None
     return resp
 
@@ -88,6 +99,8 @@ class IntegrationService:
             create_data = data.model_copy(update={"config_json": None})
         if data.provider == "github" and data.config_json:
             create_data = data.model_copy(update={"config_json": None})
+        if data.provider == "sarvam" and data.config_json:
+            create_data = data.model_copy(update={"config_json": None})
         conn = await self.repo.create(user_id, create_data, display_name)
         return _safe_response(conn)
 
@@ -102,6 +115,8 @@ class IntegrationService:
             # Reject raw config_json on generic PATCH; use dedicated telegram config endpoint.
             update_data = data.model_copy(update={"config_json": None})
         if conn.provider == "github" and data.config_json is not None:
+            update_data = data.model_copy(update={"config_json": None})
+        if conn.provider == "sarvam" and data.config_json is not None:
             update_data = data.model_copy(update={"config_json": None})
         updated = await self.repo.update(conn, update_data)
         return _safe_response(updated)
@@ -487,3 +502,111 @@ class IntegrationService:
                 branch=cfg.branch,
                 can_push=False,
             )
+
+    async def get_or_create_sarvam(self, user_id: str):
+        conn = await self.repo.get_by_provider(user_id, "sarvam")
+        if conn is not None:
+            return conn
+        return await self.repo.create(
+            user_id,
+            IntegrationCreate(provider="sarvam", enabled=False),
+            "Sarvam AI",
+        )
+
+    async def get_sarvam_status(self, user_id: str) -> SarvamConfigStatus:
+        conn = await self.get_or_create_sarvam(user_id)
+        masked = mask_sarvam_config(conn.config_json)
+        return SarvamConfigStatus(
+            connection_id=conn.id,
+            enabled=conn.enabled,
+            status=conn.status,
+            configured=masked.configured,
+            api_key_masked=masked.api_key_masked,
+            last_sync_at=conn.last_sync_at,
+        )
+
+    async def save_sarvam_config(self, user_id: str, data: SarvamConfigUpdate) -> SarvamConfigStatus:
+        conn = await self.get_or_create_sarvam(user_id)
+        if data.enabled is None and data.api_key is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+
+        new_json = serialize_sarvam_config(
+            api_key=data.api_key,
+            existing_json=conn.config_json,
+        )
+
+        update = IntegrationUpdate(config_json=new_json)
+        if data.enabled is not None:
+            update.enabled = data.enabled
+        elif parse_sarvam_config(new_json) is not None:
+            update.enabled = True
+
+        updated = await self.repo.update(conn, update)
+        if parse_sarvam_config(updated.config_json) is not None and updated.enabled:
+            updated.status = "connected"
+            await self.repo.db.flush()
+
+        return await self.get_sarvam_status(user_id)
+
+    async def test_sarvam(self, user_id: str) -> SarvamTestResponse:
+        conn = await self.repo.get_by_provider(user_id, "sarvam")
+        if conn is None:
+            return SarvamTestResponse(ok=False, detail="Sarvam not connected")
+        cfg = parse_sarvam_config(conn.config_json)
+        if cfg is None:
+            return SarvamTestResponse(ok=False, detail="Sarvam API key not configured")
+
+        import httpx
+
+        model = "sarvam-105b"
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.post(
+                    "https://api.sarvam.ai/v1/chat/completions",
+                    headers={
+                        "api-subscription-key": cfg.api_key,
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": "Reply with the single word: ok"}],
+                        "max_tokens": 8,
+                        "temperature": 0.2,
+                        "n": 1,
+                        "stream": False,
+                        "reasoning_effort": None,
+                    },
+                )
+                if res.status_code == 403:
+                    conn.status = "error"
+                    await self.repo.db.flush()
+                    return SarvamTestResponse(
+                        ok=False,
+                        detail="Invalid or revoked Sarvam API key. Check Integrations → Sarvam.",
+                        model=model,
+                    )
+                res.raise_for_status()
+            conn.last_sync_at = datetime.now(timezone.utc)
+            conn.status = "connected"
+            await self.repo.db.flush()
+            return SarvamTestResponse(
+                ok=True,
+                detail="Sarvam API key verified",
+                model=model,
+            )
+        except httpx.TimeoutException:
+            conn.status = "error"
+            await self.repo.db.flush()
+            return SarvamTestResponse(ok=False, detail="Sarvam request timed out", model=model)
+        except httpx.HTTPStatusError as exc:
+            conn.status = "error"
+            await self.repo.db.flush()
+            return SarvamTestResponse(
+                ok=False,
+                detail=f"Sarvam returned HTTP {exc.response.status_code}",
+                model=model,
+            )
+        except Exception as exc:
+            conn.status = "error"
+            await self.repo.db.flush()
+            return SarvamTestResponse(ok=False, detail=str(exc), model=model)

@@ -19,6 +19,9 @@ from app.modules.integrations.schemas import (
     IntegrationSyncResponse,
     IntegrationUpdate,
     ReportRunResponse,
+    SarvamConfigStatus,
+    SarvamConfigUpdate,
+    SarvamTestResponse,
     TelegramConfigStatus,
     TelegramConfigUpdate,
     TelegramTestResponse,
@@ -85,6 +88,31 @@ async def test_github(
     db: AsyncSession = Depends(get_db),
 ):
     return await IntegrationService(db).test_github(user.id)
+
+
+@router.get("/sarvam", response_model=SarvamConfigStatus)
+async def get_sarvam_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await IntegrationService(db).get_sarvam_status(user.id)
+
+
+@router.put("/sarvam/config", response_model=SarvamConfigStatus)
+async def save_sarvam_config(
+    data: SarvamConfigUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await IntegrationService(db).save_sarvam_config(user.id, data)
+
+
+@router.post("/sarvam/test", response_model=SarvamTestResponse)
+async def test_sarvam(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await IntegrationService(db).test_sarvam(user.id)
 
 
 @router.post("/github/sync/section/{section_id}", response_model=GitHubSyncResponse)

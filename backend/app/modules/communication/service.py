@@ -1,6 +1,33 @@
+import hashlib
+import time
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.ai.service import AiService
+from app.modules.ai.use_cases import USE_CASE_WRITING_FEEDBACK
+from app.modules.communication.ai.metrics import compute_deterministic_metrics
+from app.modules.communication.ai.provider import (
+    InvalidCredentialError,
+    MalformedResponseError,
+    MissingCredentialError,
+    ProviderUnavailableError,
+    RateLimitError,
+    SarvamWritingProvider,
+    TimeoutError_,
+    WritingAiError,
+)
+from app.modules.communication.ai.rubric import (
+    EVALUATION_VERSION,
+    PROMPT_VERSION,
+    RUBRIC_VERSION,
+)
+from app.modules.communication.models import (
+    WritingAIRun,
+    WritingEvaluation,
+    dumps_json,
+    loads_json,
+)
 from app.modules.communication.repository import CommunicationRepository
 from app.modules.communication.schemas import (
     SpeakingCreate,
@@ -10,13 +37,67 @@ from app.modules.communication.schemas import (
     VocabularyResponse,
     VocabularyUpdate,
     WritingCreate,
+    WritingEvaluationResponse,
+    WritingIssueItem,
     WritingResponse,
     WritingUpdate,
 )
+from app.modules.integrations.repository import IntegrationRepository
+from app.modules.integrations.sarvam_config import parse_config as parse_sarvam_config
+
+
+def _evaluation_key(
+    *,
+    content: str,
+    rubric_version: str,
+    prompt_version: str,
+    evaluation_version: str,
+    provider: str,
+    model: str,
+) -> str:
+    payload = "\n".join(
+        [
+            hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            rubric_version,
+            prompt_version,
+            evaluation_version,
+            provider,
+            model,
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _to_evaluation_response(row: WritingEvaluation, *, cached: bool = False) -> WritingEvaluationResponse:
+    issues_raw = loads_json(row.issues_json, [])
+    issues = [WritingIssueItem.model_validate(i) for i in issues_raw if isinstance(i, dict)]
+    return WritingEvaluationResponse(
+        id=row.id,
+        writing_id=row.writing_id,
+        evaluation_key=row.evaluation_key,
+        provider=row.provider,
+        model=row.model,
+        model_version=row.model_version,
+        prompt_version=row.prompt_version,
+        rubric_version=row.rubric_version,
+        evaluation_version=row.evaluation_version,
+        overall_score=row.overall_score,
+        dimensions=loads_json(row.dimensions_json, {}),
+        strengths=loads_json(row.strengths_json, []),
+        issues=issues,
+        suggestions=loads_json(row.suggestions_json, []),
+        metrics=loads_json(row.metrics_json, {}),
+        already_strong=row.already_strong,
+        truncated=row.truncated,
+        truncation_note=row.truncation_note,
+        cached=cached,
+        created_at=row.created_at,
+    )
 
 
 class CommunicationService:
     def __init__(self, db: AsyncSession):
+        self.db = db
         self.repo = CommunicationRepository(db)
 
     async def list_vocabulary(self, user_id: str, search: str | None = None) -> list[VocabularyResponse]:
@@ -99,3 +180,156 @@ class CommunicationService:
         if item is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Speaking practice not found")
         await self.repo.delete_speaking(item)
+
+    async def get_writing_feedback(
+        self, user_id: str, writing_id: str
+    ) -> WritingEvaluationResponse:
+        item = await self.repo.get_writing(user_id, writing_id)
+        if item is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        latest = await self.repo.get_latest_evaluation(user_id, writing_id)
+        if latest is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No AI feedback yet. Click AI Feedback to evaluate this writing.",
+            )
+        return _to_evaluation_response(latest, cached=True)
+
+    async def evaluate_writing(self, user_id: str, writing_id: str) -> WritingEvaluationResponse:
+        item = await self.repo.get_writing(user_id, writing_id)
+        if item is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        if not (item.content or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Write some content before requesting AI Feedback.",
+            )
+
+        provider_name, model = await AiService(self.db).resolve_model_for_use_case(
+            user_id, USE_CASE_WRITING_FEEDBACK
+        )
+        if provider_name != "sarvam":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Provider '{provider_name}' is not implemented for writing feedback yet.",
+            )
+
+        key = _evaluation_key(
+            content=item.content or "",
+            rubric_version=RUBRIC_VERSION,
+            prompt_version=PROMPT_VERSION,
+            evaluation_version=EVALUATION_VERSION,
+            provider=provider_name,
+            model=model,
+        )
+        existing = await self.repo.get_evaluation_by_key(writing_id, key)
+        if existing is not None:
+            return _to_evaluation_response(existing, cached=True)
+
+        conn = await IntegrationRepository(self.db).get_by_provider(user_id, "sarvam")
+        cfg = parse_sarvam_config(conn.config_json) if conn is not None else None
+        if cfg is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "missing_credential",
+                    "message": "Connect your Sarvam API key in Integrations before requesting AI Feedback.",
+                },
+            )
+
+        run = WritingAIRun(
+            user_id=user_id,
+            writing_id=writing_id,
+            provider=provider_name,
+            model=model,
+            operation="evaluate_writing",
+            prompt_version=PROMPT_VERSION,
+            rubric_version=RUBRIC_VERSION,
+            status="pending",
+        )
+        await self.repo.create_ai_run(run)
+
+        adapter = SarvamWritingProvider(api_key=cfg.api_key, model=model)
+        started = time.perf_counter()
+        try:
+            result = await adapter.evaluate_writing(
+                title=item.title,
+                content=item.content or "",
+                category=item.category,
+            )
+        except WritingAiError as exc:
+            run.status = "error"
+            run.error_code = exc.code
+            run.error_message = str(exc)
+            run.latency_ms = int((time.perf_counter() - started) * 1000)
+            await self.repo.update_ai_run(run)
+            http_status = status.HTTP_400_BAD_REQUEST
+            if isinstance(exc, (TimeoutError_, ProviderUnavailableError, RateLimitError)):
+                http_status = status.HTTP_503_SERVICE_UNAVAILABLE
+            elif isinstance(exc, InvalidCredentialError):
+                http_status = status.HTTP_401_UNAUTHORIZED
+            elif isinstance(exc, MissingCredentialError):
+                http_status = status.HTTP_400_BAD_REQUEST
+            elif isinstance(exc, MalformedResponseError):
+                http_status = status.HTTP_502_BAD_GATEWAY
+            raise HTTPException(
+                status_code=http_status,
+                detail={"code": exc.code, "message": str(exc)},
+            ) from exc
+        except Exception as exc:
+            run.status = "error"
+            run.error_code = "unknown"
+            run.error_message = str(exc)
+            run.latency_ms = int((time.perf_counter() - started) * 1000)
+            await self.repo.update_ai_run(run)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "provider_unavailable",
+                    "message": "AI feedback is temporarily unavailable. Your writing has not been changed.",
+                },
+            ) from exc
+
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        usage = result.pop("_usage", {}) or {}
+        metrics = compute_deterministic_metrics(item.content or "")
+
+        evaluation = WritingEvaluation(
+            user_id=user_id,
+            writing_id=writing_id,
+            evaluation_key=key,
+            provider=result["provider"],
+            model=result["model"],
+            model_version=None,
+            prompt_version=result.get("promptVersion", PROMPT_VERSION),
+            rubric_version=result.get("rubricVersion", RUBRIC_VERSION),
+            evaluation_version=result.get("evaluationVersion", EVALUATION_VERSION),
+            overall_score=int(result["overallScore"]),
+            dimensions_json=dumps_json(result.get("dimensions") or {}),
+            strengths_json=dumps_json(result.get("strengths") or []),
+            issues_json=dumps_json(result.get("issues") or []),
+            suggestions_json=dumps_json(result.get("suggestions") or []),
+            metrics_json=dumps_json(metrics),
+            already_strong=bool(result.get("alreadyStrong")),
+            truncated=bool(result.get("truncated")),
+            truncation_note=result.get("truncationNote"),
+        )
+        try:
+            saved = await self.repo.create_evaluation(evaluation)
+        except Exception:
+            # Race: another request may have inserted the same key.
+            raced = await self.repo.get_evaluation_by_key(writing_id, key)
+            if raced is not None:
+                run.status = "cached"
+                run.latency_ms = latency_ms
+                await self.repo.update_ai_run(run)
+                return _to_evaluation_response(raced, cached=True)
+            raise
+
+        run.status = "success"
+        run.latency_ms = latency_ms
+        run.prompt_tokens = usage.get("prompt_tokens")
+        run.completion_tokens = usage.get("completion_tokens")
+        await self.repo.update_ai_run(run)
+
+        return _to_evaluation_response(saved, cached=False)

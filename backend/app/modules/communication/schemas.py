@@ -92,3 +92,37 @@ class SpeakingResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class WritingIssueItem(BaseModel):
+    location: str = ""
+    problem_type: str = ""
+    severity: str = "medium"
+    original_text: str = ""
+    explanation: str = ""
+    suggestion: str = ""
+
+
+class WritingEvaluationResponse(BaseModel):
+    id: str
+    writing_id: str
+    evaluation_key: str
+    provider: str
+    model: str
+    model_version: str | None = None
+    prompt_version: str
+    rubric_version: str
+    evaluation_version: str
+    overall_score: int
+    dimensions: dict[str, int]
+    strengths: list[str]
+    issues: list[WritingIssueItem]
+    suggestions: list[str]
+    metrics: dict
+    already_strong: bool = False
+    truncated: bool = False
+    truncation_note: str | None = None
+    cached: bool = False
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

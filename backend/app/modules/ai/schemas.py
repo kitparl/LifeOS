@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -29,3 +31,35 @@ class AiChatResponse(BaseModel):
 class AiIndexResponse(BaseModel):
     indexed: int
     embedded: int
+
+
+class ModelOptionResponse(BaseModel):
+    provider: str
+    model: str
+    display_name: str
+    available: bool = True
+
+
+class CurrentSelectionResponse(BaseModel):
+    provider: str
+    model: str
+    updated_at: datetime | None = None
+
+
+class UseCaseResponse(BaseModel):
+    use_case: str
+    display_name: str
+    options: list[ModelOptionResponse]
+    current: CurrentSelectionResponse | None = None
+
+
+class UseCaseModelUpdate(BaseModel):
+    provider: str = Field(min_length=1, max_length=32)
+    model: str = Field(min_length=1, max_length=80)
+
+
+class UseCaseHistoryItem(BaseModel):
+    provider: str
+    model: str
+    effective_from: datetime
+    effective_to: datetime | None = None

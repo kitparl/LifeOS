@@ -17,6 +17,7 @@ INTEGRATION_PROVIDERS = (
     "email",
     "openai",
     "gemini",
+    "sarvam",
 )
 
 

@@ -1,7 +1,13 @@
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.communication.models import SpeakingPractice, VocabularyWord, WritingPractice
+from app.modules.communication.models import (
+    SpeakingPractice,
+    VocabularyWord,
+    WritingAIRun,
+    WritingEvaluation,
+    WritingPractice,
+)
 from app.modules.communication.schemas import (
     SpeakingCreate,
     SpeakingUpdate,
@@ -112,3 +118,45 @@ class CommunicationRepository:
     async def delete_speaking(self, item: SpeakingPractice) -> None:
         await self.db.delete(item)
         await self.db.flush()
+
+    async def get_evaluation_by_key(
+        self, writing_id: str, evaluation_key: str
+    ) -> WritingEvaluation | None:
+        result = await self.db.execute(
+            select(WritingEvaluation).where(
+                WritingEvaluation.writing_id == writing_id,
+                WritingEvaluation.evaluation_key == evaluation_key,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_latest_evaluation(
+        self, user_id: str, writing_id: str
+    ) -> WritingEvaluation | None:
+        result = await self.db.execute(
+            select(WritingEvaluation)
+            .where(
+                WritingEvaluation.user_id == user_id,
+                WritingEvaluation.writing_id == writing_id,
+            )
+            .order_by(WritingEvaluation.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def create_evaluation(self, evaluation: WritingEvaluation) -> WritingEvaluation:
+        self.db.add(evaluation)
+        await self.db.flush()
+        await self.db.refresh(evaluation)
+        return evaluation
+
+    async def create_ai_run(self, run: WritingAIRun) -> WritingAIRun:
+        self.db.add(run)
+        await self.db.flush()
+        await self.db.refresh(run)
+        return run
+
+    async def update_ai_run(self, run: WritingAIRun) -> WritingAIRun:
+        await self.db.flush()
+        await self.db.refresh(run)
+        return run

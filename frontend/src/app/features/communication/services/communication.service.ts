@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { SpeakingPractice, VocabularyWord, WritingPractice } from '../models/communication.models';
+import { SpeakingPractice, VocabularyWord, WritingEvaluation, WritingPractice } from '../models/communication.models';
 
 @Injectable({ providedIn: 'root' })
 export class CommunicationService {
@@ -51,6 +51,14 @@ export class CommunicationService {
 
   deleteWriting(id: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/writing/${id}`);
+  }
+
+  requestAiFeedback(writingId: string): Observable<WritingEvaluation> {
+    return this.http.post<WritingEvaluation>(`${this.api}/writing/${writingId}/ai-feedback`, {});
+  }
+
+  getAiFeedback(writingId: string): Observable<WritingEvaluation> {
+    return this.http.get<WritingEvaluation>(`${this.api}/writing/${writingId}/ai-feedback`);
   }
 
   listSpeaking(category?: string): Observable<SpeakingPractice[]> {

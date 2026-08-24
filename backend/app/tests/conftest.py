@@ -12,6 +12,9 @@ import app.modules.integrations.github_sync_models  # noqa: F401
 import app.modules.routines.models  # noqa: F401
 import app.modules.wishlist.models  # noqa: F401
 import app.modules.tasks.models  # noqa: F401
+import app.modules.ai.models  # noqa: F401
+import app.modules.communication.models  # noqa: F401
+import app.modules.integrations.models  # noqa: F401
 
 from app.core.database import Base, get_db
 from app.main import app

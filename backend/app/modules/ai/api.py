@@ -3,7 +3,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.modules.ai.schemas import AiChatRequest, AiChatResponse, AiIndexResponse, AiStatusResponse
+from app.modules.ai.schemas import (
+    AiChatRequest,
+    AiChatResponse,
+    AiIndexResponse,
+    AiStatusResponse,
+    UseCaseHistoryItem,
+    UseCaseModelUpdate,
+    UseCaseResponse,
+)
 from app.modules.ai.service import AiService
 from app.modules.auth.models import User
 
@@ -33,3 +41,30 @@ async def ai_chat(
     db: AsyncSession = Depends(get_db),
 ):
     return await AiService(db).chat(user.id, data.message)
+
+
+@router.get("/use-cases", response_model=list[UseCaseResponse])
+async def list_use_cases(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiService(db).list_use_cases(user.id)
+
+
+@router.put("/use-cases/{use_case}/model", response_model=UseCaseResponse)
+async def set_use_case_model(
+    use_case: str,
+    data: UseCaseModelUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiService(db).set_use_case_model(user.id, use_case, data.provider, data.model)
+
+
+@router.get("/use-cases/{use_case}/history", response_model=list[UseCaseHistoryItem])
+async def get_use_case_history(
+    use_case: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiService(db).get_use_case_history(user.id, use_case)

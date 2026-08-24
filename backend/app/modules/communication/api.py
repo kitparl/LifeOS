@@ -12,6 +12,7 @@ from app.modules.communication.schemas import (
     VocabularyResponse,
     VocabularyUpdate,
     WritingCreate,
+    WritingEvaluationResponse,
     WritingResponse,
     WritingUpdate,
 )
@@ -110,6 +111,24 @@ async def delete_writing(
     db: AsyncSession = Depends(get_db),
 ):
     await CommunicationService(db).delete_writing(user.id, item_id)
+
+
+@router.post("/writing/{item_id}/ai-feedback", response_model=WritingEvaluationResponse)
+async def evaluate_writing(
+    item_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await CommunicationService(db).evaluate_writing(user.id, item_id)
+
+
+@router.get("/writing/{item_id}/ai-feedback", response_model=WritingEvaluationResponse)
+async def get_writing_feedback(
+    item_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await CommunicationService(db).get_writing_feedback(user.id, item_id)
 
 
 @router.get("/speaking", response_model=list[SpeakingResponse])

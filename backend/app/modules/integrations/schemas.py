@@ -210,3 +210,24 @@ class GitHubSyncResponse(BaseModel):
     md_path: str | None = None
     synced_at: datetime | None = None
     remote_commit_sha: str | None = None
+
+
+class SarvamConfigUpdate(BaseModel):
+    api_key: str | None = Field(default=None, max_length=200)
+    enabled: bool | None = None
+
+
+class SarvamConfigStatus(BaseModel):
+    connection_id: str
+    provider: str = "sarvam"
+    enabled: bool
+    status: str
+    configured: bool
+    api_key_masked: str | None = None
+    last_sync_at: datetime | None = None
+
+
+class SarvamTestResponse(BaseModel):
+    ok: bool
+    detail: str
+    model: str | None = None

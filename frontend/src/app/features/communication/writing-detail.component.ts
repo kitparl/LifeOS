@@ -5,11 +5,12 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MarkdownService } from '../../shared/markdown/markdown.service';
 import { WritingPractice } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
+import { WritingFeedbackPanelComponent } from './writing-feedback-panel.component';
 
 @Component({
   selector: 'app-writing-detail',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, WritingFeedbackPanelComponent],
   template: `
     @if (item; as w) {
       <div class="space-y-3" style="max-width: 760px">
@@ -31,6 +32,8 @@ import { CommunicationService } from './services/communication.service';
             <div class="prose-content" [innerHTML]="safeMarkdown(w.content)"></div>
           }
         </div>
+
+        <app-writing-feedback-panel [writingId]="w.id" />
 
         <a routerLink="/communication" class="link text-sm">← Back to Communication</a>
       </div>
