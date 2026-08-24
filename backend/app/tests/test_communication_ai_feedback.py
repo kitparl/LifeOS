@@ -254,3 +254,57 @@ def test_malformed_response_helper():
         from app.modules.communication.ai.provider import _parse_json_object
 
         _parse_json_object("not json at all")
+
+
+@pytest.mark.asyncio
+async def test_writing_rewrite_idempotency(client):
+    token = await _auth(client, "rewrite@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    created = await client.post(
+        "/api/v1/communication/writing",
+        headers=headers,
+        json={"title": "Draft", "content": "He go to school yesterday.", "category": "notes"},
+    )
+    writing_id = created.json()["id"]
+
+    await client.put(
+        "/api/v1/integrations/sarvam/config",
+        headers=headers,
+        json={"api_key": "sk-rewrite-3333", "enabled": True},
+    )
+
+    fake_rewrite = {
+        "promptVersion": "writing-rewrite-v1",
+        "provider": "sarvam",
+        "model": "sarvam-105b",
+        "suggestedVersion": "He went to school yesterday.",
+        "whyBetter": ["Correct past tense"],
+        "keyChanges": ["go → went"],
+        "_usage": {"prompt_tokens": 80, "completion_tokens": 40},
+    }
+
+    with patch(
+        "app.modules.communication.service.SarvamWritingProvider.suggest_rewrite",
+        new_callable=AsyncMock,
+        return_value=dict(fake_rewrite),
+    ) as mock_rewrite:
+        first = await client.post(
+            f"/api/v1/communication/writing/{writing_id}/ai-rewrite",
+            headers=headers,
+        )
+        assert first.status_code == 200, first.text
+        body1 = first.json()
+        assert body1["cached"] is False
+        assert body1["suggested_text"] == "He went to school yesterday."
+        assert mock_rewrite.await_count == 1
+
+        second = await client.post(
+            f"/api/v1/communication/writing/{writing_id}/ai-rewrite",
+            headers=headers,
+        )
+        assert second.status_code == 200
+        body2 = second.json()
+        assert body2["cached"] is True
+        assert body2["id"] == body1["id"]
+        assert mock_rewrite.await_count == 1

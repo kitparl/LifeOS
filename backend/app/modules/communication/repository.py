@@ -7,6 +7,7 @@ from app.modules.communication.models import (
     WritingAIRun,
     WritingEvaluation,
     WritingPractice,
+    WritingRewritePreview,
 )
 from app.modules.communication.schemas import (
     SpeakingCreate,
@@ -160,3 +161,34 @@ class CommunicationRepository:
         await self.db.flush()
         await self.db.refresh(run)
         return run
+
+    async def get_rewrite_by_key(
+        self, writing_id: str, rewrite_key: str
+    ) -> WritingRewritePreview | None:
+        result = await self.db.execute(
+            select(WritingRewritePreview).where(
+                WritingRewritePreview.writing_id == writing_id,
+                WritingRewritePreview.rewrite_key == rewrite_key,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_latest_rewrite(
+        self, user_id: str, writing_id: str
+    ) -> WritingRewritePreview | None:
+        result = await self.db.execute(
+            select(WritingRewritePreview)
+            .where(
+                WritingRewritePreview.user_id == user_id,
+                WritingRewritePreview.writing_id == writing_id,
+            )
+            .order_by(WritingRewritePreview.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def create_rewrite(self, preview: WritingRewritePreview) -> WritingRewritePreview:
+        self.db.add(preview)
+        await self.db.flush()
+        await self.db.refresh(preview)
+        return preview

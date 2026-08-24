@@ -89,6 +89,31 @@ class WritingEvaluation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
+class WritingRewritePreview(Base):
+    """Optional coach rewrite — separate from evaluation; never replaces user content."""
+
+    __tablename__ = "writing_rewrite_previews"
+    __table_args__ = (
+        UniqueConstraint("writing_id", "rewrite_key", name="uq_writing_rewrite_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    writing_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("writing_practices.id"), index=True, nullable=False
+    )
+    rewrite_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    model: Mapped[str] = mapped_column(String(80), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    suggested_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    why_better_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    key_changes_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    truncated: Mapped[bool] = mapped_column(default=False)
+    truncation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class WritingAIRun(Base):
     """Traceability log for writing-related AI invocations. Never stores credentials."""
 

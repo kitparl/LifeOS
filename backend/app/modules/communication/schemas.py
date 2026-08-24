@@ -126,3 +126,21 @@ class WritingEvaluationResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class WritingRewriteResponse(BaseModel):
+    id: str
+    writing_id: str
+    rewrite_key: str
+    provider: str
+    model: str
+    prompt_version: str
+    suggested_text: str
+    why_better: list[str]
+    key_changes: list[str]
+    truncated: bool = False
+    truncation_note: str | None = None
+    cached: bool = False
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

@@ -82,6 +82,22 @@ export interface WritingEvaluation {
   created_at: string;
 }
 
+export interface WritingRewrite {
+  id: string;
+  writing_id: string;
+  rewrite_key: string;
+  provider: string;
+  model: string;
+  prompt_version: string;
+  suggested_text: string;
+  why_better: string[];
+  key_changes: string[];
+  truncated: boolean;
+  truncation_note: string | null;
+  cached: boolean;
+  created_at: string;
+}
+
 export const DIMENSION_LABELS: Record<string, string> = {
   grammar: 'Grammar',
   punctuation: 'Punctuation',

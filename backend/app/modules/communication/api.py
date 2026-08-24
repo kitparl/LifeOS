@@ -14,6 +14,7 @@ from app.modules.communication.schemas import (
     WritingCreate,
     WritingEvaluationResponse,
     WritingResponse,
+    WritingRewriteResponse,
     WritingUpdate,
 )
 from app.modules.communication.service import CommunicationService
@@ -129,6 +130,24 @@ async def get_writing_feedback(
     db: AsyncSession = Depends(get_db),
 ):
     return await CommunicationService(db).get_writing_feedback(user.id, item_id)
+
+
+@router.post("/writing/{item_id}/ai-rewrite", response_model=WritingRewriteResponse)
+async def request_writing_rewrite(
+    item_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await CommunicationService(db).request_writing_rewrite(user.id, item_id)
+
+
+@router.get("/writing/{item_id}/ai-rewrite", response_model=WritingRewriteResponse)
+async def get_writing_rewrite(
+    item_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await CommunicationService(db).get_writing_rewrite(user.id, item_id)
 
 
 @router.get("/speaking", response_model=list[SpeakingResponse])

@@ -13,7 +13,7 @@ import { WritingFeedbackPanelComponent } from './writing-feedback-panel.componen
   imports: [RouterLink, WritingFeedbackPanelComponent],
   template: `
     @if (item; as w) {
-      <div class="space-y-3" style="max-width: 760px">
+      <div class="writing-detail-page w-full max-w-6xl mx-auto space-y-3">
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h1 class="text-lg font-semibold" style="color: var(--text)">{{ w.title }}</h1>
@@ -25,15 +25,20 @@ import { WritingFeedbackPanelComponent } from './writing-feedback-panel.componen
           </div>
         </div>
 
-        <div class="panel">
-          @if (!w.content) {
-            <p class="text-sm" style="color: var(--text-muted); font-style: italic">No content.</p>
-          } @else {
-            <div class="prose-content" [innerHTML]="safeMarkdown(w.content)"></div>
-          }
-        </div>
+        <div class="writing-detail-grid">
+          <div class="panel min-h-[12rem]">
+            <p class="text-xs font-medium mb-2" style="color: var(--text-muted)">Your writing</p>
+            @if (!w.content) {
+              <p class="text-sm" style="color: var(--text-muted); font-style: italic">No content.</p>
+            } @else {
+              <div class="prose-content" [innerHTML]="safeMarkdown(w.content)"></div>
+            }
+          </div>
 
-        <app-writing-feedback-panel [writingId]="w.id" />
+          <div class="writing-detail-feedback">
+            <app-writing-feedback-panel [writingId]="w.id" [originalContent]="w.content || ''" />
+          </div>
+        </div>
 
         <a routerLink="/communication" class="link text-sm">← Back to Communication</a>
       </div>
@@ -45,6 +50,29 @@ import { WritingFeedbackPanelComponent } from './writing-feedback-panel.componen
       <p class="text-sm" style="color: var(--danger)">Writing not found.</p>
     }
   `,
+  styles: [
+    `
+      .writing-detail-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        align-items: start;
+      }
+
+      @media (min-width: 1024px) {
+        .writing-detail-grid {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+
+        .writing-detail-feedback {
+          position: sticky;
+          top: 1rem;
+          max-height: calc(100vh - 2rem);
+          overflow-y: auto;
+        }
+      }
+    `,
+  ],
 })
 export class WritingDetailComponent implements OnInit {
   private readonly communication = inject(CommunicationService);

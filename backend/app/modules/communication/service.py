@@ -20,11 +20,13 @@ from app.modules.communication.ai.provider import (
 from app.modules.communication.ai.rubric import (
     EVALUATION_VERSION,
     PROMPT_VERSION,
+    REWRITE_PROMPT_VERSION,
     RUBRIC_VERSION,
 )
 from app.modules.communication.models import (
     WritingAIRun,
     WritingEvaluation,
+    WritingRewritePreview,
     dumps_json,
     loads_json,
 )
@@ -40,6 +42,7 @@ from app.modules.communication.schemas import (
     WritingEvaluationResponse,
     WritingIssueItem,
     WritingResponse,
+    WritingRewriteResponse,
     WritingUpdate,
 )
 from app.modules.integrations.repository import IntegrationRepository
@@ -68,6 +71,24 @@ def _evaluation_key(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _rewrite_key(
+    *,
+    content: str,
+    prompt_version: str,
+    provider: str,
+    model: str,
+) -> str:
+    payload = "\n".join(
+        [
+            hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            prompt_version,
+            provider,
+            model,
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _to_evaluation_response(row: WritingEvaluation, *, cached: bool = False) -> WritingEvaluationResponse:
     issues_raw = loads_json(row.issues_json, [])
     issues = [WritingIssueItem.model_validate(i) for i in issues_raw if isinstance(i, dict)]
@@ -88,6 +109,24 @@ def _to_evaluation_response(row: WritingEvaluation, *, cached: bool = False) -> 
         suggestions=loads_json(row.suggestions_json, []),
         metrics=loads_json(row.metrics_json, {}),
         already_strong=row.already_strong,
+        truncated=row.truncated,
+        truncation_note=row.truncation_note,
+        cached=cached,
+        created_at=row.created_at,
+    )
+
+
+def _to_rewrite_response(row: WritingRewritePreview, *, cached: bool = False) -> WritingRewriteResponse:
+    return WritingRewriteResponse(
+        id=row.id,
+        writing_id=row.writing_id,
+        rewrite_key=row.rewrite_key,
+        provider=row.provider,
+        model=row.model,
+        prompt_version=row.prompt_version,
+        suggested_text=row.suggested_text,
+        why_better=loads_json(row.why_better_json, []),
+        key_changes=loads_json(row.key_changes_json, []),
         truncated=row.truncated,
         truncation_note=row.truncation_note,
         cached=cached,
@@ -333,3 +372,143 @@ class CommunicationService:
         await self.repo.update_ai_run(run)
 
         return _to_evaluation_response(saved, cached=False)
+
+    async def get_writing_rewrite(self, user_id: str, writing_id: str) -> WritingRewriteResponse:
+        item = await self.repo.get_writing(user_id, writing_id)
+        if item is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        latest = await self.repo.get_latest_rewrite(user_id, writing_id)
+        if latest is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No coach rewrite yet. Click “How AI would write this” to generate one.",
+            )
+        return _to_rewrite_response(latest, cached=True)
+
+    async def request_writing_rewrite(self, user_id: str, writing_id: str) -> WritingRewriteResponse:
+        item = await self.repo.get_writing(user_id, writing_id)
+        if item is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        if not (item.content or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Write some content before requesting a coach rewrite.",
+            )
+
+        provider_name, model = await AiService(self.db).resolve_model_for_use_case(
+            user_id, USE_CASE_WRITING_FEEDBACK
+        )
+        if provider_name != "sarvam":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Provider '{provider_name}' is not implemented for writing rewrite yet.",
+            )
+
+        key = _rewrite_key(
+            content=item.content or "",
+            prompt_version=REWRITE_PROMPT_VERSION,
+            provider=provider_name,
+            model=model,
+        )
+        existing = await self.repo.get_rewrite_by_key(writing_id, key)
+        if existing is not None:
+            return _to_rewrite_response(existing, cached=True)
+
+        conn = await IntegrationRepository(self.db).get_by_provider(user_id, "sarvam")
+        cfg = parse_sarvam_config(conn.config_json) if conn is not None else None
+        if cfg is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "missing_credential",
+                    "message": "Connect your Sarvam API key in Integrations before requesting a coach rewrite.",
+                },
+            )
+
+        run = WritingAIRun(
+            user_id=user_id,
+            writing_id=writing_id,
+            provider=provider_name,
+            model=model,
+            operation="suggest_rewrite",
+            prompt_version=REWRITE_PROMPT_VERSION,
+            rubric_version=RUBRIC_VERSION,
+            status="pending",
+        )
+        await self.repo.create_ai_run(run)
+
+        adapter = SarvamWritingProvider(api_key=cfg.api_key, model=model)
+        started = time.perf_counter()
+        try:
+            result = await adapter.suggest_rewrite(
+                title=item.title,
+                content=item.content or "",
+                category=item.category,
+            )
+        except WritingAiError as exc:
+            run.status = "error"
+            run.error_code = exc.code
+            run.error_message = str(exc)
+            run.latency_ms = int((time.perf_counter() - started) * 1000)
+            await self.repo.update_ai_run(run)
+            http_status = status.HTTP_400_BAD_REQUEST
+            if isinstance(exc, (TimeoutError_, ProviderUnavailableError, RateLimitError)):
+                http_status = status.HTTP_503_SERVICE_UNAVAILABLE
+            elif isinstance(exc, InvalidCredentialError):
+                http_status = status.HTTP_401_UNAUTHORIZED
+            elif isinstance(exc, MissingCredentialError):
+                http_status = status.HTTP_400_BAD_REQUEST
+            elif isinstance(exc, MalformedResponseError):
+                http_status = status.HTTP_502_BAD_GATEWAY
+            raise HTTPException(
+                status_code=http_status,
+                detail={"code": exc.code, "message": str(exc)},
+            ) from exc
+        except Exception as exc:
+            run.status = "error"
+            run.error_code = "unknown"
+            run.error_message = str(exc)
+            run.latency_ms = int((time.perf_counter() - started) * 1000)
+            await self.repo.update_ai_run(run)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "provider_unavailable",
+                    "message": "Coach rewrite is temporarily unavailable. Your writing has not been changed.",
+                },
+            ) from exc
+
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        usage = result.pop("_usage", {}) or {}
+
+        preview = WritingRewritePreview(
+            user_id=user_id,
+            writing_id=writing_id,
+            rewrite_key=key,
+            provider=result["provider"],
+            model=result["model"],
+            prompt_version=result.get("promptVersion", REWRITE_PROMPT_VERSION),
+            suggested_text=result["suggestedVersion"],
+            why_better_json=dumps_json(result.get("whyBetter") or []),
+            key_changes_json=dumps_json(result.get("keyChanges") or []),
+            truncated=bool(result.get("truncated")),
+            truncation_note=result.get("truncationNote"),
+        )
+        try:
+            saved = await self.repo.create_rewrite(preview)
+        except Exception:
+            raced = await self.repo.get_rewrite_by_key(writing_id, key)
+            if raced is not None:
+                run.status = "cached"
+                run.latency_ms = latency_ms
+                await self.repo.update_ai_run(run)
+                return _to_rewrite_response(raced, cached=True)
+            raise
+
+        run.status = "success"
+        run.latency_ms = latency_ms
+        run.prompt_tokens = usage.get("prompt_tokens")
+        run.completion_tokens = usage.get("completion_tokens")
+        await self.repo.update_ai_run(run)
+
+        return _to_rewrite_response(saved, cached=False)

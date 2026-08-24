@@ -5,6 +5,7 @@ from __future__ import annotations
 RUBRIC_VERSION = "writing-rubric-v1"
 EVALUATION_VERSION = "v1"
 PROMPT_VERSION = "writing-feedback-v1"
+REWRITE_PROMPT_VERSION = "writing-rewrite-v1"
 
 # Stable dimension keys (canonical JSON uses these camelCase / snake keys).
 DIMENSIONS: tuple[str, ...] = (

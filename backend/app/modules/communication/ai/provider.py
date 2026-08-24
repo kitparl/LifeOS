@@ -13,6 +13,7 @@ from app.modules.communication.ai.rubric import (
     DIMENSIONS,
     EVALUATION_VERSION,
     PROMPT_VERSION,
+    REWRITE_PROMPT_VERSION,
     RUBRIC_VERSION,
     compute_overall_score,
     normalize_dimensions,
@@ -24,6 +25,7 @@ SARVAM_CHAT_URL = "https://api.sarvam.ai/v1/chat/completions"
 DEFAULT_MODEL = "sarvam-105b"
 MAX_CONTENT_CHARS = 12_000
 MAX_TOKENS = 1200
+REWRITE_MAX_TOKENS = 1400
 TEMPERATURE = 0.25
 
 
@@ -119,15 +121,54 @@ class SarvamWritingProvider:
         validated["_usage"] = usage
         return validated
 
-    async def _chat(self, system: str, user_message: str) -> tuple[str, dict[str, Any]]:
+    async def suggest_rewrite(
+        self,
+        *,
+        title: str,
+        content: str,
+        category: str,
+    ) -> dict[str, Any]:
+        truncated = False
+        body = content or ""
+        if len(body) > MAX_CONTENT_CHARS:
+            body = body[:MAX_CONTENT_CHARS]
+            truncated = True
+
+        system = _build_rewrite_system_prompt()
+        user_msg = (
+            f"Title: {title}\nCategory: {category}\n\nOriginal writing:\n{body}\n\n"
+            "Return ONLY the JSON object described in the system prompt."
+        )
+
+        raw_text, usage = await self._chat(
+            system, user_msg, max_tokens=REWRITE_MAX_TOKENS, temperature=0.35
+        )
+        parsed = _parse_json_object(raw_text)
+        validated = _validate_rewrite(parsed, provider="sarvam", model=self.model)
+        if truncated:
+            validated["truncated"] = True
+            validated["truncationNote"] = (
+                f"Rewrite is based on the first {MAX_CONTENT_CHARS} characters of the writing."
+            )
+        validated["_usage"] = usage
+        return validated
+
+    async def _chat(
+        self,
+        system: str,
+        user_message: str,
+        *,
+        max_tokens: int = MAX_TOKENS,
+        temperature: float = TEMPERATURE,
+    ) -> tuple[str, dict[str, Any]]:
         payload = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_message},
             ],
-            "temperature": TEMPERATURE,
-            "max_tokens": MAX_TOKENS,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
             "n": 1,
             "stream": False,
             "reasoning_effort": None,
@@ -190,6 +231,46 @@ def _build_system_prompt() -> str:
         "}\n"
         "If alreadyStrong is true, issues and suggestions may be empty."
     )
+
+
+def _build_rewrite_system_prompt() -> str:
+    return (
+        "You are an expert writing coach. The user wants to see how YOU would write their piece "
+        "if you were the author — same intent, audience, and tone, but clearer and more polished. "
+        "Do NOT change the core message or invent new facts. "
+        "Respond with ONLY valid JSON (no markdown fences) matching this shape:\n"
+        "{\n"
+        '  "suggestedVersion": "<full rewritten text>",\n'
+        '  "whyBetter": ["short reason 1", "..."],\n'
+        '  "keyChanges": ["specific change 1", "..."]\n'
+        "}\n"
+        "Keep whyBetter and keyChanges concise (max 6 items each)."
+    )
+
+
+def _validate_rewrite(data: dict, *, provider: str, model: str) -> dict[str, Any]:
+    suggested = str(data.get("suggestedVersion") or data.get("suggested_version") or "").strip()
+    if not suggested:
+        raise MalformedResponseError("AI rewrite response did not include suggestedVersion.")
+
+    why_raw = data.get("whyBetter") or data.get("why_better") or []
+    if not isinstance(why_raw, list):
+        why_raw = []
+    why_better = [str(x).strip() for x in why_raw if str(x).strip()][:6]
+
+    changes_raw = data.get("keyChanges") or data.get("key_changes") or []
+    if not isinstance(changes_raw, list):
+        changes_raw = []
+    key_changes = [str(x).strip() for x in changes_raw if str(x).strip()][:6]
+
+    return {
+        "promptVersion": REWRITE_PROMPT_VERSION,
+        "provider": provider,
+        "model": model,
+        "suggestedVersion": suggested[:20_000],
+        "whyBetter": why_better,
+        "keyChanges": key_changes,
+    }
 
 
 def _parse_json_object(raw: str) -> dict:
