@@ -91,6 +91,7 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("github_sync_state", "remote_commit_sha", "VARCHAR(64)"),
     ("github_sync_state", "sync_status", "VARCHAR(16) DEFAULT 'never_synced'"),
     ("github_sync_state", "last_error", "TEXT"),
+    ("github_sync_state", "source_hash", "VARCHAR(64)"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [

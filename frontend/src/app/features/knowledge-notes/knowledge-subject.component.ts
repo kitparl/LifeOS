@@ -23,7 +23,7 @@ import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { FileImageSrcDirective } from '../../shared/markdown/file-image-src.directive';
 import { AttachmentListComponent } from '../files/components/attachment-list.component';
 import { FileRecord } from '../files/models/file.models';
-import { IntegrationsService } from '../integrations/services/integrations.service';
+import { IntegrationsService, GitHubSectionSyncDisplay } from '../integrations/services/integrations.service';
 import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
 import { GitHubSyncButtonComponent } from './github-sync-button.component';
 import { ModalComponent } from '../../shared/modal/modal.component';
@@ -297,6 +297,14 @@ const SIDEBAR_MAX = 480;
                             (dblclick)="startRename('section', sec.id, $event)"
                           >{{ sec.title }}</button>
                         }
+                        @if (resolveGitHubSyncStatus(sec.id); as ghStatus) {
+                          <span
+                            class="kn-gh-sync"
+                            [attr.data-status]="ghStatus"
+                            [title]="githubSyncHint(sec.id)"
+                            aria-hidden="true"
+                          ></span>
+                        }
                         <button
                           type="button"
                           class="kn-section__delete"
@@ -374,6 +382,13 @@ const SIDEBAR_MAX = 480;
                       [filename]="form.controls.title.value || 'section'"
                       (exportError)="onMarkdownImportError($event)"
                     />
+                    @if (resolveGitHubSyncStatus(sec.id); as ghStatus) {
+                      <span
+                        class="kn-gh-sync kn-gh-sync--label"
+                        [attr.data-status]="ghStatus"
+                        [title]="githubSyncHint(sec.id)"
+                      >{{ githubSyncShortLabel(ghStatus) }}</span>
+                    }
                     <app-github-sync-button
                       [sectionId]="sec.id"
                       [configured]="githubConfigured()"
@@ -516,6 +531,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   readonly githubConfigured = signal(false);
   readonly githubMessage = signal<string | null>(null);
   readonly githubMessageSectionId = signal<string | null>(null);
+  readonly sectionSyncStatuses = signal<Record<string, GitHubSectionSyncDisplay>>({});
   readonly renaming = signal<RenameTarget | null>(null);
   readonly openMenu = signal<string | null>(null);
   readonly detailsOpen = signal(false);
@@ -583,9 +599,19 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     if (id) this.load(id);
 
     this.integrations.getGitHub().subscribe({
-      next: (status) =>
-        this.githubConfigured.set(!!(status.configured && status.enabled)),
-      error: () => this.githubConfigured.set(false),
+      next: (status) => {
+        const configured = !!(status.configured && status.enabled);
+        this.githubConfigured.set(configured);
+        if (configured && this.subject()?.id) {
+          this.reloadGitHubSyncStatuses(this.subject()!.id);
+        } else if (!configured) {
+          this.sectionSyncStatuses.set({});
+        }
+      },
+      error: () => {
+        this.githubConfigured.set(false);
+        this.sectionSyncStatuses.set({});
+      },
     });
 
     this.dirty$
@@ -641,6 +667,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
         this.loading.set(false);
         this.initExpandedDefaults(s);
         this.restoreSelection();
+        this.reloadGitHubSyncStatuses(id);
       },
       error: () => this.loading.set(false),
     });
@@ -735,12 +762,73 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.importError.set('');
     this.githubMessage.set(message);
     this.githubMessageSectionId.set(sectionId);
+    const subjectId = this.subject()?.id;
+    if (subjectId) this.reloadGitHubSyncStatuses(subjectId);
   }
 
   onGitHubSyncError(message: string): void {
     this.githubMessage.set(null);
     this.githubMessageSectionId.set(null);
     this.importError.set(message);
+    const subjectId = this.subject()?.id;
+    if (subjectId) this.reloadGitHubSyncStatuses(subjectId);
+  }
+
+  resolveGitHubSyncStatus(sectionId: string): GitHubSectionSyncDisplay | null {
+    if (!this.githubConfigured()) return null;
+    let status = this.sectionSyncStatuses()[sectionId] ?? 'never';
+    if (this.selected()?.id === sectionId && this.syncState() === 'unsaved' && status === 'synced') {
+      status = 'outdated';
+    }
+    return status;
+  }
+
+  githubSyncHint(sectionId: string): string {
+    const status = this.resolveGitHubSyncStatus(sectionId);
+    switch (status) {
+      case 'synced':
+        return 'Synced to GitHub';
+      case 'outdated':
+        return 'Needs GitHub sync';
+      case 'syncing':
+        return 'Syncing to GitHub…';
+      case 'failed':
+        return 'Last GitHub sync failed';
+      default:
+        return 'Not synced to GitHub';
+    }
+  }
+
+  githubSyncShortLabel(status: GitHubSectionSyncDisplay): string {
+    switch (status) {
+      case 'synced':
+        return 'Synced';
+      case 'outdated':
+        return 'Needs sync';
+      case 'syncing':
+        return 'Syncing…';
+      case 'failed':
+        return 'Sync failed';
+      default:
+        return 'Not synced';
+    }
+  }
+
+  private reloadGitHubSyncStatuses(subjectId: string): void {
+    if (!this.githubConfigured()) {
+      this.sectionSyncStatuses.set({});
+      return;
+    }
+    this.integrations.getGitHubSectionSyncStatuses(subjectId).subscribe({
+      next: (res) => {
+        const map: Record<string, GitHubSectionSyncDisplay> = {};
+        for (const item of res.sections) {
+          map[item.section_id] = item.status;
+        }
+        this.sectionSyncStatuses.set(map);
+      },
+      error: () => this.sectionSyncStatuses.set({}),
+    });
   }
 
   saveBeforeGitHubSync(): Promise<void> {
@@ -1054,6 +1142,8 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
           this.scheduleSave();
         } else {
           this.syncState.set('synced');
+          const subjectId = this.subject()?.id;
+          if (subjectId) this.reloadGitHubSyncStatuses(subjectId);
           if (returnToRead) {
             if (wasNew) {
               this.newlyCreatedSectionIds.delete(sec.id);
@@ -1183,6 +1273,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
           this.refreshSync();
         }
         this.subject.set({ ...s! });
+        this.reloadGitHubSyncStatuses(s!.id);
       },
     });
   }
@@ -1197,7 +1288,11 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
       c.order_index = i;
       return this.service.updateChapter(c.id, { order_index: i });
     });
-    if (reqs.length) forkJoin(reqs).subscribe();
+    if (reqs.length) {
+      forkJoin(reqs).subscribe({
+        complete: () => this.reloadGitHubSyncStatuses(s!.id),
+      });
+    }
   }
 
   onSectionDrop(event: CdkDragDrop<KnowledgeSection[]>): void {
@@ -1237,7 +1332,14 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     const reqs = persist.map((sec) =>
       this.service.updateSection(sec.id, { order_index: sec.order_index, chapter_id: sec.chapter_id })
     );
-    if (reqs.length) forkJoin(reqs).subscribe();
+    if (reqs.length) {
+      forkJoin(reqs).subscribe({
+        complete: () => {
+          const subjectId = this.subject()?.id;
+          if (subjectId) this.reloadGitHubSyncStatuses(subjectId);
+        },
+      });
+    }
   }
 
   async deleteSection(sec: KnowledgeSection): Promise<void> {

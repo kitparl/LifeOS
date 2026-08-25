@@ -22,6 +22,8 @@ from app.modules.integrations.schemas import (
     SarvamConfigStatus,
     SarvamConfigUpdate,
     SarvamTestResponse,
+    SectionSyncStatus,
+    SubjectSectionSyncStatusResponse,
     TelegramConfigStatus,
     TelegramConfigUpdate,
     TelegramTestResponse,
@@ -123,6 +125,21 @@ async def sync_github_section(
 ):
     result = await GitHubSyncService(db).sync_section(user.id, section_id)
     return GitHubSyncResponse(**result)
+
+
+@router.get(
+    "/github/sync/status/subject/{subject_id}",
+    response_model=SubjectSectionSyncStatusResponse,
+)
+async def get_github_subject_sync_status(
+    subject_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    sections = await GitHubSyncService(db).get_subject_sync_statuses(user.id, subject_id)
+    return SubjectSectionSyncStatusResponse(
+        sections=[SectionSyncStatus(**item) for item in sections]
+    )
 
 
 @router.post("/telegram/digest", response_model=DigestResponse)

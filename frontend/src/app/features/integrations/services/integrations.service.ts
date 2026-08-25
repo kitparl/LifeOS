@@ -176,6 +176,19 @@ export interface GitHubSyncResponse {
   remote_commit_sha?: string | null;
 }
 
+export type GitHubSectionSyncDisplay = 'never' | 'synced' | 'outdated' | 'syncing' | 'failed';
+
+export interface SectionSyncStatus {
+  section_id: string;
+  status: GitHubSectionSyncDisplay;
+  synced_at: string | null;
+  last_error: string | null;
+}
+
+export interface SubjectSectionSyncStatusResponse {
+  sections: SectionSyncStatus[];
+}
+
 export interface SarvamConfigStatus {
   connection_id: string;
   provider: string;
@@ -292,6 +305,12 @@ export class IntegrationsService {
 
   syncSectionToGitHub(sectionId: string): Observable<GitHubSyncResponse> {
     return this.http.post<GitHubSyncResponse>(`${this.api}/github/sync/section/${sectionId}`, {});
+  }
+
+  getGitHubSectionSyncStatuses(subjectId: string): Observable<SubjectSectionSyncStatusResponse> {
+    return this.http.get<SubjectSectionSyncStatusResponse>(
+      `${this.api}/github/sync/status/subject/${subjectId}`
+    );
   }
 
   getSarvam(): Observable<SarvamConfigStatus> {

@@ -22,6 +22,19 @@ class GitHubSyncRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_sections(
+        self, user_id: str, section_ids: list[str]
+    ) -> dict[str, GitHubSyncState]:
+        if not section_ids:
+            return {}
+        result = await self.db.execute(
+            select(GitHubSyncState).where(
+                GitHubSyncState.user_id == user_id,
+                GitHubSyncState.section_id.in_(section_ids),
+            )
+        )
+        return {row.section_id: row for row in result.scalars().all()}
+
     async def upsert(
         self,
         *,
@@ -34,6 +47,7 @@ class GitHubSyncRepository:
         remote_commit_sha: str | None = None,
         sync_status: str = "synced",
         last_error: str | None = None,
+        source_hash: str | None = None,
     ) -> GitHubSyncState:
         row = await self.get_by_section(user_id, section_id)
         now = datetime.now(timezone.utc)
@@ -49,6 +63,7 @@ class GitHubSyncRepository:
                 sync_status=sync_status or SYNC_STATUS_NEVER,
                 last_error=last_error,
                 synced_at=now,
+                source_hash=source_hash,
             )
             self.db.add(row)
         else:
@@ -60,6 +75,8 @@ class GitHubSyncRepository:
                 row.remote_commit_sha = remote_commit_sha
             row.sync_status = sync_status
             row.last_error = last_error
+            if source_hash is not None:
+                row.source_hash = source_hash
             row.synced_at = now
         await self.db.flush()
         await self.db.refresh(row)

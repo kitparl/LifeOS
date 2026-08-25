@@ -23,6 +23,7 @@ class GitHubSyncState(Base):
     md_path: Mapped[str] = mapped_column(String(500), nullable=False)
     md_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     assets_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     remote_commit_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     sync_status: Mapped[str] = mapped_column(String(16), nullable=False, default=SYNC_STATUS_NEVER)

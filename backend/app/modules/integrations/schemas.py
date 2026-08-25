@@ -212,6 +212,17 @@ class GitHubSyncResponse(BaseModel):
     remote_commit_sha: str | None = None
 
 
+class SectionSyncStatus(BaseModel):
+    section_id: str
+    status: str
+    synced_at: datetime | None = None
+    last_error: str | None = None
+
+
+class SubjectSectionSyncStatusResponse(BaseModel):
+    sections: list[SectionSyncStatus]
+
+
 class SarvamConfigUpdate(BaseModel):
     api_key: str | None = Field(default=None, max_length=200)
     enabled: bool | None = None

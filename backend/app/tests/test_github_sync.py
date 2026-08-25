@@ -16,15 +16,20 @@ from app.modules.integrations.github_config import (
     parse_preferences,
     serialize_config,
 )
-from app.modules.integrations.github_slug import slugify
+from app.modules.integrations.github_slug import slugify, strip_leading_number
 from app.modules.integrations.github_sync_planner import build_sync_plan
 from app.modules.integrations.github_sync_service import (
     _asset_filename,
     _content_hash,
     build_paths,
+    compute_rank,
+    compute_source_hash,
+    derive_display_sync_status,
     extract_file_ids,
+    format_number,
     rewrite_markdown,
 )
+from app.modules.integrations.github_sync_models import GitHubSyncState, SYNC_STATUS_FAILED, SYNC_STATUS_SYNCED, SYNC_STATUS_SYNCING, SYNC_STATUS_UNCHANGED
 from app.modules.knowledge_notes.models import KnowledgeChapter, KnowledgeSection, KnowledgeSubject
 
 
@@ -70,6 +75,30 @@ def test_uuid_asset_filename():
     assert _asset_filename("shot.png", file_id) == f"{file_id}-shot.png"
 
 
+def test_strip_leading_number():
+    assert strip_leading_number("01-foo") == "foo"
+    assert strip_leading_number("foo") == "foo"
+    assert strip_leading_number("123-only-digits") == "only-digits"
+    assert strip_leading_number("") == "untitled"
+
+
+def test_compute_rank_basic():
+    siblings = [("c2", 1), ("c1", 0), ("c3", 2)]
+    assert compute_rank(siblings, "c1") == (1, 2)
+    assert compute_rank(siblings, "c2") == (2, 2)
+    assert compute_rank(siblings, "c3") == (3, 2)
+    assert format_number(1, 2) == "01"
+    assert format_number(10, 2) == "10"
+
+
+def test_compute_rank_width_grows_past_99():
+    siblings = [(f"s{i}", i) for i in range(100)]
+    rank, width = compute_rank(siblings, "s50")
+    assert rank == 51
+    assert width == 3
+    assert format_number(rank, width) == "051"
+
+
 def test_build_paths():
     subject = KnowledgeSubject(id="s1", user_id="u1", title="Python", order_index=0)
     chapter = KnowledgeChapter(id="c1", user_id="u1", subject_id="s1", title="Variables", order_index=0)
@@ -81,12 +110,44 @@ def test_build_paths():
         content="hello",
         order_index=0,
     )
-    md_path, assets_dir = build_paths(subject, chapter, section, "")
-    assert md_path == "python/variables/intro.md"
-    assert assets_dir == "python/variables/assets"
+    md_path, assets_dir = build_paths(subject, chapter, section, "", "01", "01")
+    assert md_path == "python/01-variables/01-intro.md"
+    assert assets_dir == "python/01-variables/assets"
 
-    nested = build_paths(subject, chapter, section, "notes")
-    assert nested[0] == "notes/python/variables/intro.md"
+    nested = build_paths(subject, chapter, section, "notes", "01", "01")
+    assert nested[0] == "notes/python/01-variables/01-intro.md"
+
+
+def test_build_paths_subject_not_numbered():
+    subject = KnowledgeSubject(id="s1", user_id="u1", title="First Section", order_index=0)
+    chapter = KnowledgeChapter(id="c1", user_id="u1", subject_id="s1", title="Data Collections", order_index=0)
+    section = KnowledgeSection(
+        id="sec1",
+        user_id="u1",
+        chapter_id="c1",
+        title="Choosing the Right Collection",
+        content="hello",
+        order_index=0,
+    )
+    md_path, _ = build_paths(subject, chapter, section, "", "01", "01")
+    assert md_path.startswith("first-section/01-data-collections/01-")
+    assert "/first-section/" in f"/{md_path}/"
+    assert "01-first-section" not in md_path
+
+
+def test_build_paths_strips_existing_prefix_before_renumber():
+    subject = KnowledgeSubject(id="s1", user_id="u1", title="Python", order_index=0)
+    chapter = KnowledgeChapter(id="c1", user_id="u1", subject_id="s1", title="01 Variables", order_index=0)
+    section = KnowledgeSection(
+        id="sec1",
+        user_id="u1",
+        chapter_id="c1",
+        title="02 Intro",
+        content="hello",
+        order_index=0,
+    )
+    md_path, _ = build_paths(subject, chapter, section, "", "03", "04")
+    assert md_path == "python/03-variables/04-intro.md"
 
 
 def test_content_hash_stable():
@@ -95,6 +156,80 @@ def test_content_hash_stable():
     h3 = _content_hash("# Title\nchanged", {"id1": "abc"})
     assert h1 == h2
     assert h1 != h3
+
+
+def test_compute_source_hash_changes_on_edit():
+    base = compute_source_hash(
+        content="hello",
+        title="Intro",
+        section_order_index=0,
+        chapter_id="c1",
+        chapter_order_index=0,
+    )
+    changed = compute_source_hash(
+        content="hello world",
+        title="Intro",
+        section_order_index=0,
+        chapter_id="c1",
+        chapter_order_index=0,
+    )
+    reordered = compute_source_hash(
+        content="hello",
+        title="Intro",
+        section_order_index=1,
+        chapter_id="c1",
+        chapter_order_index=0,
+    )
+    assert base != changed
+    assert base != reordered
+
+
+def test_derive_display_sync_status():
+    current = compute_source_hash(
+        content="hello",
+        title="Intro",
+        section_order_index=0,
+        chapter_id="c1",
+        chapter_order_index=0,
+    )
+    assert derive_display_sync_status(None, current) == "never"
+
+    synced = GitHubSyncState(
+        user_id="u1",
+        section_id="s1",
+        md_path="a/b/c.md",
+        sync_status=SYNC_STATUS_SYNCED,
+        source_hash=current,
+    )
+    assert derive_display_sync_status(synced, current) == "synced"
+    assert derive_display_sync_status(synced, current + "x") == "outdated"
+
+    syncing = GitHubSyncState(
+        user_id="u1",
+        section_id="s1",
+        md_path="a/b/c.md",
+        sync_status=SYNC_STATUS_SYNCING,
+        source_hash=current,
+    )
+    assert derive_display_sync_status(syncing, current) == "syncing"
+
+    failed = GitHubSyncState(
+        user_id="u1",
+        section_id="s1",
+        md_path="a/b/c.md",
+        sync_status=SYNC_STATUS_FAILED,
+        source_hash=current,
+    )
+    assert derive_display_sync_status(failed, current) == "failed"
+
+    unchanged = GitHubSyncState(
+        user_id="u1",
+        section_id="s1",
+        md_path="a/b/c.md",
+        sync_status=SYNC_STATUS_UNCHANGED,
+        source_hash=current,
+    )
+    assert derive_display_sync_status(unchanged, current) == "synced"
 
 
 def test_github_config_roundtrip():
@@ -160,6 +295,26 @@ def test_planner_rename_deletes_old_path():
     assert any(f.action == "create" and f.path == "notes/a/b/new.md" for f in plan.files)
 
 
+def test_planner_renumber_moves_md_and_assets():
+    old_md = "notes/subject/01-chapter/01-section.md"
+    new_md = "notes/subject/02-chapter/01-section.md"
+    old_asset = "notes/subject/01-chapter/assets/fid1-x.png"
+    new_asset = "notes/subject/02-chapter/assets/fid1-x.png"
+    plan = build_sync_plan(
+        md_path=new_md,
+        rewritten_md="hello",
+        content_hash="newhash",
+        assets=[("fid1", new_asset, b"img")],
+        previous_md_path=old_md,
+        previous_content_hash="oldhash",
+        previous_assets=[("fid1", old_asset, "sha1")],
+    )
+    assert any(d.action == "delete" and d.path == old_md for d in plan.deletes)
+    assert any(d.action == "delete" and d.path == old_asset for d in plan.deletes)
+    assert any(f.action == "create" and f.path == new_md for f in plan.files)
+    assert any(f.action == "create" and f.path == new_asset for f in plan.files)
+
+
 def test_planner_orphan_asset_delete():
     plan = build_sync_plan(
         md_path="notes/a/b/c.md",
@@ -206,8 +361,9 @@ async def test_sync_section_unchanged_skips_commit():
     svc._load_section_context = AsyncMock(
         return_value=MagicMock(section=section, chapter=chapter, subject=subject)
     )
+    svc._resolve_path_numbers = AsyncMock(return_value=("01", "01"))
 
-    md_path, _ = build_paths(subject, chapter, section, "")
+    md_path, _ = build_paths(subject, chapter, section, "", "01", "01")
     content_hash = _content_hash("plain text", {})
     state = MagicMock()
     state.md_path = md_path
@@ -262,8 +418,9 @@ async def test_sync_section_recreates_when_remote_file_missing(monkeypatch):
     svc._load_section_context = AsyncMock(
         return_value=MagicMock(section=section, chapter=chapter, subject=subject)
     )
+    svc._resolve_path_numbers = AsyncMock(return_value=("01", "01"))
 
-    md_path, _ = build_paths(subject, chapter, section, "")
+    md_path, _ = build_paths(subject, chapter, section, "", "01", "01")
     content_hash = _content_hash("plain text", {})
     state = MagicMock()
     state.md_path = md_path

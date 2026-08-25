@@ -23,12 +23,13 @@ from app.modules.integrations.github_client import (
     user_facing_github_error,
 )
 from app.modules.integrations.github_config import DecryptedGitHubConfig, parse_config
-from app.modules.integrations.github_slug import slugify
+from app.modules.integrations.github_slug import slugify, strip_leading_number
 from app.modules.integrations.github_sync_models import (
     SYNC_STATUS_FAILED,
     SYNC_STATUS_SYNCED,
     SYNC_STATUS_SYNCING,
     SYNC_STATUS_UNCHANGED,
+    GitHubSyncState,
 )
 from app.modules.integrations.github_sync_notifier import notify_github_sync_result
 from app.modules.integrations.github_sync_planner import build_sync_plan
@@ -91,19 +92,37 @@ def rewrite_markdown(content: str, id_to_relpath: dict[str, str]) -> str:
     return _INLINE_FILE_RE.sub(repl, content)
 
 
+def compute_rank(siblings: list[tuple[str, int]], target_id: str) -> tuple[int, int]:
+    """Return 1-based rank and zero-pad width for *target_id* among *siblings*."""
+    ordered = sorted(siblings, key=lambda item: (item[1], item[0]))
+    width = max(2, len(str(len(siblings))))
+    for rank, (sid, _) in enumerate(ordered, start=1):
+        if sid == target_id:
+            return rank, width
+    return len(ordered) + 1, width
+
+
+def format_number(rank: int, width: int) -> str:
+    return str(rank).zfill(width)
+
+
 def build_paths(
     subject: KnowledgeSubject,
     chapter: KnowledgeChapter,
     section: KnowledgeSection,
     base_path: str,
+    chapter_number: str,
+    section_number: str,
 ) -> tuple[str, str]:
     subject_slug = slugify(subject.title, "subject")
-    chapter_slug = slugify(chapter.title, "chapter")
-    section_slug = slugify(section.title, "section")
-    if not section_slug.endswith(".md"):
-        section_slug = f"{section_slug}.md"
-    prefix = "/".join(p for p in [base_path.strip("/"), subject_slug, chapter_slug] if p)
-    md_path = f"{prefix}/{section_slug}"
+    chapter_slug = strip_leading_number(slugify(chapter.title, "chapter"))
+    section_slug = strip_leading_number(slugify(section.title, "section"))
+    chapter_folder = f"{chapter_number}-{chapter_slug}"
+    section_file = f"{section_number}-{section_slug}"
+    if not section_file.endswith(".md"):
+        section_file = f"{section_file}.md"
+    prefix = "/".join(p for p in [base_path.strip("/"), subject_slug, chapter_folder] if p)
+    md_path = f"{prefix}/{section_file}"
     assets_dir = f"{prefix}/assets"
     return md_path, assets_dir
 
@@ -120,6 +139,46 @@ def _asset_filename(record_filename: str, file_id: str) -> str:
 def _content_hash(md_text: str, asset_checksums: dict[str, str]) -> str:
     payload = md_text + "\n" + json.dumps(asset_checksums, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def compute_source_hash(
+    *,
+    content: str,
+    title: str,
+    section_order_index: int,
+    chapter_id: str,
+    chapter_order_index: int,
+) -> str:
+    """Hash of section fields that affect GitHub export path or pushed content."""
+    payload = json.dumps(
+        {
+            "content": content or "",
+            "title": title or "",
+            "section_order_index": section_order_index,
+            "chapter_id": chapter_id,
+            "chapter_order_index": chapter_order_index,
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def derive_display_sync_status(
+    state: GitHubSyncState | None,
+    current_source_hash: str,
+) -> str:
+    """Map stored sync state + current source hash to UI status."""
+    if state is None:
+        return "never"
+    if state.sync_status == SYNC_STATUS_SYNCING:
+        return "syncing"
+    if state.sync_status == SYNC_STATUS_FAILED:
+        return "failed"
+    if state.sync_status in (SYNC_STATUS_SYNCED, SYNC_STATUS_UNCHANGED):
+        if state.source_hash and state.source_hash == current_source_hash:
+            return "synced"
+        return "outdated"
+    return "never"
 
 
 def _parse_assets_json(raw: str | None) -> list[AssetRecord]:
@@ -207,6 +266,27 @@ class GitHubSyncService:
         section, chapter, subject = row
         return SectionContext(section=section, chapter=chapter, subject=subject)
 
+    async def _resolve_path_numbers(self, user_id: str, ctx: SectionContext) -> tuple[str, str]:
+        chapter_rows = await self.db.execute(
+            select(KnowledgeChapter.id, KnowledgeChapter.order_index).where(
+                KnowledgeChapter.subject_id == ctx.subject.id,
+                KnowledgeChapter.user_id == user_id,
+            )
+        )
+        chapter_siblings = [(row[0], row[1]) for row in chapter_rows.all()]
+
+        section_rows = await self.db.execute(
+            select(KnowledgeSection.id, KnowledgeSection.order_index).where(
+                KnowledgeSection.chapter_id == ctx.chapter.id,
+                KnowledgeSection.user_id == user_id,
+            )
+        )
+        section_siblings = [(row[0], row[1]) for row in section_rows.all()]
+
+        chapter_rank, chapter_width = compute_rank(chapter_siblings, ctx.chapter.id)
+        section_rank, section_width = compute_rank(section_siblings, ctx.section.id)
+        return format_number(chapter_rank, chapter_width), format_number(section_rank, section_width)
+
     def _client(self, cfg: DecryptedGitHubConfig) -> GitHubClient:
         return GitHubClient.from_repo_slug(cfg.token, cfg.repo, branch=cfg.branch)
 
@@ -248,7 +328,22 @@ class GitHubSyncService:
                 cfg, conn = await self._load_github_config(user_id)
                 ctx = await self._load_section_context(user_id, section_id)
                 client = self._client(cfg)
-                md_path, assets_dir = build_paths(ctx.subject, ctx.chapter, ctx.section, cfg.base_path)
+                chapter_num, section_num = await self._resolve_path_numbers(user_id, ctx)
+                md_path, assets_dir = build_paths(
+                    ctx.subject,
+                    ctx.chapter,
+                    ctx.section,
+                    cfg.base_path,
+                    chapter_num,
+                    section_num,
+                )
+                source_hash = compute_source_hash(
+                    content=ctx.section.content or "",
+                    title=ctx.section.title,
+                    section_order_index=ctx.section.order_index,
+                    chapter_id=ctx.chapter.id,
+                    chapter_order_index=ctx.chapter.order_index,
+                )
 
                 await self.sync_repo.set_status(
                     user_id,
@@ -305,6 +400,7 @@ class GitHubSyncService:
                             remote_commit_sha=state.remote_commit_sha if state else None,
                             sync_status=SYNC_STATUS_UNCHANGED,
                             last_error=None,
+                            source_hash=source_hash,
                         )
                         await self.db.flush()
                         return {
@@ -346,6 +442,7 @@ class GitHubSyncService:
                     remote_commit_sha=commit_sha or None,
                     sync_status=SYNC_STATUS_SYNCED,
                     last_error=None,
+                    source_hash=source_hash,
                 )
                 conn.last_sync_at = now
                 conn.status = "connected"
@@ -432,6 +529,55 @@ class GitHubSyncService:
                         repo=cfg.repo if cfg else None,
                     )
                 raise
+
+    async def get_subject_sync_statuses(self, user_id: str, subject_id: str) -> list[dict]:
+        await self._load_github_config(user_id)
+
+        subject_check = await self.db.execute(
+            select(KnowledgeSubject.id).where(
+                KnowledgeSubject.id == subject_id,
+                KnowledgeSubject.user_id == user_id,
+            )
+        )
+        if subject_check.scalar_one_or_none() is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Subject not found")
+
+        rows = await self.db.execute(
+            select(KnowledgeSection, KnowledgeChapter)
+            .join(KnowledgeChapter, KnowledgeSection.chapter_id == KnowledgeChapter.id)
+            .where(
+                KnowledgeChapter.subject_id == subject_id,
+                KnowledgeSection.user_id == user_id,
+                KnowledgeSection.archived_at.is_(None),
+            )
+        )
+        sections = [(row[0], row[1]) for row in rows.all()]
+        if not sections:
+            return []
+
+        section_ids = [sec.id for sec, _ in sections]
+        states = await self.sync_repo.get_by_sections(user_id, section_ids)
+
+        out: list[dict] = []
+        for section, chapter in sections:
+            current_hash = compute_source_hash(
+                content=section.content or "",
+                title=section.title,
+                section_order_index=section.order_index,
+                chapter_id=chapter.id,
+                chapter_order_index=chapter.order_index,
+            )
+            state = states.get(section.id)
+            status = derive_display_sync_status(state, current_hash)
+            out.append(
+                {
+                    "section_id": section.id,
+                    "status": status,
+                    "synced_at": state.synced_at if state else None,
+                    "last_error": state.last_error if state and status == "failed" else None,
+                }
+            )
+        return out
 
     async def delete_section_remote(self, user_id: str, section_id: str) -> None:
         state = await self.sync_repo.get_by_section(user_id, section_id)
