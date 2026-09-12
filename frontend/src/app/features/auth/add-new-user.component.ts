@@ -11,12 +11,12 @@ import {
 } from '../../core/validators/username.validator';
 
 @Component({
-  selector: 'app-register',
+  selector: 'app-add-new-user',
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink],
   template: `
     <div class="mx-auto mt-16 max-w-md">
-      <div class="title-bar">Create your LifeOS account</div>
+      <div class="title-bar">Add new user</div>
       <div class="panel">
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="flex flex-col gap-3">
           <label class="text-sm font-medium">
@@ -59,20 +59,19 @@ import {
           @if (error()) {
             <p class="text-sm text-red-700">{{ error() }}</p>
           }
+          @if (success()) {
+            <p class="text-sm text-green-800">{{ success() }}</p>
+          }
           <button
             class="btn-primary"
             type="submit"
             [disabled]="form.invalid || form.pending || submitting()"
           >
-            Register
+            {{ submitting() ? 'Creating…' : 'Create user' }}
           </button>
         </form>
         <div class="mt-4 flex flex-col gap-2 text-center text-sm">
-          <p class="m-0">
-            Already have an account?
-            <a routerLink="/login" class="link">Log in</a>
-          </p>
-          <a routerLink="/add-new-user" class="link">Add new user</a>
+          <a routerLink="/register" class="link">Open register page</a>
           <button type="button" class="btn-secondary" (click)="lockRegistration()" [disabled]="locking()">
             {{ locking() ? 'Locking…' : 'Lock registration' }}
           </button>
@@ -81,7 +80,7 @@ import {
     </div>
   `,
 })
-export class RegisterComponent {
+export class AddNewUserComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly gate = inject(RegistrationGateService);
@@ -91,6 +90,7 @@ export class RegisterComponent {
   readonly submitting = signal(false);
   readonly locking = signal(false);
   readonly error = signal<string | null>(null);
+  readonly success = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     display_name: ['', Validators.required],
@@ -130,18 +130,22 @@ export class RegisterComponent {
     }
     this.submitting.set(true);
     this.error.set(null);
-    this.auth.register(this.form.getRawValue()).subscribe({
-      next: () => this.router.navigate(['/analytics/dashboard']),
+    this.success.set(null);
+    this.auth.adminCreateUser(this.form.getRawValue()).subscribe({
+      next: (user) => {
+        this.success.set(`Created ${user.username} (${user.email}). They can sign in via /login.`);
+        this.form.reset();
+        this.submitting.set(false);
+      },
       error: (err) => {
         const detail = err?.error?.detail;
         this.error.set(
           typeof detail === 'string'
             ? detail
-            : 'Registration failed. Email or username may already be in use.',
+            : 'Could not create user. Email or username may already be in use.',
         );
         this.submitting.set(false);
       },
-      complete: () => this.submitting.set(false),
     });
   }
 

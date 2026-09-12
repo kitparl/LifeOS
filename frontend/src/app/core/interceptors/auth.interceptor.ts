@@ -3,7 +3,14 @@ import { inject } from '@angular/core';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 
-const AUTH_SKIP_REFRESH = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'];
+const AUTH_SKIP_REFRESH = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/logout',
+  '/auth/registration-gate/',
+  '/auth/admin/create-user',
+];
 
 function shouldSkipRefresh(url: string): boolean {
   return AUTH_SKIP_REFRESH.some((path) => url.includes(path));

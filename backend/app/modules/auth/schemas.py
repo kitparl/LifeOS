@@ -21,6 +21,15 @@ class RegisterRequest(BaseModel):
             raise ValueError(str(e)) from e
 
 
+class RegistrationGateLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class RegistrationGateStatusResponse(BaseModel):
+    unlocked: bool
+
+
 class LoginRequest(BaseModel):
     model_config = {"populate_by_name": True}
 

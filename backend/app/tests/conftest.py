@@ -18,6 +18,7 @@ import app.modules.integrations.models  # noqa: F401
 
 from app.core.database import Base, get_db
 from app.main import app
+from app.modules.auth.registration_gate import require_registration_unlock
 
 TEST_DB = "sqlite+aiosqlite:///:memory:"
 
@@ -38,6 +39,8 @@ async def client():
                 raise
 
     app.dependency_overrides[get_db] = override_get_db
+    # Existing suite registers users freely; gate tests clear this override explicitly.
+    app.dependency_overrides[require_registration_unlock] = lambda: None
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

@@ -23,6 +23,15 @@ export interface RegisterRequest {
   username: string;
 }
 
+export interface RegistrationGateLoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegistrationGateStatus {
+  unlocked: boolean;
+}
+
 export interface UserUpdateRequest {
   display_name?: string;
   timezone?: string;

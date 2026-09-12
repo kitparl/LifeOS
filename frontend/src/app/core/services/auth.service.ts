@@ -96,6 +96,13 @@ export class AuthService {
       );
   }
 
+  /** Create a user while unlocked; does not change the caller's auth session. */
+  adminCreateUser(data: RegisterRequest): Observable<User> {
+    return this.http.post<User>(`${environment.apiUrl}/auth/admin/create-user`, data, {
+      withCredentials: true,
+    });
+  }
+
   logout(): Observable<void> {
     this.cancelRefreshTimer();
     return this.http

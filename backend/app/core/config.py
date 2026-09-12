@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     public_base_url: str = Field(default="", validation_alias="PUBLIC_BASE_URL")
     # Dev fallback: long-poll getUpdates instead of (or alongside) webhooks.
     telegram_polling_enabled: bool = Field(default=False, validation_alias="TELEGRAM_POLLING_ENABLED")
+    # Registration gate: single admin who can unlock /register and /add-new-user.
+    # Password must be a bcrypt hash (never plaintext). Generate with:
+    #   python -c "import bcrypt; print(bcrypt.hashpw(b'YOUR_PASSWORD', bcrypt.gensalt()).decode())"
+    admin_gate_email: str = Field(default="", validation_alias="ADMIN_GATE_EMAIL")
+    admin_gate_password_hash: str = Field(default="", validation_alias="ADMIN_GATE_PASSWORD_HASH")
+
 
     @field_validator("database_url", mode="before")
     @classmethod

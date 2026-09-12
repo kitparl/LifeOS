@@ -15,6 +15,8 @@ from app.modules.auth.schemas import (
     ChangePasswordRequest,
     LoginRequest,
     RegisterRequest,
+    RegistrationGateLoginRequest,
+    RegistrationGateStatusResponse,
     TokenResponse,
     UserResponse,
     UserUpdateRequest,
@@ -23,6 +25,14 @@ from app.modules.auth.schemas import (
     UsernameHistoryEntry,
 )
 from app.modules.auth.service import AuthService
+from app.modules.auth.registration_gate import (
+    REG_UNLOCK_COOKIE,
+    create_unlock_token,
+    is_registration_unlocked,
+    require_registration_unlock,
+    unlock_cookie_kwargs,
+    verify_gate_credentials,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 REFRESH_COOKIE = "refresh_token"
@@ -68,11 +78,52 @@ def _check_availability_rate_limit(request: Request) -> None:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(data: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)):
+async def register(
+    data: RegisterRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_registration_unlock),
+):
     service = AuthService(db)
     user, access, refresh = await service.register(data)
     _set_refresh_cookie(response, refresh)
     return TokenResponse(access_token=access)
+
+
+@router.post("/admin/create-user", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def admin_create_user(
+    data: RegisterRequest,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_registration_unlock),
+):
+    """Create a user without logging the caller in as that user."""
+    service = AuthService(db)
+    user, _access, _refresh = await service.register(data)
+    return user
+
+
+@router.post("/registration-gate/login")
+async def registration_gate_login(data: RegistrationGateLoginRequest, response: Response):
+    if not verify_gate_credentials(data.email, data.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    token = create_unlock_token()
+    response.set_cookie(REG_UNLOCK_COOKIE, token, **unlock_cookie_kwargs())
+    return {"ok": True}
+
+
+@router.post("/registration-gate/logout")
+async def registration_gate_logout(response: Response):
+    response.delete_cookie(
+        REG_UNLOCK_COOKIE,
+        secure=settings.cookie_secure,
+        samesite="lax",
+    )
+    return {"ok": True}
+
+
+@router.get("/registration-gate/status", response_model=RegistrationGateStatusResponse)
+async def registration_gate_status(request: Request):
+    return RegistrationGateStatusResponse(unlocked=is_registration_unlocked(request))
 
 
 @router.post("/login", response_model=TokenResponse)

@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
+import { registrationUnlockGuard } from './core/guards/registration-unlock.guard';
 
 export const routes: Routes = [
   {
@@ -13,9 +14,20 @@ export const routes: Routes = [
     canActivate: [guestGuard],
   },
   {
+    path: 'register-access',
+    loadComponent: () =>
+      import('./features/auth/registration-gate.component').then((m) => m.RegistrationGateComponent),
+  },
+  {
     path: 'register',
     loadComponent: () => import('./features/auth/register.component').then((m) => m.RegisterComponent),
-    canActivate: [guestGuard],
+    canActivate: [guestGuard, registrationUnlockGuard],
+  },
+  {
+    path: 'add-new-user',
+    loadComponent: () =>
+      import('./features/auth/add-new-user.component').then((m) => m.AddNewUserComponent),
+    canActivate: [registrationUnlockGuard],
   },
   {
     path: '',
