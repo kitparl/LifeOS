@@ -3,7 +3,6 @@ import {
   Input,
   Output,
   EventEmitter,
-  OnInit,
   OnDestroy,
   ElementRef,
   ViewChild,
@@ -84,7 +83,7 @@ type VimModeLabel = 'NORMAL' | 'INSERT' | 'VISUAL' | 'REPLACE';
     }
   `]
 })
-export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy {
+export class MarkdownEditorComponent implements AfterViewInit, OnDestroy {
   @ViewChild('editorContainer', { static: true }) editorContainer!: ElementRef<HTMLElement>;
 
   @Input() content = '';
@@ -115,8 +114,6 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
       this.bindVimModeListener(keymap);
     });
   }
-
-  ngOnInit(): void {}
 
   ngAfterViewInit(): void {
     this.initializeEditor();

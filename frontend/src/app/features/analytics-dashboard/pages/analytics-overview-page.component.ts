@@ -40,10 +40,10 @@ import { WidgetFrameComponent } from '../widgets/widget-frame.component';
         <p class="text-sm text-[var(--text-muted)]">Loading overview…</p>
       } @else if (error()) {
         <p class="text-sm text-[var(--danger)]">{{ error() }}</p>
-      } @else if (data()) {
+      }       @else if (data(); as overview) {
         <div class="space-y-4">
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            @for (kpi of data()!.kpis; track kpi.id) {
+            @for (kpi of overview.kpis; track kpi.id) {
               <app-kpi-card
                 [title]="kpi.title"
                 [value]="kpi.value"
@@ -55,14 +55,14 @@ import { WidgetFrameComponent } from '../widgets/widget-frame.component';
 
           <div class="grid gap-3 lg:grid-cols-2">
             <app-widget-frame title="Upcoming Events">
-              @if (!data()!.upcoming_events.length) {
+              @if (!overview.upcoming_events.length) {
                 <p class="text-sm text-[var(--text-muted)]">No upcoming events</p>
               } @else {
                 <ul class="space-y-2 text-sm">
-                  @for (e of data()!.upcoming_events; track $index) {
+                  @for (e of overview.upcoming_events; track $index) {
                     <li class="flex justify-between gap-2">
-                      <span>{{ e['title'] }}</span>
-                      <span class="text-[var(--text-muted)]">{{ e['starts_at'] }}</span>
+                      <span>{{ e.title }}</span>
+                      <span class="text-[var(--text-muted)]">{{ e.starts_at }}</span>
                     </li>
                   }
                 </ul>
@@ -70,14 +70,14 @@ import { WidgetFrameComponent } from '../widgets/widget-frame.component';
             </app-widget-frame>
 
             <app-widget-frame title="Recent Activity">
-              @if (!data()!.recent_activity.length) {
+              @if (!overview.recent_activity.length) {
                 <p class="text-sm text-[var(--text-muted)]">No recent activity</p>
               } @else {
                 <ul class="space-y-2 text-sm">
-                  @for (a of data()!.recent_activity; track $index) {
+                  @for (a of overview.recent_activity; track $index) {
                     <li class="flex justify-between gap-2">
-                      <span>{{ a['title'] }}</span>
-                      <span class="text-[var(--text-muted)]">{{ a['module'] }}</span>
+                      <span>{{ a.title }}</span>
+                      <span class="text-[var(--text-muted)]">{{ a.module }}</span>
                     </li>
                   }
                 </ul>

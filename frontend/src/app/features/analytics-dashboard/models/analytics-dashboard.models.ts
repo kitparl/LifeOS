@@ -30,6 +30,12 @@ export interface KpiCard {
   trend?: number | null;
 }
 
+export interface OverviewListItem {
+  title?: string;
+  starts_at?: string;
+  module?: string;
+}
+
 export interface AnalyticsOverview {
   life_score: number;
   todays_tasks: number;
@@ -40,8 +46,8 @@ export interface AnalyticsOverview {
   focus_time_label: string;
   journal_streak: number;
   mood_score: number | null;
-  upcoming_events: Array<Record<string, unknown>>;
-  recent_activity: Array<Record<string, unknown>>;
+  upcoming_events: OverviewListItem[];
+  recent_activity: OverviewListItem[];
   kpis: KpiCard[];
   range_days: number;
 }

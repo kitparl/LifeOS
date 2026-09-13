@@ -1,3 +1,5 @@
+// Strip path separators and C0 controls from download filenames.
+// eslint-disable-next-line no-control-regex -- intentional: strip ASCII control chars from filenames
 const UNSAFE_FILENAME_CHARS = /[<>:"/\\|?*\x00-\x1f]/g;
 
 export function sanitizeMarkdownFilename(title: string, fallback = 'export'): string {
