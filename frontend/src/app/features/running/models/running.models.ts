@@ -95,7 +95,7 @@ export interface RaceCreate {
   notes?: string | null;
 }
 
-export interface RaceUpdate extends Partial<RaceCreate> {}
+export type RaceUpdate = Partial<RaceCreate>;
 
 export interface RunningSettings {
   weekly_goal_km: number;

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
 import { EditorPreferencesService } from './core/services/editor-preferences.service';
@@ -30,15 +30,18 @@ export class AppComponent implements OnInit {
   private readonly editorPrefs = inject(EditorPreferencesService);
   private readonly auth = inject(AuthService);
 
+  constructor() {
+    effect(() => {
+      const user = this.auth.user();
+      this.theme.setTimezone(user?.timezone);
+    });
+  }
+
   ngOnInit(): void {
     this.theme.init();
     this.navPrefs.init();
     this.editorPrefs.init();
     this.pwa.init();
     void this.sync.init();
-    const user = this.auth.user();
-    if (user?.timezone) {
-      this.theme.setTimezone(user.timezone);
-    }
   }
 }
