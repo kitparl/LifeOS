@@ -3,7 +3,6 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Observable,
-  Subject,
   catchError,
   map,
   of,
@@ -21,8 +20,6 @@ import {
   UserUpdateRequest,
 } from '../models/auth.models';
 
-/** How many ms before expiry to proactively refresh (2 minutes) */
-const REFRESH_BEFORE_MS = 2 * 60 * 1000;
 /** Access token lifetime in ms (30 min - 2 min buffer = 28 min) */
 const TOKEN_LIFETIME_MS = 28 * 60 * 1000;
 
@@ -78,7 +75,6 @@ export class AuthService {
         switchMap(() => this.loadMe()),
         map(() => this.user()!),
         tap(() => this.scheduleProactiveRefresh()),
-        catchError((err) => throwError(() => err)),
       );
   }
 
@@ -92,7 +88,6 @@ export class AuthService {
         switchMap(() => this.loadMe()),
         map(() => this.user()!),
         tap(() => this.scheduleProactiveRefresh()),
-        catchError((err) => throwError(() => err)),
       );
   }
 

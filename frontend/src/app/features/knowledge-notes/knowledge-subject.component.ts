@@ -1,9 +1,5 @@
 import {
-  CdkDrag,
   CdkDragDrop,
-  CdkDragHandle,
-  CdkDragPlaceholder,
-  CdkDropList,
   moveItemInArray,
   transferArrayItem,
 } from '@angular/cdk/drag-drop';
@@ -13,20 +9,14 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
-import { LucideCircle, LucideCircleCheck, LucideDynamicIcon, provideLucideIcons } from '@lucide/angular';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
-import { MarkdownImportButtonComponent } from '../../shared/markdown/markdown-import-button.component';
 import { MarkdownImportResult } from '../../shared/markdown/markdown-import.service';
-import { MarkdownExportButtonComponent } from '../../shared/markdown/markdown-export-button.component';
 import { downloadMarkdown } from '../../shared/markdown/markdown-export';
-import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
-import { FileImageSrcDirective } from '../../shared/markdown/file-image-src.directive';
-import { AttachmentListComponent } from '../files/components/attachment-list.component';
 import { FileRecord } from '../files/models/file.models';
 import { IntegrationsService, GitHubSectionSyncDisplay } from '../integrations/services/integrations.service';
-import { KnowledgeNotesEditorComponent } from './knowledge-notes-editor.component';
-import { GitHubSyncButtonComponent } from './github-sync-button.component';
 import { ModalComponent } from '../../shared/modal/modal.component';
+import { KnowledgeSectionEditorComponent } from './components/knowledge-section-editor.component';
+import { KnowledgeRenameTarget, KnowledgeSidebarComponent } from './components/knowledge-sidebar.component';
 import {
   KnowledgeChapter,
   KnowledgeSearchHit,
@@ -34,9 +24,13 @@ import {
   KnowledgeSubjectDetail,
 } from './models/knowledge-notes.models';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
+import {
+  resolveDefaultSection,
+  stripFileMarkdown,
+} from './knowledge-notes.utils';
 
 type SyncState = 'synced' | 'unsaved' | 'saving';
-type RenameTarget = { kind: 'chapter' | 'section' | 'subject'; id: string };
+type RenameTarget = KnowledgeRenameTarget;
 type SearchGroup = { chapter_id: string; chapter_title: string; sections: KnowledgeSearchHit[] };
 
 const SIDEBAR_KEY = 'lifeos.kn.sidebarWidth';
@@ -46,6 +40,7 @@ const LAST_EDITED_PREFIX = 'lifeos.kn.lastEdited.';
 const SIDEBAR_DEFAULT = 256;
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 480;
+const ARCHIVE_TTL_DAYS = 7;
 
 @Component({
   selector: 'app-knowledge-subject',
@@ -53,21 +48,10 @@ const SIDEBAR_MAX = 480;
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    KnowledgeNotesEditorComponent,
-    MarkdownPipe,
-    FileImageSrcDirective,
-    AttachmentListComponent,
-    MarkdownImportButtonComponent,
-    MarkdownExportButtonComponent,
-    GitHubSyncButtonComponent,
     ModalComponent,
-    CdkDropList,
-    CdkDrag,
-    CdkDragHandle,
-    CdkDragPlaceholder,
-    LucideDynamicIcon,
+    KnowledgeSidebarComponent,
+    KnowledgeSectionEditorComponent,
   ],
-  providers: [provideLucideIcons(LucideCircleCheck, LucideCircle)],
   template: `
     @if (subject(); as s) {
       <div class="space-y-2">
@@ -159,189 +143,36 @@ const SIDEBAR_MAX = 480;
           [class.is-resizing]="resizing()"
           [style.--kn-sidebar-width.px]="sidebarWidth()"
         >
-          <aside class="kn-sidebar">
-            <div class="flex items-center justify-between px-1 pb-1">
-              <span class="section-heading">Chapters</span>
-              <button
-                type="button"
-                class="kn-plus"
-                title="New chapter"
-                aria-label="New chapter"
-                (click)="addChapter()"
-              >+</button>
-            </div>
-            @if (s.chapters.length === 0) {
-              <p class="px-1 text-xs" style="color: var(--text-muted)">No chapters yet.</p>
-            }
-            <div
-              class="kn-chapter-list"
-              cdkDropList
-              [cdkDropListData]="s.chapters"
-              [cdkDropListConnectedTo]="noConnectedLists"
-              (cdkDropListDropped)="onChapterDrop($event)"
-            >
-              @for (c of s.chapters; track c.id; let ci = $index) {
-                <div class="kn-chapter" cdkDrag [cdkDragDisabled]="!!renaming()" [class.kn-chapter--closed]="!!c.closed_at">
-                  <div class="kn-chapter__head">
-                    <span class="kn-drag" title="Drag to reorder" aria-hidden="true" cdkDragHandle>⋮⋮</span>
-                    <button
-                      type="button"
-                      class="kn-chapter__chevron"
-                      [attr.aria-expanded]="isExpanded(c.id)"
-                      [attr.aria-label]="isExpanded(c.id) ? 'Collapse chapter' : 'Expand chapter'"
-                      (click)="toggleChapter(c, $event)"
-                    >{{ isExpanded(c.id) ? '▼' : '▶' }}</button>
-                    <span class="kn-index kn-index--chapter" aria-hidden="true">{{ ci + 1 }}</span>
-                    <span class="kn-status-slot" aria-hidden="true">
-                      @if (chapterStatus(c) === 'done') {
-                        <svg class="kn-status-icon kn-status-icon--done" lucideIcon="circle-check" title="Completed"></svg>
-                      } @else if (chapterStatus(c) === 'ongoing') {
-                        <svg class="kn-status-icon kn-status-icon--ongoing" lucideIcon="circle" title="In progress"></svg>
-                      }
-                    </span>
-                    @if (renaming()?.kind === 'chapter' && renaming()?.id === c.id) {
-                      <input
-                        #renameInput
-                        type="text"
-                        class="kn-inline-input"
-                        [value]="c.title"
-                        aria-label="Rename chapter"
-                        (click)="$event.stopPropagation()"
-                        (keydown.enter)="commitRename($event)"
-                        (keydown.escape)="cancelRename()"
-                        (blur)="commitRename($event)"
-                      />
-                    } @else {
-                      <span
-                        class="kn-chapter__title truncate"
-                        [class.kn-closed]="!!c.closed_at"
-                        title="Click to expand · double-click to rename"
-                        (click)="onChapterClick(c, $event)"
-                        (dblclick)="startRename('chapter', c.id, $event)"
-                      >{{ c.title }}</span>
-                    }
-                    <button
-                      type="button"
-                      class="kn-plus kn-plus--row"
-                      title="New section"
-                      aria-label="New section"
-                      (click)="addSection(c); $event.stopPropagation()"
-                    >+</button>
-                    <div class="kn-overflow kn-chapter__overflow" [class.is-open]="openMenu() === 'chapter:' + c.id">
-                      <button
-                        type="button"
-                        class="kn-overflow__btn kn-overflow__btn--quiet"
-                        aria-label="Chapter actions"
-                        aria-haspopup="menu"
-                        [attr.aria-expanded]="openMenu() === 'chapter:' + c.id"
-                        (click)="toggleMenu('chapter:' + c.id, $event)"
-                      >⋯</button>
-                      @if (openMenu() === 'chapter:' + c.id) {
-                        <div class="menu kn-overflow__menu" role="menu" (click)="$event.stopPropagation()">
-                          <button type="button" class="menu-item" role="menuitem" (click)="startRename('chapter', c.id); closeMenu()">Rename</button>
-                          @if (c.closed_at) {
-                            <button type="button" class="menu-item" role="menuitem" (click)="toggleChapterClosed(c, false); closeMenu()">Reopen chapter</button>
-                          } @else {
-                            <button type="button" class="menu-item" role="menuitem" (click)="toggleChapterClosed(c, true); closeMenu()">Mark chapter completed</button>
-                          }
-                          <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteChapter(c); closeMenu()">Delete</button>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                  @if (isExpanded(c.id)) {
-                  <div
-                    class="kn-section-list"
-                    cdkDropList
-                    [id]="sectionListId(c.id)"
-                    [cdkDropListData]="c.sections"
-                    [cdkDropListConnectedTo]="sectionListIds()"
-                    (cdkDropListDropped)="onSectionDrop($event)"
-                  >
-                    @for (sec of c.sections; track sec.id) {
-                      <div
-                        class="kn-section-row"
-                        cdkDrag
-                        [cdkDragDisabled]="!!renaming()"
-                        [class.active]="selected()?.id === sec.id"
-                        [class.kn-section-row--closed]="!!sec.closed_at"
-                      >
-                        <span class="kn-drag" title="Drag to reorder" aria-hidden="true" cdkDragHandle>⋮⋮</span>
-                        <span class="kn-status-slot" aria-hidden="true">
-                          @if (sectionStatus(c, sec) === 'done') {
-                            <svg class="kn-status-icon kn-status-icon--done" lucideIcon="circle-check" title="Completed"></svg>
-                          } @else if (sectionStatus(c, sec) === 'ongoing') {
-                            <svg class="kn-status-icon kn-status-icon--ongoing" lucideIcon="circle" title="In progress"></svg>
-                          }
-                        </span>
-                        @if (renaming()?.kind === 'section' && renaming()?.id === sec.id) {
-                          <input
-                            #renameInput
-                            type="text"
-                            class="kn-inline-input"
-                            [value]="sec.title"
-                            aria-label="Rename section"
-                            (click)="$event.stopPropagation()"
-                            (keydown.enter)="commitRename($event)"
-                            (keydown.escape)="cancelRename()"
-                            (blur)="commitRename($event)"
-                          />
-                        } @else {
-                          <button
-                            type="button"
-                            class="kn-section-link"
-                            [class.active]="selected()?.id === sec.id"
-                            [class.kn-closed]="!!sec.closed_at"
-                            title="Double-click to rename"
-                            (click)="selectSection(sec, c)"
-                            (dblclick)="startRename('section', sec.id, $event)"
-                          >{{ sec.title }}</button>
-                        }
-                        @if (resolveGitHubSyncStatus(sec.id); as ghStatus) {
-                          <span
-                            class="kn-gh-sync"
-                            [attr.data-status]="ghStatus"
-                            [title]="githubSyncHint(sec.id)"
-                            aria-hidden="true"
-                          ></span>
-                        }
-                        <button
-                          type="button"
-                          class="kn-section__delete"
-                          title="Delete section"
-                          aria-label="Delete section"
-                          (click)="deleteSection(sec); $event.stopPropagation()"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                          </svg>
-                        </button>
-                        <div *cdkDragPlaceholder class="kn-drag-placeholder"></div>
-                      </div>
-                    }
-                  </div>
-                  }
-                  <div *cdkDragPlaceholder class="kn-drag-placeholder kn-drag-placeholder--chapter"></div>
-                </div>
-              }
-            </div>
-            @if (archivedSections().length > 0) {
-              <div class="kn-archived">
-                <p class="kn-archived__heading">Archived</p>
-                @for (sec of archivedSections(); track sec.id) {
-                  <div class="kn-archived__row">
-                    <div class="min-w-0 flex-1">
-                      <p class="kn-archived__title truncate">{{ sec.title }}</p>
-                      <p class="kn-archived__meta">Deletes in {{ archiveDaysLeft(sec) }}d</p>
-                    </div>
-                    <button type="button" class="btn-ghost text-xs" (click)="restoreSection(sec)">Restore</button>
-                    <button type="button" class="btn-ghost text-xs" (click)="deletePermanently(sec)">Delete</button>
-                  </div>
-                }
-              </div>
-            }
-          </aside>
+          <app-knowledge-sidebar
+            [subject]="s"
+            [selected]="selected()"
+            [renaming]="renaming()"
+            [openMenu]="openMenu()"
+            [expandedChapterIds]="expandedChapterIds"
+            [sectionListIds]="sectionListIds()"
+            [archivedSections]="archivedSections()"
+            [noConnectedLists]="noConnectedLists"
+            [githubConfigured]="githubConfigured()"
+            [sectionSyncStatuses]="sectionSyncStatuses()"
+            [syncState]="syncState()"
+            (addChapter)="addChapter()"
+            (chapterDrop)="onChapterDrop($event)"
+            (sectionDrop)="onSectionDrop($event)"
+            (toggleChapter)="toggleChapter($event.chapter, $event.event)"
+            (chapterClick)="onChapterClick($event.chapter, $event.event)"
+            (startRename)="startRename($event.kind, $event.id, $event.event)"
+            (commitRename)="commitRename($event)"
+            (cancelRename)="cancelRename()"
+            (addSection)="addSection($event)"
+            (toggleMenu)="toggleMenu($event.id, $event.event)"
+            (closeMenu)="closeMenu()"
+            (toggleChapterClosed)="toggleChapterClosed($event.chapter, $event.closed)"
+            (deleteChapter)="deleteChapter($event)"
+            (selectSection)="selectSection($event.section, $event.chapter)"
+            (deleteSection)="deleteSection($event)"
+            (restoreSection)="restoreSection($event)"
+            (deletePermanently)="deletePermanently($event)"
+          />
 
           <div
             class="kn-split-divider"
@@ -358,128 +189,36 @@ const SIDEBAR_MAX = 480;
             (keydown)="onResizeKeydown($event)"
           ></div>
 
-          <section class="kn-main">
-            @if (selected(); as sec) {
-              <form [formGroup]="form" class="space-y-2">
-                <div class="kn-docbar">
-                  @if (previewOnly()) {
-                    <h2 class="kn-section-title-read">{{ form.controls.title.value }}</h2>
-                  } @else {
-                    <input class="kn-section-title" formControlName="title" placeholder="Section title" />
-                  }
-                  <div class="kn-docbar__actions">
-                    @if (importError()) {
-                      <span class="text-xs" style="color: var(--danger)">{{ importError() }}</span>
-                    }
-                    <app-markdown-import-button
-                      [currentContent]="form.controls.content.value"
-                      [currentTitle]="form.controls.title.value"
-                      (imported)="onMarkdownImported($event)"
-                      (importError)="onMarkdownImportError($event)"
-                    />
-                    <app-markdown-export-button
-                      [content]="form.controls.content.value"
-                      [filename]="form.controls.title.value || 'section'"
-                      (exportError)="onMarkdownImportError($event)"
-                    />
-                    @if (resolveGitHubSyncStatus(sec.id); as ghStatus) {
-                      <span
-                        class="kn-gh-sync kn-gh-sync--label"
-                        [attr.data-status]="ghStatus"
-                        [title]="githubSyncHint(sec.id)"
-                      >{{ githubSyncShortLabel(ghStatus) }}</span>
-                    }
-                    <app-github-sync-button
-                      [sectionId]="sec.id"
-                      [configured]="githubConfigured()"
-                      [disabled]="syncState() === 'saving'"
-                      [beforeSync]="saveBeforeGitHubSync.bind(this)"
-                      (syncSuccess)="onGitHubSyncSuccess($event, sec.id)"
-                      (syncError)="onGitHubSyncError($event)"
-                    />
-                    @if (githubMessage() && githubMessageSectionId() === sec.id) {
-                      <span class="text-xs" style="color: var(--success)">{{ githubMessage() }}</span>
-                    }
-                    @if (previewOnly()) {
-                      <button type="button" class="btn-primary text-xs" (click)="enterEditMode()">Edit</button>
-                    } @else {
-                      <span class="kn-sync" [attr.data-state]="syncState()" aria-live="polite">
-                        @switch (syncState()) {
-                          @case ('saving') { Saving… }
-                          @case ('unsaved') { Unsaved }
-                          @default { Synced }
-                        }
-                      </span>
-                      <button
-                        type="button"
-                        class="btn-primary text-xs"
-                        [disabled]="syncState() !== 'unsaved'"
-                        (click)="save()"
-                      >Save</button>
-                      <button type="button" class="btn-secondary text-xs" (click)="cancelEdit()">Cancel</button>
-                    }
-                    <div class="kn-overflow">
-                      <button
-                        type="button"
-                        class="btn-ghost kn-overflow__btn"
-                        aria-label="Section actions"
-                        aria-haspopup="menu"
-                        [attr.aria-expanded]="openMenu() === 'section'"
-                        (click)="toggleMenu('section', $event)"
-                      >⋯</button>
-                      @if (openMenu() === 'section') {
-                        <div class="menu kn-overflow__menu" role="menu" (click)="$event.stopPropagation()">
-                          <button type="button" class="menu-item" role="menuitem" (click)="exportSectionMarkdown(); closeMenu()">Export to MD</button>
-                          @if (sec.closed_at) {
-                            <button type="button" class="menu-item" role="menuitem" (click)="toggleSectionClosed(sec, false); closeMenu()">Reopen section</button>
-                          } @else {
-                            <button type="button" class="menu-item" role="menuitem" (click)="toggleSectionClosed(sec, true); closeMenu()">Mark section completed</button>
-                          }
-                          <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteSection(sec); closeMenu()">Delete</button>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                </div>
-                @if (previewOnly()) {
-                  <div class="markdown-body panel" appFileImageSrc [innerHTML]="form.controls.content.value | markdown"></div>
-                } @else {
-                  <app-knowledge-notes-editor
-                    [section]="sec"
-                    (contentChange)="onEditorContentChange($event)"
-                    (sectionUpdated)="onEditorSaved($event)"
-                    (saveRequested)="save()"
-                    (editorReadyChange)="onEditorReady()"
-                    (filesChanged)="onInlineFilesChanged()"
-                  />
-                }
-                <div class="kn-attachments space-y-2">
-                  <app-attachment-list
-                    #historyList
-                    module="knowledge_notes"
-                    title="Document history"
-                    emptyText="Images and files used in this section."
-                    [entityId]="sec.id"
-                    [allowUpload]="false"
-                    [enablePreview]="true"
-                    (removed)="onDocumentRemoved($event)"
-                  />
-                  <app-attachment-list
-                    module="knowledge_notes_extra"
-                    title="Additional documents"
-                    emptyText="PDFs and extras for this section — not inserted into the note."
-                    [entityId]="sec.id"
-                  />
-                </div>
-              </form>
-            } @else {
-              <div class="empty-state">
-                <div class="empty-state__icon">📝</div>
-                <p class="empty-state__title">Select a section</p>
-                <p class="empty-state__desc">Choose a section on the left, or add a chapter and section to begin writing.</p>
-              </div>
-            }
-          </section>
+          <app-knowledge-section-editor
+            [section]="selected()"
+            [form]="form"
+            [previewOnly]="previewOnly()"
+            [syncState]="syncState()"
+            [importError]="importError()"
+            [githubConfigured]="githubConfigured()"
+            [githubMessage]="githubMessage()"
+            [githubMessageSectionId]="githubMessageSectionId()"
+            [sectionSyncStatuses]="sectionSyncStatuses()"
+            [openMenu]="openMenu()"
+            [beforeSync]="saveBeforeGitHubSyncBound"
+            (markdownImported)="onMarkdownImported($event)"
+            (markdownImportError)="onMarkdownImportError($event)"
+            (gitHubSyncSuccess)="onGitHubSyncSuccess($event.message, $event.sectionId)"
+            (gitHubSyncError)="onGitHubSyncError($event)"
+            (enterEditMode)="enterEditMode()"
+            (save)="save()"
+            (cancelEdit)="cancelEdit()"
+            (toggleMenu)="toggleMenu($event.id, $event.event)"
+            (closeMenu)="closeMenu()"
+            (exportSectionMarkdown)="exportSectionMarkdown()"
+            (toggleSectionClosed)="toggleSectionClosed($event.section, $event.closed)"
+            (deleteSection)="deleteSection($event)"
+            (editorContentChange)="onEditorContentChange($event)"
+            (editorSaved)="onEditorSaved($event)"
+            (editorReady)="onEditorReady()"
+            (inlineFilesChanged)="onInlineFilesChanged()"
+            (documentRemoved)="onDocumentRemoved($event)"
+          />
         </div>
       </div>
 
@@ -519,8 +258,8 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 
   @ViewChild('layout') layoutRef?: ElementRef<HTMLElement>;
   @ViewChild('renameInput') renameInput?: ElementRef<HTMLInputElement>;
-  @ViewChild(KnowledgeNotesEditorComponent) editor?: KnowledgeNotesEditorComponent;
-  @ViewChild('historyList') historyList?: AttachmentListComponent;
+  @ViewChild(KnowledgeSidebarComponent) sidebar?: KnowledgeSidebarComponent;
+  @ViewChild(KnowledgeSectionEditorComponent) sectionEditor?: KnowledgeSectionEditorComponent;
 
   readonly subject = signal<KnowledgeSubjectDetail | null>(null);
   readonly selected = signal<KnowledgeSection | null>(null);
@@ -565,7 +304,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   });
   readonly noConnectedLists: string[] = [];
   private focusRename = false;
-  private expandedChapterIds = new Set<string>();
+  expandedChapterIds = new Set<string>();
   private lastSectionByChapter: Record<string, string> = {};
   private lastEditedSectionId: string | null = null;
   private newlyCreatedSectionIds = new Set<string>();
@@ -586,6 +325,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   private lastSavedContent = '';
   private suppressDirty = false;
   private readonly dirty$ = new Subject<void>();
+  readonly saveBeforeGitHubSyncBound = () => this.saveBeforeGitHubSync();
 
   @HostListener('document:click')
   onDocumentClick(): void {
@@ -638,17 +378,20 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
 
   ngAfterViewChecked(): void {
     if (!this.focusRename) return;
+    const kind = this.renaming()?.kind;
+    if (kind === 'chapter' || kind === 'section') {
+      const el = this.sidebar?.renameInput?.nativeElement;
+      if (!el) return;
+      this.focusRename = false;
+      el.focus({ preventScroll: true });
+      el.select();
+      return;
+    }
     const el = this.renameInput?.nativeElement;
     if (!el) return;
     this.focusRename = false;
     el.focus({ preventScroll: true });
     el.select();
-  }
-
-  archiveDaysLeft(sec: KnowledgeSection): number {
-    if (!sec.archived_at) return ARCHIVE_TTL_DAYS;
-    const expires = new Date(sec.archived_at).getTime() + ARCHIVE_TTL_DAYS * 24 * 60 * 60 * 1000;
-    return Math.max(0, Math.ceil((expires - Date.now()) / (24 * 60 * 60 * 1000)));
   }
 
   sectionListId(chapterId: string): string {
@@ -697,15 +440,6 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  chapterStatus(chapter: KnowledgeChapter): 'done' | 'ongoing' | null {
-    if (chapter.sections.length === 0) return null;
-    return isChapterComplete(chapter) ? 'done' : 'ongoing';
-  }
-
-  sectionStatus(chapter: KnowledgeChapter, sec: KnowledgeSection): 'done' | 'ongoing' {
-    return isSectionComplete(chapter, sec) ? 'done' : 'ongoing';
-  }
-
   selectSection(sec: KnowledgeSection, chapter?: KnowledgeChapter): void {
     const s = this.subject();
     const parent =
@@ -749,7 +483,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
       this.enterEditMode();
     }
 
-    this.editor?.setContent(result.content);
+    this.sectionEditor?.setContent(result.content);
     this.refreshSync();
     this.scheduleSave();
   }
@@ -772,46 +506,6 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.importError.set(message);
     const subjectId = this.subject()?.id;
     if (subjectId) this.reloadGitHubSyncStatuses(subjectId);
-  }
-
-  resolveGitHubSyncStatus(sectionId: string): GitHubSectionSyncDisplay | null {
-    if (!this.githubConfigured()) return null;
-    let status = this.sectionSyncStatuses()[sectionId] ?? 'never';
-    if (this.selected()?.id === sectionId && this.syncState() === 'unsaved' && status === 'synced') {
-      status = 'outdated';
-    }
-    return status;
-  }
-
-  githubSyncHint(sectionId: string): string {
-    const status = this.resolveGitHubSyncStatus(sectionId);
-    switch (status) {
-      case 'synced':
-        return 'Synced to GitHub';
-      case 'outdated':
-        return 'Needs GitHub sync';
-      case 'syncing':
-        return 'Syncing to GitHub…';
-      case 'failed':
-        return 'Last GitHub sync failed';
-      default:
-        return 'Not synced to GitHub';
-    }
-  }
-
-  githubSyncShortLabel(status: GitHubSectionSyncDisplay): string {
-    switch (status) {
-      case 'synced':
-        return 'Synced';
-      case 'outdated':
-        return 'Needs sync';
-      case 'syncing':
-        return 'Syncing…';
-      case 'failed':
-        return 'Sync failed';
-      default:
-        return 'Not synced';
-    }
   }
 
   private reloadGitHubSyncStatuses(subjectId: string): void {
@@ -1099,7 +793,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   }
 
   onInlineFilesChanged(): void {
-    this.historyList?.load();
+    this.sectionEditor?.reloadHistory();
   }
 
   onDocumentRemoved(file: FileRecord): void {
@@ -1108,7 +802,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.form.controls.content.setValue(next, { emitEvent: false });
     const sec = this.selected();
     if (sec) sec.content = next;
-    this.editor?.setContent(next);
+    this.sectionEditor?.setContent(next);
     this.refreshSync();
     this.saveIfDirty();
   }
@@ -1216,12 +910,20 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   private queueRenameFocus(): void {
     this.focusRename = true;
     setTimeout(() => {
-      this.renameInput?.nativeElement.focus({ preventScroll: true });
-      this.renameInput?.nativeElement.select();
+      const el =
+        this.renaming()?.kind === 'subject'
+          ? this.renameInput?.nativeElement
+          : this.sidebar?.renameInput?.nativeElement;
+      el?.focus({ preventScroll: true });
+      el?.select();
     }, 0);
     setTimeout(() => {
-      this.renameInput?.nativeElement.focus({ preventScroll: true });
-      this.renameInput?.nativeElement.select();
+      const el =
+        this.renaming()?.kind === 'subject'
+          ? this.renameInput?.nativeElement
+          : this.sidebar?.renameInput?.nativeElement;
+      el?.focus({ preventScroll: true });
+      el?.select();
     }, 80);
   }
 
@@ -1493,48 +1195,4 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     if (!Number.isFinite(raw)) return SIDEBAR_DEFAULT;
     return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, raw));
   }
-}
-
-const ARCHIVE_TTL_DAYS = 7;
-
-export function isSectionComplete(chapter: KnowledgeChapter, sec: KnowledgeSection): boolean {
-  return !!(chapter.closed_at || sec.closed_at);
-}
-
-export function isChapterComplete(chapter: KnowledgeChapter): boolean {
-  if (chapter.closed_at) return true;
-  return chapter.sections.length > 0 && chapter.sections.every((s) => !!s.closed_at);
-}
-
-export function resolveDefaultSection(
-  subject: KnowledgeSubjectDetail,
-  lastEditedSectionId: string | null
-): { section: KnowledgeSection; chapter: KnowledgeChapter } | null {
-  const pairs: { section: KnowledgeSection; chapter: KnowledgeChapter }[] = [];
-  for (const chapter of subject.chapters) {
-    for (const section of chapter.sections) {
-      pairs.push({ section, chapter });
-    }
-  }
-  if (pairs.length === 0) return null;
-
-  const incomplete = pairs.filter(({ section, chapter }) => !isSectionComplete(chapter, section));
-
-  if (incomplete.length === 0) {
-    return pairs[0];
-  }
-
-  if (lastEditedSectionId) {
-    const lastEdited = incomplete.find(({ section }) => section.id === lastEditedSectionId);
-    if (lastEdited) return lastEdited;
-  }
-
-  return incomplete[0];
-}
-
-export function stripFileMarkdown(content: string, fileId: string): string {
-  if (!content || !fileId) return content;
-  const escaped = fileId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`!?\\[[^\\]]*\\]\\([^)]*\\/files\\/${escaped}\\/content[^)]*\\)`, 'gi');
-  return content.replace(re, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trimEnd();
 }

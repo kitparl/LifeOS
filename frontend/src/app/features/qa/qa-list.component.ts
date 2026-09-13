@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
@@ -174,6 +175,7 @@ export class QAListComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly viewTabs: ViewTab[] = [
     { id: 'all', label: 'All Q&A' },
@@ -197,7 +199,7 @@ export class QAListComponent implements OnInit {
 
   ngOnInit(): void {
     this.qaService.listTypes().subscribe({ next: (t) => this.types.set(t) });
-    this.route.queryParamMap.subscribe((params) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const paramView = params.get('view');
       const nextView: QAViewMode =
         paramView === 'month' || paramView === 'deep' ? paramView : 'all';

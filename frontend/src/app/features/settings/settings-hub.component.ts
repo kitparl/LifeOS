@@ -1,6 +1,6 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { RouterLink } from '@angular/router';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ExportPageComponent } from '../export/export-page.component';
 import { ProfileComponent } from '../profile/profile.component';
 import { SettingsAppSectionComponent } from './settings-app-section.component';
@@ -53,8 +53,6 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
         </p>
         <app-settings-integrations-section />
       </section>
-      <!-- Legacy fragment target so #notifications still scrolls here -->
-      <div id="notifications" class="scroll-mt-24" aria-hidden="true"></div>
 
       <section id="export" class="scroll-mt-24 space-y-3">
         <h2 class="text-base font-semibold">Export</h2>
@@ -80,6 +78,7 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
 })
 export class SettingsHubComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly sections = [
     { id: 'profile', label: 'Profile' },
@@ -92,7 +91,7 @@ export class SettingsHubComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    this.route.fragment.subscribe((fragment) => {
+    this.route.fragment.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((fragment) => {
       if (!fragment) {
         return;
       }

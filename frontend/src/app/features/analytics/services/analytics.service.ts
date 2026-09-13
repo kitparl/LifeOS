@@ -2,17 +2,18 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { AnalyticsCharts, AnalyticsSummary } from '../models/analytics.models';
 
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/analytics`;
 
-  summary(): Observable<Record<string, unknown>> {
-    return this.http.get<Record<string, unknown>>(`${this.api}/summary`);
+  summary(): Observable<AnalyticsSummary> {
+    return this.http.get<AnalyticsSummary>(`${this.api}/summary`);
   }
 
-  charts(): Observable<Record<string, unknown>> {
-    return this.http.get<Record<string, unknown>>(`${this.api}/charts`);
+  charts(): Observable<AnalyticsCharts> {
+    return this.http.get<AnalyticsCharts>(`${this.api}/charts`);
   }
 }

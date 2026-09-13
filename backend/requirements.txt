@@ -4,6 +4,7 @@ sqlalchemy[asyncio]>=2.0.36
 asyncpg>=0.30.0
 pydantic>=2.10.0
 pydantic-settings>=2.6.0
+email-validator>=2.0.0
 python-jose[cryptography]>=3.3.0
 bcrypt>=4.2.0
 cryptography>=43.0.0
@@ -14,4 +15,7 @@ tzdata>=2024.1
 boto3>=1.35.0
 filetype>=1.2.0
 
-# Dev / test (install with: pip install -r requirements-dev.txt)
+# Local tooling (harmless in production; keeps a single install command)
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+ruff>=0.8.0

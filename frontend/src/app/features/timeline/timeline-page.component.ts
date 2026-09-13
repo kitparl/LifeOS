@@ -1,17 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
-
-interface TimelineItem {
-  module: string;
-  entity_type: string;
-  id: string;
-  title: string;
-  occurred_at: string;
-  route: string;
-}
+import { TimelineItem, TimelineService } from './services/timeline.service';
 
 @Component({
   selector: 'app-timeline-page',
@@ -40,13 +30,13 @@ interface TimelineItem {
   `,
 })
 export class TimelinePageComponent implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly timeline = inject(TimelineService);
   events: TimelineItem[] = [];
   loading = false;
 
   ngOnInit(): void {
     this.loading = true;
-    this.http.get<TimelineItem[]>(`${environment.apiUrl}/timeline`).subscribe({
+    this.timeline.list().subscribe({
       next: (data) => {
         this.events = data;
         this.loading = false;

@@ -1,8 +1,9 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subscription, distinctUntilChanged, map } from 'rxjs';
+import { distinctUntilChanged, map } from 'rxjs';
 import { PublicUser } from '../../core/models/auth.models';
 import { UserPickerComponent } from './components/user-picker.component';
 import { AttachmentListComponent } from '../files/components/attachment-list.component';
@@ -428,12 +429,12 @@ type DetailTab = 'overview' | 'people' | 'activity';
     }
   `,
 })
-export class TaskDetailComponent implements OnInit, OnDestroy {
+export class TaskDetailComponent implements OnInit {
   private readonly tasksService = inject(TasksService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
-  private routeSub?: Subscription;
+  private readonly destroyRef = inject(DestroyRef);
 
   statuses = TASK_STATUSES;
   tabs: { value: DetailTab; label: string }[] = [
@@ -459,10 +460,11 @@ export class TaskDetailComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // Re-load when navigating parent ↔ subtask (same component instance).
-    this.routeSub = this.route.paramMap
+    this.route.paramMap
       .pipe(
         map((params) => params.get('id')),
         distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((id) => {
         if (id) {
@@ -476,10 +478,6 @@ export class TaskDetailComponent implements OnInit, OnDestroy {
           this.load(id);
         }
       });
-  }
-
-  ngOnDestroy(): void {
-    this.routeSub?.unsubscribe();
   }
 
   load(id: string): void {

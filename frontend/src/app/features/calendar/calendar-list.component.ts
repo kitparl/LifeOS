@@ -1,6 +1,5 @@
 import {
   Component,
-  OnDestroy,
   HostListener,
   ViewChild,
   signal,
@@ -254,7 +253,7 @@ interface QuickCreateState {
     </div>
   `,
 })
-export class CalendarListComponent implements OnDestroy {
+export class CalendarListComponent {
   @ViewChild('calendar') calendarRef!: FullCalendarComponent;
 
   private readonly calendarService = inject(CalendarService);
@@ -307,8 +306,6 @@ export class CalendarListComponent implements OnDestroy {
     eventDidMount: this.applyEventColor.bind(this),
   };
 
-  ngOnDestroy(): void { /* cleanup if needed */ }
-
   categoryColor(cat: EventCategory): string {
     return CATEGORY_COLORS[cat] ?? '#6b7280';
   }
@@ -348,7 +345,6 @@ export class CalendarListComponent implements OnDestroy {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private applyEventColor(info: { event: EventApi; el: HTMLElement }): void {
     const cat = info.event.extendedProps['category'] as EventCategory;
     if (cat) {

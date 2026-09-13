@@ -6,7 +6,6 @@ import {
   PublicUser,
   UsernameAvailability,
   UsernameChangeRequest,
-  UsernameHistoryEntry,
   User,
 } from '../models/auth.models';
 
@@ -23,10 +22,6 @@ export class UsernameService {
 
   changeUsername(data: UsernameChangeRequest): Observable<User> {
     return this.http.patch<User>(`${this.authApi}/me/username`, data);
-  }
-
-  history(): Observable<UsernameHistoryEntry[]> {
-    return this.http.get<UsernameHistoryEntry[]>(`${this.authApi}/me/username-history`);
   }
 
   search(q: string, limit = 20): Observable<PublicUser[]> {

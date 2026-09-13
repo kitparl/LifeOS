@@ -1,5 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
+import { TabHubComponent } from '../../shared/tab-hub/tab-hub.component';
 import { AnalyticsTab } from './models/analytics-dashboard.models';
 import { AnalyticsOverviewPageComponent } from './pages/analytics-overview-page.component';
 import { AnalyticsProductivityPageComponent } from './pages/analytics-productivity-page.component';
@@ -12,6 +14,7 @@ import { AnalyticsAiPageComponent } from './pages/analytics-ai-page.component';
   selector: 'app-analytics-dashboard-hub',
   standalone: true,
   imports: [
+    TabHubComponent,
     AnalyticsOverviewPageComponent,
     AnalyticsProductivityPageComponent,
     AnalyticsGoalsPageComponent,
@@ -23,19 +26,7 @@ import { AnalyticsAiPageComponent } from './pages/analytics-ai-page.component';
     <div class="space-y-3">
       <h1 class="text-lg font-semibold">Analytics</h1>
 
-      <div class="flex flex-wrap gap-1 border-b border-[var(--xp-border)] text-sm">
-        @for (t of tabs; track t.id) {
-          <button
-            type="button"
-            class="px-3 py-2"
-            [class.bg-[var(--xp-blue)]]="tab() === t.id"
-            [class.text-white]="tab() === t.id"
-            (click)="setTab(t.id)"
-          >
-            {{ t.label }}
-          </button>
-        }
-      </div>
+      <app-tab-hub [tabs]="tabs" [activeId]="tab()" [wrap]="true" (tabChange)="setTab($event)" />
 
       @if (tab() === 'overview') {
         <app-analytics-overview-page />
@@ -56,6 +47,7 @@ import { AnalyticsAiPageComponent } from './pages/analytics-ai-page.component';
 export class AnalyticsDashboardHubComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly tab = signal<AnalyticsTab>('overview');
   readonly tabs = [
@@ -77,7 +69,7 @@ export class AnalyticsDashboardHubComponent implements OnInit {
   ]);
 
   ngOnInit(): void {
-    this.route.queryParamMap.subscribe((params) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const t = params.get('tab') as AnalyticsTab | null;
       if (t && this.valid.has(t)) {
         this.tab.set(t);
@@ -87,7 +79,7 @@ export class AnalyticsDashboardHubComponent implements OnInit {
     });
   }
 
-  setTab(id: AnalyticsTab): void {
+  setTab(id: string): void {
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { tab: id === 'overview' ? null : id },

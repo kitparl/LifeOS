@@ -52,12 +52,3 @@ export interface PublicUser {
   username: string;
   display_name: string;
 }
-
-export interface UsernameHistoryEntry {
-  id: string;
-  old_username: string;
-  new_username: string;
-  changed_at: string;
-  changed_by: string;
-  reason: string | null;
-}

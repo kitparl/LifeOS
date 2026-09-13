@@ -1,15 +1,16 @@
 import {
   Component,
+  DestroyRef,
   EventEmitter,
   Input,
   OnChanges,
-  OnDestroy,
   Output,
   SimpleChanges,
   ViewChild,
   inject,
 } from '@angular/core';
-import { Subject, firstValueFrom, takeUntil } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import {
   CodeOutputComponent,
   CodeWorkspaceComponent,
@@ -101,11 +102,11 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
     </div>
   `,
 })
-export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
+export class KnowledgeNotesEditorComponent implements OnChanges {
   private readonly knowledgeNotes = inject(KnowledgeNotesService);
   private readonly execution = inject(CodeExecutionService);
   private readonly filesService = inject(FilesService);
-  private readonly destroy$ = new Subject<void>();
+  private readonly destroyRef = inject(DestroyRef);
 
   @ViewChild(CodeWorkspaceComponent) workspace?: CodeWorkspaceComponent;
 
@@ -138,11 +139,6 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
       return;
     }
     this.prepareSection(this.section);
-  }
-
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
   }
 
   onContentChange(content: string): void {
@@ -209,7 +205,7 @@ export class KnowledgeNotesEditorComponent implements OnChanges, OnDestroy {
         code: block.code,
         executionId: `${this.section.id}_${block.id}`,
       })
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (result) => this.storeResult(block, result),
         error: (error) =>

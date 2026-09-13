@@ -6,7 +6,7 @@
     "npm": "10.x"
   },
   "scripts": {
-    "heroku-postbuild": "cd frontend && npm ci --legacy-peer-deps && npm run build && mkdir -p ../backend/static && cp -r dist/frontend/browser/* ../backend/static/"
+    "build:frontend": "cd frontend && npm ci --legacy-peer-deps && npm run build && mkdir -p ../backend/static && cp -r dist/frontend/browser/* ../backend/static/"
   },
   "dependencies": {
     "@types/dompurify": "^3.0.5",

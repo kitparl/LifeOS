@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { switchMap, tap } from 'rxjs';
 import { KnowledgeSubjectListItem } from '../knowledge-notes/models/knowledge-notes.models';
 import { KnowledgeNotesService } from '../knowledge-notes/services/knowledge-notes.service';
 import {
@@ -284,11 +285,21 @@ export class LearningConceptDetailComponent implements OnInit {
         title: raw.title.trim() || c.title,
         content: raw.content,
       })
-      .subscribe({
-        next: (note) => {
+      .pipe(
+        tap((note) => {
           this.notes.update((list) => [...list, note]);
-          this.noteForm.patchValue({ subject_id: note.subject_id, subject_title: '', title: '', content: '' });
-          this.knowledgeService.listSubjects({ limit: 100 }).subscribe({ next: (result) => this.subjects.set(result.items) });
+          this.noteForm.patchValue({
+            subject_id: note.subject_id,
+            subject_title: '',
+            title: '',
+            content: '',
+          });
+        }),
+        switchMap(() => this.knowledgeService.listSubjects({ limit: 100 })),
+      )
+      .subscribe({
+        next: (result) => {
+          this.subjects.set(result.items);
           this.savingNote.set(false);
         },
         error: () => this.savingNote.set(false),

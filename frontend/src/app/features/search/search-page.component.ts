@@ -1,4 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { SearchResultItem } from './models/search.models';
@@ -49,6 +50,7 @@ export class SearchPageComponent implements OnInit {
   private readonly searchService = inject(SearchService);
   private readonly route = inject(ActivatedRoute);
   private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
 
   form = this.fb.nonNullable.group({ q: '', semantic: false });
   results: SearchResultItem[] = [];
@@ -57,7 +59,7 @@ export class SearchPageComponent implements OnInit {
   lastQuery = '';
 
   ngOnInit(): void {
-    this.route.queryParamMap.subscribe((params) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const q = params.get('q');
       if (q) {
         this.form.patchValue({ q });

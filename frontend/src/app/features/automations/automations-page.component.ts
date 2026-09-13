@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
+import { PaginatedListState } from '../../shared/pagination/paginated-list.state';
 import { AutomationRule, AutomationsService } from './services/automations.service';
 
 @Component({
@@ -44,9 +45,9 @@ import { AutomationRule, AutomationsService } from './services/automations.servi
           }
         </ul>
         <app-list-paginator
-          [total]="total"
-          [pageSize]="pageSize"
-          [currentPage]="currentPage"
+          [total]="paging.total"
+          [pageSize]="paging.pageSize"
+          [currentPage]="paging.currentPage"
           (pageChange)="setPage($event)"
         />
       </div>
@@ -67,9 +68,7 @@ export class AutomationsPageComponent implements OnInit {
   private readonly automations = inject(AutomationsService);
   private readonly fb = inject(FormBuilder);
   rules: AutomationRule[] = [];
-  total = 0;
-  currentPage = 1;
-  readonly pageSize = 25;
+  readonly paging = new PaginatedListState();
   evalResults: { evaluated: number; triggered: number; results: { rule_name: string; triggered: boolean; message: string | null }[] } | null = null;
   form = this.fb.nonNullable.group({
     name: '',
@@ -83,25 +82,24 @@ export class AutomationsPageComponent implements OnInit {
   }
 
   load(): void {
-    const offset = (this.currentPage - 1) * this.pageSize;
-    this.automations.list({ limit: this.pageSize, offset }).subscribe({
+    this.automations.list({ limit: this.paging.pageSize, offset: this.paging.offset }).subscribe({
       next: (result) => {
         this.rules = result.items;
-        this.total = result.total;
+        this.paging.total = result.total;
         this.clampPage();
       },
     });
   }
 
   setPage(page: number): void {
-    this.currentPage = page;
+    this.paging.setPage(page);
     this.load();
   }
 
   private clampPage(): void {
-    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
-    if (this.currentPage > totalPages) {
-      this.currentPage = totalPages;
+    const totalPages = Math.max(1, Math.ceil(this.paging.total / this.paging.pageSize));
+    if (this.paging.currentPage > totalPages) {
+      this.paging.setPage(totalPages);
       this.load();
     }
   }
@@ -111,7 +109,7 @@ export class AutomationsPageComponent implements OnInit {
     this.automations.create(this.form.getRawValue()).subscribe({
       next: () => {
         this.form.reset({ trigger_type: 'no_journal_days', action_type: 'notify', condition_json: '{"days":3}' });
-        this.currentPage = 1;
+        this.paging.setPage(1);
         this.load();
       },
     });

@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
+import { PaginatedListState } from '../../shared/pagination/paginated-list.state';
 import { Notification } from './models/notification.models';
 import { NotificationsService } from './services/notifications.service';
 
@@ -23,9 +24,9 @@ import { NotificationsService } from './services/notifications.service';
         <a routerLink="/settings" fragment="integrations" class="link">Settings</a>.
       </p>
 
-      @if (loading) {
+      @if (paging.loading) {
         <div class="empty-state"><div class="skeleton" style="width: 120px; height: 14px"></div></div>
-      } @else if (total === 0) {
+      } @else if (paging.total === 0) {
         <div class="empty-state">
           <p class="empty-state__title">All clear</p>
           <p class="empty-state__desc">No notifications right now.</p>
@@ -52,9 +53,9 @@ import { NotificationsService } from './services/notifications.service';
           }
         </ul>
         <app-list-paginator
-          [total]="total"
-          [pageSize]="pageSize"
-          [currentPage]="currentPage"
+          [total]="paging.total"
+          [pageSize]="paging.pageSize"
+          [currentPage]="paging.currentPage"
           (pageChange)="setPage($event)"
         />
       }
@@ -65,38 +66,34 @@ export class NotificationsPageComponent implements OnInit {
   private readonly notificationsService = inject(NotificationsService);
 
   notifications: Notification[] = [];
-  total = 0;
-  loading = false;
-  currentPage = 1;
-  readonly pageSize = 25;
+  readonly paging = new PaginatedListState();
 
   ngOnInit(): void {
     this.load();
   }
 
   load(): void {
-    this.loading = true;
-    const offset = (this.currentPage - 1) * this.pageSize;
-    this.notificationsService.list({ limit: this.pageSize, offset }).subscribe({
+    this.paging.loading = true;
+    this.notificationsService.list({ limit: this.paging.pageSize, offset: this.paging.offset }).subscribe({
       next: (result) => {
         this.notifications = result.items;
-        this.total = result.total;
+        this.paging.total = result.total;
         this.clampPage();
-        this.loading = false;
+        this.paging.loading = false;
       },
-      error: () => (this.loading = false),
+      error: () => (this.paging.loading = false),
     });
   }
 
   setPage(page: number): void {
-    this.currentPage = page;
+    this.paging.setPage(page);
     this.load();
   }
 
   private clampPage(): void {
-    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
-    if (this.currentPage > totalPages) {
-      this.currentPage = totalPages;
+    const totalPages = Math.max(1, Math.ceil(this.paging.total / this.paging.pageSize));
+    if (this.paging.currentPage > totalPages) {
+      this.paging.setPage(totalPages);
       this.load();
     }
   }

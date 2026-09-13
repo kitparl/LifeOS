@@ -91,6 +91,7 @@
               "zone.js/testing"
             ],
             "tsConfig": "tsconfig.spec.json",
+            "karmaConfig": "karma.conf.js",
             "assets": [
               {
                 "glob": "**/*",
@@ -102,11 +103,23 @@
             ],
             "scripts": []
           }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html"
+            ]
+          }
         }
       }
     }
   },
   "cli": {
-    "analytics": "3cd45546-eaac-4fd6-b20a-9770b79f1de0"
+    "analytics": "3cd45546-eaac-4fd6-b20a-9770b79f1de0",
+    "schematicCollections": [
+      "angular-eslint"
+    ]
   }
 }

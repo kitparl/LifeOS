@@ -4,10 +4,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
-import { KnowledgeSubjectComponent, stripFileMarkdown, resolveDefaultSection, isSectionComplete } from './knowledge-subject.component';
+import { KnowledgeSubjectComponent } from './knowledge-subject.component';
+import { isSectionComplete, resolveDefaultSection, stripFileMarkdown } from './knowledge-notes.utils';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
 import { FilesService } from '../files/services/files.service';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { IntegrationsService } from '../integrations/services/integrations.service';
 import {
   KnowledgeChapter,
   KnowledgeSection,
@@ -146,22 +148,26 @@ describe('KnowledgeSubjectComponent', () => {
         {
           provide: FilesService,
           useValue: {
-            list: (module?: string) =>
-              module === 'knowledge_notes'
-                ? of([
-                    {
-                      id: 'f1',
-                      filename: 'shot.png',
-                      content_type: 'image/png',
-                      size_bytes: 12,
-                      storage_backend: 'local',
-                      url: '/api/v1/files/f1/content',
-                      module: 'knowledge_notes',
-                      entity_id: 's1',
-                      created_at: now,
-                    },
-                  ])
-                : of([]),
+            list: (params?: { module?: string; entityId?: string }) =>
+              of({
+                items:
+                  params?.module === 'knowledge_notes'
+                    ? [
+                        {
+                          id: 'f1',
+                          filename: 'shot.png',
+                          content_type: 'image/png',
+                          size_bytes: 12,
+                          storage_backend: 'local',
+                          url: '/api/v1/files/f1/content',
+                          module: 'knowledge_notes',
+                          entity_id: 's1',
+                          created_at: now,
+                        },
+                      ]
+                    : [],
+                total: params?.module === 'knowledge_notes' ? 1 : 0,
+              }),
             upload: () => of({}),
             delete: () => of(void 0),
             tokenUrl: () => of('blob:preview'),
@@ -172,6 +178,27 @@ describe('KnowledgeSubjectComponent', () => {
         {
           provide: BreakpointObserver,
           useValue: { observe: () => of({ breakpoints: {}, matches: true }) },
+        },
+        {
+          provide: IntegrationsService,
+          useValue: {
+            getGitHub: () =>
+              of({
+                configured: false,
+                enabled: false,
+                connection_id: '',
+                provider: 'github',
+                status: 'not_configured',
+                token_masked: null,
+                repo: null,
+                branch: 'main',
+                base_path: '',
+                notify_github_sync_in_app: false,
+                notify_github_sync_telegram: false,
+                last_sync_at: null,
+              }),
+            getGitHubSectionSyncStatuses: () => of({ sections: [] }),
+          },
         },
       ],
     }).compileComponents();

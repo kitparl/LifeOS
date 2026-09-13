@@ -6,7 +6,11 @@ import {
   NavDestination,
   getDestinationById,
 } from '../../shared/layout/nav-registry';
-import { environment } from '../../../environments/environment';
+import {
+  PreferencesApi,
+  readJsonLocalStorage,
+  writeJsonLocalStorage,
+} from './preferences-sync';
 
 export interface NavPrefsValue {
   categoryOrder: string[];
@@ -51,8 +55,7 @@ function migrateFromLegacyPinned(ids: string[]): NavPrefsValue {
 
 @Injectable({ providedIn: 'root' })
 export class NavPreferencesService {
-  private readonly http = inject(HttpClient);
-  private readonly api = `${environment.apiUrl}/preferences`;
+  private readonly prefsApi = new PreferencesApi(inject(HttpClient));
 
   private readonly prefs = signal<NavPrefsValue>(buildDefaultPrefs());
 
@@ -85,11 +88,6 @@ export class NavPreferencesService {
     return NAV_DESTINATIONS.filter((d) => !visible.has(d.id) && !d.hidden);
   });
 
-  readonly settingsDestinations = computed(() => [
-    ...this.pinnedDestinations(),
-    ...this.unpinnedDestinations(),
-  ]);
-
   /** Grouped view for sidebar: Pin first, then categories. */
   readonly navGroups = computed(() => {
     const p = this.prefs();
@@ -114,15 +112,12 @@ export class NavPreferencesService {
     return groups;
   });
 
-  readonly pinnedTopIds = computed(() => this.prefs().pinnedTop);
-  readonly prefsSnapshot = computed(() => this.prefs());
-
   init(): void {
     // Seed from localStorage while API loads
     const legacy = this.readLegacyLocal();
     this.prefs.set(migrateFromLegacyPinned(legacy));
 
-    this.http.get<{ key: string; value: NavPrefsValue | null }>(`${this.api}/${PREFS_KEY}`).subscribe({
+    this.prefsApi.get<NavPrefsValue>(PREFS_KEY).subscribe({
       next: (resp) => {
         if (resp.value && typeof resp.value === 'object' && Array.isArray(resp.value.visible)) {
           this.prefs.set(this.normalize(resp.value));
@@ -195,33 +190,6 @@ export class NavPreferencesService {
     else this.pinTop(id);
   }
 
-  /** Flat reorder (legacy) — maps to category of the moved item. */
-  reorder(fromIndex: number, toIndex: number): void {
-    const ids = this.pinnedDestinations().map((d) => d.id);
-    if (fromIndex < 0 || fromIndex >= ids.length || toIndex < 0 || toIndex >= ids.length) return;
-    const [moved] = ids.splice(fromIndex, 1);
-    ids.splice(toIndex, 0, moved);
-    this.setPinnedOrder(ids);
-  }
-
-  setPinnedOrder(ids: string[]): void {
-    const p = structuredClone(this.prefs());
-    const valid = ids.filter((id) => p.visible.includes(id));
-    // Rebuild order maps preserving categories for non-top items
-    const topSet = new Set(p.pinnedTop);
-    p.pinnedTop = valid.filter((id) => topSet.has(id));
-    const newOrder: Record<string, string[]> = {};
-    for (const id of valid) {
-      if (topSet.has(id)) continue;
-      const cat = p.moduleCategory[id] ?? getDestinationById(id)?.category ?? 'Other';
-      if (!newOrder[cat]) newOrder[cat] = [];
-      newOrder[cat].push(id);
-    }
-    p.order = newOrder;
-    p.visible = [...new Set([...valid, ...p.visible.filter((id) => !valid.includes(id))])];
-    this.commit(p);
-  }
-
   /** Reorder within a single category (or Pin). */
   reorderWithinCategory(category: string, fromIndex: number, toIndex: number): void {
     if (fromIndex === toIndex) return;
@@ -240,18 +208,6 @@ export class NavPreferencesService {
       p.order[category] = list;
     }
     this.commit(p);
-  }
-
-  moveUp(id: string): void {
-    const ids = this.pinnedDestinations().map((d) => d.id);
-    const index = ids.indexOf(id);
-    if (index > 0) this.reorder(index, index - 1);
-  }
-
-  moveDown(id: string): void {
-    const ids = this.pinnedDestinations().map((d) => d.id);
-    const index = ids.indexOf(id);
-    if (index >= 0 && index < ids.length - 1) this.reorder(index, index + 1);
   }
 
   resetToDefault(): void {
@@ -284,29 +240,19 @@ export class NavPreferencesService {
   }
 
   private saveToApi(value: NavPrefsValue): void {
-    this.http.put(`${this.api}/${PREFS_KEY}`, { value }).subscribe({ error: () => undefined });
+    this.prefsApi.put(PREFS_KEY, value).subscribe({ error: () => undefined });
   }
 
   private cacheLocal(visible: string[]): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(visible));
-    } catch {
-      /* ignore */
-    }
+    writeJsonLocalStorage(STORAGE_KEY, visible);
   }
 
   private readLegacyLocal(): string[] {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [...DEFAULT_PINNED_IDS];
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) return [...DEFAULT_PINNED_IDS];
-      const valid = parsed.filter(
-        (id): id is string => typeof id === 'string' && getDestinationById(id) !== undefined,
-      );
-      return valid.length > 0 ? valid : [...DEFAULT_PINNED_IDS];
-    } catch {
-      return [...DEFAULT_PINNED_IDS];
-    }
+    const parsed = readJsonLocalStorage<unknown>(STORAGE_KEY, null);
+    if (!Array.isArray(parsed)) return [...DEFAULT_PINNED_IDS];
+    const valid = parsed.filter(
+      (id): id is string => typeof id === 'string' && getDestinationById(id) !== undefined,
+    );
+    return valid.length > 0 ? valid : [...DEFAULT_PINNED_IDS];
   }
 }

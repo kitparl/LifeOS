@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { filesFromClipboard, filesFromDataTransfer } from '../../shared/file-upload/clipboard-files';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
+import { PaginatedListState } from '../../shared/pagination/paginated-list.state';
 import { OcrDocument, OcrService } from './services/ocr.service';
 
 @Component({
@@ -74,9 +75,9 @@ import { OcrDocument, OcrService } from './services/ocr.service';
         }
       </ul>
       <app-list-paginator
-        [total]="total"
-        [pageSize]="pageSize"
-        [currentPage]="currentPage"
+        [total]="paging.total"
+        [pageSize]="paging.pageSize"
+        [currentPage]="paging.currentPage"
         (pageChange)="setPage($event)"
       />
     </div>
@@ -86,9 +87,7 @@ export class OcrPageComponent implements OnInit {
   private readonly ocr = inject(OcrService);
   private readonly fb = inject(FormBuilder);
   docs: OcrDocument[] = [];
-  total = 0;
-  currentPage = 1;
-  readonly pageSize = 25;
+  readonly paging = new PaginatedListState();
   uploading = false;
   dragOver = false;
   uploadError = '';
@@ -100,25 +99,24 @@ export class OcrPageComponent implements OnInit {
   }
 
   load(): void {
-    const offset = (this.currentPage - 1) * this.pageSize;
-    this.ocr.list({ limit: this.pageSize, offset }).subscribe({
+    this.ocr.list({ limit: this.paging.pageSize, offset: this.paging.offset }).subscribe({
       next: (result) => {
         this.docs = result.items;
-        this.total = result.total;
+        this.paging.total = result.total;
         this.clampPage();
       },
     });
   }
 
   setPage(page: number): void {
-    this.currentPage = page;
+    this.paging.setPage(page);
     this.load();
   }
 
   private clampPage(): void {
-    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
-    if (this.currentPage > totalPages) {
-      this.currentPage = totalPages;
+    const totalPages = Math.max(1, Math.ceil(this.paging.total / this.paging.pageSize));
+    if (this.paging.currentPage > totalPages) {
+      this.paging.setPage(totalPages);
       this.load();
     }
   }

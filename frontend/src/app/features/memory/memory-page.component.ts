@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
+import { PaginatedListState } from '../../shared/pagination/paginated-list.state';
 import { MemoryItem, MemoryService } from './services/memory.service';
 
 @Component({
@@ -49,9 +50,9 @@ import { MemoryItem, MemoryService } from './services/memory.service';
           }
         </ul>
         <app-list-paginator
-          [total]="total"
-          [pageSize]="pageSize"
-          [currentPage]="currentPage"
+          [total]="paging.total"
+          [pageSize]="paging.pageSize"
+          [currentPage]="paging.currentPage"
           (pageChange)="setPage($event)"
         />
       </div>
@@ -62,9 +63,7 @@ export class MemoryPageComponent implements OnInit {
   private readonly memory = inject(MemoryService);
   private readonly fb = inject(FormBuilder);
   items: MemoryItem[] = [];
-  total = 0;
-  currentPage = 1;
-  readonly pageSize = 25;
+  readonly paging = new PaginatedListState();
   summary: { total: number; by_category: Record<string, number> } | null = null;
   categoryEntries: [string, number][] = [];
   form = this.fb.nonNullable.group({
@@ -79,11 +78,10 @@ export class MemoryPageComponent implements OnInit {
   }
 
   load(): void {
-    const offset = (this.currentPage - 1) * this.pageSize;
-    this.memory.list({ limit: this.pageSize, offset }).subscribe({
+    this.memory.list({ limit: this.paging.pageSize, offset: this.paging.offset }).subscribe({
       next: (result) => {
         this.items = result.items;
-        this.total = result.total;
+        this.paging.total = result.total;
         this.clampPage();
       },
     });
@@ -96,14 +94,14 @@ export class MemoryPageComponent implements OnInit {
   }
 
   setPage(page: number): void {
-    this.currentPage = page;
+    this.paging.setPage(page);
     this.load();
   }
 
   private clampPage(): void {
-    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
-    if (this.currentPage > totalPages) {
-      this.currentPage = totalPages;
+    const totalPages = Math.max(1, Math.ceil(this.paging.total / this.paging.pageSize));
+    if (this.paging.currentPage > totalPages) {
+      this.paging.setPage(totalPages);
       this.load();
     }
   }
@@ -113,7 +111,7 @@ export class MemoryPageComponent implements OnInit {
     this.memory.create(this.form.getRawValue()).subscribe({
       next: () => {
         this.form.reset({ category: 'fact', importance: 3 });
-        this.currentPage = 1;
+        this.paging.setPage(1);
         this.load();
       },
     });

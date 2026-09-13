@@ -29,7 +29,8 @@ export class BackendExecutor implements BaseExecutor {
   readonly executionType: ExecutionType = 'backend';
 
   private readonly API_ENDPOINT = '/api/code/execute';
-  private readonly MOCK_MODE = true; // Set to false when backend is ready
+  /** Backend `/api/code/execute` is not implemented; mock responses only. Keep CDN pyodide/sql.js. */
+  private readonly MOCK_MODE = true;
 
   constructor(
     private http: HttpClient,

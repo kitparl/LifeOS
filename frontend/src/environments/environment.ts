@@ -1,5 +1,5 @@
 /**
- * Default environment (production=true).
+ * Default environment (production=false).
  * Local dev: `npm start` reads backend/.env ENV=dev and uses development config.
  * Production build: replaced by environment.production.ts
  */

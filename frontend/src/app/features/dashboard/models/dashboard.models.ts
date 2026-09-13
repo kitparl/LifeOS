@@ -1,3 +1,5 @@
+import type { Notification } from '../../notifications/models/notification.models';
+
 export type SyncStatus = 'synced' | 'syncing' | 'offline';
 
 export interface TaskTodayItem {
@@ -31,13 +33,8 @@ export interface CalendarPreviewItem {
   starts_at: string;
 }
 
-export interface NotificationItem {
-  id: string;
-  message: string;
-  route: string | null;
-  is_read: boolean;
-  created_at: string;
-}
+/** Subset of Notification fields used by dashboard widgets. */
+export type NotificationItem = Pick<Notification, 'id' | 'message' | 'route' | 'is_read' | 'created_at'>;
 
 export interface ActivityItem {
   type: string;

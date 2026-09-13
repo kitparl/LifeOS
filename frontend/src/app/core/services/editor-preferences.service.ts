@@ -1,6 +1,10 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import {
+  PreferencesApi,
+  readJsonLocalStorage,
+  writeJsonLocalStorage,
+} from './preferences-sync';
 
 export type EditorKeymap = 'default' | 'vim';
 
@@ -25,18 +29,17 @@ function normalizePrefs(raw: unknown): EditorPrefsValue {
 
 @Injectable({ providedIn: 'root' })
 export class EditorPreferencesService {
-  private readonly http = inject(HttpClient);
-  private readonly api = `${environment.apiUrl}/preferences`;
+  private readonly prefsApi = new PreferencesApi(inject(HttpClient));
 
   private readonly prefs = signal<EditorPrefsValue>({ ...DEFAULT_PREFS });
 
-  readonly keymap = signal<EditorKeymap>('default');
+  readonly keymap = computed(() => this.prefs().keymap);
 
   init(): void {
     const local = this.readLocal();
     this.applyPrefs(local);
 
-    this.http.get<{ key: string; value: EditorPrefsValue | null }>(`${this.api}/${PREFS_KEY}`).subscribe({
+    this.prefsApi.get<EditorPrefsValue>(PREFS_KEY).subscribe({
       next: (resp) => {
         if (resp.value && typeof resp.value === 'object') {
           const normalized = normalizePrefs(resp.value);
@@ -55,9 +58,7 @@ export class EditorPreferencesService {
   }
 
   private applyPrefs(value: EditorPrefsValue): void {
-    const normalized = normalizePrefs(value);
-    this.prefs.set(normalized);
-    this.keymap.set(normalized.keymap);
+    this.prefs.set(normalizePrefs(value));
   }
 
   private commit(value: EditorPrefsValue): void {
@@ -68,24 +69,14 @@ export class EditorPreferencesService {
   }
 
   private saveToApi(value: EditorPrefsValue): void {
-    this.http.put(`${this.api}/${PREFS_KEY}`, { value }).subscribe({ error: () => undefined });
+    this.prefsApi.put(PREFS_KEY, value).subscribe({ error: () => undefined });
   }
 
   private cacheLocal(value: EditorPrefsValue): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-    } catch {
-      /* ignore */
-    }
+    writeJsonLocalStorage(STORAGE_KEY, value);
   }
 
   private readLocal(): EditorPrefsValue {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { ...DEFAULT_PREFS };
-      return normalizePrefs(JSON.parse(raw));
-    } catch {
-      return { ...DEFAULT_PREFS };
-    }
+    return normalizePrefs(readJsonLocalStorage<unknown>(STORAGE_KEY, DEFAULT_PREFS));
   }
 }
