@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Install or update AI-DLC workflow rules for Cursor from awslabs/aidlc-workflows releases.
+# Install or update AI-DLC workflow rules from awslabs/aidlc-workflows releases.
+# Wires the same rule pack for Cursor and Claude Code (single source of truth under .aidlc/).
 # Usage: ./scripts/setup-aidlc.sh [version]
 #   version: optional tag (default: latest), e.g. v1.0.0
 
@@ -25,11 +26,12 @@ curl -sL -o "$TMP_DIR/aidlc-rules.zip" "$ASSET_URL"
 unzip -qo "$TMP_DIR/aidlc-rules.zip" -d "$TMP_DIR/extract"
 
 rm -rf .aidlc/aidlc-rules
-mkdir -p .aidlc .cursor/rules
+mkdir -p .aidlc .cursor/rules .claude/rules
 cp -R "$TMP_DIR/extract/aidlc-rules" .aidlc/
 
 ln -sfn .aidlc/aidlc-rules/aws-aidlc-rule-details .aidlc-rule-details
 
+# --- Cursor ---
 cat > .cursor/rules/ai-dlc-workflow.mdc << 'EOF'
 ---
 description: "AI-DLC (AI-Driven Development Life Cycle) adaptive workflow for software development"
@@ -39,5 +41,28 @@ alwaysApply: true
 When the user invokes AI-DLC (e.g., "Using AI-DLC, ..."), read and follow `.aidlc/aidlc-rules/aws-aidlc-rules/core-workflow.md` to start the workflow.
 EOF
 
+# --- Claude Code ---
+cat > .claude/rules/ai-dlc-workflow.md << 'EOF'
+# AI-DLC (AI-Driven Development Life Cycle)
+
+When the user invokes AI-DLC (e.g., "Using AI-DLC, ..."), read and follow `.aidlc/aidlc-rules/aws-aidlc-rules/core-workflow.md` to start the workflow.
+
+Load common rules and stage rule-detail files from `.aidlc/aidlc-rules/aws-aidlc-rule-details/` (or the `.aidlc-rule-details` symlink) as required by that workflow.
+EOF
+
+if [[ ! -f CLAUDE.md ]]; then
+  cat > CLAUDE.md << 'EOF'
+# LifeOS — Claude Code project instructions
+
+## AI-DLC
+
+When the user invokes AI-DLC (e.g. "Using AI-DLC, ..."), read and follow
+`.aidlc/aidlc-rules/aws-aidlc-rules/core-workflow.md` to start the workflow.
+
+Rule details live under `.aidlc/aidlc-rules/aws-aidlc-rule-details/`
+(also reachable via the `.aidlc-rule-details` symlink).
+EOF
+fi
+
 INSTALLED_VERSION="$(cat .aidlc/aidlc-rules/VERSION 2>/dev/null || echo unknown)"
-echo "AI-DLC rules installed for Cursor: v${INSTALLED_VERSION}"
+echo "AI-DLC rules installed for Cursor + Claude Code: v${INSTALLED_VERSION}"
