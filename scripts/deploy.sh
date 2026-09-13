@@ -15,7 +15,10 @@ LOG_FILE="$LOG_DIR/deploy-lifeos.log"
 HISTORY_FILE="$LOG_DIR/deploy-lifeos-history.log"
 LAST_GOOD_FILE="$LOG_DIR/deploy-lifeos-last-good"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8000/health}"
-HEALTH_RETRIES="${HEALTH_RETRIES:-5}"
+# Two uvicorn workers on a small VPS often need 30–60s to import the app;
+# a short window fails health, triggers rollback, and can delete modules
+# out from under still-starting workers (false ModuleNotFoundError in logs).
+HEALTH_RETRIES="${HEALTH_RETRIES:-30}"
 HEALTH_RETRY_DELAY="${HEALTH_RETRY_DELAY:-2}"
 
 # ---- flags (default: full deploy) ----
@@ -124,6 +127,10 @@ setup_backend() {
         log "Creating virtualenv..."
         python3 -m venv "$VENV_DIR"
     fi
+
+    # Drop stale bytecode so package moves (e.g. integrations split) cannot
+    # leave workers importing a mixed old/new tree after reset --hard.
+    find "$BACKEND_DIR/app" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
 
     # shellcheck disable=SC1091
     source "$VENV_DIR/bin/activate"
