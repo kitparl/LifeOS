@@ -1,17 +1,34 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Notification, NotificationSettings } from '../models/notification.models';
+
+export interface NotificationListResult {
+  items: Notification[];
+  total: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class NotificationsService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/notifications`;
 
-  list(unreadOnly = false, limit = 50): Observable<Notification[]> {
-    const params = new HttpParams().set('unread_only', String(unreadOnly)).set('limit', String(limit));
-    return this.http.get<Notification[]>(this.api, { params });
+  list(opts?: {
+    unreadOnly?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Observable<NotificationListResult> {
+    let params = new HttpParams()
+      .set('unread_only', String(opts?.unreadOnly ?? false))
+      .set('limit', String(opts?.limit ?? 25));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<Notification[]>(this.api, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<Notification[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   create(data: { message: string; route?: string | null; module?: string | null }): Observable<Notification> {

@@ -1,18 +1,34 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { SpeakingPractice, VocabularyWord, WritingEvaluation, WritingPractice, WritingRewrite } from '../models/communication.models';
+
+export interface CommunicationListResult<T> {
+  items: T[];
+  total: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class CommunicationService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/communication`;
 
-  listVocabulary(search?: string): Observable<VocabularyWord[]> {
+  listVocabulary(opts?: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<CommunicationListResult<VocabularyWord>> {
     let params = new HttpParams();
-    if (search) params = params.set('search', search);
-    return this.http.get<VocabularyWord[]>(`${this.api}/vocabulary`, { params });
+    if (opts?.search) params = params.set('search', opts.search);
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<VocabularyWord[]>(`${this.api}/vocabulary`, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<VocabularyWord[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   getVocabulary(id: string): Observable<VocabularyWord> {
@@ -31,10 +47,21 @@ export class CommunicationService {
     return this.http.delete<void>(`${this.api}/vocabulary/${id}`);
   }
 
-  listWriting(category?: string): Observable<WritingPractice[]> {
+  listWriting(opts?: {
+    category?: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<CommunicationListResult<WritingPractice>> {
     let params = new HttpParams();
-    if (category) params = params.set('category', category);
-    return this.http.get<WritingPractice[]>(`${this.api}/writing`, { params });
+    if (opts?.category) params = params.set('category', opts.category);
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<WritingPractice[]>(`${this.api}/writing`, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<WritingPractice[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   getWriting(id: string): Observable<WritingPractice> {
@@ -69,10 +96,21 @@ export class CommunicationService {
     return this.http.get<WritingRewrite>(`${this.api}/writing/${writingId}/ai-rewrite`);
   }
 
-  listSpeaking(category?: string): Observable<SpeakingPractice[]> {
+  listSpeaking(opts?: {
+    category?: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<CommunicationListResult<SpeakingPractice>> {
     let params = new HttpParams();
-    if (category) params = params.set('category', category);
-    return this.http.get<SpeakingPractice[]>(`${this.api}/speaking`, { params });
+    if (opts?.category) params = params.set('category', opts.category);
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<SpeakingPractice[]>(`${this.api}/speaking`, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<SpeakingPractice[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   getSpeaking(id: string): Observable<SpeakingPractice> {

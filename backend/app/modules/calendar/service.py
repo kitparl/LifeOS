@@ -108,8 +108,13 @@ class CalendarService:
         self.repo = CalendarRepository(db)
 
     async def list_events(
-        self, user_id: str, start=None, end=None
-    ) -> list[EventListItem]:
+        self,
+        user_id: str,
+        start=None,
+        end=None,
+        limit: int | None = 25,
+        offset: int = 0,
+    ) -> tuple[list[EventListItem], int]:
         events = await self.repo.list_events(user_id, start=start, end=end)
         items: list[EventListItem] = []
         if start is not None and end is not None:
@@ -127,7 +132,10 @@ class CalendarService:
             items = [EventListItem.model_validate(e) for e in events]
 
         items.sort(key=lambda i: _sort_key(i.starts_at))
-        return items
+        total = len(items)
+        if limit is None:
+            return items, total
+        return items[offset : offset + limit], total
 
     async def get_event(self, user_id: str, event_id: str) -> EventResponse:
         event = await self.repo.get_by_id(user_id, event_id)

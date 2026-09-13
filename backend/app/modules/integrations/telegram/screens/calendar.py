@@ -24,7 +24,7 @@ def _day_bounds(d: date) -> tuple[datetime, datetime]:
 async def today_screen(db: AsyncSession, user_id: str) -> Screen:
     today = date.today()
     start, end = _day_bounds(today)
-    events = await CalendarService(db).list_events(user_id, start=start, end=end)
+    events, _ = await CalendarService(db).list_events(user_id, start=start, end=end, limit=None)
     if not events:
         text = tpl.join_blocks(tpl._header("Today", today.isoformat()), "Nothing on the calendar.")
         rows = [
@@ -53,7 +53,7 @@ async def week_screen(db: AsyncSession, user_id: str) -> Screen:
     today = date.today()
     start = datetime.combine(today, time.min, tzinfo=timezone.utc)
     end = datetime.combine(today + timedelta(days=7), time.max, tzinfo=timezone.utc)
-    events = await CalendarService(db).list_events(user_id, start=start, end=end)
+    events, _ = await CalendarService(db).list_events(user_id, start=start, end=end, limit=None)
     if not events:
         text = tpl.join_blocks(tpl._header("This week"), "No upcoming events.")
         return Screen(
@@ -83,7 +83,7 @@ async def event_detail_screen(db: AsyncSession, user_id: str, token: str) -> Scr
     today = date.today()
     start = datetime.combine(today - timedelta(days=1), time.min, tzinfo=timezone.utc)
     end = datetime.combine(today + timedelta(days=30), time.max, tzinfo=timezone.utc)
-    events = await CalendarService(db).list_events(user_id, start=start, end=end)
+    events, _ = await CalendarService(db).list_events(user_id, start=start, end=end, limit=None)
     summary = resolve_one(list(events), token)
     if summary is None:
         return Screen(

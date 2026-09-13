@@ -4,6 +4,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Pagination, paginate
 from app.modules.knowledge_notes.models import (
     KnowledgeChapter,
     KnowledgeSection,
@@ -24,13 +25,19 @@ class KnowledgeNotesRepository:
         self.db = db
 
     # ---- Subjects ----
-    async def list_subjects(self, user_id: str) -> list[KnowledgeSubject]:
-        result = await self.db.execute(
+    async def list_subjects(
+        self, user_id: str, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[KnowledgeSubject], int]:
+        q = (
             select(KnowledgeSubject)
             .where(KnowledgeSubject.user_id == user_id)
             .order_by(KnowledgeSubject.order_index, KnowledgeSubject.title)
         )
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_subject(self, user_id: str, subject_id: str) -> KnowledgeSubject | None:
         result = await self.db.execute(
@@ -202,8 +209,13 @@ class KnowledgeNotesRepository:
 
     # ---- Search ----
     async def search_sections(
-        self, user_id: str, query: str, subject_id: str | None = None
-    ) -> list[tuple]:
+        self,
+        user_id: str,
+        query: str,
+        subject_id: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[tuple], int]:
         pattern = f"%{query}%"
         stmt = (
             select(KnowledgeSection, KnowledgeChapter, KnowledgeSubject)
@@ -222,7 +234,9 @@ class KnowledgeNotesRepository:
         )
         if subject_id:
             stmt = stmt.where(KnowledgeSubject.id == subject_id)
-        result = await self.db.execute(
-            stmt.order_by(KnowledgeSection.updated_at.desc()).limit(50)
-        )
-        return list(result.all())
+        stmt = stmt.order_by(KnowledgeSection.updated_at.desc())
+        total = (
+            await self.db.execute(select(func.count()).select_from(stmt.order_by(None).subquery()))
+        ).scalar_one()
+        result = await self.db.execute(stmt.offset(offset).limit(limit))
+        return list(result.all()), int(total)

@@ -1,13 +1,14 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { Notification } from './models/notification.models';
 import { NotificationsService } from './services/notifications.service';
 
 @Component({
   selector: 'app-notifications-page',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -24,7 +25,7 @@ import { NotificationsService } from './services/notifications.service';
 
       @if (loading) {
         <div class="empty-state"><div class="skeleton" style="width: 120px; height: 14px"></div></div>
-      } @else if (notifications.length === 0) {
+      } @else if (total === 0) {
         <div class="empty-state">
           <p class="empty-state__title">All clear</p>
           <p class="empty-state__desc">No notifications right now.</p>
@@ -50,6 +51,12 @@ import { NotificationsService } from './services/notifications.service';
             </li>
           }
         </ul>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
       }
     </div>
   `,
@@ -58,7 +65,10 @@ export class NotificationsPageComponent implements OnInit {
   private readonly notificationsService = inject(NotificationsService);
 
   notifications: Notification[] = [];
+  total = 0;
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 25;
 
   ngOnInit(): void {
     this.load();
@@ -66,13 +76,29 @@ export class NotificationsPageComponent implements OnInit {
 
   load(): void {
     this.loading = true;
-    this.notificationsService.list().subscribe({
-      next: (data) => {
-        this.notifications = data;
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.notificationsService.list({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.notifications = result.items;
+        this.total = result.total;
+        this.clampPage();
         this.loading = false;
       },
       error: () => (this.loading = false),
     });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   markRead(id: string): void {

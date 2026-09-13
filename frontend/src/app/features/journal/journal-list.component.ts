@@ -31,14 +31,14 @@ import { JournalService } from './services/journal.service';
 
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading entries…</p>
-      } @else if (entries.length === 0) {
+      } @else if (total === 0) {
         <div class="panel">
           <p class="text-sm" style="color: var(--text-muted)">No journal entries yet.</p>
           <a routerLink="/journal/new" class="btn-primary mt-2 inline-block text-xs no-underline">Write entry</a>
         </div>
       } @else {
         <div class="space-y-3 md:hidden">
-          @for (entry of pagedEntries; track entry.id) {
+          @for (entry of entries; track entry.id) {
             <article class="panel space-y-2">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
@@ -54,7 +54,7 @@ import { JournalService } from './services/journal.service';
             </article>
           }
           <app-list-paginator
-            [total]="entries.length"
+            [total]="total"
             [pageSize]="pageSize"
             [currentPage]="currentPage"
             (pageChange)="setPage($event)"
@@ -71,7 +71,7 @@ import { JournalService } from './services/journal.service';
               </tr>
             </thead>
             <tbody>
-              @for (entry of pagedEntries; track entry.id) {
+              @for (entry of entries; track entry.id) {
                 <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
                   <td class="px-3 py-2">{{ entry.entry_date | date: 'mediumDate' }}</td>
                   <td class="px-3 py-2 capitalize">{{ entry.entry_type }}</td>
@@ -88,7 +88,7 @@ import { JournalService } from './services/journal.service';
             </tbody>
           </table>
           <app-list-paginator
-            [total]="entries.length"
+            [total]="total"
             [pageSize]="pageSize"
             [currentPage]="currentPage"
             (pageChange)="setPage($event)"
@@ -109,19 +109,15 @@ export class JournalListComponent implements OnInit {
     return this.markdown.toPlainText(content, 80);
   }
   entries: JournalListItem[] = [];
+  total = 0;
   loading = false;
   currentPage = 1;
-  readonly pageSize = 12;
+  readonly pageSize = 25;
 
   filters = this.fb.nonNullable.group({ entry_type: '', search: '' });
 
   ngOnInit(): void {
     this.load();
-  }
-
-  get pagedEntries(): JournalListItem[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.entries.slice(start, start + this.pageSize);
   }
 
   applyFilters(): void {
@@ -132,11 +128,18 @@ export class JournalListComponent implements OnInit {
   load(): void {
     this.loading = true;
     const raw = this.filters.getRawValue();
+    const offset = (this.currentPage - 1) * this.pageSize;
     this.journalService
-      .list(raw.entry_type || undefined, raw.search || undefined)
+      .list({
+        entryType: raw.entry_type || undefined,
+        search: raw.search || undefined,
+        limit: this.pageSize,
+        offset,
+      })
       .subscribe({
-        next: (data) => {
-          this.entries = data;
+        next: (result) => {
+          this.entries = result.items;
+          this.total = result.total;
           this.clampPage();
           this.loading = false;
         },
@@ -146,10 +149,14 @@ export class JournalListComponent implements OnInit {
 
   setPage(page: number): void {
     this.currentPage = page;
+    this.load();
   }
 
   private clampPage(): void {
-    const totalPages = Math.max(1, Math.ceil(this.entries.length / this.pageSize));
-    this.currentPage = Math.min(this.currentPage, totalPages);
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 }

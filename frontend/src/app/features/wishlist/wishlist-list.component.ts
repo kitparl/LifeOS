@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import {
   WISHLIST_STATUS_FILTERS,
   WishlistListItem,
@@ -14,7 +15,7 @@ import { WishlistService } from './services/wishlist.service';
 @Component({
   selector: 'app-wishlist-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -22,7 +23,7 @@ import { WishlistService } from './services/wishlist.service';
         <a routerLink="/wishlist/new" class="btn-primary text-xs no-underline">New Item</a>
       </div>
 
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="load()">
+      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
         <select class="input-field !w-auto" formControlName="status">
           @for (s of statusFilters; track s.value) {
             <option [value]="s.value">{{ s.label }}</option>
@@ -39,7 +40,7 @@ import { WishlistService } from './services/wishlist.service';
 
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
-      } @else if (items.length === 0) {
+      } @else if (total === 0) {
         <div class="panel">
           <p class="text-sm" style="color: var(--text-muted)">
             {{ emptyMessage }}
@@ -72,6 +73,12 @@ import { WishlistService } from './services/wishlist.service';
             </div>
           }
         </div>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
       }
     </div>
   `,
@@ -83,7 +90,10 @@ export class WishlistListComponent implements OnInit {
   readonly categories = signal<string[]>([]);
   readonly statusFilters = WISHLIST_STATUS_FILTERS;
   items: WishlistListItem[] = [];
+  total = 0;
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 25;
   filters = this.fb.nonNullable.group({
     status: '' as WishlistStatusFilter,
     category: '',
@@ -133,20 +143,43 @@ export class WishlistListComponent implements OnInit {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
   }
 
+  applyFilters(): void {
+    this.currentPage = 1;
+    this.load();
+  }
+
   load(): void {
     this.loading = true;
     const { category, status } = this.filters.getRawValue();
+    const offset = (this.currentPage - 1) * this.pageSize;
     this.wishlistService
       .list({
         category: category || undefined,
         status: status || undefined,
+        limit: this.pageSize,
+        offset,
       })
       .subscribe({
-        next: (data) => {
-          this.items = data;
+        next: (result) => {
+          this.items = result.items;
+          this.total = result.total;
+          this.clampPage();
           this.loading = false;
         },
         error: () => (this.loading = false),
       });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 }

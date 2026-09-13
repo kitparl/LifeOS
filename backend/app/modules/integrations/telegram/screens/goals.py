@@ -16,7 +16,7 @@ from app.modules.tasks.service import TaskService
 
 
 async def goals_list_screen(db: AsyncSession, user_id: str) -> Screen:
-    goals = await GoalService(db).list_goals(user_id, status="active")
+    goals, _ = await GoalService(db).list_goals(user_id, status="active", limit=100)
     if not goals:
         return Screen(
             text=tpl.join_blocks(tpl._header("Goals"), "No active goals."),
@@ -34,9 +34,10 @@ async def goals_list_screen(db: AsyncSession, user_id: str) -> Screen:
 
 
 async def goal_detail_screen(db: AsyncSession, user_id: str, token: str) -> Screen:
-    goals = await GoalService(db).list_goals(user_id, status="active")
+    goals, _ = await GoalService(db).list_goals(user_id, status="active", limit=100)
+    archived, _ = await GoalService(db).list_goals(user_id, status="archived", limit=100)
     # Include archived for view
-    all_goals = list(goals) + list(await GoalService(db).list_goals(user_id, status="archived"))
+    all_goals = list(goals) + list(archived)
     summary = resolve_one(all_goals, token)
     if summary is None:
         return Screen(
@@ -91,7 +92,7 @@ async def on_msdone(ctx: CallbackContext) -> tuple[Screen, str]:
     if len(ctx.args) < 2:
         return await goals_list_screen(ctx.db, ctx.user_id), "Bad request"
     goal_token, ms_token = ctx.args[0], ctx.args[1]
-    goals = await GoalService(ctx.db).list_goals(ctx.user_id, status="active")
+    goals, _ = await GoalService(ctx.db).list_goals(ctx.user_id, status="active", limit=100)
     summary = resolve_one(list(goals), goal_token)
     if summary is None:
         return await goals_list_screen(ctx.db, ctx.user_id), "Not found"

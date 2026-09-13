@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -39,11 +39,18 @@ router = APIRouter(prefix="/learning", tags=["learning"])
 
 @router.get("/items", response_model=list[LearningListItem])
 async def list_learning(
+    response: Response,
     item_type: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await LearningService(db).list_items(user.id, item_type)
+    items, total = await LearningService(db).list_items(
+        user.id, item_type, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/items", response_model=LearningResponse, status_code=status.HTTP_201_CREATED)
@@ -88,10 +95,15 @@ async def delete_learning(
 
 @router.get("/tracks", response_model=list[TrackListItem])
 async def list_tracks(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await LearningService(db).list_tracks(user.id)
+    items, total = await LearningService(db).list_tracks(user.id, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/tracks", response_model=TrackListItem, status_code=status.HTTP_201_CREATED)
@@ -141,12 +153,19 @@ async def get_track_progress(
 
 @router.get("/concepts", response_model=list[ConceptListItem])
 async def list_concepts(
+    response: Response,
     item_id: str | None = Query(default=None),
     week: int | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await LearningService(db).list_concepts(user.id, item_id, week)
+    items, total = await LearningService(db).list_concepts(
+        user.id, item_id, week, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.get("/concepts/{concept_id}", response_model=ConceptResponse)
@@ -173,11 +192,18 @@ async def update_concept(
 
 @router.get("/concepts/{concept_id}/notes", response_model=list[ConceptNoteResponse])
 async def list_concept_notes(
+    response: Response,
     concept_id: str,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await LearningService(db).list_concept_notes(user.id, concept_id)
+    items, total = await LearningService(db).list_concept_notes(
+        user.id, concept_id, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post(
@@ -211,12 +237,19 @@ async def detach_concept_note(
 
 @router.get("/resources", response_model=list[ResourceResponse])
 async def list_resources(
+    response: Response,
     concept_id: str | None = Query(default=None),
     item_id: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await LearningService(db).list_resources(user.id, concept_id, item_id)
+    items, total = await LearningService(db).list_resources(
+        user.id, concept_id, item_id, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/resources", response_model=ResourceResponse, status_code=status.HTTP_201_CREATED)
@@ -243,12 +276,19 @@ async def update_resource(
 
 @router.get("/sessions", response_model=list[SessionResponse])
 async def list_sessions(
+    response: Response,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await LearningService(db).list_sessions(user.id, from_date, to_date)
+    items, total = await LearningService(db).list_sessions(
+        user.id, from_date, to_date, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)

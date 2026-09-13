@@ -15,9 +15,13 @@ class WishlistService:
         user_id: str,
         category: str | None = None,
         status: str | None = None,
-    ) -> list[WishlistListItem]:
-        items = await self.repo.list_items(user_id, category=category, status=status)
-        return [WishlistListItem.model_validate(i) for i in items]
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[WishlistListItem], int]:
+        items, total = await self.repo.list_items(
+            user_id, category=category, status=status, limit=limit, offset=offset
+        )
+        return [WishlistListItem.model_validate(i) for i in items], total
 
     async def list_categories(self, user_id: str) -> list[str]:
         """Suggested defaults + user-created, de-duplicated (CI) and sorted."""

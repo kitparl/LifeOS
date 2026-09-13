@@ -32,6 +32,7 @@ async def test_create_and_list_goals(client):
     listing = await client.get("/api/v1/goals", headers=headers)
     assert listing.status_code == 200
     assert len(listing.json()) == 1
+    assert listing.headers.get("X-Total-Count") == "1"
 
 
 @pytest.mark.asyncio

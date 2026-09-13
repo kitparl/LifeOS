@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Pagination, paginate
 from app.modules.habits.models import Habit, HabitLog
 from app.modules.habits.schemas import HabitCreate, HabitUpdate
 from app.modules.habits.stats import _today, is_completed_for_period
@@ -13,13 +14,21 @@ class HabitRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_habits(self, user_id: str, active_only: bool = True) -> list[Habit]:
+    async def list_habits(
+        self,
+        user_id: str,
+        active_only: bool = True,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[Habit], int] | list[Habit]:
         q = select(Habit).where(Habit.user_id == user_id).options(selectinload(Habit.logs))
         if active_only:
             q = q.where(Habit.is_active.is_(True))
         q = q.order_by(Habit.name.asc())
-        result = await self.db.execute(q)
-        return list(result.scalars().unique().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            return list(result.scalars().unique().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset), unique=True)
 
     async def get_by_id(self, user_id: str, habit_id: str) -> Habit | None:
         result = await self.db.execute(

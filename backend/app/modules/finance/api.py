@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -24,11 +24,18 @@ async def finance_summary(user: User = Depends(get_current_user), db: AsyncSessi
 
 @router.get("/transactions", response_model=list[TransactionResponse])
 async def list_transactions(
+    response: Response,
     txn_type: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await FinanceService(db).list_transactions(user.id, txn_type)
+    items, total = await FinanceService(db).list_transactions(
+        user.id, txn_type, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/transactions", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
@@ -60,8 +67,16 @@ async def delete_transaction(
 
 
 @router.get("/budgets", response_model=list[BudgetResponse])
-async def list_budgets(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await FinanceService(db).list_budgets(user.id)
+async def list_budgets(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    items, total = await FinanceService(db).list_budgets(user.id, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/budgets", response_model=BudgetResponse, status_code=status.HTTP_201_CREATED)

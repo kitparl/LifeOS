@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.life_timeline.models import LifeMilestone
 from app.modules.life_timeline.schemas import MilestoneCreate, MilestoneUpdate
 
@@ -9,13 +10,19 @@ class LifeTimelineRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_milestones(self, user_id: str) -> list[LifeMilestone]:
-        result = await self.db.execute(
+    async def list_milestones(
+        self, user_id: str, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[LifeMilestone], int]:
+        q = (
             select(LifeMilestone)
             .where(LifeMilestone.user_id == user_id)
             .order_by(LifeMilestone.milestone_date.desc())
         )
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_milestone(self, user_id: str, milestone_id: str) -> LifeMilestone | None:
         result = await self.db.execute(

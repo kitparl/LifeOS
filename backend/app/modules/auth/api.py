@@ -202,11 +202,16 @@ async def change_username(
 
 @router.get("/me/username-history", response_model=list[UsernameHistoryEntry])
 async def username_history(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = AuthService(db)
-    return await service.list_username_history(user.id)
+    items, total = await service.list_username_history(user.id, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/me/change-password", status_code=status.HTTP_204_NO_CONTENT)

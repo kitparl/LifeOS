@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.running.models import RaceEvent, Run, RunningSettings, RunningShoe
 from app.modules.running.schemas import RaceCreate, RaceUpdate, RunCreate, RunUpdate, RunningSettingsUpdate
 from app.modules.running.stats import weekly_km
@@ -11,6 +12,7 @@ class RunningRepository:
         self.db = db
 
     async def list_runs(self, user_id: str, shoe: str | None = None) -> list[Run]:
+        """Fetch all runs (used for merge/stats); pagination happens in the service."""
         q = select(Run).where(Run.user_id == user_id)
         if shoe:
             q = q.where(Run.shoe == shoe)
@@ -76,7 +78,13 @@ class RunningRepository:
         await self.db.delete(run)
         await self.db.flush()
 
-    async def list_races(self, user_id: str, upcoming_only: bool = False) -> list[RaceEvent]:
+    async def list_races(
+        self,
+        user_id: str,
+        upcoming_only: bool = False,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[RaceEvent], int]:
         q = select(RaceEvent).where(RaceEvent.user_id == user_id)
         if upcoming_only:
             from datetime import datetime, timezone
@@ -84,8 +92,11 @@ class RunningRepository:
             today = datetime.now(timezone.utc).date()
             q = q.where(RaceEvent.race_date >= today)
         q = q.order_by(RaceEvent.race_date.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_race(self, user_id: str, race_id: str) -> RaceEvent | None:
         result = await self.db.execute(

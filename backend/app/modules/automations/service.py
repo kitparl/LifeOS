@@ -26,9 +26,11 @@ class AutomationService:
         self.repo = AutomationRepository(db)
         self.notifications = NotificationService(db)
 
-    async def list_rules(self, user_id: str) -> list[AutomationResponse]:
-        rules = await self.repo.list_rules(user_id)
-        return [AutomationResponse.model_validate(r) for r in rules]
+    async def list_rules(
+        self, user_id: str, limit: int | None = 25, offset: int = 0
+    ) -> tuple[list[AutomationResponse], int]:
+        rules, total = await self.repo.list_rules(user_id, limit=limit, offset=offset)
+        return [AutomationResponse.model_validate(r) for r in rules], total
 
     async def create_rule(self, user_id: str, data: AutomationCreate) -> AutomationResponse:
         if data.trigger_type not in TRIGGER_TYPES:
@@ -52,7 +54,7 @@ class AutomationService:
         await self.repo.delete(rule)
 
     async def evaluate(self, user_id: str) -> AutomationEvaluateResponse:
-        rules = await self.repo.list_rules(user_id)
+        rules, _ = await self.repo.list_rules(user_id, limit=None)
         results: list[AutomationRunResult] = []
         triggered_count = 0
 

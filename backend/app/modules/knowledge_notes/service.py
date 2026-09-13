@@ -60,9 +60,11 @@ class KnowledgeNotesService:
                 await self.files.soft_delete(row)
 
     # ---- Subjects ----
-    async def list_subjects(self, user_id: str) -> list[SubjectListItem]:
+    async def list_subjects(
+        self, user_id: str, limit: int | None = 25, offset: int = 0
+    ) -> tuple[list[SubjectListItem], int]:
         await self._purge_expired(user_id)
-        subjects = await self.repo.list_subjects(user_id)
+        subjects, total = await self.repo.list_subjects(user_id, limit=limit, offset=offset)
         items: list[SubjectListItem] = []
         for s in subjects:
             chapters, sections = await self.repo.subject_counts(s.id)
@@ -78,7 +80,7 @@ class KnowledgeNotesService:
                     updated_at=s.updated_at,
                 )
             )
-        return items
+        return items, total
 
     async def get_subject(self, user_id: str, subject_id: str) -> SubjectDetail:
         await self._purge_expired(user_id)
@@ -219,13 +221,20 @@ class KnowledgeNotesService:
 
     # ---- Search ----
     async def search(
-        self, user_id: str, query: str, subject_id: str | None = None
-    ) -> list[SearchHit]:
+        self,
+        user_id: str,
+        query: str,
+        subject_id: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[SearchHit], int]:
         query = (query or "").strip()
         if not query:
-            return []
+            return [], 0
         await self._purge_expired(user_id)
-        rows = await self.repo.search_sections(user_id, query, subject_id)
+        rows, total = await self.repo.search_sections(
+            user_id, query, subject_id, limit=limit, offset=offset
+        )
         hits: list[SearchHit] = []
         for section, chapter, subject in rows:
             hits.append(
@@ -239,7 +248,7 @@ class KnowledgeNotesService:
                     snippet=self._snippet(section.content, query),
                 )
             )
-        return hits
+        return hits, total
 
     @staticmethod
     def _snippet(content: str, query: str, radius: int = 60) -> str:

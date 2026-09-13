@@ -101,7 +101,7 @@ export class TaskListSectionComponent {
   @Input() showDateAction = false;
   @Input() tasks: TaskListItem[] = [];
   @Input() total = 0;
-  @Input() pageSize = 12;
+  @Input() pageSize = 25;
   @Input() currentPage = 1;
   @Input() loading = false;
   @Input() emptyMessage = 'No tasks.';

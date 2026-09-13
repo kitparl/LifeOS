@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -25,21 +25,35 @@ router = APIRouter(prefix="/knowledge-notes", tags=["knowledge-notes"])
 # ---- Search ----
 @router.get("/search", response_model=list[SearchHit])
 async def search_notes(
+    response: Response,
     q: str = Query(default=""),
     subject_id: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await KnowledgeNotesService(db).search(user.id, q, subject_id)
+    items, total = await KnowledgeNotesService(db).search(
+        user.id, q, subject_id, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 # ---- Subjects ----
 @router.get("/subjects", response_model=list[SubjectListItem])
 async def list_subjects(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await KnowledgeNotesService(db).list_subjects(user.id)
+    items, total = await KnowledgeNotesService(db).list_subjects(
+        user.id, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/subjects", response_model=SubjectDetail, status_code=status.HTTP_201_CREATED)

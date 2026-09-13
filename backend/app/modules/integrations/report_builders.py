@@ -78,7 +78,7 @@ def _group_pending(tasks: list[Task], today: date, tz: ZoneInfo) -> tuple[list[s
 async def _calendar_lines(
     db: AsyncSession, user_id: str, start: datetime, end: datetime, *, limit: int = 40
 ) -> list[str]:
-    events = await CalendarService(db).list_events(user_id, start=start, end=end)
+    events, _ = await CalendarService(db).list_events(user_id, start=start, end=end, limit=None)
     lines: list[str] = []
     for e in events[:limit]:
         when = e.starts_at.strftime("%a %m-%d %H:%M") if e.starts_at else "?"
@@ -93,7 +93,7 @@ async def _calendar_lines(
 
 
 async def _habits_open_lines(db: AsyncSession, user_id: str) -> list[str]:
-    habits = await HabitService(db).list_habits(user_id, active_only=True)
+    habits, _ = await HabitService(db).list_habits(user_id, active_only=True, limit=100)
     lines: list[str] = []
     for h in habits:
         if h.completed_today:
@@ -105,7 +105,7 @@ async def _habits_open_lines(db: AsyncSession, user_id: str) -> list[str]:
 
 
 async def _goals_lines(db: AsyncSession, user_id: str, *, limit: int = 8) -> list[str]:
-    goals = await GoalService(db).list_goals(user_id, status="active")
+    goals, _ = await GoalService(db).list_goals(user_id, status="active", limit=100)
     lines: list[str] = []
     for g in goals[:limit]:
         lines.append(f"{g.title} · {g.progress}%")
@@ -127,7 +127,7 @@ async def _linked_habit_lines_for_today(db: AsyncSession, user_id: str) -> list[
         from app.modules.routines.models import Routine, RoutineBlock
         from sqlalchemy.orm import selectinload
 
-        routines = await RoutineService(db).repo.list_routines(user_id, active_only=True)
+        routines = await RoutineService(db).repo.list_routines(user_id, active_only=True, limit=None)
         if not routines:
             return []
         tz = ZoneInfo(routines[0].timezone or "Asia/Kolkata")
@@ -263,7 +263,7 @@ async def build_weekly(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportBu
     end = start + timedelta(days=8)
 
     goals = await _goals_lines(db, user_id, limit=15)
-    habits = await HabitService(db).list_habits(user_id, active_only=True)
+    habits, _ = await HabitService(db).list_habits(user_id, active_only=True, limit=100)
     streak_lines: list[str] = []
     for h in habits:
         n = getattr(h, "streak", 0) or 0

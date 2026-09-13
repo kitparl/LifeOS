@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -18,11 +18,18 @@ router = APIRouter(prefix="/routines", tags=["routines"])
 
 @router.get("", response_model=list[RoutineListItem])
 async def list_routines(
+    response: Response,
     active_only: bool = Query(default=False),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await RoutineService(db).list_routines(user.id, active_only=active_only)
+    items, total = await RoutineService(db).list_routines(
+        user.id, active_only=active_only, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.get("/areas", response_model=list[str])

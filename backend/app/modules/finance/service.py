@@ -17,10 +17,16 @@ class FinanceService:
         self.repo = FinanceRepository(db)
 
     async def list_transactions(
-        self, user_id: str, txn_type: str | None = None
-    ) -> list[TransactionResponse]:
-        txns = await self.repo.list_transactions(user_id, txn_type)
-        return [TransactionResponse.model_validate(t) for t in txns]
+        self,
+        user_id: str,
+        txn_type: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[TransactionResponse], int]:
+        txns, total = await self.repo.list_transactions(
+            user_id, txn_type, limit=limit, offset=offset
+        )
+        return [TransactionResponse.model_validate(t) for t in txns], total
 
     async def create_transaction(self, user_id: str, data: TransactionCreate) -> TransactionResponse:
         if data.txn_type not in ("income", "expense"):
@@ -41,8 +47,11 @@ class FinanceService:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Transaction not found")
         await self.repo.delete_transaction(txn)
 
-    async def list_budgets(self, user_id: str) -> list[BudgetResponse]:
-        return [BudgetResponse.model_validate(b) for b in await self.repo.list_budgets(user_id)]
+    async def list_budgets(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[BudgetResponse], int]:
+        budgets, total = await self.repo.list_budgets(user_id, limit=limit, offset=offset)
+        return [BudgetResponse.model_validate(b) for b in budgets], total
 
     async def upsert_budget(self, user_id: str, data: BudgetCreate) -> BudgetResponse:
         budget = await self.repo.upsert_budget(user_id, data)
@@ -54,10 +63,10 @@ class FinanceService:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Budget not found")
 
     async def summary(self, user_id: str) -> FinanceSummary:
-        txns = await self.repo.list_transactions(user_id)
+        txns, _ = await self.repo.list_transactions(user_id, limit=None)
         income = sum(t.amount for t in txns if t.txn_type == "income")
         expenses = sum(t.amount for t in txns if t.txn_type == "expense")
-        budgets = await self.list_budgets(user_id)
+        budgets, _ = await self.list_budgets(user_id, limit=100)
         return FinanceSummary(
             total_income=income,
             total_expenses=expenses,

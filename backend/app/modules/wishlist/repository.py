@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.wishlist.models import WishlistCategory, WishlistItem
 from app.modules.wishlist.schemas import WishlistCreate, WishlistUpdate
 
@@ -14,7 +15,9 @@ class WishlistRepository:
         user_id: str,
         category: str | None = None,
         status: str | None = None,
-    ) -> list[WishlistItem]:
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[WishlistItem], int]:
         q = select(WishlistItem).where(WishlistItem.user_id == user_id)
         if category:
             q = q.where(WishlistItem.category == category)
@@ -23,8 +26,7 @@ class WishlistRepository:
         elif status:
             q = q.where(WishlistItem.status == status)
         q = q.order_by(WishlistItem.updated_at.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def list_category_names(self, user_id: str) -> list[str]:
         result = await self.db.execute(

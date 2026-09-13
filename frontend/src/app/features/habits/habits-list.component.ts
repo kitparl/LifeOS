@@ -2,13 +2,14 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { HABIT_FREQUENCIES, HabitListItem } from './models/habit.models';
 import { HabitsService } from './services/habits.service';
 
 @Component({
   selector: 'app-habits-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -16,7 +17,7 @@ import { HabitsService } from './services/habits.service';
         <a routerLink="/habits/new" class="btn-primary text-xs no-underline">New Habit</a>
       </div>
 
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="load()">
+      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
         <label class="flex items-center gap-1 text-xs">
           <input type="checkbox" formControlName="active_only" />
           Active only
@@ -26,7 +27,7 @@ import { HabitsService } from './services/habits.service';
 
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading habits…</p>
-      } @else if (habits.length === 0) {
+      } @else if (total === 0) {
         <div class="panel">
           <p class="text-sm" style="color: var(--text-muted)">No habits yet.</p>
           <a routerLink="/habits/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create habit</a>
@@ -55,6 +56,12 @@ import { HabitsService } from './services/habits.service';
               </div>
             </article>
           }
+          <app-list-paginator
+            [total]="total"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
         </div>
         <div class="panel hidden !p-0 overflow-hidden md:block">
           <table class="w-full text-sm">
@@ -94,6 +101,12 @@ import { HabitsService } from './services/habits.service';
               }
             </tbody>
           </table>
+          <app-list-paginator
+            [total]="total"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
         </div>
       }
     </div>
@@ -106,7 +119,10 @@ export class HabitsListComponent implements OnInit {
 
   frequencies = HABIT_FREQUENCIES;
   habits: HabitListItem[] = [];
+  total = 0;
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 25;
 
   filters = this.fb.nonNullable.group({ active_only: true });
 
@@ -114,16 +130,39 @@ export class HabitsListComponent implements OnInit {
     this.load();
   }
 
+  applyFilters(): void {
+    this.currentPage = 1;
+    this.load();
+  }
+
   load(): void {
     this.loading = true;
     const activeOnly = this.filters.getRawValue().active_only;
-    this.habitsService.list(activeOnly).subscribe({
-      next: (data) => {
-        this.habits = data;
-        this.loading = false;
-      },
-      error: () => (this.loading = false),
-    });
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.habitsService
+      .list({ activeOnly, limit: this.pageSize, offset })
+      .subscribe({
+        next: (result) => {
+          this.habits = result.items;
+          this.total = result.total;
+          this.clampPage();
+          this.loading = false;
+        },
+        error: () => (this.loading = false),
+      });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   toggleToday(habit: HabitListItem, event: Event): void {

@@ -50,7 +50,7 @@ async def list_files(
     response: Response,
     module: str | None = Query(default=None),
     entity_id: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

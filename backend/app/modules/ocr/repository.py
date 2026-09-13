@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.ocr.models import OcrDocument
 from app.modules.ocr.schemas import OcrDocumentCreate
 
@@ -9,11 +10,15 @@ class OcrRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_documents(self, user_id: str) -> list[OcrDocument]:
-        result = await self.db.execute(
-            select(OcrDocument).where(OcrDocument.user_id == user_id).order_by(OcrDocument.created_at.desc())
+    async def list_documents(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[OcrDocument], int]:
+        q = (
+            select(OcrDocument)
+            .where(OcrDocument.user_id == user_id)
+            .order_by(OcrDocument.created_at.desc())
         )
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_by_id(self, user_id: str, doc_id: str) -> OcrDocument | None:
         result = await self.db.execute(

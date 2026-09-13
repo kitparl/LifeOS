@@ -238,7 +238,7 @@ export class TasksListComponent implements OnInit {
 
   scope: TaskScope = 'owned';
   activeTab: TaskTab = 'today';
-  readonly pageSize = 12;
+  readonly pageSize = 25;
 
   stats = { completedToday: 0, streakDays: 0 };
   quickTitle = '';

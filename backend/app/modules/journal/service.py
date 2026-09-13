@@ -10,10 +10,17 @@ class JournalService:
         self.repo = JournalRepository(db)
 
     async def list_entries(
-        self, user_id: str, entry_type: str | None = None, search: str | None = None
-    ) -> list[JournalListItem]:
-        entries = await self.repo.list_entries(user_id, entry_type=entry_type, search=search)
-        return [JournalListItem.model_validate(e) for e in entries]
+        self,
+        user_id: str,
+        entry_type: str | None = None,
+        search: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[JournalListItem], int]:
+        entries, total = await self.repo.list_entries(
+            user_id, entry_type=entry_type, search=search, limit=limit, offset=offset
+        )
+        return [JournalListItem.model_validate(e) for e in entries], total
 
     async def get_entry(self, user_id: str, entry_id: str) -> JournalResponse:
         entry = await self.repo.get_by_id(user_id, entry_id)

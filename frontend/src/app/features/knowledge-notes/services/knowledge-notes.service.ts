@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom, map } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import {
   isExecutableLanguage,
@@ -27,8 +27,18 @@ export class KnowledgeNotesService {
   private readonly codeBlockCache = new Map<string, CodeBlock[]>();
 
   // Subjects
-  listSubjects(): Observable<KnowledgeSubjectListItem[]> {
-    return this.http.get<KnowledgeSubjectListItem[]>(`${this.api}/subjects`);
+  listSubjects(opts?: { limit?: number; offset?: number }): Observable<{ items: KnowledgeSubjectListItem[]; total: number }> {
+    let params = new HttpParams();
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http
+      .get<KnowledgeSubjectListItem[]>(`${this.api}/subjects`, { params, observe: 'response' })
+      .pipe(
+        map((response) => ({
+          items: response.body ?? [],
+          total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+        })),
+      );
   }
 
   getSubject(id: string): Observable<KnowledgeSubjectDetail> {

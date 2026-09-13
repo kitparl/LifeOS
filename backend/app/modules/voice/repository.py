@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.voice.models import VoiceNote
 from app.modules.voice.schemas import VoiceNoteCreate
 
@@ -9,11 +10,15 @@ class VoiceRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_notes(self, user_id: str) -> list[VoiceNote]:
-        result = await self.db.execute(
-            select(VoiceNote).where(VoiceNote.user_id == user_id).order_by(VoiceNote.created_at.desc())
+    async def list_notes(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[VoiceNote], int]:
+        q = (
+            select(VoiceNote)
+            .where(VoiceNote.user_id == user_id)
+            .order_by(VoiceNote.created_at.desc())
         )
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def create(self, user_id: str, data: VoiceNoteCreate, command_result: str | None = None) -> VoiceNote:
         note = VoiceNote(

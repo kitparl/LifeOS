@@ -76,9 +76,13 @@ class RoutineService:
             updated_at=routine.updated_at,
         )
 
-    async def list_routines(self, user_id: str, active_only: bool = False) -> list[RoutineListItem]:
-        routines = await self.repo.list_routines(user_id, active_only=active_only)
-        return [self._to_list_item(r) for r in routines]
+    async def list_routines(
+        self, user_id: str, active_only: bool = False, limit: int = 25, offset: int = 0
+    ) -> tuple[list[RoutineListItem], int]:
+        routines, total = await self.repo.list_routines(
+            user_id, active_only=active_only, limit=limit, offset=offset
+        )
+        return [self._to_list_item(r) for r in routines], total
 
     async def get_routine(self, user_id: str, routine_id: str) -> RoutineResponse:
         routine = await self.repo.get_by_id(user_id, routine_id)
@@ -176,7 +180,7 @@ class RoutineService:
         if start is None or end is None:
             return []
 
-        routines = await self.repo.list_routines(user_id, active_only=True)
+        routines = await self.repo.list_routines(user_id, active_only=True, limit=None)
         items: list[EventListItem] = []
 
         # Normalize range to dates in UTC for iteration bounds, then apply each routine's TZ.
@@ -228,7 +232,7 @@ class RoutineService:
 
     async def today_preview(self, user_id: str, limit: int = 8) -> list[tuple[str, str, datetime, str]]:
         """Return today's routine blocks for dashboard (event_id, title, starts_at, routine_id)."""
-        routines = await self.repo.list_routines(user_id, active_only=True)
+        routines = await self.repo.list_routines(user_id, active_only=True, limit=None)
         if not routines:
             return []
 

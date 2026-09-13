@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.auth.models import User, UsernameHistory
 from app.modules.auth.username_rules import normalize_username
 
@@ -74,20 +75,22 @@ class UserRepository:
         await self.db.refresh(entry)
         return entry
 
-    async def list_username_history(self, user_id: str) -> list[UsernameHistory]:
-        result = await self.db.execute(
+    async def list_username_history(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[UsernameHistory], int]:
+        q = (
             select(UsernameHistory)
             .where(UsernameHistory.user_id == user_id)
             .order_by(UsernameHistory.changed_at.desc())
         )
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def search_users(
-        self, q: str, limit: int = 20, *, include_email: bool = False
-    ) -> list[User]:
+        self, q: str, limit: int = 25, offset: int = 0, *, include_email: bool = False
+    ) -> tuple[list[User], int]:
         term = (q or "").strip()
         if not term:
-            return []
+            return [], 0
         pattern = f"%{term.lower()}%"
         exact = normalize_username(term)
         conditions = [
@@ -96,13 +99,12 @@ class UserRepository:
         ]
         if include_email:
             conditions.append(func.lower(User.email).like(pattern))
-        result = await self.db.execute(
+        stmt = (
             select(User)
             .where(or_(*conditions))
             .order_by(
                 case((User.username == exact, 0), else_=1),
                 User.username.asc(),
             )
-            .limit(limit)
         )
-        return list(result.scalars().all())
+        return await paginate(self.db, stmt, Pagination(limit=limit, offset=offset))

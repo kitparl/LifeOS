@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,11 +12,18 @@ router = APIRouter(prefix="/mood", tags=["mood"])
 
 @router.get("/entries", response_model=list[MoodResponse])
 async def list_mood_entries(
+    response: Response,
     days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await MoodService(db).list_entries(user.id, days=days)
+    items, total = await MoodService(db).list_entries(
+        user.id, days=days, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.get("/today", response_model=MoodResponse | None)

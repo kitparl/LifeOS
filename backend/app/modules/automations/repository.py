@@ -1,25 +1,30 @@
-import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.automations.models import AutomationRule
 from app.modules.automations.schemas import AutomationCreate, AutomationUpdate
-from app.modules.finance.models import FinanceBudget, FinanceTransaction
-from app.modules.journal.models import JournalEntry
-from app.modules.running.models import Run
 
 
 class AutomationRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_rules(self, user_id: str) -> list[AutomationRule]:
-        result = await self.db.execute(
-            select(AutomationRule).where(AutomationRule.user_id == user_id).order_by(AutomationRule.created_at.desc())
+    async def list_rules(
+        self, user_id: str, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[AutomationRule], int]:
+        q = (
+            select(AutomationRule)
+            .where(AutomationRule.user_id == user_id)
+            .order_by(AutomationRule.created_at.desc())
         )
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_by_id(self, user_id: str, rule_id: str) -> AutomationRule | None:
         result = await self.db.execute(

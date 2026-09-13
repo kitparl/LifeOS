@@ -169,11 +169,11 @@ export class AttachmentListComponent implements OnChanges {
       return;
     }
     this.loading = true;
-    this.filesService.list(this.module, this.entityId).subscribe({
-      next: (data) => {
-        this.files = data;
+    this.filesService.list({ module: this.module, entityId: this.entityId, limit: 100 }).subscribe({
+      next: (result) => {
+        this.files = result.items;
         this.loading = false;
-        for (const f of data) {
+        for (const f of result.items) {
           if (this.isImage(f) && !this.previewUrl[f.id]) {
             this.filesService.tokenUrl(f.id).subscribe({
               next: (url) => (this.previewUrl[f.id] = url),

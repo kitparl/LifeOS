@@ -1,12 +1,13 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { VoiceNote, VoiceService } from './services/voice.service';
 
 @Component({
   selector: 'app-voice-page',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4 max-w-2xl">
       <h1 class="text-lg font-semibold">Voice</h1>
@@ -26,18 +27,26 @@ import { VoiceNote, VoiceService } from './services/voice.service';
         <textarea class="input-field min-h-[60px]" formControlName="transcript" placeholder="Voice note transcript…"></textarea>
         <button type="submit" class="btn-primary text-xs" [disabled]="noteForm.invalid">Save note</button>
       </form>
-      <ul class="panel !p-0 divide-y divide-[var(--xp-border)] text-sm">
-        @for (n of notes; track n.id) {
-          <li class="flex justify-between gap-2 px-3 py-2">
-            <div>
-              <p class="font-medium">{{ n.title || 'Note' }} <span class="text-xs text-gray-500">({{ n.note_type }})</span></p>
-              <p>{{ n.transcript }}</p>
-              @if (n.command_result) { <p class="text-xs" style="color: var(--text-muted)">{{ n.command_result }}</p> }
-            </div>
-            <button type="button" class="text-xs text-red-700 shrink-0" (click)="remove(n.id)">Delete</button>
-          </li>
-        }
-      </ul>
+      <div class="panel !p-0 overflow-hidden">
+        <ul class="divide-y divide-[var(--xp-border)] text-sm">
+          @for (n of notes; track n.id) {
+            <li class="flex justify-between gap-2 px-3 py-2">
+              <div>
+                <p class="font-medium">{{ n.title || 'Note' }} <span class="text-xs text-gray-500">({{ n.note_type }})</span></p>
+                <p>{{ n.transcript }}</p>
+                @if (n.command_result) { <p class="text-xs" style="color: var(--text-muted)">{{ n.command_result }}</p> }
+              </div>
+              <button type="button" class="text-xs text-red-700 shrink-0" (click)="remove(n.id)">Delete</button>
+            </li>
+          }
+        </ul>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
+      </div>
     </div>
   `,
 })
@@ -46,13 +55,40 @@ export class VoicePageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   notes: VoiceNote[] = [];
+  total = 0;
+  currentPage = 1;
+  readonly pageSize = 25;
   commandResult: string | null = null;
   commandRoute: string | null = null;
   commandForm = this.fb.nonNullable.group({ transcript: '' });
   noteForm = this.fb.nonNullable.group({ title: '', transcript: '' });
 
   ngOnInit(): void {
-    this.voice.list().subscribe({ next: (n) => (this.notes = n) });
+    this.load();
+  }
+
+  load(): void {
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.voice.list({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.notes = result.items;
+        this.total = result.total;
+        this.clampPage();
+      },
+    });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   runCommand(): void {
@@ -61,7 +97,8 @@ export class VoicePageComponent implements OnInit {
       next: (r) => {
         this.commandResult = r.message;
         this.commandRoute = r.route;
-        this.voice.list().subscribe({ next: (n) => (this.notes = n) });
+        this.currentPage = 1;
+        this.load();
       },
     });
   }
@@ -75,14 +112,13 @@ export class VoicePageComponent implements OnInit {
     this.voice.createNote(v.transcript, v.title || undefined).subscribe({
       next: () => {
         this.noteForm.reset();
-        this.voice.list().subscribe({ next: (n) => (this.notes = n) });
+        this.currentPage = 1;
+        this.load();
       },
     });
   }
 
   remove(id: string): void {
-    this.voice.delete(id).subscribe({
-      next: () => this.voice.list().subscribe({ next: (n) => (this.notes = n) }),
-    });
+    this.voice.delete(id).subscribe({ next: () => this.load() });
   }
 }

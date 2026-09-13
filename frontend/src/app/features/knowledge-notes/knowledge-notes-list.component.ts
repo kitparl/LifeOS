@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ModalComponent } from '../../shared/modal/modal.component';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import {
   KnowledgeSearchHit,
   KnowledgeSubjectListItem,
@@ -11,7 +12,7 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
 @Component({
   selector: 'app-knowledge-notes-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ModalComponent],
+  imports: [ReactiveFormsModule, RouterLink, ModalComponent, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -57,7 +58,7 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
 
       @if (loading()) {
         <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
-      } @else if (subjects().length === 0) {
+      } @else if (total === 0) {
         <div class="empty-state">
           <div class="empty-state__icon">📚</div>
           <p class="empty-state__title">No subjects yet</p>
@@ -103,6 +104,12 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
             </div>
           }
         </div>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
       }
     </div>
 
@@ -162,6 +169,9 @@ export class KnowledgeNotesListComponent implements OnInit {
   readonly formOpen = signal(false);
   readonly formMode = signal<'create' | 'edit'>('create');
   readonly saving = signal(false);
+  total = 0;
+  currentPage = 1;
+  readonly pageSize = 25;
 
   private editingId: string | null = null;
 
@@ -178,13 +188,29 @@ export class KnowledgeNotesListComponent implements OnInit {
 
   load(): void {
     this.loading.set(true);
-    this.service.listSubjects().subscribe({
-      next: (s) => {
-        this.subjects.set(s);
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.service.listSubjects({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.subjects.set(result.items);
+        this.total = result.total;
+        this.clampPage();
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   runSearch(): void {

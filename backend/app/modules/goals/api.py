@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -21,14 +21,21 @@ router = APIRouter(prefix="/goals", tags=["goals"])
 
 @router.get("", response_model=list[GoalListItem])
 async def list_goals(
+    response: Response,
     category: str | None = Query(default=None),
     status: str | None = Query(default=None),
     period: str | None = Query(default=None),
     missed: bool | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await GoalService(db).list_goals(user.id, category, status, period, missed)
+    items, total = await GoalService(db).list_goals(
+        user.id, category, status, period, missed, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)

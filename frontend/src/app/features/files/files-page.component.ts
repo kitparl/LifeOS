@@ -1,12 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { FileRecord } from './models/file.models';
 import { FilesService } from './services/files.service';
 
 @Component({
   selector: 'app-files-page',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
       <h1 class="text-lg font-semibold">Files</h1>
@@ -14,7 +15,7 @@ import { FilesService } from './services/files.service';
 
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
-      } @else if (files.length === 0) {
+      } @else if (total === 0) {
         <p class="text-sm" style="color: var(--text-muted)">No files uploaded yet.</p>
       } @else {
         <div class="panel !p-0 overflow-hidden">
@@ -34,6 +35,12 @@ import { FilesService } from './services/files.service';
               </li>
             }
           </ul>
+          <app-list-paginator
+            [total]="total"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
         </div>
       }
     </div>
@@ -43,7 +50,10 @@ export class FilesPageComponent implements OnInit {
   private readonly filesService = inject(FilesService);
 
   files: FileRecord[] = [];
+  total = 0;
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 25;
 
   ngOnInit(): void {
     this.load();
@@ -51,13 +61,29 @@ export class FilesPageComponent implements OnInit {
 
   load(): void {
     this.loading = true;
-    this.filesService.list().subscribe({
-      next: (data) => {
-        this.files = data;
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.filesService.list({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.files = result.items;
+        this.total = result.total;
+        this.clampPage();
         this.loading = false;
       },
       error: () => (this.loading = false),
     });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   open(f: FileRecord): void {

@@ -100,8 +100,14 @@ class AuthService:
             ) from None
         return user
 
-    async def list_username_history(self, user_id: str):
-        return await self.repo.list_username_history(user_id)
+    async def list_username_history(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ):
+        return await self.repo.list_username_history(user_id, limit=limit, offset=offset)
 
-    async def search_users(self, q: str, limit: int, *, include_email: bool):
-        return await self.repo.search_users(q, limit=limit, include_email=include_email)
+    async def search_users(
+        self, q: str, limit: int, offset: int = 0, *, include_email: bool
+    ):
+        return await self.repo.search_users(
+            q, limit=limit, offset=offset, include_email=include_email
+        )

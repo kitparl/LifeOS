@@ -83,7 +83,7 @@ async def cmd_today(db: AsyncSession, user_id: str, args: str):
             for e in events[:10]
         ]
 
-        races = await RunningService(db).list_races(user_id, upcoming_only=True)
+        races, _ = await RunningService(db).list_races(user_id, upcoming_only=True, limit=None)
         race_lines = [r.name for r in races if str(r.race_date) == today.isoformat()]
 
         return tpl.today_agenda(today, tasks=task_lines, calendar=cal_lines, races=race_lines)
@@ -199,7 +199,7 @@ async def cmd_habits(db: AsyncSession, user_id: str, args: str):
         logger.exception("Interactive /habits failed; using text fallback")
         from app.modules.habits.service import HabitService
 
-        habits = await HabitService(db).list_habits(user_id, active_only=True)
+        habits, _ = await HabitService(db).list_habits(user_id, active_only=True, limit=100)
         due = [h for h in habits if not h.completed_today]
         if not due:
             return tpl.habits_empty()
@@ -216,7 +216,7 @@ async def cmd_goals(db: AsyncSession, user_id: str, args: str):
         logger.exception("Interactive /goals failed; using text fallback")
         from app.modules.goals.service import GoalService
 
-        goals = await GoalService(db).list_goals(user_id, status="active")
+        goals, _ = await GoalService(db).list_goals(user_id, status="active", limit=100)
         if not goals:
             return tpl.goals_empty()
         lines = [

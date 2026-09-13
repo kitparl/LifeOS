@@ -17,7 +17,7 @@ from app.modules.routines.service import RoutineService
 
 
 async def routines_list_screen(db: AsyncSession, user_id: str) -> Screen:
-    routines = await RoutineService(db).list_routines(user_id, active_only=True)
+    routines, _ = await RoutineService(db).list_routines(user_id, active_only=True, limit=100)
     if not routines:
         return Screen(
             text=tpl.join_blocks(tpl._header("Routines"), "No active routines."),
@@ -45,7 +45,7 @@ async def routines_list_screen(db: AsyncSession, user_id: str) -> Screen:
 
 
 async def routine_detail_screen(db: AsyncSession, user_id: str, token: str) -> Screen:
-    routines = await RoutineService(db).list_routines(user_id, active_only=False)
+    routines, _ = await RoutineService(db).list_routines(user_id, active_only=False, limit=100)
     summary = resolve_one(list(routines), token)
     if summary is None:
         return Screen(
@@ -89,7 +89,7 @@ async def on_view(ctx: CallbackContext) -> Screen:
 @register("routine", "skip")
 async def on_skip(ctx: CallbackContext) -> tuple[Screen, str]:
     token = ctx.args[0] if ctx.args else ""
-    routines = await RoutineService(ctx.db).list_routines(ctx.user_id, active_only=False)
+    routines, _ = await RoutineService(ctx.db).list_routines(ctx.user_id, active_only=False, limit=100)
     summary = resolve_one(list(routines), token)
     if summary is None:
         return await routines_list_screen(ctx.db, ctx.user_id), "Not found"
@@ -107,7 +107,7 @@ async def on_skip(ctx: CallbackContext) -> tuple[Screen, str]:
 @register("routine", "unskip")
 async def on_unskip(ctx: CallbackContext) -> tuple[Screen, str]:
     token = ctx.args[0] if ctx.args else ""
-    routines = await RoutineService(ctx.db).list_routines(ctx.user_id, active_only=False)
+    routines, _ = await RoutineService(ctx.db).list_routines(ctx.user_id, active_only=False, limit=100)
     summary = resolve_one(list(routines), token)
     if summary is None:
         return await routines_list_screen(ctx.db, ctx.user_id), "Not found"

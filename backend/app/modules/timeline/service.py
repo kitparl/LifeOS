@@ -19,7 +19,9 @@ class TimelineService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_events(self, user_id: str, limit: int = 100) -> list[TimelineItem]:
+    async def list_events(
+        self, user_id: str, limit: int | None = 25, offset: int = 0
+    ) -> tuple[list[TimelineItem], int]:
         items: list[TimelineItem] = []
 
         goals = await self.db.execute(select(Goal).where(Goal.user_id == user_id))
@@ -99,4 +101,7 @@ class TimelineService:
             )
 
         items.sort(key=lambda x: x.occurred_at, reverse=True)
-        return items[:limit]
+        total = len(items)
+        if limit is None:
+            return items, total
+        return items[offset : offset + limit], total

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -17,19 +17,32 @@ router = APIRouter(prefix="/life-timeline", tags=["life-timeline"])
 
 @router.get("", response_model=list[LifeTimelineItem])
 async def complete_life_timeline(
-    limit: int = Query(default=150, le=500),
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await LifeTimelineService(db).list_complete(user.id, limit)
+    items, total = await LifeTimelineService(db).list_complete(
+        user.id, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.get("/milestones", response_model=list[MilestoneResponse])
 async def list_milestones(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await LifeTimelineService(db).list_milestones(user.id)
+    items, total = await LifeTimelineService(db).list_milestones(
+        user.id, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/milestones", response_model=MilestoneResponse, status_code=status.HTTP_201_CREATED)

@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import {
   SPEAKING_CATEGORIES,
   SpeakingPractice,
@@ -14,7 +15,7 @@ import { CommunicationService } from './services/communication.service';
 @Component({
   selector: 'app-communication-hub',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -46,11 +47,11 @@ import { CommunicationService } from './services/communication.service';
       </div>
 
       @if (tab() === 'vocabulary') {
-        <form class="flex gap-2 text-sm" [formGroup]="vocabFilter" (ngSubmit)="loadVocabulary()">
+        <form class="flex gap-2 text-sm" [formGroup]="vocabFilter" (ngSubmit)="searchVocabulary()">
           <input class="input-field !w-48" formControlName="search" placeholder="Search words…" />
           <button type="submit" class="btn-primary text-xs">Search</button>
         </form>
-        @if (vocabulary.length === 0) {
+        @if (vocabTotal === 0) {
           <p class="text-sm" style="color: var(--text-muted)">No vocabulary yet.</p>
         } @else {
           <div class="panel !p-0 overflow-hidden">
@@ -78,12 +79,18 @@ import { CommunicationService } from './services/communication.service';
                 }
               </tbody>
             </table>
+            <app-list-paginator
+              [total]="vocabTotal"
+              [pageSize]="pageSize"
+              [currentPage]="vocabPage"
+              (pageChange)="setVocabPage($event)"
+            />
           </div>
         }
       }
 
       @if (tab() === 'writing') {
-        @if (writing.length === 0) {
+        @if (writingTotal === 0) {
           <p class="text-sm" style="color: var(--text-muted)">No writing practice yet.</p>
         } @else {
           <ul class="divide-y divide-[var(--xp-border)] panel !p-0 text-sm">
@@ -100,11 +107,17 @@ import { CommunicationService } from './services/communication.service';
               </li>
             }
           </ul>
+          <app-list-paginator
+            [total]="writingTotal"
+            [pageSize]="pageSize"
+            [currentPage]="writingPage"
+            (pageChange)="setWritingPage($event)"
+          />
         }
       }
 
       @if (tab() === 'speaking') {
-        @if (speaking.length === 0) {
+        @if (speakingTotal === 0) {
           <p class="text-sm" style="color: var(--text-muted)">No speaking practice yet.</p>
         } @else {
           <ul class="divide-y divide-[var(--xp-border)] panel !p-0 text-sm">
@@ -118,6 +131,12 @@ import { CommunicationService } from './services/communication.service';
               </li>
             }
           </ul>
+          <app-list-paginator
+            [total]="speakingTotal"
+            [pageSize]="pageSize"
+            [currentPage]="speakingPage"
+            (pageChange)="setSpeakingPage($event)"
+          />
         }
       }
     </div>
@@ -140,6 +159,13 @@ export class CommunicationHubComponent implements OnInit {
   vocabulary: VocabularyWord[] = [];
   writing: WritingPractice[] = [];
   speaking: SpeakingPractice[] = [];
+  vocabTotal = 0;
+  writingTotal = 0;
+  speakingTotal = 0;
+  vocabPage = 1;
+  writingPage = 1;
+  speakingPage = 1;
+  readonly pageSize = 25;
 
   vocabFilter = this.fb.nonNullable.group({ search: '' });
 
@@ -153,20 +179,93 @@ export class CommunicationHubComponent implements OnInit {
 
   loadAll(): void {
     this.loadVocabulary();
-    this.communication.listWriting().subscribe({ next: (w) => (this.writing = w) });
-    this.communication.listSpeaking().subscribe({ next: (s) => (this.speaking = s) });
+    this.loadWriting();
+    this.loadSpeaking();
+  }
+
+  searchVocabulary(): void {
+    this.vocabPage = 1;
+    this.loadVocabulary();
   }
 
   loadVocabulary(): void {
     const search = this.vocabFilter.getRawValue().search;
-    this.communication.listVocabulary(search || undefined).subscribe({ next: (v) => (this.vocabulary = v) });
+    const offset = (this.vocabPage - 1) * this.pageSize;
+    this.communication
+      .listVocabulary({ search: search || undefined, limit: this.pageSize, offset })
+      .subscribe({
+        next: (result) => {
+          this.vocabulary = result.items;
+          this.vocabTotal = result.total;
+          this.clampPage('vocab');
+        },
+      });
+  }
+
+  loadWriting(): void {
+    const offset = (this.writingPage - 1) * this.pageSize;
+    this.communication.listWriting({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.writing = result.items;
+        this.writingTotal = result.total;
+        this.clampPage('writing');
+      },
+    });
+  }
+
+  loadSpeaking(): void {
+    const offset = (this.speakingPage - 1) * this.pageSize;
+    this.communication.listSpeaking({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.speaking = result.items;
+        this.speakingTotal = result.total;
+        this.clampPage('speaking');
+      },
+    });
+  }
+
+  setVocabPage(page: number): void {
+    this.vocabPage = page;
+    this.loadVocabulary();
+  }
+
+  setWritingPage(page: number): void {
+    this.writingPage = page;
+    this.loadWriting();
+  }
+
+  setSpeakingPage(page: number): void {
+    this.speakingPage = page;
+    this.loadSpeaking();
+  }
+
+  private clampPage(which: 'vocab' | 'writing' | 'speaking'): void {
+    if (which === 'vocab') {
+      const totalPages = Math.max(1, Math.ceil(this.vocabTotal / this.pageSize));
+      if (this.vocabPage > totalPages) {
+        this.vocabPage = totalPages;
+        this.loadVocabulary();
+      }
+    } else if (which === 'writing') {
+      const totalPages = Math.max(1, Math.ceil(this.writingTotal / this.pageSize));
+      if (this.writingPage > totalPages) {
+        this.writingPage = totalPages;
+        this.loadWriting();
+      }
+    } else {
+      const totalPages = Math.max(1, Math.ceil(this.speakingTotal / this.pageSize));
+      if (this.speakingPage > totalPages) {
+        this.speakingPage = totalPages;
+        this.loadSpeaking();
+      }
+    }
   }
 
   async removeWriting(item: WritingPractice): Promise<void> {
     const ok = await this.confirm.confirm(`Delete writing "${item.title}" permanently?`, 'Delete writing');
     if (!ok) return;
     this.communication.deleteWriting(item.id).subscribe({
-      next: () => this.communication.listWriting().subscribe({ next: (w) => (this.writing = w) }),
+      next: () => this.loadWriting(),
     });
   }
 }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -42,11 +42,18 @@ async def create_shoe(
 
 @router.get("/runs", response_model=list[RunListItem])
 async def list_runs(
+    response: Response,
     shoe: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await RunningService(db).list_runs(user.id, shoe=shoe)
+    items, total = await RunningService(db).list_runs(
+        user.id, shoe=shoe, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/runs", response_model=RunResponse, status_code=status.HTTP_201_CREATED)
@@ -88,11 +95,18 @@ async def delete_run(
 
 @router.get("/races", response_model=list[RaceResponse])
 async def list_races(
+    response: Response,
     upcoming_only: bool = Query(default=False),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await RunningService(db).list_races(user.id, upcoming_only=upcoming_only)
+    items, total = await RunningService(db).list_races(
+        user.id, upcoming_only=upcoming_only, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/races", response_model=RaceResponse, status_code=status.HTTP_201_CREATED)

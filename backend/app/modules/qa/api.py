@@ -29,7 +29,7 @@ async def list_qa_entries(
     created_from: datetime | None = Query(default=None),
     created_to: datetime | None = Query(default=None),
     sort_by: str = Query(default="updated_at", pattern="^(created_at|updated_at)$"),
-    limit: int | None = Query(default=None, ge=1, le=200),
+    limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     include_answer: bool = Query(default=True),
     user: User = Depends(get_current_user),

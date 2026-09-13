@@ -75,14 +75,14 @@ type PeriodTab = 'all' | GoalPeriod;
 
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading goals…</p>
-      } @else if (goals.length === 0) {
+      } @else if (total === 0) {
         <div class="panel">
           <p class="text-sm" style="color: var(--text-muted)">No goals yet.</p>
           <a routerLink="/goals/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create your first goal</a>
         </div>
       } @else {
         <div class="space-y-3 md:hidden">
-          @for (goal of pagedGoals; track goal.id) {
+          @for (goal of goals; track goal.id) {
             <article class="panel space-y-3">
               <div class="min-w-0">
                 <a [routerLink]="['/goals', goal.id]" class="block truncate text-sm font-semibold text-[var(--xp-blue)] underline">
@@ -101,7 +101,7 @@ type PeriodTab = 'all' | GoalPeriod;
             </article>
           }
           <app-list-paginator
-            [total]="goals.length"
+            [total]="total"
             [pageSize]="pageSize"
             [currentPage]="currentPage"
             (pageChange)="setPage($event)"
@@ -120,7 +120,7 @@ type PeriodTab = 'all' | GoalPeriod;
               </tr>
             </thead>
             <tbody>
-              @for (goal of pagedGoals; track goal.id) {
+              @for (goal of goals; track goal.id) {
                 <tr class="border-b border-[var(--xp-border)] hover:bg-[var(--primary-soft)]">
                   <td class="px-3 py-2">
                     <a [routerLink]="['/goals', goal.id]" class="link">{{ goal.title }}</a>
@@ -142,7 +142,7 @@ type PeriodTab = 'all' | GoalPeriod;
             </tbody>
           </table>
           <app-list-paginator
-            [total]="goals.length"
+            [total]="total"
             [pageSize]="pageSize"
             [currentPage]="currentPage"
             (pageChange)="setPage($event)"
@@ -164,9 +164,10 @@ export class GoalsListComponent implements OnInit {
   periodTab = signal<PeriodTab>('all');
   goals: GoalListItem[] = [];
   missedGoals: GoalListItem[] = [];
+  total = 0;
   loading = false;
   currentPage = 1;
-  readonly pageSize = 12;
+  readonly pageSize = 25;
 
   filters = this.fb.nonNullable.group({ category: '', status: 'active' });
 
@@ -174,11 +175,6 @@ export class GoalsListComponent implements OnInit {
     this.goalsService.listCategories().subscribe({ next: (c) => this.categories.set(c) });
     this.load();
     this.loadMissed();
-  }
-
-  get pagedGoals(): GoalListItem[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.goals.slice(start, start + this.pageSize);
   }
 
   setPeriodTab(tab: PeriodTab): void {
@@ -196,15 +192,19 @@ export class GoalsListComponent implements OnInit {
     this.loading = true;
     const { category, status } = this.filters.getRawValue();
     const tab = this.periodTab();
+    const offset = (this.currentPage - 1) * this.pageSize;
     this.goalsService
       .list({
         category: category || undefined,
         status: status || undefined,
         period: tab === 'all' ? undefined : tab,
+        limit: this.pageSize,
+        offset,
       })
       .subscribe({
-        next: (data) => {
-          this.goals = data;
+        next: (result) => {
+          this.goals = result.items;
+          this.total = result.total;
           this.clampPage();
           this.loading = false;
         },
@@ -213,17 +213,21 @@ export class GoalsListComponent implements OnInit {
   }
 
   loadMissed(): void {
-    this.goalsService.list({ status: 'active', missed: true }).subscribe({
-      next: (data) => (this.missedGoals = data),
+    this.goalsService.list({ status: 'active', missed: true, limit: 100, offset: 0 }).subscribe({
+      next: (result) => (this.missedGoals = result.items),
     });
   }
 
   setPage(page: number): void {
     this.currentPage = page;
+    this.load();
   }
 
   private clampPage(): void {
-    const totalPages = Math.max(1, Math.ceil(this.goals.length / this.pageSize));
-    this.currentPage = Math.min(this.currentPage, totalPages);
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 }

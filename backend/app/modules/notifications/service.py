@@ -16,10 +16,16 @@ class NotificationService:
         self.repo = NotificationRepository(db)
 
     async def list_notifications(
-        self, user_id: str, unread_only: bool = False, limit: int = 50
-    ) -> list[NotificationResponse]:
-        items = await self.repo.list_notifications(user_id, unread_only=unread_only, limit=limit)
-        return [NotificationResponse.model_validate(n) for n in items]
+        self,
+        user_id: str,
+        unread_only: bool = False,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[NotificationResponse], int]:
+        items, total = await self.repo.list_notifications(
+            user_id, unread_only=unread_only, limit=limit, offset=offset
+        )
+        return [NotificationResponse.model_validate(n) for n in items], total
 
     async def create(self, user_id: str, data: NotificationCreate) -> NotificationResponse:
         n = await self.repo.create(user_id, data)
@@ -72,4 +78,5 @@ class NotificationService:
         return TelegramSendResponse(sent=True, detail="Telegram message sent")
 
     async def get_dashboard_notifications(self, user_id: str, limit: int = 5) -> list[NotificationResponse]:
-        return await self.list_notifications(user_id, unread_only=True, limit=limit)
+        items, _ = await self.list_notifications(user_id, unread_only=True, limit=limit)
+        return items

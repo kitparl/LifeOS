@@ -1,6 +1,6 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 
 export interface VoiceNote {
@@ -19,13 +19,26 @@ export interface VoiceCommandResponse {
   transcript: string;
 }
 
+export interface VoiceListResult {
+  items: VoiceNote[];
+  total: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class VoiceService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/voice`;
 
-  list(): Observable<VoiceNote[]> {
-    return this.http.get<VoiceNote[]>(`${this.api}/notes`);
+  list(opts?: { limit?: number; offset?: number }): Observable<VoiceListResult> {
+    let params = new HttpParams();
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<VoiceNote[]>(`${this.api}/notes`, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<VoiceNote[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   createNote(transcript: string, title?: string): Observable<VoiceNote> {

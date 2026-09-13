@@ -1,6 +1,7 @@
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.communication.models import (
     SpeakingPractice,
     VocabularyWord,
@@ -23,14 +24,19 @@ class CommunicationRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_vocabulary(self, user_id: str, search: str | None = None) -> list[VocabularyWord]:
+    async def list_vocabulary(
+        self,
+        user_id: str,
+        search: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[VocabularyWord], int]:
         q = select(VocabularyWord).where(VocabularyWord.user_id == user_id)
         if search:
             pattern = f"%{search}%"
             q = q.where(or_(VocabularyWord.word.ilike(pattern), VocabularyWord.meaning.ilike(pattern)))
         q = q.order_by(VocabularyWord.word.asc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_vocabulary(self, user_id: str, word_id: str) -> VocabularyWord | None:
         result = await self.db.execute(
@@ -56,13 +62,18 @@ class CommunicationRepository:
         await self.db.delete(word)
         await self.db.flush()
 
-    async def list_writing(self, user_id: str, category: str | None = None) -> list[WritingPractice]:
+    async def list_writing(
+        self,
+        user_id: str,
+        category: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[WritingPractice], int]:
         q = select(WritingPractice).where(WritingPractice.user_id == user_id)
         if category:
             q = q.where(WritingPractice.category == category)
         q = q.order_by(WritingPractice.updated_at.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_writing(self, user_id: str, item_id: str) -> WritingPractice | None:
         result = await self.db.execute(
@@ -88,13 +99,18 @@ class CommunicationRepository:
         await self.db.delete(item)
         await self.db.flush()
 
-    async def list_speaking(self, user_id: str, category: str | None = None) -> list[SpeakingPractice]:
+    async def list_speaking(
+        self,
+        user_id: str,
+        category: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[SpeakingPractice], int]:
         q = select(SpeakingPractice).where(SpeakingPractice.user_id == user_id)
         if category:
             q = q.where(SpeakingPractice.category == category)
         q = q.order_by(SpeakingPractice.updated_at.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_speaking(self, user_id: str, item_id: str) -> SpeakingPractice | None:
         result = await self.db.execute(

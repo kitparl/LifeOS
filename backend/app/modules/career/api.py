@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -34,8 +34,16 @@ async def update_profile(
 
 
 @router.get("/projects", response_model=list[ProjectResponse])
-async def list_projects(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await CareerService(db).list_projects(user.id)
+async def list_projects(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    items, total = await CareerService(db).list_projects(user.id, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -76,8 +84,16 @@ async def delete_project(
 
 
 @router.get("/applications", response_model=list[ApplicationResponse])
-async def list_applications(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await CareerService(db).list_applications(user.id)
+async def list_applications(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    items, total = await CareerService(db).list_applications(user.id, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/applications", response_model=ApplicationResponse, status_code=status.HTTP_201_CREATED)

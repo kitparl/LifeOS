@@ -62,9 +62,13 @@ class HabitService:
             logs=stats.recent_logs,
         )
 
-    async def list_habits(self, user_id: str, active_only: bool = True) -> list[HabitListItem]:
-        habits = await self.repo.list_habits(user_id, active_only=active_only)
-        return [self._to_list_item(h) for h in habits]
+    async def list_habits(
+        self, user_id: str, active_only: bool = True, limit: int = 25, offset: int = 0
+    ) -> tuple[list[HabitListItem], int]:
+        habits, total = await self.repo.list_habits(
+            user_id, active_only=active_only, limit=limit, offset=offset
+        )
+        return [self._to_list_item(h) for h in habits], total
 
     async def get_habit(self, user_id: str, habit_id: str) -> HabitResponse:
         habit = await self.repo.get_by_id(user_id, habit_id)

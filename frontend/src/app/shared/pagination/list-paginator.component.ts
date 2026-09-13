@@ -83,7 +83,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 })
 export class ListPaginatorComponent {
   @Input() total = 0;
-  @Input() pageSize = 12;
+  @Input() pageSize = 25;
   @Input() currentPage = 1;
   @Output() pageChange = new EventEmitter<number>();
 

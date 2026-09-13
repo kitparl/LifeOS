@@ -47,7 +47,7 @@ async def list_tasks(
     search: str | None = Query(default=None),
     scope: str = Query(default="owned", pattern="^(owned|assigned_to_me|all)$"),
     include_archived: bool = Query(default=False),
-    limit: int | None = Query(default=None, ge=1, le=200),
+    limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

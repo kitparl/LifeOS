@@ -1,11 +1,12 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { CareerService } from './services/career.service';
 
 @Component({
   selector: 'app-career-page',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
       <h1 class="text-lg font-semibold">Career</h1>
@@ -37,6 +38,12 @@ import { CareerService } from './services/career.service';
               </li>
             }
           </ul>
+          <app-list-paginator
+            [total]="projectsTotal"
+            [pageSize]="pageSize"
+            [currentPage]="projectsPage"
+            (pageChange)="setProjectsPage($event)"
+          />
         </div>
 
         <div class="panel !p-0 overflow-hidden">
@@ -60,6 +67,12 @@ import { CareerService } from './services/career.service';
               </li>
             }
           </ul>
+          <app-list-paginator
+            [total]="applicationsTotal"
+            [pageSize]="pageSize"
+            [currentPage]="applicationsPage"
+            (pageChange)="setApplicationsPage($event)"
+          />
         </div>
       </div>
 
@@ -77,6 +90,11 @@ export class CareerPageComponent implements OnInit {
 
   projects: Record<string, unknown>[] = [];
   applications: Record<string, unknown>[] = [];
+  projectsTotal = 0;
+  applicationsTotal = 0;
+  projectsPage = 1;
+  applicationsPage = 1;
+  readonly pageSize = 25;
   analytics: Record<string, unknown> | null = null;
 
   profileForm = this.fb.nonNullable.group({
@@ -103,9 +121,49 @@ export class CareerPageComponent implements OnInit {
           resume_url: (p['resume_url'] as string) ?? '',
         }),
     });
-    this.career.listProjects().subscribe({ next: (d) => (this.projects = d) });
-    this.career.listApplications().subscribe({ next: (d) => (this.applications = d) });
+    this.loadProjects();
+    this.loadApplications();
     this.career.analytics().subscribe({ next: (d) => (this.analytics = d) });
+  }
+
+  loadProjects(): void {
+    const offset = (this.projectsPage - 1) * this.pageSize;
+    this.career.listProjects({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.projects = result.items;
+        this.projectsTotal = result.total;
+        const totalPages = Math.max(1, Math.ceil(this.projectsTotal / this.pageSize));
+        if (this.projectsPage > totalPages) {
+          this.projectsPage = totalPages;
+          this.loadProjects();
+        }
+      },
+    });
+  }
+
+  loadApplications(): void {
+    const offset = (this.applicationsPage - 1) * this.pageSize;
+    this.career.listApplications({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.applications = result.items;
+        this.applicationsTotal = result.total;
+        const totalPages = Math.max(1, Math.ceil(this.applicationsTotal / this.pageSize));
+        if (this.applicationsPage > totalPages) {
+          this.applicationsPage = totalPages;
+          this.loadApplications();
+        }
+      },
+    });
+  }
+
+  setProjectsPage(page: number): void {
+    this.projectsPage = page;
+    this.loadProjects();
+  }
+
+  setApplicationsPage(page: number): void {
+    this.applicationsPage = page;
+    this.loadApplications();
   }
 
   saveProfile(): void {
@@ -116,22 +174,32 @@ export class CareerPageComponent implements OnInit {
   addProject(): void {
     const raw = this.projectForm.getRawValue();
     if (!raw.name) return;
-    this.career.createProject(raw).subscribe({ next: () => this.load() });
+    this.career.createProject(raw).subscribe({
+      next: () => {
+        this.projectsPage = 1;
+        this.load();
+      },
+    });
     this.projectForm.reset();
   }
 
   removeProject(id: string): void {
-    this.career.deleteProject(id).subscribe({ next: () => this.load() });
+    this.career.deleteProject(id).subscribe({ next: () => this.loadProjects() });
   }
 
   addApplication(): void {
     const raw = this.appForm.getRawValue();
     if (!raw.company || !raw.role) return;
-    this.career.createApplication(raw).subscribe({ next: () => this.load() });
+    this.career.createApplication(raw).subscribe({
+      next: () => {
+        this.applicationsPage = 1;
+        this.load();
+      },
+    });
     this.appForm.reset({ company: '', role: '', status: 'applied' });
   }
 
   removeApplication(id: string): void {
-    this.career.deleteApplication(id).subscribe({ next: () => this.load() });
+    this.career.deleteApplication(id).subscribe({ next: () => this.loadApplications() });
   }
 }

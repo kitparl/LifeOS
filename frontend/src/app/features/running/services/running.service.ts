@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import {
   RaceCreate,
@@ -19,10 +19,21 @@ export class RunningService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/running`;
 
-  listRuns(shoe?: string): Observable<RunListItem[]> {
+  listRuns(opts?: {
+    shoe?: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<{ items: RunListItem[]; total: number }> {
     let params = new HttpParams();
-    if (shoe) params = params.set('shoe', shoe);
-    return this.http.get<RunListItem[]>(`${this.api}/runs`, { params });
+    if (opts?.shoe) params = params.set('shoe', opts.shoe);
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<RunListItem[]>(`${this.api}/runs`, { params, observe: 'response' }).pipe(
+      map((response) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   listShoes(): Observable<string[]> {

@@ -14,7 +14,7 @@ from app.modules.integrations.telegram.renderer import Screen
 
 
 async def habits_list_screen(db: AsyncSession, user_id: str) -> Screen:
-    habits = await HabitService(db).list_habits(user_id, active_only=True)
+    habits, _ = await HabitService(db).list_habits(user_id, active_only=True, limit=100)
     if not habits:
         return Screen(
             text=tpl.join_blocks(tpl._header("Habits"), "No active habits."),
@@ -52,7 +52,7 @@ async def on_list(ctx: CallbackContext) -> Screen:
 @register("habit", "done")
 async def on_done(ctx: CallbackContext) -> tuple[Screen, str]:
     token = ctx.args[0] if ctx.args else ""
-    habits = await HabitService(ctx.db).list_habits(ctx.user_id, active_only=True)
+    habits, _ = await HabitService(ctx.db).list_habits(ctx.user_id, active_only=True, limit=100)
     habit = resolve_one(list(habits), token)
     if habit is None:
         return await habits_list_screen(ctx.db, ctx.user_id), "Not found"
@@ -63,7 +63,7 @@ async def on_done(ctx: CallbackContext) -> tuple[Screen, str]:
 @register("habit", "undo")
 async def on_undo(ctx: CallbackContext) -> tuple[Screen, str]:
     token = ctx.args[0] if ctx.args else ""
-    habits = await HabitService(ctx.db).list_habits(ctx.user_id, active_only=True)
+    habits, _ = await HabitService(ctx.db).list_habits(ctx.user_id, active_only=True, limit=100)
     habit = resolve_one(list(habits), token)
     if habit is None:
         return await habits_list_screen(ctx.db, ctx.user_id), "Not found"

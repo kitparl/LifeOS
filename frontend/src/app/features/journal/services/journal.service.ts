@@ -1,19 +1,36 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { JournalCreate, JournalEntry, JournalListItem, JournalUpdate } from '../models/journal.models';
+
+export interface JournalListResult {
+  items: JournalListItem[];
+  total: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class JournalService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/journal/entries`;
 
-  list(entryType?: string, search?: string): Observable<JournalListItem[]> {
+  list(opts?: {
+    entryType?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<JournalListResult> {
     let params = new HttpParams();
-    if (entryType) params = params.set('entry_type', entryType);
-    if (search) params = params.set('search', search);
-    return this.http.get<JournalListItem[]>(this.api, { params });
+    if (opts?.entryType) params = params.set('entry_type', opts.entryType);
+    if (opts?.search) params = params.set('search', opts.search);
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<JournalListItem[]>(this.api, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<JournalListItem[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   get(id: string): Observable<JournalEntry> {

@@ -19,7 +19,9 @@ class SearchService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def search(self, user_id: str, query: str, limit: int = 20) -> SearchResponse:
+    async def search(
+        self, user_id: str, query: str, limit: int = 25, offset: int = 0
+    ) -> SearchResponse:
         q = query.strip()
         if not q:
             return SearchResponse(query=q, total=0, results=[])
@@ -31,7 +33,7 @@ class SearchService:
                 select(Goal).where(
                     Goal.user_id == user_id,
                     or_(Goal.title.ilike(pattern), Goal.description.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for g in rows.scalars().all():
                 results.append(
@@ -51,7 +53,7 @@ class SearchService:
                     Task.user_id == user_id,
                     Task.deleted_at.is_(None),
                     or_(Task.title.ilike(pattern), Task.description.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for t in rows.scalars().all():
                 results.append(
@@ -70,7 +72,7 @@ class SearchService:
                 select(Habit).where(
                     Habit.user_id == user_id,
                     or_(Habit.name.ilike(pattern), Habit.description.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for h in rows.scalars().all():
                 results.append(
@@ -86,7 +88,7 @@ class SearchService:
 
         async def add_run_rows():
             rows = await self.db.execute(
-                select(Run).where(Run.user_id == user_id, Run.notes.ilike(pattern)).limit(limit)
+                select(Run).where(Run.user_id == user_id, Run.notes.ilike(pattern))
             )
             for r in rows.scalars().all():
                 results.append(
@@ -105,7 +107,7 @@ class SearchService:
                 select(CalendarEvent).where(
                     CalendarEvent.user_id == user_id,
                     or_(CalendarEvent.title.ilike(pattern), CalendarEvent.description.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for e in rows.scalars().all():
                 results.append(
@@ -128,7 +130,7 @@ class SearchService:
                         JournalEntry.content.ilike(pattern),
                         JournalEntry.gratitude.ilike(pattern),
                     ),
-                ).limit(limit)
+                )
             )
             for j in rows.scalars().all():
                 results.append(
@@ -147,7 +149,7 @@ class SearchService:
                 select(VocabularyWord).where(
                     VocabularyWord.user_id == user_id,
                     or_(VocabularyWord.word.ilike(pattern), VocabularyWord.meaning.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for w in rows.scalars().all():
                 results.append(
@@ -166,7 +168,7 @@ class SearchService:
                 select(WritingPractice).where(
                     WritingPractice.user_id == user_id,
                     or_(WritingPractice.title.ilike(pattern), WritingPractice.content.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for w in rows.scalars().all():
                 results.append(
@@ -185,7 +187,7 @@ class SearchService:
                 select(SpeakingPractice).where(
                     SpeakingPractice.user_id == user_id,
                     or_(SpeakingPractice.title.ilike(pattern), SpeakingPractice.prompt.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for s in rows.scalars().all():
                 results.append(
@@ -204,7 +206,7 @@ class SearchService:
                 select(QAEntry).where(
                     QAEntry.user_id == user_id,
                     or_(QAEntry.question.ilike(pattern), QAEntry.current_answer.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for e in rows.scalars().all():
                 results.append(
@@ -223,7 +225,7 @@ class SearchService:
                 select(WishlistItem).where(
                     WishlistItem.user_id == user_id,
                     or_(WishlistItem.title.ilike(pattern), WishlistItem.description.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for w in rows.scalars().all():
                 results.append(
@@ -242,7 +244,7 @@ class SearchService:
                 select(LearningItem).where(
                     LearningItem.user_id == user_id,
                     or_(LearningItem.title.ilike(pattern), LearningItem.notes.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for item in items.scalars().all():
                 results.append(
@@ -259,7 +261,7 @@ class SearchService:
                 select(LearningConcept).where(
                     LearningConcept.user_id == user_id,
                     or_(LearningConcept.title.ilike(pattern), LearningConcept.summary.ilike(pattern)),
-                ).limit(limit)
+                )
             )
             for c in concepts.scalars().all():
                 results.append(
@@ -286,10 +288,13 @@ class SearchService:
         await add_wishlist_rows()
         await add_learning_rows()
 
-        results = results[:limit]
-        return SearchResponse(query=q, total=len(results), results=results)
+        total = len(results)
+        page = results[offset : offset + limit]
+        return SearchResponse(query=q, total=total, results=page)
 
-    async def semantic_search(self, user_id: str, query: str, limit: int = 20) -> SearchResponse:
+    async def semantic_search(
+        self, user_id: str, query: str, limit: int = 25, offset: int = 0
+    ) -> SearchResponse:
         q = query.strip()
         if not q:
             return SearchResponse(query=q, total=0, results=[])
@@ -299,7 +304,7 @@ class SearchService:
             await ai.index(user_id)
             rows = await ai.repo.list_for_user(user_id)
         sources = await ai._retrieve(user_id, q, rows)
-        results = [
+        all_results = [
             SearchResultItem(
                 module=s.source_type,
                 entity_type=s.source_type,
@@ -308,8 +313,11 @@ class SearchService:
                 subtitle=s.snippet[:80] if s.snippet else None,
                 route=s.route,
             )
-            for s in sources[:limit]
+            for s in sources
         ]
-        if not results:
-            return await self.search(user_id, q, limit=limit)
-        return SearchResponse(query=q, total=len(results), results=results)
+        if not all_results:
+            return await self.search(user_id, q, limit=limit, offset=offset)
+        total = len(all_results)
+        return SearchResponse(
+            query=q, total=total, results=all_results[offset : offset + limit]
+        )

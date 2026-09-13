@@ -55,9 +55,15 @@ class LearningService:
 
     # --- Legacy items ---
 
-    async def list_items(self, user_id: str, item_type: str | None = None) -> list[LearningListItem]:
-        items = await self.repo.list_items(user_id, item_type)
-        return [LearningListItem.model_validate(i) for i in items]
+    async def list_items(
+        self,
+        user_id: str,
+        item_type: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[LearningListItem], int]:
+        items, total = await self.repo.list_items(user_id, item_type, limit=limit, offset=offset)
+        return [LearningListItem.model_validate(i) for i in items], total
 
     async def get_item(self, user_id: str, item_id: str) -> LearningResponse:
         item = await self.repo.get_by_id(user_id, item_id)
@@ -87,9 +93,11 @@ class LearningService:
 
     # --- Tracks ---
 
-    async def list_tracks(self, user_id: str) -> list[TrackListItem]:
-        tracks = await self.repo.list_tracks(user_id)
-        return [TrackListItem.model_validate(t) for t in tracks]
+    async def list_tracks(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[TrackListItem], int]:
+        tracks, total = await self.repo.list_tracks(user_id, limit=limit, offset=offset)
+        return [TrackListItem.model_validate(t) for t in tracks], total
 
     async def create_track(self, user_id: str, data: TrackCreate) -> TrackListItem:
         existing = await self.repo.get_track_by_slug(user_id, data.slug)
@@ -131,10 +139,17 @@ class LearningService:
     # --- Concepts ---
 
     async def list_concepts(
-        self, user_id: str, item_id: str | None = None, week: int | None = None
-    ) -> list[ConceptListItem]:
-        concepts = await self.repo.list_concepts(user_id, item_id, week)
-        return [ConceptListItem.model_validate(c) for c in concepts]
+        self,
+        user_id: str,
+        item_id: str | None = None,
+        week: int | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[ConceptListItem], int]:
+        concepts, total = await self.repo.list_concepts(
+            user_id, item_id, week, limit=limit, offset=offset
+        )
+        return [ConceptListItem.model_validate(c) for c in concepts], total
 
     async def get_concept(self, user_id: str, concept_id: str) -> ConceptResponse:
         concept = await self.repo.get_concept(user_id, concept_id)
@@ -145,7 +160,7 @@ class LearningService:
     async def _concept_with_inherited(self, user_id: str, concept) -> ConceptResponse:
         """Phase-level resources apply to every concept in the phase, so surface them here."""
         response = ConceptResponse.model_validate(concept)
-        phase_rows = await self.repo.list_resources(user_id, item_id=concept.item_id)
+        phase_rows = await self.repo.list_resources(user_id, item_id=concept.item_id, limit=None)
         response.inherited_resources = [
             ResourceResponse.model_validate(r) for r in phase_rows if r.concept_id is None
         ]
@@ -176,10 +191,17 @@ class LearningService:
     # --- Resources ---
 
     async def list_resources(
-        self, user_id: str, concept_id: str | None = None, item_id: str | None = None
-    ) -> list[ResourceResponse]:
-        rows = await self.repo.list_resources(user_id, concept_id, item_id)
-        return [ResourceResponse.model_validate(r) for r in rows]
+        self,
+        user_id: str,
+        concept_id: str | None = None,
+        item_id: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[ResourceResponse], int]:
+        rows, total = await self.repo.list_resources(
+            user_id, concept_id, item_id, limit=limit, offset=offset
+        )
+        return [ResourceResponse.model_validate(r) for r in rows], total
 
     async def create_resource(self, user_id: str, data: ResourceCreate) -> ResourceResponse:
         if not data.concept_id and not data.item_id:
@@ -209,10 +231,17 @@ class LearningService:
     # --- Sessions ---
 
     async def list_sessions(
-        self, user_id: str, from_date: date | None = None, to_date: date | None = None
-    ) -> list[SessionResponse]:
-        rows = await self.repo.list_sessions(user_id, from_date, to_date)
-        return [SessionResponse.model_validate(s) for s in rows]
+        self,
+        user_id: str,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[SessionResponse], int]:
+        rows, total = await self.repo.list_sessions(
+            user_id, from_date, to_date, limit=limit, offset=offset
+        )
+        return [SessionResponse.model_validate(s) for s in rows], total
 
     async def create_session(self, user_id: str, data: SessionCreate) -> SessionResponse:
         item = await self.repo.get_by_id(user_id, data.item_id)
@@ -238,12 +267,19 @@ class LearningService:
 
     # --- Concept ↔ knowledge notes ---
 
-    async def list_concept_notes(self, user_id: str, concept_id: str) -> list[ConceptNoteResponse]:
+    async def list_concept_notes(
+        self, user_id: str, concept_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[ConceptNoteResponse], int]:
         concept = await self.repo.get_concept(user_id, concept_id)
         if not concept:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Concept not found")
-        rows = await self.repo.list_concept_notes(user_id, concept_id)
-        return [self._note_response(link, section, chapter, subject) for link, section, chapter, subject in rows]
+        rows, total = await self.repo.list_concept_notes(
+            user_id, concept_id, limit=limit, offset=offset
+        )
+        return [
+            self._note_response(link, section, chapter, subject)
+            for link, section, chapter, subject in rows
+        ], total
 
     async def attach_concept_note(
         self, user_id: str, concept_id: str, data: ConceptNoteCreate

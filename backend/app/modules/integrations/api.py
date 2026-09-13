@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, Request, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -224,10 +224,17 @@ async def telegram_webhook(
 
 @router.get("", response_model=list[IntegrationResponse])
 async def list_integrations(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).list_connections(user.id)
+    items, total = await IntegrationService(db).list_connections(
+        user.id, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("", response_model=IntegrationResponse, status_code=status.HTTP_201_CREATED)

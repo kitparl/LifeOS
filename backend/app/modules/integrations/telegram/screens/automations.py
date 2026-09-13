@@ -17,7 +17,7 @@ from app.modules.integrations.telegram.state import clear_conversation
 
 
 async def automations_list_screen(db: AsyncSession, user_id: str) -> Screen:
-    rules = await AutomationService(db).list_rules(user_id)
+    rules, _ = await AutomationService(db).list_rules(user_id, limit=None)
     if not rules:
         return Screen(
             text=tpl.join_blocks(tpl._header("Automations"), "No automation rules yet."),
@@ -58,7 +58,7 @@ async def on_list(ctx: CallbackContext) -> Screen:
 @register("auto", "toggle")
 async def on_toggle(ctx: CallbackContext) -> tuple[Screen, str]:
     token = ctx.args[0] if ctx.args else ""
-    rules = await AutomationService(ctx.db).list_rules(ctx.user_id)
+    rules, _ = await AutomationService(ctx.db).list_rules(ctx.user_id, limit=None)
     rule = resolve_one(list(rules), token)
     if rule is None:
         return await automations_list_screen(ctx.db, ctx.user_id), "Not found"

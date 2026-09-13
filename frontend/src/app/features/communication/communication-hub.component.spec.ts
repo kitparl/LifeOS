@@ -28,9 +28,9 @@ describe('CommunicationHubComponent', () => {
 
   beforeEach(async () => {
     communication = {
-      listVocabulary: jasmine.createSpy('listVocabulary').and.returnValue(of([])),
-      listWriting: jasmine.createSpy('listWriting').and.returnValue(of([writing])),
-      listSpeaking: jasmine.createSpy('listSpeaking').and.returnValue(of([])),
+      listVocabulary: jasmine.createSpy('listVocabulary').and.returnValue(of({ items: [], total: 0 })),
+      listWriting: jasmine.createSpy('listWriting').and.returnValue(of({ items: [writing], total: 1 })),
+      listSpeaking: jasmine.createSpy('listSpeaking').and.returnValue(of({ items: [], total: 0 })),
       deleteWriting: jasmine.createSpy('deleteWriting').and.returnValue(of(void 0)),
     };
 

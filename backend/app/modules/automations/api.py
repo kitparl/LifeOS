@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -17,10 +17,15 @@ router = APIRouter(prefix="/automations", tags=["automations"])
 
 @router.get("/rules", response_model=list[AutomationResponse])
 async def list_automations(
+    response: Response,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await AutomationService(db).list_rules(user.id)
+    items, total = await AutomationService(db).list_rules(user.id, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/rules", response_model=AutomationResponse, status_code=status.HTTP_201_CREATED)

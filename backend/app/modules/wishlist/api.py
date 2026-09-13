@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -36,15 +36,22 @@ async def create_wishlist_category(
 
 @router.get("/items", response_model=list[WishlistListItem])
 async def list_wishlist_items(
+    response: Response,
     category: str | None = Query(default=None),
     status: str | None = Query(
         default=None,
         pattern="^(incomplete|in_progress|completed|delayed)$",
     ),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await WishlistService(db).list_items(user.id, category=category, status=status)
+    items, total = await WishlistService(db).list_items(
+        user.id, category=category, status=status, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/items", response_model=WishlistResponse, status_code=status.HTTP_201_CREATED)

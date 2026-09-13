@@ -1,6 +1,7 @@
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.notifications.models import Notification, NotificationSettings
 from app.modules.notifications.schemas import NotificationCreate, NotificationSettingsUpdate
 
@@ -10,14 +11,17 @@ class NotificationRepository:
         self.db = db
 
     async def list_notifications(
-        self, user_id: str, unread_only: bool = False, limit: int = 50
-    ) -> list[Notification]:
+        self,
+        user_id: str,
+        unread_only: bool = False,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[Notification], int]:
         q = select(Notification).where(Notification.user_id == user_id)
         if unread_only:
             q = q.where(Notification.is_read.is_(False))
-        q = q.order_by(Notification.created_at.desc()).limit(limit)
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        q = q.order_by(Notification.created_at.desc())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_by_id(self, user_id: str, notification_id: str) -> Notification | None:
         result = await self.db.execute(

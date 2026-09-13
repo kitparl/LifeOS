@@ -31,7 +31,9 @@ describe('KnowledgeNotesListComponent', () => {
 
   beforeEach(async () => {
     notes = {
-      listSubjects: jasmine.createSpy('listSubjects').and.returnValue(of(structuredClone(subjects))),
+      listSubjects: jasmine.createSpy('listSubjects').and.returnValue(
+        of({ items: structuredClone(subjects), total: subjects.length }),
+      ),
       updateSubject: jasmine.createSpy('updateSubject').and.returnValue(of({})),
       search: jasmine.createSpy('search').and.returnValue(of([])),
       createSubject: jasmine.createSpy('createSubject').and.returnValue(of({ id: 'new' })),

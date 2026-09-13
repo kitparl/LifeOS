@@ -2,13 +2,14 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { RoutineListItem, formatDaysLabel } from './models/routine.models';
 import { RoutinesService } from './services/routines.service';
 
 @Component({
   selector: 'app-routines-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -21,7 +22,7 @@ import { RoutinesService } from './services/routines.service';
         <a routerLink="/routines/new" class="btn-primary text-xs no-underline">New Routine</a>
       </div>
 
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="load()">
+      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
         <label class="flex items-center gap-1 text-xs">
           <input type="checkbox" formControlName="active_only" />
           Active only
@@ -31,7 +32,7 @@ import { RoutinesService } from './services/routines.service';
 
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading routines…</p>
-      } @else if (routines.length === 0) {
+      } @else if (total === 0) {
         <div class="panel">
           <p class="text-sm" style="color: var(--text-muted)">
             No routines yet. Create a weekday schedule with timed blocks (DSA, gym, reading…).
@@ -66,6 +67,12 @@ import { RoutinesService } from './services/routines.service';
               </div>
             </article>
           }
+          <app-list-paginator
+            [total]="total"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
         </div>
         <div class="panel hidden !p-0 overflow-hidden md:block">
           <table class="w-full text-sm">
@@ -110,6 +117,12 @@ import { RoutinesService } from './services/routines.service';
               }
             </tbody>
           </table>
+          <app-list-paginator
+            [total]="total"
+            [pageSize]="pageSize"
+            [currentPage]="currentPage"
+            (pageChange)="setPage($event)"
+          />
         </div>
       }
     </div>
@@ -121,12 +134,15 @@ export class RoutinesListComponent implements OnInit {
   private readonly confirm = inject(ConfirmService);
 
   routines: RoutineListItem[] = [];
+  total = 0;
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 25;
 
   filters = this.fb.nonNullable.group({ active_only: true });
 
   ngOnInit(): void {
-    this.filters.controls.active_only.valueChanges.subscribe(() => this.load());
+    this.filters.controls.active_only.valueChanges.subscribe(() => this.applyFilters());
     this.load();
   }
 
@@ -134,16 +150,37 @@ export class RoutinesListComponent implements OnInit {
     return formatDaysLabel(days);
   }
 
+  applyFilters(): void {
+    this.currentPage = 1;
+    this.load();
+  }
+
   load(): void {
     this.loading = true;
     const activeOnly = this.filters.getRawValue().active_only;
-    this.routinesService.list(activeOnly).subscribe({
-      next: (data) => {
-        this.routines = data;
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.routinesService.list({ activeOnly, limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.routines = result.items;
+        this.total = result.total;
+        this.clampPage();
         this.loading = false;
       },
       error: () => (this.loading = false),
     });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   deactivate(routine: RoutineListItem): void {

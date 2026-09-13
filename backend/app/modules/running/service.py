@@ -152,10 +152,16 @@ class RunningService:
             updated_at=run.updated_at,
         )
 
-    async def list_runs(self, user_id: str, shoe: str | None = None) -> list[RunListItem]:
+    async def list_runs(
+        self,
+        user_id: str,
+        shoe: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[RunListItem], int]:
         runs = await self.repo.list_runs(user_id, shoe=shoe)
         items = [self._to_list_item(r) for r in runs]
-        races = await self.repo.list_races(user_id)
+        races, _ = await self.repo.list_races(user_id)
         for race in races:
             if not self._bool_field(race, "attended"):
                 continue
@@ -164,7 +170,8 @@ class RunningService:
                 continue
             items.append(self._race_to_list_item(race))
         items.sort(key=lambda item: (item.run_date, item.updated_at), reverse=True)
-        return items
+        total = len(items)
+        return items[offset : offset + limit], total
 
     async def list_shoes(self, user_id: str) -> list[str]:
         stored = await self.repo.list_shoe_names(user_id)
@@ -205,9 +212,17 @@ class RunningService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
         await self.repo.delete_run(run)
 
-    async def list_races(self, user_id: str, upcoming_only: bool = False) -> list[RaceResponse]:
-        races = await self.repo.list_races(user_id, upcoming_only=upcoming_only)
-        return [self._to_race_response(r) for r in races]
+    async def list_races(
+        self,
+        user_id: str,
+        upcoming_only: bool = False,
+        limit: int | None = 25,
+        offset: int = 0,
+    ) -> tuple[list[RaceResponse], int]:
+        races, total = await self.repo.list_races(
+            user_id, upcoming_only=upcoming_only, limit=limit, offset=offset
+        )
+        return [self._to_race_response(r) for r in races], total
 
     async def get_race(self, user_id: str, race_id: str) -> RaceResponse:
         race = await self.repo.get_race(user_id, race_id)
@@ -256,7 +271,7 @@ class RunningService:
 
     async def get_stats(self, user_id: str) -> RunningStatsResponse:
         runs = await self.repo.list_runs(user_id)
-        races = await self.repo.list_races(user_id)
+        races, _ = await self.repo.list_races(user_id)
         settings = await self.repo.get_settings(user_id)
         last_run = runs[0] if runs else None
         total_km = round(sum(r.distance_km for r in runs), 2)

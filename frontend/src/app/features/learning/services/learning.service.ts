@@ -1,6 +1,6 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import {
   ConceptNote,
@@ -17,17 +17,34 @@ import {
   TrackProgress,
 } from '../models/learning.models';
 
+export interface LearningListResult {
+  items: LearningListItem[];
+  total: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class LearningService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/learning`;
   private readonly api = `${this.base}/items`;
 
-  list(itemType?: string): Observable<LearningListItem[]> {
+  list(opts?: {
+    itemType?: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<LearningListResult> {
     let params = new HttpParams();
-    if (itemType) params = params.set('item_type', itemType);
-    return this.http.get<LearningListItem[]>(this.api, { params });
+    if (opts?.itemType) params = params.set('item_type', opts.itemType);
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<LearningListItem[]>(this.api, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<LearningListItem[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
+
 
   get(id: string): Observable<LearningItem> {
     return this.http.get<LearningItem>(`${this.api}/${id}`);

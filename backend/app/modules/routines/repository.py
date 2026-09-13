@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Pagination, paginate
 from app.modules.habits.models import Habit
 from app.modules.routines.models import (
     Routine,
@@ -16,7 +17,13 @@ class RoutineRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_routines(self, user_id: str, active_only: bool = False) -> list[Routine]:
+    async def list_routines(
+        self,
+        user_id: str,
+        active_only: bool = False,
+        limit: int | None = 25,
+        offset: int = 0,
+    ) -> tuple[list[Routine], int] | list[Routine]:
         q = (
             select(Routine)
             .where(Routine.user_id == user_id)
@@ -31,8 +38,10 @@ class RoutineRepository:
         )
         if active_only:
             q = q.where(Routine.is_active.is_(True))
-        result = await self.db.execute(q)
-        return list(result.scalars().unique().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            return list(result.scalars().unique().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset), unique=True)
 
     async def get_by_id(self, user_id: str, routine_id: str) -> Routine | None:
         result = await self.db.execute(

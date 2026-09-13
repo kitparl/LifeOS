@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Pagination, paginate
 from app.modules.knowledge_notes.models import (
     KnowledgeChapter,
     KnowledgeSection,
@@ -34,13 +35,18 @@ class LearningRepository:
 
     # --- LearningItem (legacy + phases) ---
 
-    async def list_items(self, user_id: str, item_type: str | None = None) -> list[LearningItem]:
+    async def list_items(
+        self,
+        user_id: str,
+        item_type: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[LearningItem], int]:
         q = select(LearningItem).where(LearningItem.user_id == user_id)
         if item_type:
             q = q.where(LearningItem.item_type == item_type)
         q = q.order_by(LearningItem.updated_at.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_by_id(self, user_id: str, item_id: str) -> LearningItem | None:
         result = await self.db.execute(
@@ -79,13 +85,15 @@ class LearningRepository:
 
     # --- Tracks ---
 
-    async def list_tracks(self, user_id: str) -> list[LearningTrack]:
-        result = await self.db.execute(
+    async def list_tracks(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[LearningTrack], int]:
+        q = (
             select(LearningTrack)
             .where(LearningTrack.user_id == user_id)
             .order_by(LearningTrack.sort_order, LearningTrack.created_at)
         )
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_track(self, user_id: str, track_id: str) -> LearningTrack | None:
         result = await self.db.execute(
@@ -116,16 +124,20 @@ class LearningRepository:
     # --- Concepts ---
 
     async def list_concepts(
-        self, user_id: str, item_id: str | None = None, week: int | None = None
-    ) -> list[LearningConcept]:
+        self,
+        user_id: str,
+        item_id: str | None = None,
+        week: int | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[LearningConcept], int]:
         q = select(LearningConcept).where(LearningConcept.user_id == user_id)
         if item_id:
             q = q.where(LearningConcept.item_id == item_id)
         if week is not None:
             q = q.where(LearningConcept.week_number == week)
         q = q.order_by(LearningConcept.week_number, LearningConcept.sort_order)
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_concept(self, user_id: str, concept_id: str) -> LearningConcept | None:
         result = await self.db.execute(
@@ -188,16 +200,23 @@ class LearningRepository:
     # --- Resources ---
 
     async def list_resources(
-        self, user_id: str, concept_id: str | None = None, item_id: str | None = None
-    ) -> list[LearningResource]:
+        self,
+        user_id: str,
+        concept_id: str | None = None,
+        item_id: str | None = None,
+        limit: int | None = 25,
+        offset: int = 0,
+    ) -> tuple[list[LearningResource], int] | list[LearningResource]:
         q = select(LearningResource).where(LearningResource.user_id == user_id)
         if concept_id:
             q = q.where(LearningResource.concept_id == concept_id)
         if item_id:
             q = q.where(LearningResource.item_id == item_id)
         q = q.order_by(LearningResource.sort_order)
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_resource(self, user_id: str, resource_id: str) -> LearningResource | None:
         result = await self.db.execute(
@@ -243,16 +262,20 @@ class LearningRepository:
     # --- Sessions ---
 
     async def list_sessions(
-        self, user_id: str, from_date: date | None = None, to_date: date | None = None
-    ) -> list[StudySession]:
+        self,
+        user_id: str,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[StudySession], int]:
         q = select(StudySession).where(StudySession.user_id == user_id)
         if from_date:
             q = q.where(StudySession.session_date >= from_date)
         if to_date:
             q = q.where(StudySession.session_date <= to_date)
         q = q.order_by(StudySession.session_date.desc(), StudySession.created_at.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def create_session(self, user_id: str, data: SessionCreate) -> StudySession:
         session = StudySession(user_id=user_id, **data.model_dump())
@@ -290,8 +313,10 @@ class LearningRepository:
 
     # --- Concept ↔ knowledge notes ---
 
-    async def list_concept_notes(self, user_id: str, concept_id: str) -> list[tuple]:
-        result = await self.db.execute(
+    async def list_concept_notes(
+        self, user_id: str, concept_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[tuple], int]:
+        q = (
             select(LearningConceptNote, KnowledgeSection, KnowledgeChapter, KnowledgeSubject)
             .join(KnowledgeSection, LearningConceptNote.section_id == KnowledgeSection.id)
             .join(KnowledgeChapter, KnowledgeSection.chapter_id == KnowledgeChapter.id)
@@ -302,7 +327,10 @@ class LearningRepository:
             )
             .order_by(KnowledgeSubject.title, KnowledgeChapter.order_index, KnowledgeSection.order_index)
         )
-        return list(result.all())
+        count_q = select(func.count()).select_from(q.order_by(None).subquery())
+        total = int((await self.db.execute(count_q)).scalar_one())
+        result = await self.db.execute(q.offset(offset).limit(limit))
+        return list(result.all()), total
 
     async def get_concept_note(self, user_id: str, note_id: str) -> LearningConceptNote | None:
         result = await self.db.execute(

@@ -21,7 +21,7 @@ INBOX_CHAPTER = "Quick Capture"
 async def _ensure_inbox(db: AsyncSession, user_id: str) -> str:
     """Return chapter_id for Telegram Inbox / Quick Capture, creating if needed."""
     svc = KnowledgeNotesService(db)
-    subjects = await svc.list_subjects(user_id)
+    subjects, _ = await svc.list_subjects(user_id, limit=None)
     subject = next((s for s in subjects if s.title == INBOX_SUBJECT), None)
     if subject is None:
         detail = await svc.create_subject(
@@ -54,7 +54,7 @@ async def notes_menu_screen(db: AsyncSession, user_id: str) -> Screen:
 
 
 async def subjects_screen(db: AsyncSession, user_id: str) -> Screen:
-    subjects = await KnowledgeNotesService(db).list_subjects(user_id)
+    subjects, _ = await KnowledgeNotesService(db).list_subjects(user_id, limit=None)
     if not subjects:
         lines = ["No subjects yet. Capture a note to create the Inbox."]
     else:
@@ -151,7 +151,7 @@ async def step_search(db: AsyncSession, user_id: str, text: str, data: dict) -> 
     q = (text or "").strip()
     if not q:
         return Screen(text="Send a keyword to search.")
-    hits = await KnowledgeNotesService(db).search(user_id, q)
+    hits, _ = await KnowledgeNotesService(db).search(user_id, q, limit=25)
     clear_conversation(user_id)
     if not hits:
         return Screen(

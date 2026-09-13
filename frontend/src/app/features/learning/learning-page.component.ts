@@ -1,13 +1,14 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { LEARNING_TYPES, LearningListItem, LearningType } from './models/learning.models';
 import { LearningService } from './services/learning.service';
 
 @Component({
   selector: 'app-learning-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -18,7 +19,7 @@ import { LearningService } from './services/learning.service';
           <a routerLink="/learning/new" class="btn-primary text-xs no-underline">New Item</a>
         </div>
       </div>
-      <form class="flex gap-2 text-sm" [formGroup]="filters" (ngSubmit)="load()">
+      <form class="flex gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
         <select class="input-field !w-auto" formControlName="item_type">
           <option value="">All types</option>
           @for (t of types; track t.value) {
@@ -29,7 +30,7 @@ import { LearningService } from './services/learning.service';
       </form>
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
-      } @else if (items.length === 0) {
+      } @else if (total === 0) {
         <div class="panel"><p class="text-sm" style="color: var(--text-muted)">No learning items yet.</p></div>
       } @else {
         <ul class="panel !p-0 divide-y divide-[var(--xp-border)] text-sm">
@@ -42,6 +43,12 @@ import { LearningService } from './services/learning.service';
             </li>
           }
         </ul>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
       }
     </div>
   `,
@@ -51,23 +58,49 @@ export class LearningListComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   types = LEARNING_TYPES;
   items: LearningListItem[] = [];
+  total = 0;
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 25;
   filters = this.fb.nonNullable.group({ item_type: '' });
 
   ngOnInit(): void {
     this.load();
   }
 
+  applyFilters(): void {
+    this.currentPage = 1;
+    this.load();
+  }
+
   load(): void {
     this.loading = true;
     const t = this.filters.getRawValue().item_type;
-    this.learningService.list(t || undefined).subscribe({
-      next: (data) => {
-        this.items = data;
-        this.loading = false;
-      },
-      error: () => (this.loading = false),
-    });
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.learningService
+      .list({ itemType: t || undefined, limit: this.pageSize, offset })
+      .subscribe({
+        next: (result) => {
+          this.items = result.items;
+          this.total = result.total;
+          this.clampPage();
+          this.loading = false;
+        },
+        error: () => (this.loading = false),
+      });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 }
 

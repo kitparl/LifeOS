@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,11 +12,18 @@ router = APIRouter(prefix="/memory", tags=["memory"])
 
 @router.get("/items", response_model=list[MemoryResponse])
 async def list_memory(
+    response: Response,
     category: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await MemoryService(db).list_items(user.id, category)
+    items, total = await MemoryService(db).list_items(
+        user.id, category, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.get("/summary", response_model=MemorySummary)

@@ -1,17 +1,33 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Routine, RoutineCreate, RoutineListItem, RoutineUpdate } from '../models/routine.models';
+
+export interface RoutineListResult {
+  items: RoutineListItem[];
+  total: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class RoutinesService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/routines`;
 
-  list(activeOnly = true): Observable<RoutineListItem[]> {
-    const params = new HttpParams().set('active_only', String(activeOnly));
-    return this.http.get<RoutineListItem[]>(this.api, { params });
+  list(opts?: {
+    activeOnly?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Observable<RoutineListResult> {
+    let params = new HttpParams().set('active_only', String(opts?.activeOnly ?? true));
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<RoutineListItem[]>(this.api, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<RoutineListItem[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   get(id: string): Observable<Routine> {

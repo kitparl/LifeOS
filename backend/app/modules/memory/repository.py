@@ -1,6 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.memory.models import AiMemoryItem
 from app.modules.memory.schemas import MemoryCreate, MemoryUpdate
 
@@ -9,13 +10,22 @@ class MemoryRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_items(self, user_id: str, category: str | None = None) -> list[AiMemoryItem]:
+    async def list_items(
+        self,
+        user_id: str,
+        category: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[AiMemoryItem], int]:
         q = select(AiMemoryItem).where(AiMemoryItem.user_id == user_id)
         if category:
             q = q.where(AiMemoryItem.category == category)
         q = q.order_by(AiMemoryItem.importance.desc(), AiMemoryItem.updated_at.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_by_id(self, user_id: str, item_id: str) -> AiMemoryItem | None:
         result = await self.db.execute(

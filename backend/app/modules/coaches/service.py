@@ -28,7 +28,7 @@ class CoachesService:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown coach type: {coach_type}")
 
         context, summary = await self._build_context(user_id, coach_type)
-        memories = await self.memory_repo.list_items(user_id)
+        memories, _ = await self.memory_repo.list_items(user_id, limit=None)
         memory_text = "\n".join(f"- {m.memory_key}: {m.memory_value}" for m in memories[:10])
         if memory_text:
             context = f"User memories:\n{memory_text}\n\n{context}"

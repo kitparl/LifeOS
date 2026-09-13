@@ -1,6 +1,7 @@
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.journal.models import JournalEntry
 from app.modules.journal.schemas import JournalCreate, JournalUpdate
 
@@ -10,8 +11,13 @@ class JournalRepository:
         self.db = db
 
     async def list_entries(
-        self, user_id: str, entry_type: str | None = None, search: str | None = None
-    ) -> list[JournalEntry]:
+        self,
+        user_id: str,
+        entry_type: str | None = None,
+        search: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[JournalEntry], int]:
         q = select(JournalEntry).where(JournalEntry.user_id == user_id)
         if entry_type:
             q = q.where(JournalEntry.entry_type == entry_type)
@@ -25,8 +31,7 @@ class JournalRepository:
                 )
             )
         q = q.order_by(JournalEntry.entry_date.desc(), JournalEntry.created_at.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_by_id(self, user_id: str, entry_id: str) -> JournalEntry | None:
         result = await self.db.execute(

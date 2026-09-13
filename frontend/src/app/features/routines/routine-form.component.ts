@@ -280,8 +280,8 @@ export class RoutineFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.habitsService.list(true).subscribe({
-      next: (habits) => (this.availableHabits = habits),
+    this.habitsService.list({ activeOnly: true, limit: 100 }).subscribe({
+      next: (result) => (this.availableHabits = result.items),
     });
     this.routinesService.listAreas().subscribe({ next: (a) => this.areaOptions.set(a) });
     this.routinesService.listCategories().subscribe({ next: (c) => this.categoryOptions.set(c) });

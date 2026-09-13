@@ -186,7 +186,7 @@ export class QAListComponent implements OnInit {
   total = 0;
   loading = false;
   currentPage = 1;
-  readonly pageSize = 20;
+  readonly pageSize = 25;
   readonly types = signal<string[]>([]);
 
   filters = this.fb.nonNullable.group({ search: '', type: '', tag: '' });

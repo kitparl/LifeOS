@@ -27,8 +27,11 @@ class CareerService:
         updated = await self.repo.update_profile(profile, data)
         return CareerProfileResponse.model_validate(updated)
 
-    async def list_projects(self, user_id: str) -> list[ProjectResponse]:
-        return [ProjectResponse.model_validate(p) for p in await self.repo.list_projects(user_id)]
+    async def list_projects(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[ProjectResponse], int]:
+        projects, total = await self.repo.list_projects(user_id, limit=limit, offset=offset)
+        return [ProjectResponse.model_validate(p) for p in projects], total
 
     async def get_project(self, user_id: str, project_id: str) -> ProjectResponse:
         project = await self.repo.get_project(user_id, project_id)
@@ -53,8 +56,11 @@ class CareerService:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
         await self.repo.delete_project(project)
 
-    async def list_applications(self, user_id: str) -> list[ApplicationResponse]:
-        return [ApplicationResponse.model_validate(a) for a in await self.repo.list_applications(user_id)]
+    async def list_applications(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[ApplicationResponse], int]:
+        apps, total = await self.repo.list_applications(user_id, limit=limit, offset=offset)
+        return [ApplicationResponse.model_validate(a) for a in apps], total
 
     async def get_application(self, user_id: str, app_id: str) -> ApplicationResponse:
         app = await self.repo.get_application(user_id, app_id)
@@ -80,8 +86,8 @@ class CareerService:
         await self.repo.delete_application(app)
 
     async def analytics(self, user_id: str) -> dict:
-        apps = await self.repo.list_applications(user_id)
-        projects = await self.repo.list_projects(user_id)
+        apps, _ = await self.repo.list_applications(user_id, limit=None)
+        projects, _ = await self.repo.list_projects(user_id, limit=None)
         by_status: dict[str, int] = {}
         for a in apps:
             by_status[a.status] = by_status.get(a.status, 0) + 1

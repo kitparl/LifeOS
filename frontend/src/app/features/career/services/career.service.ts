@@ -1,7 +1,12 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+
+export interface CareerListResult {
+  items: Record<string, unknown>[];
+  total: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class CareerService {
@@ -16,8 +21,18 @@ export class CareerService {
     return this.http.patch<Record<string, unknown>>(`${this.api}/profile`, data);
   }
 
-  listProjects(): Observable<Record<string, unknown>[]> {
-    return this.http.get<Record<string, unknown>[]>(`${this.api}/projects`);
+  listProjects(opts?: { limit?: number; offset?: number }): Observable<CareerListResult> {
+    let params = new HttpParams();
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http
+      .get<Record<string, unknown>[]>(`${this.api}/projects`, { params, observe: 'response' })
+      .pipe(
+        map((response: HttpResponse<Record<string, unknown>[]>) => ({
+          items: response.body ?? [],
+          total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+        })),
+      );
   }
 
   createProject(data: Record<string, unknown>): Observable<Record<string, unknown>> {
@@ -28,8 +43,18 @@ export class CareerService {
     return this.http.delete<void>(`${this.api}/projects/${id}`);
   }
 
-  listApplications(): Observable<Record<string, unknown>[]> {
-    return this.http.get<Record<string, unknown>[]>(`${this.api}/applications`);
+  listApplications(opts?: { limit?: number; offset?: number }): Observable<CareerListResult> {
+    let params = new HttpParams();
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http
+      .get<Record<string, unknown>[]>(`${this.api}/applications`, { params, observe: 'response' })
+      .pipe(
+        map((response: HttpResponse<Record<string, unknown>[]>) => ({
+          items: response.body ?? [],
+          total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+        })),
+      );
   }
 
   createApplication(data: Record<string, unknown>): Observable<Record<string, unknown>> {

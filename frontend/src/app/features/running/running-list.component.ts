@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BarChartComponent } from '../../shared/charts/bar-chart.component';
 import { LineChartComponent } from '../../shared/charts/line-chart.component';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import {
   RaceEvent,
   RunListItem,
@@ -22,7 +23,7 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
 @Component({
   selector: 'app-running-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, LineChartComponent, BarChartComponent],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, LineChartComponent, BarChartComponent, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -106,7 +107,7 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
             <div class="empty-state">
               <div class="skeleton" style="width: 160px; height: 14px"></div>
             </div>
-          } @else if (runs.length === 0) {
+          } @else if (runsTotal === 0) {
             <div class="empty-state">
               <div class="empty-state__icon">🏃</div>
               <p class="empty-state__title">No runs yet</p>
@@ -146,6 +147,12 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
                   </div>
                 </article>
               }
+              <app-list-paginator
+                [total]="runsTotal"
+                [pageSize]="pageSize"
+                [currentPage]="currentPage"
+                (pageChange)="setPage($event)"
+              />
             </div>
             <div class="hidden overflow-x-auto md:block">
               <table class="w-full text-sm" style="min-width: 520px">
@@ -203,6 +210,12 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
                   }
                 </tbody>
               </table>
+              <app-list-paginator
+                [total]="runsTotal"
+                [pageSize]="pageSize"
+                [currentPage]="currentPage"
+                (pageChange)="setPage($event)"
+              />
             </div>
           }
         </div>
@@ -472,11 +485,14 @@ export class RunningListComponent implements OnInit {
   ] as const;
 
   runs: RunListItem[] = [];
+  runsTotal = 0;
   races: RaceEvent[] = [];
   stats: RunningStats | null = null;
   shoeOptions: string[] = [];
   shoeFilter = signal('');
   loading = false;
+  currentPage = 1;
+  readonly pageSize = 25;
 
   settingsForm = this.fb.nonNullable.group({
     weekly_goal_km: [40, [Validators.required, Validators.min(1)]],
@@ -506,9 +522,12 @@ export class RunningListComponent implements OnInit {
   load(): void {
     this.loading = true;
     const shoe = this.shoeFilter() || undefined;
-    this.runningService.listRuns(shoe).subscribe({
-      next: (runs) => {
-        this.runs = runs;
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.runningService.listRuns({ shoe, limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.runs = result.items;
+        this.runsTotal = result.total;
+        this.clampPage();
         this.loading = false;
       },
       error: () => (this.loading = false),
@@ -532,8 +551,22 @@ export class RunningListComponent implements OnInit {
     this.runningService.listRaces().subscribe({ next: (r) => (this.races = r) });
   }
 
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.runsTotal / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
+  }
+
   filterByShoe(shoe: string): void {
     this.shoeFilter.set(shoe);
+    this.currentPage = 1;
     this.setTab('runs');
     this.load();
   }

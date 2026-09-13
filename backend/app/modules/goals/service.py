@@ -50,14 +50,24 @@ class GoalService:
         status: str | None = None,
         period: str | None = None,
         missed: bool | None = None,
-    ) -> list[GoalListItem]:
-        goals = await self.repo.list_goals(user_id, category, status, period)
-        items = [self._to_list_item(g) for g in goals]
-        if missed is True:
-            items = [i for i in items if i.is_missed]
-        elif missed is False:
-            items = [i for i in items if not i.is_missed]
-        return items
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[GoalListItem], int]:
+        # `missed` is derived in Python, so filter then slice when that flag is set.
+        if missed is not None:
+            goals = await self.repo.list_goals_all(user_id, category, status, period)
+            items = [self._to_list_item(g) for g in goals]
+            if missed is True:
+                items = [i for i in items if i.is_missed]
+            else:
+                items = [i for i in items if not i.is_missed]
+            total = len(items)
+            return items[offset : offset + limit], total
+
+        goals, total = await self.repo.list_goals(
+            user_id, category, status, period, limit=limit, offset=offset
+        )
+        return [self._to_list_item(g) for g in goals], total
 
     async def list_categories(self, user_id: str) -> list[str]:
         """Suggested defaults + user-created, de-duplicated (CI) and sorted."""

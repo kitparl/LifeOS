@@ -1,12 +1,13 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { filesFromClipboard, filesFromDataTransfer } from '../../shared/file-upload/clipboard-files';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { OcrDocument, OcrService } from './services/ocr.service';
 
 @Component({
   selector: 'app-ocr-page',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
       <h1 class="text-lg font-semibold">OCR Pipeline</h1>
@@ -72,6 +73,12 @@ import { OcrDocument, OcrService } from './services/ocr.service';
           <li class="px-3 py-4 text-gray-600">No OCR documents yet.</li>
         }
       </ul>
+      <app-list-paginator
+        [total]="total"
+        [pageSize]="pageSize"
+        [currentPage]="currentPage"
+        (pageChange)="setPage($event)"
+      />
     </div>
   `,
 })
@@ -79,6 +86,9 @@ export class OcrPageComponent implements OnInit {
   private readonly ocr = inject(OcrService);
   private readonly fb = inject(FormBuilder);
   docs: OcrDocument[] = [];
+  total = 0;
+  currentPage = 1;
+  readonly pageSize = 25;
   uploading = false;
   dragOver = false;
   uploadError = '';
@@ -90,7 +100,27 @@ export class OcrPageComponent implements OnInit {
   }
 
   load(): void {
-    this.ocr.list().subscribe({ next: (d) => (this.docs = d) });
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.ocr.list({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.docs = result.items;
+        this.total = result.total;
+        this.clampPage();
+      },
+    });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   onFile(event: Event): void {

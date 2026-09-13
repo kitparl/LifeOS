@@ -11,9 +11,11 @@ class OcrService:
         self.repo = OcrRepository(db)
         self.files = FileService(db)
 
-    async def list_documents(self, user_id: str) -> list[OcrDocumentResponse]:
-        docs = await self.repo.list_documents(user_id)
-        return [OcrDocumentResponse.model_validate(d) for d in docs]
+    async def list_documents(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[OcrDocumentResponse], int]:
+        docs, total = await self.repo.list_documents(user_id, limit=limit, offset=offset)
+        return [OcrDocumentResponse.model_validate(d) for d in docs], total
 
     async def get_document(self, user_id: str, doc_id: str) -> OcrDocumentResponse:
         doc = await self.repo.get_by_id(user_id, doc_id)

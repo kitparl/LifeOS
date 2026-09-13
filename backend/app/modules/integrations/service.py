@@ -81,9 +81,11 @@ class IntegrationService:
     def __init__(self, db: AsyncSession):
         self.repo = IntegrationRepository(db)
 
-    async def list_connections(self, user_id: str) -> list[IntegrationResponse]:
-        conns = await self.repo.list_connections(user_id)
-        return [_safe_response(c) for c in conns]
+    async def list_connections(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[IntegrationResponse], int]:
+        conns, total = await self.repo.list_connections(user_id, limit=limit, offset=offset)
+        return [_safe_response(c) for c in conns], total
 
     async def create_connection(self, user_id: str, data: IntegrationCreate) -> IntegrationResponse:
         if data.provider not in INTEGRATION_PROVIDERS:

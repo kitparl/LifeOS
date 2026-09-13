@@ -1,11 +1,12 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { MemoryItem, MemoryService } from './services/memory.service';
 
 @Component({
   selector: 'app-memory-page',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
       <h1 class="text-lg font-semibold">AI Memory</h1>
@@ -33,19 +34,27 @@ import { MemoryItem, MemoryService } from './services/memory.service';
           <button type="submit" class="btn-primary text-xs" [disabled]="form.invalid">Save</button>
         </form>
       </div>
-      <ul class="panel !p-0 divide-y divide-[var(--xp-border)] text-sm">
-        @for (item of items; track item.id) {
-          <li class="flex justify-between gap-2 px-3 py-2">
-            <div>
-              <p class="font-medium">{{ item.memory_key }} <span class="text-xs text-gray-500 capitalize">({{ item.category }})</span></p>
-              <p class="" style="color: var(--text)">{{ item.memory_value }}</p>
-            </div>
-            <button type="button" class="text-xs text-red-700 shrink-0" (click)="remove(item.id)">Delete</button>
-          </li>
-        } @empty {
-          <li class="px-3 py-4 text-gray-600">No memories yet.</li>
-        }
-      </ul>
+      <div class="panel !p-0 overflow-hidden">
+        <ul class="divide-y divide-[var(--xp-border)] text-sm">
+          @for (item of items; track item.id) {
+            <li class="flex justify-between gap-2 px-3 py-2">
+              <div>
+                <p class="font-medium">{{ item.memory_key }} <span class="text-xs text-gray-500 capitalize">({{ item.category }})</span></p>
+                <p class="" style="color: var(--text)">{{ item.memory_value }}</p>
+              </div>
+              <button type="button" class="text-xs text-red-700 shrink-0" (click)="remove(item.id)">Delete</button>
+            </li>
+          } @empty {
+            <li class="px-3 py-4 text-gray-600">No memories yet.</li>
+          }
+        </ul>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
+      </div>
     </div>
   `,
 })
@@ -53,6 +62,9 @@ export class MemoryPageComponent implements OnInit {
   private readonly memory = inject(MemoryService);
   private readonly fb = inject(FormBuilder);
   items: MemoryItem[] = [];
+  total = 0;
+  currentPage = 1;
+  readonly pageSize = 25;
   summary: { total: number; by_category: Record<string, number> } | null = null;
   categoryEntries: [string, number][] = [];
   form = this.fb.nonNullable.group({
@@ -67,7 +79,14 @@ export class MemoryPageComponent implements OnInit {
   }
 
   load(): void {
-    this.memory.list().subscribe({ next: (d) => (this.items = d) });
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.memory.list({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.items = result.items;
+        this.total = result.total;
+        this.clampPage();
+      },
+    });
     this.memory.summary().subscribe({
       next: (s) => {
         this.summary = s;
@@ -76,9 +95,28 @@ export class MemoryPageComponent implements OnInit {
     });
   }
 
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
+  }
+
   add(): void {
     if (this.form.invalid) return;
-    this.memory.create(this.form.getRawValue()).subscribe({ next: () => { this.form.reset({ category: 'fact', importance: 3 }); this.load(); } });
+    this.memory.create(this.form.getRawValue()).subscribe({
+      next: () => {
+        this.form.reset({ category: 'fact', importance: 3 });
+        this.currentPage = 1;
+        this.load();
+      },
+    });
   }
 
   remove(id: string): void {

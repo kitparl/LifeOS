@@ -1,12 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { FinanceService } from './services/finance.service';
 
 @Component({
   selector: 'app-finance-page',
   standalone: true,
-  imports: [ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
       <h1 class="text-lg font-semibold">Finance</h1>
@@ -34,20 +35,28 @@ import { FinanceService } from './services/finance.service';
         </form>
       </div>
 
-      <ul class="panel !p-0 divide-y divide-[var(--xp-border)] text-sm">
-        @for (t of transactions; track t['id']) {
-          <li class="flex items-center justify-between gap-2 px-3 py-2">
-            <div>
-              <p>{{ $any(t).description || $any(t).category }} <span class="text-gray-500">({{ $any(t).txn_type }})</span></p>
-              <p class="text-xs text-gray-500">{{ $any(t).txn_date | date }}</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <span [class.text-green-700]="$any(t).txn_type === 'income'" [class.text-red-700]="$any(t).txn_type === 'expense'">{{ $any(t).amount }}</span>
-              <button type="button" class="text-xs" style="color: var(--danger)" (click)="removeTxn($any(t).id)">Delete</button>
-            </div>
-          </li>
-        }
-      </ul>
+      <div class="panel !p-0 overflow-hidden">
+        <ul class="divide-y divide-[var(--xp-border)] text-sm">
+          @for (t of transactions; track t['id']) {
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div>
+                <p>{{ $any(t).description || $any(t).category }} <span class="text-gray-500">({{ $any(t).txn_type }})</span></p>
+                <p class="text-xs text-gray-500">{{ $any(t).txn_date | date }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span [class.text-green-700]="$any(t).txn_type === 'income'" [class.text-red-700]="$any(t).txn_type === 'expense'">{{ $any(t).amount }}</span>
+                <button type="button" class="text-xs" style="color: var(--danger)" (click)="removeTxn($any(t).id)">Delete</button>
+              </div>
+            </li>
+          }
+        </ul>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
+      </div>
     </div>
   `,
 })
@@ -57,6 +66,9 @@ export class FinancePageComponent implements OnInit {
 
   summary: Record<string, unknown> | null = null;
   transactions: Record<string, unknown>[] = [];
+  total = 0;
+  currentPage = 1;
+  readonly pageSize = 25;
 
   txnForm = this.fb.nonNullable.group({
     txn_type: ['expense'],
@@ -72,13 +84,38 @@ export class FinancePageComponent implements OnInit {
 
   load(): void {
     this.finance.summary().subscribe({ next: (s) => (this.summary = s) });
-    this.finance.listTransactions().subscribe({ next: (t) => (this.transactions = t) });
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.finance.listTransactions({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.transactions = result.items;
+        this.total = result.total;
+        this.clampPage();
+      },
+    });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   addTxn(): void {
     const raw = this.txnForm.getRawValue();
     if (!raw.amount) return;
-    this.finance.createTransaction({ ...raw, description: raw.description || null }).subscribe({ next: () => this.load() });
+    this.finance.createTransaction({ ...raw, description: raw.description || null }).subscribe({
+      next: () => {
+        this.currentPage = 1;
+        this.load();
+      },
+    });
   }
 
   removeTxn(id: string): void {

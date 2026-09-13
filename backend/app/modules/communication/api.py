@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -24,11 +24,18 @@ router = APIRouter(prefix="/communication", tags=["communication"])
 
 @router.get("/vocabulary", response_model=list[VocabularyResponse])
 async def list_vocabulary(
+    response: Response,
     search: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await CommunicationService(db).list_vocabulary(user.id, search=search)
+    items, total = await CommunicationService(db).list_vocabulary(
+        user.id, search=search, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/vocabulary", response_model=VocabularyResponse, status_code=status.HTTP_201_CREATED)
@@ -70,11 +77,18 @@ async def delete_vocabulary(
 
 @router.get("/writing", response_model=list[WritingResponse])
 async def list_writing(
+    response: Response,
     category: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await CommunicationService(db).list_writing(user.id, category=category)
+    items, total = await CommunicationService(db).list_writing(
+        user.id, category=category, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/writing", response_model=WritingResponse, status_code=status.HTTP_201_CREATED)
@@ -152,11 +166,18 @@ async def get_writing_rewrite(
 
 @router.get("/speaking", response_model=list[SpeakingResponse])
 async def list_speaking(
+    response: Response,
     category: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await CommunicationService(db).list_speaking(user.id, category=category)
+    items, total = await CommunicationService(db).list_speaking(
+        user.id, category=category, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/speaking", response_model=SpeakingResponse, status_code=status.HTTP_201_CREATED)

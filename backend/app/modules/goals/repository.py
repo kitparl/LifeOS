@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Pagination, paginate
 from app.modules.goals.models import Goal, GoalCategory, GoalMilestone
 from app.modules.goals.schemas import GoalCreate, GoalUpdate, MilestoneCreate, MilestoneUpdate
 
@@ -62,13 +63,13 @@ class GoalRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_goals(
+    def _goals_base_query(
         self,
         user_id: str,
         category: str | None = None,
         status: str | None = None,
         period: str | None = None,
-    ) -> list[Goal]:
+    ):
         q = select(Goal).where(Goal.user_id == user_id).options(selectinload(Goal.milestones))
         if category:
             q = q.where(Goal.category == category)
@@ -76,8 +77,37 @@ class GoalRepository:
             q = q.where(Goal.status == status)
         if period:
             q = q.where(Goal.period == period)
-        q = q.order_by(Goal.updated_at.desc())
-        result = await self.db.execute(q)
+        return q.order_by(Goal.updated_at.desc())
+
+    async def list_goals(
+        self,
+        user_id: str,
+        category: str | None = None,
+        status: str | None = None,
+        period: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[Goal], int]:
+        q = self._goals_base_query(user_id, category, status, period)
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().unique().all())
+            return rows, len(rows)
+        return await paginate(
+            self.db,
+            q,
+            Pagination(limit=limit, offset=offset),
+            unique=True,
+        )
+
+    async def list_goals_all(
+        self,
+        user_id: str,
+        category: str | None = None,
+        status: str | None = None,
+        period: str | None = None,
+    ) -> list[Goal]:
+        result = await self.db.execute(self._goals_base_query(user_id, category, status, period))
         return list(result.scalars().unique().all())
 
     async def get_active_for_dashboard(self, user_id: str, limit: int = 5) -> list[Goal]:

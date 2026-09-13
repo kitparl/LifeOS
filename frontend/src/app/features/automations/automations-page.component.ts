@@ -1,11 +1,12 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { AutomationRule, AutomationsService } from './services/automations.service';
 
 @Component({
   selector: 'app-automations-page',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -30,17 +31,25 @@ import { AutomationRule, AutomationsService } from './services/automations.servi
           <button type="submit" class="btn-primary text-xs sm:col-span-2 !w-fit" [disabled]="form.invalid">Add rule</button>
         </form>
       </div>
-      <ul class="panel !p-0 divide-y divide-[var(--xp-border)] text-sm">
-        @for (r of rules; track r.id) {
-          <li class="flex justify-between gap-2 px-3 py-2">
-            <div>
-              <p class="font-medium">{{ r.name }}</p>
-              <p class="text-xs" style="color: var(--text-muted)">{{ r.trigger_type }} → {{ r.action_type }}</p>
-            </div>
-            <button type="button" class="text-xs" style="color: var(--danger)" (click)="remove(r.id)">Delete</button>
-          </li>
-        }
-      </ul>
+      <div class="panel !p-0 overflow-hidden">
+        <ul class="divide-y divide-[var(--xp-border)] text-sm">
+          @for (r of rules; track r.id) {
+            <li class="flex justify-between gap-2 px-3 py-2">
+              <div>
+                <p class="font-medium">{{ r.name }}</p>
+                <p class="text-xs" style="color: var(--text-muted)">{{ r.trigger_type }} → {{ r.action_type }}</p>
+              </div>
+              <button type="button" class="text-xs" style="color: var(--danger)" (click)="remove(r.id)">Delete</button>
+            </li>
+          }
+        </ul>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
+      </div>
       @if (evalResults) {
         <div class="panel text-sm">
           <p class="font-medium mb-2">Last evaluation: {{ evalResults.triggered }}/{{ evalResults.evaluated }} triggered</p>
@@ -58,6 +67,9 @@ export class AutomationsPageComponent implements OnInit {
   private readonly automations = inject(AutomationsService);
   private readonly fb = inject(FormBuilder);
   rules: AutomationRule[] = [];
+  total = 0;
+  currentPage = 1;
+  readonly pageSize = 25;
   evalResults: { evaluated: number; triggered: number; results: { rule_name: string; triggered: boolean; message: string | null }[] } | null = null;
   form = this.fb.nonNullable.group({
     name: '',
@@ -71,12 +83,38 @@ export class AutomationsPageComponent implements OnInit {
   }
 
   load(): void {
-    this.automations.list().subscribe({ next: (r) => (this.rules = r) });
+    const offset = (this.currentPage - 1) * this.pageSize;
+    this.automations.list({ limit: this.pageSize, offset }).subscribe({
+      next: (result) => {
+        this.rules = result.items;
+        this.total = result.total;
+        this.clampPage();
+      },
+    });
+  }
+
+  setPage(page: number): void {
+    this.currentPage = page;
+    this.load();
+  }
+
+  private clampPage(): void {
+    const totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+    if (this.currentPage > totalPages) {
+      this.currentPage = totalPages;
+      this.load();
+    }
   }
 
   add(): void {
     if (this.form.invalid) return;
-    this.automations.create(this.form.getRawValue()).subscribe({ next: () => { this.form.reset({ trigger_type: 'no_journal_days', action_type: 'notify', condition_json: '{"days":3}' }); this.load(); } });
+    this.automations.create(this.form.getRawValue()).subscribe({
+      next: () => {
+        this.form.reset({ trigger_type: 'no_journal_days', action_type: 'notify', condition_json: '{"days":3}' });
+        this.currentPage = 1;
+        this.load();
+      },
+    });
   }
 
   remove(id: string): void {

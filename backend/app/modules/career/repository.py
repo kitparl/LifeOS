@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.career.models import CareerProfile, CareerProject, JobApplication
 from app.modules.career.schemas import (
     ApplicationCreate,
@@ -33,11 +34,19 @@ class CareerRepository:
         await self.db.refresh(profile)
         return profile
 
-    async def list_projects(self, user_id: str) -> list[CareerProject]:
-        result = await self.db.execute(
-            select(CareerProject).where(CareerProject.user_id == user_id).order_by(CareerProject.updated_at.desc())
+    async def list_projects(
+        self, user_id: str, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[CareerProject], int]:
+        q = (
+            select(CareerProject)
+            .where(CareerProject.user_id == user_id)
+            .order_by(CareerProject.updated_at.desc())
         )
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_project(self, user_id: str, project_id: str) -> CareerProject | None:
         result = await self.db.execute(
@@ -62,11 +71,19 @@ class CareerRepository:
     async def delete_project(self, project: CareerProject) -> None:
         await self.db.delete(project)
 
-    async def list_applications(self, user_id: str) -> list[JobApplication]:
-        result = await self.db.execute(
-            select(JobApplication).where(JobApplication.user_id == user_id).order_by(JobApplication.updated_at.desc())
+    async def list_applications(
+        self, user_id: str, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[JobApplication], int]:
+        q = (
+            select(JobApplication)
+            .where(JobApplication.user_id == user_id)
+            .order_by(JobApplication.updated_at.desc())
         )
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_application(self, user_id: str, app_id: str) -> JobApplication | None:
         result = await self.db.execute(

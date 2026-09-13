@@ -3,6 +3,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.finance.models import FinanceBudget, FinanceTransaction
 from app.modules.finance.schemas import BudgetCreate, BudgetUpdate, TransactionCreate, TransactionUpdate
 
@@ -12,8 +13,13 @@ class FinanceRepository:
         self.db = db
 
     async def list_transactions(
-        self, user_id: str, txn_type: str | None = None, month: date | None = None
-    ) -> list[FinanceTransaction]:
+        self,
+        user_id: str,
+        txn_type: str | None = None,
+        month: date | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[FinanceTransaction], int]:
         q = select(FinanceTransaction).where(FinanceTransaction.user_id == user_id)
         if txn_type:
             q = q.where(FinanceTransaction.txn_type == txn_type)
@@ -21,8 +27,11 @@ class FinanceRepository:
             start = month.replace(day=1)
             q = q.where(FinanceTransaction.txn_date >= start)
         q = q.order_by(FinanceTransaction.txn_date.desc())
-        result = await self.db.execute(q)
-        return list(result.scalars().all())
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_transaction(self, user_id: str, txn_id: str) -> FinanceTransaction | None:
         result = await self.db.execute(
@@ -47,9 +56,15 @@ class FinanceRepository:
     async def delete_transaction(self, txn: FinanceTransaction) -> None:
         await self.db.delete(txn)
 
-    async def list_budgets(self, user_id: str) -> list[FinanceBudget]:
-        result = await self.db.execute(select(FinanceBudget).where(FinanceBudget.user_id == user_id))
-        return list(result.scalars().all())
+    async def list_budgets(
+        self, user_id: str, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[FinanceBudget], int]:
+        q = select(FinanceBudget).where(FinanceBudget.user_id == user_id)
+        if limit is None:
+            result = await self.db.execute(q)
+            rows = list(result.scalars().all())
+            return rows, len(rows)
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def upsert_budget(self, user_id: str, data: BudgetCreate) -> FinanceBudget:
         result = await self.db.execute(

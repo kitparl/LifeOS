@@ -1,17 +1,33 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Habit, HabitCreate, HabitListItem, HabitUpdate } from '../models/habit.models';
+
+export interface HabitListResult {
+  items: HabitListItem[];
+  total: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class HabitsService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/habits`;
 
-  list(activeOnly = true): Observable<HabitListItem[]> {
-    const params = new HttpParams().set('active_only', String(activeOnly));
-    return this.http.get<HabitListItem[]>(this.api, { params });
+  list(opts?: {
+    activeOnly?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Observable<HabitListResult> {
+    let params = new HttpParams().set('active_only', String(opts?.activeOnly ?? true));
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<HabitListItem[]>(this.api, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<HabitListItem[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   get(id: string): Observable<Habit> {

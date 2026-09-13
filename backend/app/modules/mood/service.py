@@ -10,9 +10,13 @@ class MoodService:
     def __init__(self, db: AsyncSession):
         self.repo = MoodRepository(db)
 
-    async def list_entries(self, user_id: str, days: int = 30) -> list[MoodResponse]:
-        entries = await self.repo.list_entries(user_id, days=days)
-        return [MoodResponse.model_validate(e) for e in entries]
+    async def list_entries(
+        self, user_id: str, days: int = 30, limit: int = 25, offset: int = 0
+    ) -> tuple[list[MoodResponse], int]:
+        entries, total = await self.repo.list_entries(
+            user_id, days=days, limit=limit, offset=offset
+        )
+        return [MoodResponse.model_validate(e) for e in entries], total
 
     async def get_today(self, user_id: str) -> MoodResponse | None:
         today = datetime.now(timezone.utc).date()
@@ -24,7 +28,7 @@ class MoodService:
         return MoodResponse.model_validate(entry)
 
     async def get_stats(self, user_id: str, days: int = 7) -> MoodStats:
-        entries = await self.repo.list_entries(user_id, days=days)
+        entries, _ = await self.repo.list_entries(user_id, days=days, limit=None)
         if not entries:
             return MoodStats(
                 days=days,

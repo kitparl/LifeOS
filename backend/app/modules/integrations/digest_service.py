@@ -97,16 +97,16 @@ class DigestService:
             when = e.starts_at.strftime("%Y-%m-%d %H:%M") if e.starts_at else "?"
             content.upcoming_events.append(f"{e.title} @ {when}")
 
-        races = await RunningService(self.db).list_races(user_id, upcoming_only=True)
+        races, _ = await RunningService(self.db).list_races(user_id, upcoming_only=True, limit=None)
         for r in races[:10]:
             content.upcoming_races.append(f"{r.name} · {r.race_date}")
 
-        habits = await HabitService(self.db).list_habits(user_id, active_only=True)
+        habits, _ = await HabitService(self.db).list_habits(user_id, active_only=True, limit=100)
         for h in habits:
             if not h.completed_today:
                 content.habits_due.append(f"{h.name} ({h.frequency})")
 
-        goals = await GoalService(self.db).list_goals(user_id, status="active")
+        goals, _ = await GoalService(self.db).list_goals(user_id, status="active", limit=100)
         for g in goals[:10]:
             target = g.target_date.date().isoformat() if g.target_date else "no target"
             content.active_goals.append(f"{g.title} · {g.progress}% · {target}")

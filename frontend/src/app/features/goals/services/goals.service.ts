@@ -1,6 +1,6 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import {
   Goal,
@@ -9,6 +9,11 @@ import {
   GoalUpdate,
   Milestone,
 } from '../models/goal.models';
+
+export interface GoalListResult {
+  items: GoalListItem[];
+  total: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class GoalsService {
@@ -20,14 +25,23 @@ export class GoalsService {
     status?: string;
     period?: string;
     missed?: boolean;
-  }): Observable<GoalListItem[]> {
+    limit?: number;
+    offset?: number;
+  }): Observable<GoalListResult> {
     let params = new HttpParams();
     if (opts?.category) params = params.set('category', opts.category);
     if (opts?.status) params = params.set('status', opts.status);
     if (opts?.period) params = params.set('period', opts.period);
     if (opts?.missed === true) params = params.set('missed', 'true');
     if (opts?.missed === false) params = params.set('missed', 'false');
-    return this.http.get<GoalListItem[]>(this.api, { params });
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http.get<GoalListItem[]>(this.api, { params, observe: 'response' }).pipe(
+      map((response: HttpResponse<GoalListItem[]>) => ({
+        items: response.body ?? [],
+        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+      })),
+    );
   }
 
   get(id: string): Observable<Goal> {

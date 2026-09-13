@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,12 +12,19 @@ router = APIRouter(prefix="/journal", tags=["journal"])
 
 @router.get("/entries", response_model=list[JournalListItem])
 async def list_entries(
+    response: Response,
     entry_type: str | None = Query(default=None),
     search: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await JournalService(db).list_entries(user.id, entry_type=entry_type, search=search)
+    items, total = await JournalService(db).list_entries(
+        user.id, entry_type=entry_type, search=search, limit=limit, offset=offset
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("/entries", response_model=JournalResponse, status_code=status.HTTP_201_CREATED)

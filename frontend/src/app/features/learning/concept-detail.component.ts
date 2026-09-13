@@ -255,7 +255,7 @@ export class LearningConceptDetailComponent implements OnInit {
     this.learningService.listSessions().subscribe({
       next: (all) => this.sessions.set(all.filter((s) => s.concept_id === id)),
     });
-    this.knowledgeService.listSubjects().subscribe({ next: (s) => this.subjects.set(s) });
+    this.knowledgeService.listSubjects({ limit: 100 }).subscribe({ next: (result) => this.subjects.set(result.items) });
     this.loadNotes(id);
   }
 
@@ -288,7 +288,7 @@ export class LearningConceptDetailComponent implements OnInit {
         next: (note) => {
           this.notes.update((list) => [...list, note]);
           this.noteForm.patchValue({ subject_id: note.subject_id, subject_title: '', title: '', content: '' });
-          this.knowledgeService.listSubjects().subscribe({ next: (s) => this.subjects.set(s) });
+          this.knowledgeService.listSubjects({ limit: 100 }).subscribe({ next: (result) => this.subjects.set(result.items) });
           this.savingNote.set(false);
         },
         error: () => this.savingNote.set(false),

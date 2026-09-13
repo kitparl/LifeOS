@@ -11,7 +11,6 @@ from app.modules.life_timeline.schemas import (
     MilestoneUpdate,
 )
 from app.modules.memory.repository import MemoryRepository
-from app.modules.timeline.schemas import TimelineItem
 from app.modules.timeline.service import TimelineService
 
 
@@ -22,10 +21,12 @@ class LifeTimelineService:
         self.timeline = TimelineService(db)
         self.memory_repo = MemoryRepository(db)
 
-    async def list_complete(self, user_id: str, limit: int = 150) -> list[LifeTimelineItem]:
+    async def list_complete(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[LifeTimelineItem], int]:
         items: list[LifeTimelineItem] = []
 
-        events: list[TimelineItem] = await self.timeline.list_events(user_id, limit=limit)
+        events, _ = await self.timeline.list_events(user_id, limit=None)
         for e in events:
             items.append(
                 LifeTimelineItem(
@@ -38,7 +39,7 @@ class LifeTimelineService:
                 )
             )
 
-        milestones = await self.repo.list_milestones(user_id)
+        milestones, _ = await self.repo.list_milestones(user_id, limit=None)
         for m in milestones:
             at = datetime.combine(m.milestone_date, datetime.min.time()).replace(
                 tzinfo=m.created_at.tzinfo
@@ -58,7 +59,7 @@ class LifeTimelineService:
                 )
             )
 
-        memories = await self.memory_repo.list_items(user_id)
+        memories, _ = await self.memory_repo.list_items(user_id, limit=None)
         for mem in memories[:20]:
             items.append(
                 LifeTimelineItem(
@@ -75,11 +76,14 @@ class LifeTimelineService:
             )
 
         items.sort(key=lambda x: x.occurred_at, reverse=True)
-        return items[:limit]
+        total = len(items)
+        return items[offset : offset + limit], total
 
-    async def list_milestones(self, user_id: str) -> list[MilestoneResponse]:
-        ms = await self.repo.list_milestones(user_id)
-        return [MilestoneResponse.model_validate(m) for m in ms]
+    async def list_milestones(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[MilestoneResponse], int]:
+        ms, total = await self.repo.list_milestones(user_id, limit=limit, offset=offset)
+        return [MilestoneResponse.model_validate(m) for m in ms], total
 
     async def create_milestone(self, user_id: str, data: MilestoneCreate) -> MilestoneResponse:
         m = await self.repo.create(user_id, data)

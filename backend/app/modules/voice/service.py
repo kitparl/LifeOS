@@ -40,9 +40,11 @@ class VoiceService:
     def __init__(self, db: AsyncSession):
         self.repo = VoiceRepository(db)
 
-    async def list_notes(self, user_id: str) -> list[VoiceNoteResponse]:
-        notes = await self.repo.list_notes(user_id)
-        return [VoiceNoteResponse.model_validate(n) for n in notes]
+    async def list_notes(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[VoiceNoteResponse], int]:
+        notes, total = await self.repo.list_notes(user_id, limit=limit, offset=offset)
+        return [VoiceNoteResponse.model_validate(n) for n in notes], total
 
     async def create_note(self, user_id: str, data: VoiceNoteCreate) -> VoiceNoteResponse:
         note = await self.repo.create(user_id, data)

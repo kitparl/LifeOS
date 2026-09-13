@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Pagination, paginate
 from app.modules.integrations.models import IntegrationConnection
 from app.modules.integrations.schemas import IntegrationCreate, IntegrationUpdate
 
@@ -9,13 +10,15 @@ class IntegrationRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_connections(self, user_id: str) -> list[IntegrationConnection]:
-        result = await self.db.execute(
+    async def list_connections(
+        self, user_id: str, limit: int = 25, offset: int = 0
+    ) -> tuple[list[IntegrationConnection], int]:
+        q = (
             select(IntegrationConnection)
             .where(IntegrationConnection.user_id == user_id)
             .order_by(IntegrationConnection.provider)
         )
-        return list(result.scalars().all())
+        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def get_by_id(self, user_id: str, conn_id: str) -> IntegrationConnection | None:
         result = await self.db.execute(
