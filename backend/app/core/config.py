@@ -5,6 +5,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEV_ENVS = frozenset({"dev", "development", "local"})
+_DEFAULT_SECRET_KEY = "dev-secret-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -13,7 +14,7 @@ class Settings(BaseSettings):
     app_name: str = "LifeOS API"
     app_env: str = Field(default="production", validation_alias="ENV")
     database_url: str = "sqlite+aiosqlite:///./lifeos_dev.db"
-    secret_key: str = "dev-secret-change-in-production"
+    secret_key: str = _DEFAULT_SECRET_KEY
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 30
@@ -49,7 +50,7 @@ class Settings(BaseSettings):
     ai_chat_model: str = "gpt-4o-mini"
     ai_embedding_model: str = "text-embedding-3-small"
     # Fernet key (url-safe base64-encoded 32 bytes) for encrypting integration secrets at rest.
-    # If empty, a stable key is derived from secret_key. Prefer setting this in production.
+    # Required in production. In development, if empty, a stable key is derived from secret_key.
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     # Production APIs that handle bot tokens MUST be served over HTTPS (TLS terminated at reverse proxy).
     integration_enc_key: str = Field(default="", validation_alias="INTEGRATION_ENC_KEY")
@@ -80,6 +81,16 @@ class Settings(BaseSettings):
     def apply_env_defaults(self) -> Self:
         if self.cookie_secure is None:
             self.cookie_secure = self.is_production
+        if self.is_production:
+            if self.secret_key == _DEFAULT_SECRET_KEY:
+                raise ValueError(
+                    "SECRET_KEY must be set to a unique non-default value when ENV is production"
+                )
+            if not (self.integration_enc_key or "").strip():
+                raise ValueError(
+                    "INTEGRATION_ENC_KEY must be set when ENV is production "
+                    "(do not derive encryption from SECRET_KEY in production)"
+                )
         return self
 
     @property

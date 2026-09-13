@@ -1,9 +1,10 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import GOAL_CREATED, GOAL_MILESTONE_ADDED, EntityCreated, event_bus
 from app.modules.goals.models import SUGGESTED_GOAL_CATEGORIES, Goal
 from app.modules.goals.repository import GoalRepository, is_goal_missed
+from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.goals.schemas import (
     GoalCreate,
     GoalListItem,
@@ -13,7 +14,6 @@ from app.modules.goals.schemas import (
     MilestoneResponse,
     MilestoneUpdate,
 )
-
 
 class GoalService:
     def __init__(self, db: AsyncSession):
@@ -82,14 +82,12 @@ class GoalService:
     async def create_category(self, user_id: str, name: str) -> str:
         clean = name.strip()
         if not clean:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name required")
+            raise BadRequestError("Category name required")
         await self.repo.ensure_category(user_id, clean)
         return clean
 
     async def get_goal(self, user_id: str, goal_id: str) -> GoalResponse:
-        goal = await self.repo.get_by_id(user_id, goal_id)
-        if goal is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+        goal = get_or_404(await self.repo.get_by_id(user_id, goal_id), "Goal not found")
         return self._to_response(goal)
 
     async def create_goal(self, user_id: str, data: GoalCreate) -> GoalResponse:
@@ -109,29 +107,21 @@ class GoalService:
         return self._to_response(goal)
 
     async def update_goal(self, user_id: str, goal_id: str, data: GoalUpdate) -> GoalResponse:
-        goal = await self.repo.get_by_id(user_id, goal_id)
-        if goal is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+        goal = get_or_404(await self.repo.get_by_id(user_id, goal_id), "Goal not found")
         updated = await self.repo.update(goal, data)
         return self._to_response(updated)
 
     async def archive_goal(self, user_id: str, goal_id: str) -> GoalResponse:
-        goal = await self.repo.get_by_id(user_id, goal_id)
-        if goal is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+        goal = get_or_404(await self.repo.get_by_id(user_id, goal_id), "Goal not found")
         archived = await self.repo.archive(goal)
         return self._to_response(archived)
 
     async def delete_goal(self, user_id: str, goal_id: str) -> None:
-        goal = await self.repo.get_by_id(user_id, goal_id)
-        if goal is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+        goal = get_or_404(await self.repo.get_by_id(user_id, goal_id), "Goal not found")
         await self.repo.delete(goal)
 
     async def add_milestone(self, user_id: str, goal_id: str, data: MilestoneCreate) -> MilestoneResponse:
-        goal = await self.repo.get_by_id(user_id, goal_id)
-        if goal is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+        goal = get_or_404(await self.repo.get_by_id(user_id, goal_id), "Goal not found")
         milestone = await self.repo.add_milestone(goal, data)
         await event_bus.emit(
             self.repo.db,
@@ -149,20 +139,12 @@ class GoalService:
     async def update_milestone(
         self, user_id: str, goal_id: str, milestone_id: str, data: MilestoneUpdate
     ) -> MilestoneResponse:
-        goal = await self.repo.get_by_id(user_id, goal_id)
-        if goal is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
-        milestone = await self.repo.get_milestone(goal_id, milestone_id)
-        if milestone is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Milestone not found")
+        get_or_404(await self.repo.get_by_id(user_id, goal_id), "Goal not found")
+        milestone = get_or_404(await self.repo.get_milestone(goal_id, milestone_id), "Milestone not found")
         updated = await self.repo.update_milestone(milestone, data)
         return MilestoneResponse.model_validate(updated)
 
     async def delete_milestone(self, user_id: str, goal_id: str, milestone_id: str) -> None:
-        goal = await self.repo.get_by_id(user_id, goal_id)
-        if goal is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
-        milestone = await self.repo.get_milestone(goal_id, milestone_id)
-        if milestone is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Milestone not found")
+        get_or_404(await self.repo.get_by_id(user_id, goal_id), "Goal not found")
+        milestone = get_or_404(await self.repo.get_milestone(goal_id, milestone_id), "Milestone not found")
         await self.repo.delete_milestone(milestone)

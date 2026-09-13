@@ -3,9 +3,8 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 
 import filetype
-from fastapi import HTTPException, status
-
 from app.core.config import Settings, get_settings
+from app.core.exceptions import BadRequestError
 
 ALLOWED_MODULES = frozenset(
     {
@@ -101,26 +100,21 @@ NEVER_INLINE_TYPES = frozenset(
     }
 )
 
-
 def parse_allowed_types(settings: Settings | None = None) -> set[str]:
     settings = settings or get_settings()
     return {t.strip().lower() for t in settings.allowed_upload_types.split(",") if t.strip()}
-
 
 def validate_module(module: str | None) -> str | None:
     if module is None or module == "":
         return None
     if module not in ALLOWED_MODULES:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid module '{module}'. Allowed: {', '.join(sorted(ALLOWED_MODULES))}",
+        raise BadRequestError(
+            f"Invalid module '{module}'. Allowed: {', '.join(sorted(ALLOWED_MODULES))}",
         )
     return module
 
-
 def extension_for_mime(content_type: str) -> str:
     return _MIME_TO_EXT.get(content_type.lower(), "")
-
 
 def sniff_content_type(head_bytes: bytes, filename: str, settings: Settings | None = None) -> str:
     """Sniff real type from magic bytes; fall back for text; enforce allowlist."""
@@ -147,34 +141,19 @@ def sniff_content_type(head_bytes: bytes, filename: str, settings: Settings | No
     if sniffed in NEVER_INLINE_TYPES or client_ext in {".html", ".htm", ".svg"}:
         # Reject HTML/SVG uploads entirely when not on allowlist (they never are by default).
         if sniffed not in allowed:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail=f"File type '{sniffed}' is not allowed",
-            )
+            raise BadRequestError(f"File type '{sniffed}' is not allowed",)
 
     if sniffed not in allowed and sniffed != "application/octet-stream":
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail=f"File type '{sniffed}' is not allowed",
-        )
+        raise BadRequestError(f"File type '{sniffed}' is not allowed",)
     if sniffed == "application/octet-stream" and "application/octet-stream" not in allowed:
         # Binary unknown — reject unless explicitly allowed.
         if client_ext not in _TEXT_EXT_MIME:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail="Could not determine an allowed file type",
-            )
+            raise BadRequestError("Could not determine an allowed file type",)
 
     expected = _EXT_EXPECTED_MIME.get(client_ext)
     if expected is not None and expected and sniffed not in expected:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail=f"File content ({sniffed}) does not match extension '{client_ext}'",
-        )
+        raise BadRequestError(f"File content ({sniffed}) does not match extension '{client_ext}'",)
     if expected is not None and not expected:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail=f"Extension '{client_ext}' is not allowed",
-        )
+        raise BadRequestError(f"Extension '{client_ext}' is not allowed",)
 
     return sniffed

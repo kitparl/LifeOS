@@ -6,7 +6,7 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram import keyboards as kb
 from app.modules.integrations.telegram.callbacks import CallbackContext, register
 from app.modules.integrations.telegram.ids import resolve_one, short_id
@@ -62,7 +62,7 @@ async def routine_detail_screen(db: AsyncSession, user_id: str, token: str) -> S
         st = b.start_time.strftime("%H:%M") if hasattr(b.start_time, "strftime") else str(b.start_time)
         et = b.end_time.strftime("%H:%M") if hasattr(b.end_time, "strftime") else str(b.end_time)
         block_lines.append(f"• <b>{tpl.esc(st)}–{tpl.esc(et)}</b> {tpl.esc(b.title)}")
-    status = f"⏭ Skipped today" if skipped else "Active today"
+    status = "⏭ Skipped today" if skipped else "Active today"
     text = tpl.join_blocks(
         tpl._header(routine.name, status),
         "\n".join(block_lines) if block_lines else "<i>No blocks</i>",

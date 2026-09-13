@@ -16,9 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.calendar.repository import CalendarRepository
 from app.modules.goals.service import GoalService
 from app.modules.habits.service import HabitService
-from app.modules.integrations.notifier import NotifierMessage
-from app.modules.integrations.notifier_registry import build_user_notifier
-from app.modules.integrations.repository import IntegrationRepository
+from app.modules.integrations.notifications.notifier import NotifierMessage
 from app.modules.integrations.schemas import DigestResponse
 from app.modules.running.service import RunningService
 from app.modules.tasks.repository import TaskRepository
@@ -50,7 +48,7 @@ class DigestContent:
 
 def format_digest(content: DigestContent, *, now: datetime | None = None) -> NotifierMessage:
     """Pure formatter — easy to unit test without I/O."""
-    from app.modules.integrations import telegram_templates as tpl
+    from app.modules.integrations.telegram import templates as tpl
 
     text = tpl.digest_message(
         stamp=now or datetime.now(timezone.utc),
@@ -115,6 +113,6 @@ class DigestService:
 
     async def send_digest(self, user_id: str) -> DigestResponse:
         """Manual / scheduled entry: enriched morning report (Cycle 8)."""
-        from app.modules.integrations.scheduled_report_service import ScheduledReportService
+        from app.modules.integrations.scheduling.scheduled_report_service import ScheduledReportService
 
         return await ScheduledReportService(self.db).run(user_id, "morning")

@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import HABIT_CREATED, EntityCreated, event_bus
@@ -11,13 +11,13 @@ from app.modules.habits.schemas import (
     HabitStats,
     HabitUpdate,
 )
+from app.core.exceptions import get_or_404
 from app.modules.habits.stats import (
     calculate_completion_rate,
     calculate_streak,
     count_missed_periods,
     is_completed_for_period,
 )
-
 
 class HabitService:
     def __init__(self, db: AsyncSession):
@@ -71,9 +71,7 @@ class HabitService:
         return [self._to_list_item(h) for h in habits], total
 
     async def get_habit(self, user_id: str, habit_id: str) -> HabitResponse:
-        habit = await self.repo.get_by_id(user_id, habit_id)
-        if habit is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habit not found")
+        habit = get_or_404(await self.repo.get_by_id(user_id, habit_id), "Habit not found")
         return self._to_response(habit)
 
     async def create_habit(self, user_id: str, data: HabitCreate) -> HabitResponse:
@@ -92,30 +90,22 @@ class HabitService:
         return self._to_response(habit)
 
     async def update_habit(self, user_id: str, habit_id: str, data: HabitUpdate) -> HabitResponse:
-        habit = await self.repo.get_by_id(user_id, habit_id)
-        if habit is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habit not found")
+        habit = get_or_404(await self.repo.get_by_id(user_id, habit_id), "Habit not found")
         updated = await self.repo.update(habit, data)
         return self._to_response(updated)
 
     async def delete_habit(self, user_id: str, habit_id: str) -> None:
-        habit = await self.repo.get_by_id(user_id, habit_id)
-        if habit is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habit not found")
+        habit = get_or_404(await self.repo.get_by_id(user_id, habit_id), "Habit not found")
         await self.repo.delete(habit)
 
     async def complete_today(self, user_id: str, habit_id: str) -> HabitResponse:
-        habit = await self.repo.get_by_id(user_id, habit_id)
-        if habit is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habit not found")
+        habit = get_or_404(await self.repo.get_by_id(user_id, habit_id), "Habit not found")
         await self.repo.complete_today(habit)
         habit = await self.repo.get_by_id(user_id, habit_id)
         return self._to_response(habit)
 
     async def uncomplete_today(self, user_id: str, habit_id: str) -> HabitResponse:
-        habit = await self.repo.get_by_id(user_id, habit_id)
-        if habit is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habit not found")
+        habit = get_or_404(await self.repo.get_by_id(user_id, habit_id), "Habit not found")
         await self.repo.uncomplete_today(habit)
         habit = await self.repo.get_by_id(user_id, habit_id)
         return self._to_response(habit)

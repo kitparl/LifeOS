@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
-from app.modules.integrations.digest_service import DigestService
+from app.modules.integrations.scheduling.digest_service import DigestService
 from app.modules.integrations.schemas import (
     DetectChatIdRequest,
     DetectChatIdResponse,
@@ -30,9 +30,9 @@ from app.modules.integrations.schemas import (
     TelegramWebhookRegisterResponse,
     TelegramWebhookStatus,
 )
-from app.modules.integrations.github_sync_service import GitHubSyncService
+from app.modules.integrations.github.sync_service import GitHubSyncService
 from app.modules.integrations.service import IntegrationService, list_integration_providers
-from app.modules.integrations.webhook_service import TelegramWebhookService
+from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -159,7 +159,7 @@ async def run_scheduled_report(
     """Manually fire a scheduled report (morning/midday/night/weekly/ai_briefing)."""
     from fastapi import HTTPException
 
-    from app.modules.integrations.scheduled_report_service import CRON_JOB_TYPES, ScheduledReportService
+    from app.modules.integrations.scheduling.scheduled_report_service import CRON_JOB_TYPES, ScheduledReportService
 
     if job_type not in CRON_JOB_TYPES:
         raise HTTPException(
@@ -176,7 +176,7 @@ async def list_report_runs(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.modules.integrations.report_repository import ReportRunRepository
+    from app.modules.integrations.reports.repository import ReportRunRepository
 
     runs = await ReportRunRepository(db).list_runs(user.id, job_type=job_type, limit=min(limit, 200))
     return [ReportRunResponse.model_validate(r) for r in runs]

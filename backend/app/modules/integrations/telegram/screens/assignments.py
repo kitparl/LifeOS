@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram import keyboards as kb
 from app.modules.integrations.telegram.callbacks import CallbackContext, register
 from app.modules.integrations.telegram.navigation import back_home

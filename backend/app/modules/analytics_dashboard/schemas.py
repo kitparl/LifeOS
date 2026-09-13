@@ -1,6 +1,5 @@
 """Pydantic schemas for the Analytics Dashboard module."""
 
-from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field

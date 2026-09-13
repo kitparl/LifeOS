@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.life_timeline.repository import LifeTimelineRepository
@@ -12,7 +11,7 @@ from app.modules.life_timeline.schemas import (
 )
 from app.modules.memory.repository import MemoryRepository
 from app.modules.timeline.service import TimelineService
-
+from app.core.exceptions import get_or_404
 
 class LifeTimelineService:
     def __init__(self, db: AsyncSession):
@@ -92,14 +91,10 @@ class LifeTimelineService:
     async def update_milestone(
         self, user_id: str, milestone_id: str, data: MilestoneUpdate
     ) -> MilestoneResponse:
-        m = await self.repo.get_milestone(user_id, milestone_id)
-        if not m:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Milestone not found")
+        m = get_or_404(await self.repo.get_milestone(user_id, milestone_id), "Milestone not found")
         updated = await self.repo.update(m, data)
         return MilestoneResponse.model_validate(updated)
 
     async def delete_milestone(self, user_id: str, milestone_id: str) -> None:
-        m = await self.repo.get_milestone(user_id, milestone_id)
-        if not m:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Milestone not found")
+        m = get_or_404(await self.repo.get_milestone(user_id, milestone_id), "Milestone not found")
         await self.repo.delete(m)

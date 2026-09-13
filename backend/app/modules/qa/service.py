@@ -1,12 +1,11 @@
 from datetime import datetime
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.qa.models import SUGGESTED_QA_TYPES
 from app.modules.qa.repository import QARepository
 from app.modules.qa.schemas import QACreate, QAListItem, QAResponse, QAUpdate, QAVersionResponse
-
+from app.core.exceptions import BadRequestError, get_or_404
 
 class QAService:
     def __init__(self, db: AsyncSession):
@@ -83,14 +82,12 @@ class QAService:
     async def create_type(self, user_id: str, name: str) -> str:
         clean = name.strip()
         if not clean:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type name required")
+            raise BadRequestError("Type name required")
         await self.repo.ensure_type(user_id, clean)
         return clean
 
     async def get_entry(self, user_id: str, entry_id: str) -> QAResponse:
-        entry = await self.repo.get_by_id(user_id, entry_id)
-        if entry is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Q&A entry not found")
+        entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Q&A entry not found")
         return self._to_response(entry)
 
     async def create_entry(self, user_id: str, data: QACreate) -> QAResponse:
@@ -98,21 +95,15 @@ class QAService:
         return self._to_response(entry)
 
     async def update_entry(self, user_id: str, entry_id: str, data: QAUpdate) -> QAResponse:
-        entry = await self.repo.get_by_id(user_id, entry_id)
-        if entry is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Q&A entry not found")
+        entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Q&A entry not found")
         updated = await self.repo.update(entry, data)
         return self._to_response(updated)
 
     async def delete_entry(self, user_id: str, entry_id: str) -> None:
-        entry = await self.repo.get_by_id(user_id, entry_id)
-        if entry is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Q&A entry not found")
+        entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Q&A entry not found")
         await self.repo.delete(entry)
 
     async def list_versions(self, user_id: str, entry_id: str) -> list[QAVersionResponse]:
-        entry = await self.repo.get_by_id(user_id, entry_id)
-        if entry is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Q&A entry not found")
+        entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Q&A entry not found")
         versions = sorted(entry.versions, key=lambda v: v.version_number, reverse=True)
         return [QAVersionResponse.model_validate(v) for v in versions]

@@ -1,9 +1,9 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.memory.repository import MemoryRepository
 from app.modules.memory.schemas import MemoryCreate, MemoryResponse, MemorySummary, MemoryUpdate
-
+from app.core.exceptions import get_or_404
 
 class MemoryService:
     def __init__(self, db: AsyncSession):
@@ -22,9 +22,7 @@ class MemoryService:
         return [MemoryResponse.model_validate(i) for i in items], total
 
     async def get_item(self, user_id: str, item_id: str) -> MemoryResponse:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if not item:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Memory item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Memory item not found")
         return MemoryResponse.model_validate(item)
 
     async def create_item(self, user_id: str, data: MemoryCreate) -> MemoryResponse:
@@ -32,16 +30,12 @@ class MemoryService:
         return MemoryResponse.model_validate(item)
 
     async def update_item(self, user_id: str, item_id: str, data: MemoryUpdate) -> MemoryResponse:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if not item:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Memory item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Memory item not found")
         updated = await self.repo.update(item, data)
         return MemoryResponse.model_validate(updated)
 
     async def delete_item(self, user_id: str, item_id: str) -> None:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if not item:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Memory item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Memory item not found")
         await self.repo.delete(item)
 
     async def summary(self, user_id: str) -> MemorySummary:

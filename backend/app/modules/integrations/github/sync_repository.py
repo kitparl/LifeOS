@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations.github_sync_models import (
+from app.modules.integrations.github.sync_models import (
     SYNC_STATUS_NEVER,
     GitHubSyncState,
 )

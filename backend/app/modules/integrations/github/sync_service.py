@@ -10,30 +10,41 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, status
+from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import (
+    AppError,
+    BadGatewayError,
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
+    UnprocessableError,
+    get_or_404,
+)
 from app.modules.files.backends import resolve_backend
 from app.modules.files.repository import FileRepository
-from app.modules.integrations.github_client import (
+from app.modules.integrations.github.client import (
     GitHubClient,
     GitHubClientError,
     TreeEntry,
     user_facing_github_error,
 )
-from app.modules.integrations.github_config import DecryptedGitHubConfig, parse_config
-from app.modules.integrations.github_slug import slugify, strip_leading_number
-from app.modules.integrations.github_sync_models import (
+from app.modules.integrations.github.config import DecryptedGitHubConfig, parse_config
+from app.modules.integrations.github.slug import slugify, strip_leading_number
+from app.modules.integrations.github.sync_models import (
     SYNC_STATUS_FAILED,
     SYNC_STATUS_SYNCED,
     SYNC_STATUS_SYNCING,
     SYNC_STATUS_UNCHANGED,
     GitHubSyncState,
 )
-from app.modules.integrations.github_sync_notifier import notify_github_sync_result
-from app.modules.integrations.github_sync_planner import build_sync_plan
-from app.modules.integrations.github_sync_repository import GitHubSyncRepository
+from app.modules.integrations.github.sync_notifier import notify_github_sync_result
+from app.modules.integrations.github.sync_planner import build_sync_plan
+from app.modules.integrations.github.sync_repository import GitHubSyncRepository
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.knowledge_notes.models import KnowledgeChapter, KnowledgeSection, KnowledgeSubject
 
@@ -45,13 +56,11 @@ _INLINE_FILE_RE = re.compile(
 )
 _SECTION_LOCKS: dict[str, asyncio.Lock] = {}
 
-
 @dataclass(frozen=True)
 class SectionContext:
     section: KnowledgeSection
     chapter: KnowledgeChapter
     subject: KnowledgeSubject
-
 
 @dataclass(frozen=True)
 class AssetRecord:
@@ -59,10 +68,8 @@ class AssetRecord:
     path: str
     sha: str | None = None
 
-
 def _lock_key(user_id: str, section_id: str) -> str:
     return f"{user_id}:{section_id}"
-
 
 def _get_lock(user_id: str, section_id: str) -> asyncio.Lock:
     key = _lock_key(user_id, section_id)
@@ -72,10 +79,8 @@ def _get_lock(user_id: str, section_id: str) -> asyncio.Lock:
         _SECTION_LOCKS[key] = lock
     return lock
 
-
 def extract_file_ids(content: str) -> set[str]:
     return {match[2] for match in _INLINE_FILE_RE.findall(content or "")}
-
 
 def rewrite_markdown(content: str, id_to_relpath: dict[str, str]) -> str:
     if not content or not id_to_relpath:
@@ -91,7 +96,6 @@ def rewrite_markdown(content: str, id_to_relpath: dict[str, str]) -> str:
 
     return _INLINE_FILE_RE.sub(repl, content)
 
-
 def compute_rank(siblings: list[tuple[str, int]], target_id: str) -> tuple[int, int]:
     """Return 1-based rank and zero-pad width for *target_id* among *siblings*."""
     ordered = sorted(siblings, key=lambda item: (item[1], item[0]))
@@ -101,10 +105,8 @@ def compute_rank(siblings: list[tuple[str, int]], target_id: str) -> tuple[int, 
             return rank, width
     return len(ordered) + 1, width
 
-
 def format_number(rank: int, width: int) -> str:
     return str(rank).zfill(width)
-
 
 def build_paths(
     subject: KnowledgeSubject,
@@ -126,7 +128,6 @@ def build_paths(
     assets_dir = f"{prefix}/assets"
     return md_path, assets_dir
 
-
 def _asset_filename(record_filename: str, file_id: str) -> str:
     """UUID-prefixed filename to avoid collisions across sections."""
     name = (record_filename or "file").strip()
@@ -135,11 +136,9 @@ def _asset_filename(record_filename: str, file_id: str) -> str:
     # Keep extension; prefix with full file_id for uniqueness
     return f"{file_id}-{name}"
 
-
 def _content_hash(md_text: str, asset_checksums: dict[str, str]) -> str:
     payload = md_text + "\n" + json.dumps(asset_checksums, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
 
 def compute_source_hash(
     *,
@@ -162,7 +161,6 @@ def compute_source_hash(
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-
 def derive_display_sync_status(
     state: GitHubSyncState | None,
     current_source_hash: str,
@@ -179,7 +177,6 @@ def derive_display_sync_status(
             return "synced"
         return "outdated"
     return "never"
-
 
 def _parse_assets_json(raw: str | None) -> list[AssetRecord]:
     if not raw:
@@ -201,19 +198,15 @@ def _parse_assets_json(raw: str | None) -> list[AssetRecord]:
             out.append(AssetRecord(file_id=file_id, path=path, sha=str(sha) if sha else None))
     return out
 
-
 def _assets_to_json(assets: list[AssetRecord]) -> str:
     return json.dumps(
         [{"file_id": a.file_id, "path": a.path, "sha": a.sha} for a in assets],
         sort_keys=True,
     )
 
-
 async def _read_file_bytes(db: AsyncSession, user_id: str, file_id: str) -> tuple[bytes, object]:
     files = FileRepository(db)
-    record = await files.get(user_id, file_id)
-    if record is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"File {file_id} not found")
+    record = get_or_404(await files.get(user_id, file_id), f"File {file_id} not found")
     backend = resolve_backend(record.storage_backend)
     stream = await backend.open(record.storage_key)
     chunks: list[bytes] = []
@@ -221,22 +214,19 @@ async def _read_file_bytes(db: AsyncSession, user_id: str, file_id: str) -> tupl
         chunks.append(chunk)
     return b"".join(chunks), record
 
-
-def _http_from_github(exc: GitHubClientError) -> HTTPException:
+def _error_from_github(exc: GitHubClientError) -> AppError:
     detail = user_facing_github_error(exc)
-    code = status.HTTP_502_BAD_GATEWAY
     if exc.code == "auth":
-        code = status.HTTP_401_UNAUTHORIZED
-    elif exc.code == "permission":
-        code = status.HTTP_403_FORBIDDEN
-    elif exc.code == "not_found":
-        code = status.HTTP_404_NOT_FOUND
-    elif exc.code == "conflict":
-        code = status.HTTP_409_CONFLICT
-    elif exc.code == "validation":
-        code = status.HTTP_422_UNPROCESSABLE_ENTITY
-    return HTTPException(code, detail=detail)
-
+        return UnauthorizedError(detail)
+    if exc.code == "permission":
+        return ForbiddenError(detail)
+    if exc.code == "not_found":
+        return NotFoundError(detail)
+    if exc.code == "conflict":
+        return ConflictError(detail)
+    if exc.code == "validation":
+        return UnprocessableError(detail)
+    return BadGatewayError(detail)
 
 class GitHubSyncService:
     def __init__(self, db: AsyncSession):
@@ -247,10 +237,10 @@ class GitHubSyncService:
     async def _load_github_config(self, user_id: str) -> tuple[DecryptedGitHubConfig, object]:
         conn = await self.integrations.get_by_provider(user_id, "github")
         if conn is None or not conn.enabled:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="GitHub integration is not enabled")
+            raise BadRequestError("GitHub integration is not enabled")
         cfg = parse_config(conn.config_json)
         if cfg is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="GitHub is not configured")
+            raise BadRequestError("GitHub is not configured")
         return cfg, conn
 
     async def _load_section_context(self, user_id: str, section_id: str) -> SectionContext:
@@ -262,7 +252,7 @@ class GitHubSyncService:
         )
         row = result.first()
         if row is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Section not found")
+            raise NotFoundError("Section not found")
         section, chapter, subject = row
         return SectionContext(section=section, chapter=chapter, subject=subject)
 
@@ -318,7 +308,7 @@ class GitHubSyncService:
     async def sync_section(self, user_id: str, section_id: str) -> dict:
         lock = _get_lock(user_id, section_id)
         if lock.locked():
-            raise HTTPException(status.HTTP_409_CONFLICT, detail="Sync already in progress")
+            raise ConflictError("Sync already in progress")
 
         async with lock:
             ctx: SectionContext | None = None
@@ -486,8 +476,8 @@ class GitHubSyncService:
                         message=detail,
                         repo=cfg.repo if cfg else None,
                     )
-                raise _http_from_github(exc) from exc
-            except HTTPException as exc:
+                raise _error_from_github(exc) from exc
+            except AppError as exc:
                 if ctx is not None and exc.status_code != status.HTTP_409_CONFLICT:
                     detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
                     await self.sync_repo.set_status(
@@ -540,7 +530,7 @@ class GitHubSyncService:
             )
         )
         if subject_check.scalar_one_or_none() is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Subject not found")
+            raise NotFoundError("Subject not found")
 
         rows = await self.db.execute(
             select(KnowledgeSection, KnowledgeChapter)
@@ -568,13 +558,13 @@ class GitHubSyncService:
                 chapter_order_index=chapter.order_index,
             )
             state = states.get(section.id)
-            status = derive_display_sync_status(state, current_hash)
+            display_status = derive_display_sync_status(state, current_hash)
             out.append(
                 {
                     "section_id": section.id,
-                    "status": status,
+                    "status": display_status,
                     "synced_at": state.synced_at if state else None,
-                    "last_error": state.last_error if state and status == "failed" else None,
+                    "last_error": state.last_error if state and display_status == "failed" else None,
                 }
             )
         return out

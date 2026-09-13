@@ -105,15 +105,15 @@ async def test_file_upload_too_large(client, tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_path_traversal_rejected(client, tmp_path, monkeypatch):
     from app.core.config import get_settings
+    from app.core.exceptions import NotFoundError
     from app.modules.files.backends.local import LocalStorageBackend
-    from fastapi import HTTPException
 
     settings = get_settings()
     root = tmp_path / "uploads"
     monkeypatch.setattr(settings, "upload_dir", str(root))
 
     backend = LocalStorageBackend(root)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(NotFoundError) as exc:
         backend._resolve("../../etc/passwd")
     assert exc.value.status_code == 404
 

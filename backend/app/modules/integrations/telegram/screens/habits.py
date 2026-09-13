@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.habits.service import HabitService
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram import keyboards as kb
 from app.modules.integrations.telegram.callbacks import CallbackContext, register
 from app.modules.integrations.telegram.ids import resolve_one, short_id

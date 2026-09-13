@@ -8,7 +8,6 @@ from app.modules.learning.models import (
     LEARNING_TYPES,
     RESOURCE_PRIORITY,
     RESOURCE_TYPES,
-    TRACK_STATUSES,
 )
 
 TrackStatus = Literal["planned", "active", "completed", "paused"]

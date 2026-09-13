@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from cryptography.fernet import Fernet
-from fastapi import HTTPException
 
 from app.core import crypto
 from app.core.events import (
@@ -15,12 +13,12 @@ from app.core.events import (
     EntityCreated,
     event_bus,
 )
-from app.modules.integrations.command_handler import handle_command
-from app.modules.integrations.outbox_models import FAILED, PENDING, PendingNotification
-from app.modules.integrations.outbox_repository import OutboxRepository
-from app.modules.integrations.scheduler import _cron_for_prefs
-from app.modules.integrations.subscriber import format_entity_message
-from app.modules.integrations.telegram_config import (
+from app.modules.integrations.telegram.command_handler import handle_command
+from app.modules.integrations.notifications.outbox_models import FAILED, PENDING, PendingNotification
+from app.modules.integrations.notifications.outbox_repository import OutboxRepository
+from app.modules.integrations.scheduling.scheduler import _cron_for_prefs
+from app.modules.integrations.notifications.subscriber import format_entity_message
+from app.modules.integrations.telegram.config import (
     TelegramPreferences,
     parse_preferences,
     serialize_config,
@@ -181,8 +179,8 @@ async def test_outbox_mark_sent_and_failed_retry():
 
 @pytest.mark.asyncio
 async def test_dispatcher_marks_sent():
-    from app.modules.integrations.dispatcher import NotificationDispatcher
-    from app.modules.integrations.notifier import NotifierResult
+    from app.modules.integrations.notifications.dispatcher import NotificationDispatcher
+    from app.modules.integrations.notifications.notifier import NotifierResult
 
     db = MagicMock()
     db.commit = AsyncMock()
@@ -204,7 +202,7 @@ async def test_dispatcher_marks_sent():
     notifier.send = AsyncMock(return_value=NotifierResult(ok=True, detail="ok"))
 
     with patch(
-        "app.modules.integrations.dispatcher.build_user_notifier",
+        "app.modules.integrations.notifications.dispatcher.build_user_notifier",
         new=AsyncMock(return_value=notifier),
     ):
         sent = await dispatcher.dispatch_pending()
@@ -214,19 +212,21 @@ async def test_dispatcher_marks_sent():
 
 @pytest.mark.asyncio
 async def test_webhook_rejects_unknown_secret():
-    from app.modules.integrations.webhook_service import TelegramWebhookService
+    from app.core.exceptions import NotFoundError
+    from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 
     db = MagicMock()
     svc = TelegramWebhookService(db)
     svc.repo.get_by_webhook_secret = AsyncMock(return_value=None)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(NotFoundError) as exc:
         await svc.handle_update("bad-secret", {"message": {"text": "/help", "chat": {"id": 1}}})
     assert exc.value.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_webhook_rejects_unknown_chat():
-    from app.modules.integrations.webhook_service import TelegramWebhookService
+    from app.core.exceptions import ForbiddenError
+    from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 
     db = MagicMock()
     conn = MagicMock()
@@ -238,7 +238,7 @@ async def test_webhook_rejects_unknown_chat():
     svc = TelegramWebhookService(db)
     svc.repo.get_by_webhook_secret = AsyncMock(return_value=conn)
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ForbiddenError) as exc:
         await svc.handle_update(
             "sec",
             {"message": {"text": "/help", "chat": {"id": 999}}},

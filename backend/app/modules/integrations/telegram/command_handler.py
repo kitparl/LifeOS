@@ -14,7 +14,7 @@ from typing import TypeAlias
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +229,6 @@ async def cmd_goals(db: AsyncSession, user_id: str, args: str):
 
 async def cmd_search(db: AsyncSession, user_id: str, args: str):
     from app.modules.integrations.telegram.screens.search import search_results_screen
-    from app.modules.integrations.telegram.screens import search as search_mod
 
     q = (args or "").strip()
     if not q:

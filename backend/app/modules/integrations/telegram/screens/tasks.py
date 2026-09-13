@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram import conversation as conv
 from app.modules.integrations.telegram import keyboards as kb
 from app.modules.integrations.telegram.callbacks import CallbackContext, register
@@ -152,7 +152,6 @@ async def on_done(ctx: CallbackContext) -> tuple[Screen, str]:
 async def on_due_menu(ctx: CallbackContext) -> Screen:
     token = ctx.args[0] if ctx.args else ""
     sid = token
-    today = date.today()
     rows = [
         kb.row(
             kb.button("Today", f"task:setdue:{sid}:0"),
@@ -300,7 +299,7 @@ async def step_ask_due(db: AsyncSession, user_id: str, text: str, data: dict) ->
     due_dt, err = _parse_due(text)
     if err:
         return Screen(text=f"Could not parse date. Use YYYY-MM-DD, today, or tomorrow.\n({tpl.esc(err)})")
-    task = await TaskService(db).create_task(user_id, TaskCreate(title=title, due_date=due_dt))
+    await TaskService(db).create_task(user_id, TaskCreate(title=title, due_date=due_dt))
     clear_conversation(user_id)
     return await tasks_list_screen(db, user_id, 0)
 

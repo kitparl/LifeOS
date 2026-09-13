@@ -1,6 +1,5 @@
 """Enterprise task management tests — assignments, soft delete, permissions, history."""
 
-from datetime import datetime, timezone
 
 import pytest
 
@@ -312,7 +311,7 @@ async def test_independent_subtask_assignment(client):
 @pytest.mark.asyncio
 async def test_reassign_and_cancel_notify_previous_assignee(client):
     # Ensure integrations subscriber is registered (lifespan may not run under ASGITransport).
-    import app.modules.integrations.subscriber  # noqa: F401
+    import app.modules.integrations.notifications.subscriber  # noqa: F401
     import app.modules.notifications.models  # noqa: F401
 
     alice_tok, _ = await _register(client, "alice_n@example.com", "alice_n")

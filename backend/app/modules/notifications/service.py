@@ -1,7 +1,8 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.notifications.repository import NotificationRepository
+from app.core.exceptions import get_or_404
 from app.modules.notifications.schemas import (
     NotificationCreate,
     NotificationResponse,
@@ -9,7 +10,6 @@ from app.modules.notifications.schemas import (
     NotificationSettingsUpdate,
     TelegramSendResponse,
 )
-
 
 class NotificationService:
     def __init__(self, db: AsyncSession):
@@ -32,9 +32,7 @@ class NotificationService:
         return NotificationResponse.model_validate(n)
 
     async def mark_read(self, user_id: str, notification_id: str) -> NotificationResponse:
-        n = await self.repo.get_by_id(user_id, notification_id)
-        if n is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        n = get_or_404(await self.repo.get_by_id(user_id, notification_id), "Notification not found")
         updated = await self.repo.mark_read(n)
         return NotificationResponse.model_validate(updated)
 
@@ -42,9 +40,7 @@ class NotificationService:
         await self.repo.mark_all_read(user_id)
 
     async def delete(self, user_id: str, notification_id: str) -> None:
-        n = await self.repo.get_by_id(user_id, notification_id)
-        if n is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        n = get_or_404(await self.repo.get_by_id(user_id, notification_id), "Notification not found")
         await self.repo.delete(n)
 
     async def get_settings(self, user_id: str) -> NotificationSettingsResponse:
@@ -58,12 +54,10 @@ class NotificationService:
         return NotificationSettingsResponse.model_validate(settings)
 
     async def send_telegram(self, user_id: str, notification_id: str) -> TelegramSendResponse:
-        n = await self.repo.get_by_id(user_id, notification_id)
-        if n is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        n = get_or_404(await self.repo.get_by_id(user_id, notification_id), "Notification not found")
 
-        from app.modules.integrations.notifier import NotifierMessage
-        from app.modules.integrations.notifier_registry import build_user_notifier
+        from app.modules.integrations.notifications.notifier import NotifierMessage
+        from app.modules.integrations.notifications.notifier_registry import build_user_notifier
 
         notifier = await build_user_notifier(self.repo.db, user_id, provider="telegram")
         if notifier is None:

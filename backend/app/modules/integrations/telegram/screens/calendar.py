@@ -7,7 +7,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.service import CalendarService
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram import keyboards as kb
 from app.modules.integrations.telegram.callbacks import CallbackContext, register
 from app.modules.integrations.telegram.ids import resolve_one, short_id

@@ -1,7 +1,6 @@
 import json
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +18,7 @@ from app.modules.journal.models import JournalEntry
 from app.modules.notifications.schemas import NotificationCreate
 from app.modules.notifications.service import NotificationService
 from app.modules.running.models import Run
-
+from app.core.exceptions import BadRequestError, get_or_404
 
 class AutomationService:
     def __init__(self, db: AsyncSession):
@@ -34,23 +33,19 @@ class AutomationService:
 
     async def create_rule(self, user_id: str, data: AutomationCreate) -> AutomationResponse:
         if data.trigger_type not in TRIGGER_TYPES:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown trigger: {data.trigger_type}")
+            raise BadRequestError(f"Unknown trigger: {data.trigger_type}")
         if data.action_type not in ACTION_TYPES:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown action: {data.action_type}")
+            raise BadRequestError(f"Unknown action: {data.action_type}")
         rule = await self.repo.create(user_id, data)
         return AutomationResponse.model_validate(rule)
 
     async def update_rule(self, user_id: str, rule_id: str, data: AutomationUpdate) -> AutomationResponse:
-        rule = await self.repo.get_by_id(user_id, rule_id)
-        if not rule:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Automation rule not found")
+        rule = get_or_404(await self.repo.get_by_id(user_id, rule_id), "Automation rule not found")
         updated = await self.repo.update(rule, data)
         return AutomationResponse.model_validate(updated)
 
     async def delete_rule(self, user_id: str, rule_id: str) -> None:
-        rule = await self.repo.get_by_id(user_id, rule_id)
-        if not rule:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Automation rule not found")
+        rule = get_or_404(await self.repo.get_by_id(user_id, rule_id), "Automation rule not found")
         await self.repo.delete(rule)
 
     async def evaluate(self, user_id: str) -> AutomationEvaluateResponse:

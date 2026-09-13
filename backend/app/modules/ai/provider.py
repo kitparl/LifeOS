@@ -2,6 +2,12 @@ import httpx
 
 from app.core.config import Settings, get_settings
 
+OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings"
+OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
+EMBED_TIMEOUT_SECONDS = 60.0
+CHAT_TIMEOUT_SECONDS = 120.0
+DEFAULT_CHAT_TEMPERATURE = 0.4
+
 
 class OpenAiProvider:
     def __init__(self, settings: Settings | None = None):
@@ -14,9 +20,9 @@ class OpenAiProvider:
     async def embed(self, text: str) -> list[float]:
         if not self.enabled:
             raise RuntimeError("OpenAI API key not configured")
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=EMBED_TIMEOUT_SECONDS) as client:
             res = await client.post(
-                "https://api.openai.com/v1/embeddings",
+                OPENAI_EMBEDDINGS_URL,
                 headers={"Authorization": f"Bearer {self.settings.openai_api_key}"},
                 json={"model": self.settings.ai_embedding_model, "input": text},
             )
@@ -26,9 +32,9 @@ class OpenAiProvider:
     async def chat(self, system: str, user_message: str) -> str:
         if not self.enabled:
             raise RuntimeError("OpenAI API key not configured")
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT_SECONDS) as client:
             res = await client.post(
-                "https://api.openai.com/v1/chat/completions",
+                OPENAI_CHAT_URL,
                 headers={"Authorization": f"Bearer {self.settings.openai_api_key}"},
                 json={
                     "model": self.settings.ai_chat_model,
@@ -36,7 +42,7 @@ class OpenAiProvider:
                         {"role": "system", "content": system},
                         {"role": "user", "content": user_message},
                     ],
-                    "temperature": 0.4,
+                    "temperature": DEFAULT_CHAT_TEMPERATURE,
                 },
             )
             res.raise_for_status()

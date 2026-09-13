@@ -228,7 +228,7 @@ async def test_expired_routine_saved_inactive(client):
 
 @pytest.mark.asyncio
 async def test_routines_expire_job_registered():
-    from app.modules.integrations import scheduler as sched_mod
+    from app.modules.integrations.scheduling import scheduler as sched_mod
 
     sched_mod.start_scheduler()
     try:

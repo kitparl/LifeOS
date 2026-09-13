@@ -18,7 +18,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.core.database import async_session_factory
-from app.modules.integrations.telegram_config import TelegramPreferences, parse_preferences
+from app.modules.integrations.telegram.config import TelegramPreferences, parse_preferences
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ def _cron_for_prefs(prefs: TelegramPreferences) -> CronTrigger:
     return CronTrigger(hour=hour, minute=minute, timezone=tz)
 
 async def _run_user_report(user_id: str, job_type: str) -> None:
-    from app.modules.integrations.scheduled_report_service import ScheduledReportService
+    from app.modules.integrations.scheduling.scheduled_report_service import ScheduledReportService
 
     async with async_session_factory() as session:
         try:
@@ -116,7 +116,7 @@ async def _run_user_digest(user_id: str) -> None:
 
 
 async def _run_reminder_poll() -> None:
-    from app.modules.integrations.reminder_scanner import ReminderScanner
+    from app.modules.integrations.scheduling.reminder_scanner import ReminderScanner
     from app.modules.integrations.repository import IntegrationRepository
 
     async with async_session_factory() as session:
@@ -132,7 +132,7 @@ async def _run_reminder_poll() -> None:
 
 
 async def _run_outbox_drain() -> None:
-    from app.modules.integrations.dispatcher import dispatch_pending_notifications
+    from app.modules.integrations.notifications.dispatcher import dispatch_pending_notifications
 
     await dispatch_pending_notifications(limit=50)
 

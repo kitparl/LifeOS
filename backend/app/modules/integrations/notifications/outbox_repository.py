@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations.outbox_models import FAILED, PENDING, SENT, PendingNotification
+from app.modules.integrations.notifications.outbox_models import FAILED, PENDING, SENT, PendingNotification
 
 
 class OutboxRepository:

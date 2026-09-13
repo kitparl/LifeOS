@@ -1,11 +1,11 @@
 import logging
 import re
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.repository import FileRepository
 from app.modules.knowledge_notes.repository import KnowledgeNotesRepository
+from app.core.exceptions import NotFoundError
 from app.modules.knowledge_notes.schemas import (
     ChapterCreate,
     ChapterResponse,
@@ -26,10 +26,8 @@ _SECTION_FILE_MODULES = ("knowledge_notes", "knowledge_notes_extra")
 
 logger = logging.getLogger(__name__)
 
-
-def _not_found(what: str) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{what} not found")
-
+def _not_found(what: str) -> NotFoundError:
+    return NotFoundError(f"{what} not found")
 
 class KnowledgeNotesService:
     def __init__(self, db: AsyncSession):
@@ -199,7 +197,7 @@ class KnowledgeNotesService:
         await self.repo.delete_section(section)
         await self._cleanup_section_files(user_id, [section_id])
         try:
-            from app.modules.integrations.github_sync_service import GitHubSyncService
+            from app.modules.integrations.github.sync_service import GitHubSyncService
 
             await GitHubSyncService(self.db).delete_section_remote(user_id, section_id)
         except Exception:

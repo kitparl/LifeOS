@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.calendar.models import CalendarEvent
 from app.modules.finance.models import FinanceTransaction
 from app.modules.goals.models import Goal
-from app.modules.habits.models import HabitLog, Habit
 from app.modules.journal.models import JournalEntry
 from app.modules.learning.models import LearningItem
 from app.modules.qa.models import QAEntry

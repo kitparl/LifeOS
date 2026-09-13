@@ -11,9 +11,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import re
 import sys
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,8 @@ from app.modules.learning.models import (
     LearningResource,
     LearningTrack,
 )
+
+logger = logging.getLogger(__name__)
 
 SEEDS_DIR = Path(__file__).resolve().parent / "seeds"
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
@@ -295,11 +298,11 @@ async def _cli_main(slug: str, user_email: str) -> None:
         result = await db.execute(select(User).where(User.email == user_email))
         user = result.scalar_one_or_none()
         if not user:
-            print(f"User not found: {user_email}", file=sys.stderr)
+            logger.error("User not found: %s", user_email)
             sys.exit(1)
         track = await seed_track(db, user.id, slug)
         await db.commit()
-        print(f"Seeded track {track.slug} ({track.id}) for {user_email}")
+        logger.info("Seeded track %s (%s) for %s", track.slug, track.id, user_email)
 
 
 def main() -> None:

@@ -8,10 +8,10 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations.notifier import NotifierMessage
-from app.modules.integrations.notifier_registry import build_user_notifier
-from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
-from app.modules.integrations.telegram_config import parse_config
+from app.modules.integrations.notifications.notifier import NotifierMessage
+from app.modules.integrations.notifications.notifier_registry import build_user_notifier
+from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
+from app.modules.integrations.telegram.config import parse_config
 from app.modules.integrations.repository import IntegrationRepository
 
 logger = logging.getLogger(__name__)

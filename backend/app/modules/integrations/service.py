@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 import logging
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.integrations.models import INTEGRATION_PROVIDERS
@@ -24,8 +23,8 @@ from app.modules.integrations.schemas import (
     TelegramConfigUpdate,
     TelegramTestResponse,
 )
-from app.modules.integrations.github_client import GitHubClient, GitHubClientError
-from app.modules.integrations.github_config import (
+from app.modules.integrations.github.client import GitHubClient, GitHubClientError
+from app.modules.integrations.github.config import (
     mask_config as mask_github_config,
     parse_config as parse_github_config,
     serialize_config as serialize_github_config,
@@ -35,8 +34,9 @@ from app.modules.integrations.sarvam_config import (
     parse_config as parse_sarvam_config,
     serialize_config as serialize_sarvam_config,
 )
-from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
-from app.modules.integrations.telegram_config import (
+from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
+from app.core.exceptions import BadRequestError, ConflictError, get_or_404
+from app.modules.integrations.telegram.config import (
     mask_config as mask_telegram_config,
     parse_config as parse_telegram_config,
     parse_preferences,
@@ -59,10 +59,8 @@ PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
     IntegrationProviderInfo(provider="sarvam", display_name="Sarvam AI", description="Writing feedback (sarvam-105b)", oauth_required=False),
 ]
 
-
 def list_integration_providers() -> list[IntegrationProviderInfo]:
     return PROVIDER_CATALOG
-
 
 def _safe_response(conn) -> IntegrationResponse:
     """Never expose raw bot tokens in API responses."""
@@ -76,7 +74,6 @@ def _safe_response(conn) -> IntegrationResponse:
         resp.config_json = None
     return resp
 
-
 class IntegrationService:
     def __init__(self, db: AsyncSession):
         self.repo = IntegrationRepository(db)
@@ -89,10 +86,10 @@ class IntegrationService:
 
     async def create_connection(self, user_id: str, data: IntegrationCreate) -> IntegrationResponse:
         if data.provider not in INTEGRATION_PROVIDERS:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown provider: {data.provider}")
+            raise BadRequestError(f"Unknown provider: {data.provider}")
         existing = await self.repo.get_by_provider(user_id, data.provider)
         if existing:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Integration already exists for this provider")
+            raise ConflictError("Integration already exists for this provider")
         catalog = next((p for p in PROVIDER_CATALOG if p.provider == data.provider), None)
         display_name = data.display_name or (catalog.display_name if catalog else data.provider)
         # Telegram secrets must go through save_telegram_config (encrypted).
@@ -109,9 +106,7 @@ class IntegrationService:
     async def update_connection(
         self, user_id: str, conn_id: str, data: IntegrationUpdate
     ) -> IntegrationResponse:
-        conn = await self.repo.get_by_id(user_id, conn_id)
-        if not conn:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+        conn = get_or_404(await self.repo.get_by_id(user_id, conn_id), "Integration not found")
         update_data = data
         if conn.provider == "telegram" and data.config_json is not None:
             # Reject raw config_json on generic PATCH; use dedicated telegram config endpoint.
@@ -124,12 +119,10 @@ class IntegrationService:
         return _safe_response(updated)
 
     async def delete_connection(self, user_id: str, conn_id: str) -> None:
-        conn = await self.repo.get_by_id(user_id, conn_id)
-        if not conn:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+        conn = get_or_404(await self.repo.get_by_id(user_id, conn_id), "Integration not found")
         if conn.provider == "telegram":
             try:
-                from app.modules.integrations.scheduler import remove_user_digest_job
+                from app.modules.integrations.scheduling.scheduler import remove_user_digest_job
 
                 remove_user_digest_job(user_id)
             except Exception:
@@ -137,16 +130,11 @@ class IntegrationService:
         await self.repo.delete(conn)
 
     async def sync_connection(self, user_id: str, conn_id: str) -> IntegrationSyncResponse:
-        conn = await self.repo.get_by_id(user_id, conn_id)
-        if not conn:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+        conn = get_or_404(await self.repo.get_by_id(user_id, conn_id), "Integration not found")
         if not conn.enabled:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Integration is disabled")
+            raise BadRequestError("Integration is disabled")
         if conn.provider == "github":
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail="Use POST /integrations/github/sync/section/{section_id} to sync notes",
-            )
+            raise BadRequestError("Use POST /integrations/github/sync/section/{section_id} to sync notes",)
         now = datetime.now(timezone.utc)
         conn.last_sync_at = now
         conn.status = "synced"
@@ -177,7 +165,7 @@ class IntegrationService:
         webhook_secret = getattr(conn, "webhook_secret", None)
 
         try:
-            from app.modules.integrations.scheduler import next_run_times
+            from app.modules.integrations.scheduling.scheduler import next_run_times
 
             next_runs = next_run_times(user_id) if conn.enabled else {}
         except Exception:
@@ -248,7 +236,7 @@ class IntegrationService:
             )
         )
         if data.enabled is None and not has_secret and not has_prefs:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+            raise BadRequestError("No fields to update")
 
         new_json = serialize_telegram_config(
             bot_token=data.bot_token,
@@ -293,7 +281,7 @@ class IntegrationService:
         # rather than only written to the log.
         scheduler_warning: str | None = None
         try:
-            from app.modules.integrations.scheduler import get_scheduler, sync_user_jobs
+            from app.modules.integrations.scheduling.scheduler import get_scheduler, sync_user_jobs
 
             if get_scheduler() is None:
                 scheduler_warning = (
@@ -304,18 +292,19 @@ class IntegrationService:
                 sync_user_jobs(
                     user_id, parse_preferences(updated.config_json), enabled=updated.enabled
                 )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to sync scheduled jobs for user=%s", user_id)
-            scheduler_warning = f"Settings saved, but scheduling them failed: {exc}"
+            scheduler_warning = (
+                "Settings saved, but scheduling them failed. "
+                "Check server logs for details."
+            )
 
         return await self.get_telegram_status(user_id, scheduler_warning=scheduler_warning)
 
     async def test_connection(self, user_id: str, conn_id: str) -> TelegramTestResponse:
-        conn = await self.repo.get_by_id(user_id, conn_id)
-        if not conn:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+        conn = get_or_404(await self.repo.get_by_id(user_id, conn_id), "Integration not found")
         if conn.provider != "telegram":
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Test is only supported for Telegram")
+            raise BadRequestError("Test is only supported for Telegram")
 
         cfg = parse_telegram_config(conn.config_json)
         if cfg is None:
@@ -325,7 +314,7 @@ class IntegrationService:
         try:
             me = await client.get_me()
             username = me.get("username")
-            from app.modules.integrations.telegram_templates import test_connection_message
+            from app.modules.integrations.telegram.templates import test_connection_message
 
             await client.send_message(
                 cfg.chat_id,
@@ -344,7 +333,8 @@ class IntegrationService:
         except TelegramClientError as exc:
             conn.status = "error"
             await self.repo.db.flush()
-            return TelegramTestResponse(ok=False, detail=str(exc) or "Telegram test failed")
+            logger.warning("Telegram test failed: %s", exc)
+            return TelegramTestResponse(ok=False, detail="Telegram test failed")
 
     async def detect_chat_id(
         self,
@@ -352,11 +342,9 @@ class IntegrationService:
         conn_id: str,
         bot_token_override: str | None = None,
     ) -> DetectChatIdResponse:
-        conn = await self.repo.get_by_id(user_id, conn_id)
-        if not conn:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+        conn = get_or_404(await self.repo.get_by_id(user_id, conn_id), "Integration not found")
         if conn.provider != "telegram":
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Detect chat id is only for Telegram")
+            raise BadRequestError("Detect chat id is only for Telegram")
 
         token = (bot_token_override or "").strip()
         if not token:
@@ -371,8 +359,8 @@ class IntegrationService:
         client = TelegramClient(token)
         try:
             updates = await client.get_updates(limit=50)
-        except TelegramClientError as exc:
-            return DetectChatIdResponse(candidates=[], detail=str(exc) or "Failed to fetch updates")
+        except TelegramClientError:
+            return DetectChatIdResponse(candidates=[], detail="Failed to fetch updates")
 
         seen: dict[str, ChatCandidate] = {}
         for update in updates:
@@ -445,7 +433,7 @@ class IntegrationService:
             )
         )
         if data.enabled is None and not has_secret and not has_prefs:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+            raise BadRequestError("No fields to update")
 
         new_json = serialize_github_config(
             token=data.token,
@@ -493,7 +481,7 @@ class IntegrationService:
                 can_push=True,
             )
         except GitHubClientError as exc:
-            from app.modules.integrations.github_client import user_facing_github_error
+            from app.modules.integrations.github.client import user_facing_github_error
 
             conn.status = "error"
             await self.repo.db.flush()
@@ -530,7 +518,7 @@ class IntegrationService:
     async def save_sarvam_config(self, user_id: str, data: SarvamConfigUpdate) -> SarvamConfigStatus:
         conn = await self.get_or_create_sarvam(user_id)
         if data.enabled is None and data.api_key is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+            raise BadRequestError("No fields to update")
 
         new_json = serialize_sarvam_config(
             api_key=data.api_key,
@@ -560,11 +548,13 @@ class IntegrationService:
 
         import httpx
 
-        model = "sarvam-105b"
+        from app.modules.communication.ai.provider import DEFAULT_MODEL, SARVAM_CHAT_URL
+
+        model = DEFAULT_MODEL
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 res = await client.post(
-                    "https://api.sarvam.ai/v1/chat/completions",
+                    SARVAM_CHAT_URL,
                     headers={
                         "api-subscription-key": cfg.api_key,
                         "Content-Type": "application/json",
@@ -608,7 +598,8 @@ class IntegrationService:
                 detail=f"Sarvam returned HTTP {exc.response.status_code}",
                 model=model,
             )
-        except Exception as exc:
+        except Exception:
             conn.status = "error"
             await self.repo.db.flush()
-            return SarvamTestResponse(ok=False, detail=str(exc), model=model)
+            logger.exception("Sarvam test failed")
+            return SarvamTestResponse(ok=False, detail="Sarvam test failed", model=model)

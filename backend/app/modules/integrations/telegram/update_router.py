@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations.command_handler import handle_command
+from app.modules.integrations.telegram.command_handler import handle_command
 from app.modules.integrations.telegram import conversation as conv
 from app.modules.integrations.telegram.callbacks import CallbackContext, dispatch, parse_callback
 from app.modules.integrations.telegram.renderer import Screen, render_screen, send_text

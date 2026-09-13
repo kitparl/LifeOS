@@ -6,7 +6,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, status
+from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -24,24 +24,24 @@ from app.modules.auth.repository import UserRepository
 from app.modules.tasks.activity_service import ActivityService
 from app.modules.tasks.models import Task, TaskAssignment
 from app.modules.tasks.permissions import TaskPermissions
+from app.core.exceptions import AppError, ConflictError, ForbiddenError, NotFoundError, UnprocessableError, get_or_404
 
 # Simple in-process rate limit for assignment mutations (SECURITY-11)
 _assign_hits: dict[str, list[float]] = defaultdict(list)
 _RATE_WINDOW_S = 60.0
 _RATE_MAX = 30
 
-
 def _check_rate(user_id: str) -> None:
     now = time.monotonic()
     hits = _assign_hits[user_id]
     _assign_hits[user_id] = [t for t in hits if now - t < _RATE_WINDOW_S]
     if len(_assign_hits[user_id]) >= _RATE_MAX:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many assignment actions")
+        _err = AppError("Too many assignment actions")
+        _err.status_code = status.HTTP_429_TOO_MANY_REQUESTS
+        raise _err
     _assign_hits[user_id].append(now)
 
-
 ACTIVE_STATUSES = ("pending", "accepted")
-
 
 class AssignmentService:
     def __init__(self, db: AsyncSession):
@@ -98,12 +98,10 @@ class AssignmentService:
         await self.perms.require(actor_id, task, "assign")
 
         if assignee_username:
-            user = await self.auth.get_by_username(assignee_username)
-            if user is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignee not found")
+            user = get_or_404(await self.auth.get_by_username(assignee_username), "Assignee not found")
             assignee_user_id = user.id
         if not assignee_user_id:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="assignee_user_id or assignee_username required")
+            raise UnprocessableError("assignee_user_id or assignee_username required")
 
         # Self-assign → accepted, no notify
         is_self = assignee_user_id == actor_id
@@ -170,9 +168,9 @@ class AssignmentService:
         _check_rate(actor_id)
         row = await self._get_assignment(task.id, assignment_id)
         if row.assignee_user_id != actor_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+            raise ForbiddenError("Permission denied")
         if row.status != "pending":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment is not pending")
+            raise ConflictError("Assignment is not pending")
         row.status = "accepted"
         row.accepted_at = datetime.now(timezone.utc)
         await self.db.flush()
@@ -195,9 +193,9 @@ class AssignmentService:
         _check_rate(actor_id)
         row = await self._get_assignment(task.id, assignment_id)
         if row.assignee_user_id != actor_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+            raise ForbiddenError("Permission denied")
         if row.status != "pending":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment is not pending")
+            raise ConflictError("Assignment is not pending")
         now = datetime.now(timezone.utc)
         row.status = "rejected"
         row.rejected_at = now
@@ -244,7 +242,7 @@ class AssignmentService:
         await self.perms.require(actor_id, task, "assign")
         row = await self._get_assignment(task.id, assignment_id)
         if row.status not in ACTIVE_STATUSES:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment is not active")
+            raise ConflictError("Assignment is not active")
         previous_assignee = row.assignee_user_id
         row.status = "cancelled"
         row.cancelled_at = datetime.now(timezone.utc)
@@ -300,9 +298,8 @@ class AssignmentService:
         )
         row = result.scalar_one_or_none()
         if row is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+            raise NotFoundError("Assignment not found")
         return row
-
 
 async def load_task_for_actor(db: AsyncSession, task_id: str, user_id: str) -> Task:
     """Load non-deleted task if actor is owner, assignee, or watcher; else 404."""
@@ -313,8 +310,8 @@ async def load_task_for_actor(db: AsyncSession, task_id: str, user_id: str) -> T
     )
     task = result.scalar_one_or_none()
     if task is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+        raise NotFoundError("Task not found")
     role = await TaskPermissions(db).resolve_role(user_id, task)
     if role.value == "none":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+        raise NotFoundError("Task not found")
     return task

@@ -4,19 +4,17 @@ from __future__ import annotations
 
 from enum import Enum
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import ForbiddenError, NotFoundError
 from app.modules.tasks.models import Task, TaskAssignment, TaskWatcher
-
 
 class TaskRole(str, Enum):
     OWNER = "owner"
     ASSIGNEE = "assignee"
     WATCHER = "watcher"
     NONE = "none"
-
 
 # Actions that require ownership
 OWNER_ACTIONS = frozenset(
@@ -37,7 +35,6 @@ ASSIGNEE_ACTIONS = frozenset({"view", "change_status", "add_note", "accept_rejec
 
 # Watchers may only view + read history
 WATCHER_ACTIONS = frozenset({"view", "view_history"})
-
 
 class TaskPermissions:
     def __init__(self, db: AsyncSession):
@@ -79,8 +76,8 @@ class TaskPermissions:
         if not self.can(role, action):
             # SECURITY-08: 404 for none to avoid existence leaks; 403 for known participants lacking permission
             if role == TaskRole.NONE:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+                raise NotFoundError("Task not found")
+            raise ForbiddenError("Permission denied")
         return role
 
     def permission_flags(self, role: TaskRole) -> dict[str, bool]:

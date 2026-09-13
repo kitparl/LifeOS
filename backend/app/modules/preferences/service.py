@@ -1,9 +1,9 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.preferences.repository import PreferenceRepository
 from app.modules.preferences.schemas import PreferenceListItem, PreferenceResponse
-
+from app.core.exceptions import BadRequestError
 
 class PreferenceService:
     def __init__(self, db: AsyncSession):
@@ -22,7 +22,7 @@ class PreferenceService:
 
     async def get_preference(self, user_id: str, key: str) -> PreferenceResponse:
         if not key or len(key) > 64:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid preference key")
+            raise BadRequestError("Invalid preference key")
         row = await self.repo.get(user_id, key)
         return PreferenceResponse(
             key=key,
@@ -32,7 +32,7 @@ class PreferenceService:
 
     async def put_preference(self, user_id: str, key: str, value: object) -> PreferenceResponse:
         if not key or len(key) > 64:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid preference key")
+            raise BadRequestError("Invalid preference key")
         row = await self.repo.upsert(user_id, key, value)
         return PreferenceResponse(
             key=row.key,

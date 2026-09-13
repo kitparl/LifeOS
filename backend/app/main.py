@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from app.core.config import get_settings
 from app.core.database import Base, engine
+from app.core.exceptions import AppError
+from app.core.logging_config import configure_logging
 from app.modules.ai.api import router as ai_router
 from app.modules.analytics.api import router as analytics_router
 from app.modules.analytics_dashboard.api import router as analytics_dashboard_router
@@ -44,6 +47,7 @@ from app.modules.routines.api import router as routines_router
 from app.modules.preferences.api import router as preferences_router
 
 settings = get_settings()
+configure_logging(level=logging.DEBUG if settings.is_development else logging.INFO)
 
 
 @asynccontextmanager
@@ -53,13 +57,13 @@ async def lifespan(app: FastAPI):
     import app.modules.files.models  # noqa: F401 — FileRecord
     import app.modules.ai.models  # noqa: F401 — ContentEmbedding + use-case model selection
     import app.modules.communication.models  # noqa: F401 — WritingEvaluation + AIRun
-    import app.modules.integrations.outbox_models  # noqa: F401
-    import app.modules.integrations.report_models  # noqa: F401
-    import app.modules.integrations.github_sync_models  # noqa: F401
+    import app.modules.integrations.notifications.outbox_models  # noqa: F401
+    import app.modules.integrations.reports.models  # noqa: F401
+    import app.modules.integrations.github.sync_models  # noqa: F401
     import app.modules.routines.models  # noqa: F401
     import app.modules.preferences.models  # noqa: F401
     import app.modules.tasks.models  # noqa: F401 — Task + assignment/history/collab tables
-    from app.modules.integrations.subscriber import register_subscribers
+    from app.modules.integrations.notifications.subscriber import register_subscribers
 
     register_subscribers()
 
@@ -69,7 +73,7 @@ async def lifespan(app: FastAPI):
         from app.core.migrations import ensure_columns
         await ensure_columns(conn)
 
-    from app.modules.integrations.scheduler import (
+    from app.modules.integrations.scheduling.scheduler import (
         load_all_scheduled_jobs,
         shutdown_scheduler,
         start_scheduler,
@@ -80,7 +84,7 @@ async def lifespan(app: FastAPI):
 
     polling_started = False
     if settings.telegram_polling_enabled:
-        from app.modules.integrations.polling import start_polling, stop_polling
+        from app.modules.integrations.telegram.polling import start_polling, stop_polling
 
         start_polling()
         polling_started = True
@@ -88,7 +92,7 @@ async def lifespan(app: FastAPI):
     yield
 
     if polling_started:
-        from app.modules.integrations.polling import stop_polling
+        from app.modules.integrations.telegram.polling import stop_polling
 
         await stop_polling()
     await shutdown_scheduler()
@@ -100,6 +104,14 @@ app = FastAPI(
     docs_url="/docs" if settings.is_development else None,
     redoc_url="/redoc" if settings.is_development else None,
 )
+
+
+@app.exception_handler(AppError)
+async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
+    """Map domain errors to the same JSON shape as FastAPI HTTPException."""
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

@@ -1,7 +1,9 @@
 """Session-scoped registration unlock (admin gate).
 
 A short-lived JWT in an HttpOnly session cookie unlocks /register and admin
-create-user for the current browser. No refresh — expires or is cleared.
+create-user for the current browser. The token is bound to the configured
+admin gate email so a generically minted unlock cookie cannot be reused.
+No refresh — expires or is cleared.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -19,10 +21,15 @@ _UNLOCK_TTL_HOURS = 4
 settings = get_settings()
 
 
-def create_unlock_token() -> str:
+def create_unlock_token(email: str) -> str:
+    """Mint an unlock JWT bound to the admin gate email."""
     expire = datetime.now(timezone.utc) + timedelta(hours=_UNLOCK_TTL_HOURS)
     return jwt.encode(
-        {"sub": "registration-gate", "exp": expire, "type": _UNLOCK_TYPE},
+        {
+            "sub": email.strip().lower(),
+            "exp": expire,
+            "type": _UNLOCK_TYPE,
+        },
         settings.secret_key,
         algorithm=settings.algorithm,
     )
@@ -31,7 +38,12 @@ def create_unlock_token() -> str:
 def verify_unlock_token(token: str) -> bool:
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        return payload.get("type") == _UNLOCK_TYPE
+        if payload.get("type") != _UNLOCK_TYPE:
+            return False
+        expected = (settings.admin_gate_email or "").strip().lower()
+        if not expected:
+            return False
+        return payload.get("sub") == expected
     except JWTError:
         return False
 

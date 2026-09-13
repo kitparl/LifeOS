@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Pagination, paginate
 from app.modules.finance.models import FinanceBudget, FinanceTransaction
-from app.modules.finance.schemas import BudgetCreate, BudgetUpdate, TransactionCreate, TransactionUpdate
+from app.modules.finance.schemas import BudgetCreate, TransactionCreate, TransactionUpdate
 
 
 class FinanceRepository:

@@ -8,14 +8,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations.notifier import NotifierMessage
-from app.modules.integrations.notifier_registry import build_user_notifier
-from app.modules.integrations.report_builders import BUILDERS, SKIP_IF_EMPTY
-from app.modules.integrations.report_repository import ReportRunRepository
+from app.modules.integrations.notifications.notifier import NotifierMessage
+from app.modules.integrations.notifications.notifier_registry import build_user_notifier
+from app.modules.integrations.reports.builders import BUILDERS, SKIP_IF_EMPTY
+from app.modules.integrations.reports.repository import ReportRunRepository
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import DigestResponse
-from app.modules.integrations.telegram_config import TelegramPreferences, parse_preferences
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram.config import TelegramPreferences, parse_preferences
+from app.modules.integrations.telegram import templates as tpl
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class ScheduledReportService:
         except Exception as exc:
             logger.exception("Report build failed user=%s job=%s", user_id, job_type)
             await self.runs.finish_run(run, status="failed", error=str(exc))
-            return DigestResponse(sent=False, detail=str(exc), sections={})
+            return DigestResponse(sent=False, detail="Report build failed", sections={})
 
         if built.is_empty and job_type in SKIP_IF_EMPTY:
             await self.runs.finish_run(

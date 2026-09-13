@@ -1,13 +1,13 @@
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.schemas import EventListItem
 from app.modules.routines.expiry import period_is_outside_today
 from app.modules.routines.models import ROUTINE_AREAS, ROUTINE_CATEGORIES
 from app.modules.routines.repository import RoutineRepository
+from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.routines.schemas import (
     LinkedHabitBrief,
     RoutineBlockResponse,
@@ -18,7 +18,6 @@ from app.modules.routines.schemas import (
 )
 
 ROUTINE_SOURCE_MODULE = "routine"
-
 
 class RoutineService:
     def __init__(self, db: AsyncSession):
@@ -85,15 +84,11 @@ class RoutineService:
         return [self._to_list_item(r) for r in routines], total
 
     async def get_routine(self, user_id: str, routine_id: str) -> RoutineResponse:
-        routine = await self.repo.get_by_id(user_id, routine_id)
-        if routine is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Routine not found")
+        routine = get_or_404(await self.repo.get_by_id(user_id, routine_id), "Routine not found")
         return self._to_response(routine)
 
     async def get_by_block(self, user_id: str, block_id: str) -> RoutineResponse:
-        routine = await self.repo.get_by_block_id(user_id, block_id)
-        if routine is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Routine block not found")
+        routine = get_or_404(await self.repo.get_by_block_id(user_id, block_id), "Routine block not found")
         return self._to_response(routine)
 
     def _apply_expiry(self, routine, start=None, end=None, is_active: bool | None = True) -> bool:
@@ -112,9 +107,7 @@ class RoutineService:
         return self._to_response(routine)
 
     async def update_routine(self, user_id: str, routine_id: str, data: RoutineUpdate) -> RoutineResponse:
-        routine = await self.repo.get_by_id(user_id, routine_id)
-        if routine is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Routine not found")
+        routine = get_or_404(await self.repo.get_by_id(user_id, routine_id), "Routine not found")
         updated = await self.repo.update(routine, data)
         start = data.start_date if "start_date" in data.model_fields_set else updated.start_date
         end = data.end_date if "end_date" in data.model_fields_set else updated.end_date
@@ -124,9 +117,7 @@ class RoutineService:
         return self._to_response(updated)
 
     async def delete_routine(self, user_id: str, routine_id: str) -> None:
-        routine = await self.repo.get_by_id(user_id, routine_id)
-        if routine is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Routine not found")
+        routine = get_or_404(await self.repo.get_by_id(user_id, routine_id), "Routine not found")
         await self.repo.delete(routine)
 
     def _merge_taxonomy(self, suggested: tuple[str, ...], stored: list[str]) -> list[str]:
@@ -144,7 +135,7 @@ class RoutineService:
     async def create_area(self, user_id: str, name: str) -> str:
         clean = name.strip()
         if not clean:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Area name required")
+            raise BadRequestError("Area name required")
         await self.repo.ensure_area(user_id, clean)
         return clean
 
@@ -155,7 +146,7 @@ class RoutineService:
     async def create_category(self, user_id: str, name: str) -> str:
         clean = name.strip()
         if not clean:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name required")
+            raise BadRequestError("Category name required")
         await self.repo.ensure_category(user_id, clean)
         return clean
 

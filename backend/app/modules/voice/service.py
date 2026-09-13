@@ -1,7 +1,8 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.voice.repository import VoiceRepository
+from app.core.exceptions import get_or_404
 from app.modules.voice.schemas import (
     VoiceCommandRequest,
     VoiceCommandResponse,
@@ -34,7 +35,6 @@ ROUTE_MAP = {
     "predictions": "/predictions",
     "life-timeline": "/life-timeline",
 }
-
 
 class VoiceService:
     def __init__(self, db: AsyncSession):
@@ -91,6 +91,4 @@ class VoiceService:
         return result
 
     async def delete_note(self, user_id: str, note_id: str) -> None:
-        note = await self.repo.delete(user_id, note_id)
-        if not note:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Voice note not found")
+        get_or_404(await self.repo.delete(user_id, note_id), "Voice note not found")

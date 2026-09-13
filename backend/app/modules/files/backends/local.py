@@ -6,10 +6,8 @@ import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from fastapi import HTTPException, status
-
 from app.modules.files.backends.base import ObjectStat, StorageBackend, StoredObject
-
+from app.core.exceptions import AppError, NotFoundError
 
 class LocalStorageBackend(StorageBackend):
     def __init__(self, root: str | Path):
@@ -19,7 +17,7 @@ class LocalStorageBackend(StorageBackend):
     def _resolve(self, key: str) -> Path:
         candidate = (self.root / key).resolve()
         if not candidate.is_relative_to(self.root):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+            raise NotFoundError("File not found")
         return candidate
 
     async def save(
@@ -49,7 +47,7 @@ class LocalStorageBackend(StorageBackend):
     async def open(self, key: str) -> AsyncIterator[bytes]:
         path = self._resolve(key)
         if not path.is_file():
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File content missing")
+            raise NotFoundError("File content missing")
 
         async def _iter() -> AsyncIterator[bytes]:
             with path.open("rb") as f:
@@ -69,13 +67,13 @@ class LocalStorageBackend(StorageBackend):
     async def exists(self, key: str) -> bool:
         try:
             return self._resolve(key).is_file()
-        except HTTPException:
+        except AppError:
             return False
 
     async def stat(self, key: str) -> ObjectStat | None:
         try:
             path = self._resolve(key)
-        except HTTPException:
+        except AppError:
             return None
         if not path.is_file():
             return None

@@ -8,13 +8,13 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.service import FileService
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram import keyboards as kb
 from app.modules.integrations.telegram.navigation import back_home
 from app.modules.integrations.telegram.renderer import Screen
-from app.modules.integrations.telegram.state import get_conversation, get_token, put_token, start_conversation
-from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
-from app.modules.integrations.telegram_config import parse_config
+from app.modules.integrations.telegram.state import get_conversation, start_conversation
+from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
+from app.modules.integrations.telegram.config import parse_config
 from app.modules.integrations.repository import IntegrationRepository
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ async def handle_media(db: AsyncSession, user_id: str, msg: dict[str, Any]) -> S
         content = await client.download_file(str(path))
     except TelegramClientError as exc:
         logger.warning("Attachment download failed: %s", exc)
-        return Screen(text=f"Download failed: {exc}")
+        return Screen(text="Download failed. Please try again.")
 
     state = get_conversation(user_id)
     module = "telegram"
@@ -83,7 +83,7 @@ async def handle_media(db: AsyncSession, user_id: str, msg: dict[str, Any]) -> S
         module = state.data.get("module") or "tasks"
         entity_id = state.data.get("entity_id")
 
-    record = await FileService(db).upload(
+    await FileService(db).upload(
         user_id,
         filename=filename,
         content=content,

@@ -45,6 +45,10 @@ _AVAIL_HITS: dict[str, list[float]] = defaultdict(list)
 _AVAIL_LIMIT = 30
 _AVAIL_WINDOW_S = 60.0
 
+_GATE_HITS: dict[str, list[float]] = defaultdict(list)
+_GATE_LIMIT = 10
+_GATE_WINDOW_S = 60.0
+
 
 def _cookie_kwargs() -> dict:
     return {
@@ -63,18 +67,46 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     )
 
 
-def _check_availability_rate_limit(request: Request) -> None:
-    ip = request.client.host if request.client else "unknown"
+def _sliding_window_rate_limit(
+    store: dict[str, list[float]],
+    key: str,
+    *,
+    limit: int,
+    window_s: float,
+    detail: str,
+) -> None:
     now = time.monotonic()
-    hits = [t for t in _AVAIL_HITS[ip] if now - t < _AVAIL_WINDOW_S]
-    if len(hits) >= _AVAIL_LIMIT:
-        _AVAIL_HITS[ip] = hits
+    hits = [t for t in store[key] if now - t < window_s]
+    if len(hits) >= limit:
+        store[key] = hits
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many availability checks. Try again shortly.",
+            detail=detail,
         )
     hits.append(now)
-    _AVAIL_HITS[ip] = hits
+    store[key] = hits
+
+
+def _check_availability_rate_limit(request: Request) -> None:
+    ip = request.client.host if request.client else "unknown"
+    _sliding_window_rate_limit(
+        _AVAIL_HITS,
+        ip,
+        limit=_AVAIL_LIMIT,
+        window_s=_AVAIL_WINDOW_S,
+        detail="Too many availability checks. Try again shortly.",
+    )
+
+
+def _check_gate_login_rate_limit(request: Request) -> None:
+    ip = request.client.host if request.client else "unknown"
+    _sliding_window_rate_limit(
+        _GATE_HITS,
+        ip,
+        limit=_GATE_LIMIT,
+        window_s=_GATE_WINDOW_S,
+        detail="Too many gate login attempts. Try again shortly.",
+    )
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -103,10 +135,15 @@ async def admin_create_user(
 
 
 @router.post("/registration-gate/login")
-async def registration_gate_login(data: RegistrationGateLoginRequest, response: Response):
+async def registration_gate_login(
+    data: RegistrationGateLoginRequest,
+    request: Request,
+    response: Response,
+):
+    _check_gate_login_rate_limit(request)
     if not verify_gate_credentials(data.email, data.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    token = create_unlock_token()
+    token = create_unlock_token(data.email)
     response.set_cookie(REG_UNLOCK_COOKIE, token, **unlock_cookie_kwargs())
     return {"ok": True}
 

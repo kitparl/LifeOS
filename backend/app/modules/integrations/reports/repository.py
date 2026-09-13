@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations.report_models import ScheduledReportRun
+from app.modules.integrations.reports.models import ScheduledReportRun
 
 logger = logging.getLogger(__name__)
 

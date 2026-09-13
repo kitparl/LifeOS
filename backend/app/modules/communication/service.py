@@ -1,9 +1,16 @@
 import hashlib
 import time
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import (
+    AppError,
+    BadGatewayError,
+    BadRequestError,
+    ServiceUnavailableError,
+    UnauthorizedError,
+    get_or_404,
+)
 from app.modules.ai.service import AiService
 from app.modules.ai.use_cases import USE_CASE_WRITING_FEEDBACK
 from app.modules.communication.ai.metrics import compute_deterministic_metrics
@@ -49,6 +56,18 @@ from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.sarvam_config import parse_config as parse_sarvam_config
 
 
+def _writing_ai_error(exc: WritingAiError) -> AppError:
+    detail = {"code": exc.code, "message": str(exc)}
+    if isinstance(exc, (TimeoutError_, ProviderUnavailableError, RateLimitError)):
+        return ServiceUnavailableError(detail)
+    if isinstance(exc, InvalidCredentialError):
+        return UnauthorizedError(detail)
+    if isinstance(exc, MissingCredentialError):
+        return BadRequestError(detail)
+    if isinstance(exc, MalformedResponseError):
+        return BadGatewayError(detail)
+    return BadRequestError(detail)
+
 def _evaluation_key(
     *,
     content: str,
@@ -70,7 +89,6 @@ def _evaluation_key(
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-
 def _rewrite_key(
     *,
     content: str,
@@ -87,7 +105,6 @@ def _rewrite_key(
         ]
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
 
 def _to_evaluation_response(row: WritingEvaluation, *, cached: bool = False) -> WritingEvaluationResponse:
     issues_raw = loads_json(row.issues_json, [])
@@ -115,7 +132,6 @@ def _to_evaluation_response(row: WritingEvaluation, *, cached: bool = False) -> 
         created_at=row.created_at,
     )
 
-
 def _to_rewrite_response(row: WritingRewritePreview, *, cached: bool = False) -> WritingRewriteResponse:
     return WritingRewriteResponse(
         id=row.id,
@@ -133,7 +149,6 @@ def _to_rewrite_response(row: WritingRewritePreview, *, cached: bool = False) ->
         created_at=row.created_at,
     )
 
-
 class CommunicationService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -148,9 +163,7 @@ class CommunicationService:
         return [VocabularyResponse.model_validate(w) for w in words], total
 
     async def get_vocabulary(self, user_id: str, word_id: str) -> VocabularyResponse:
-        word = await self.repo.get_vocabulary(user_id, word_id)
-        if word is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Word not found")
+        word = get_or_404(await self.repo.get_vocabulary(user_id, word_id), "Word not found")
         return VocabularyResponse.model_validate(word)
 
     async def create_vocabulary(self, user_id: str, data: VocabularyCreate) -> VocabularyResponse:
@@ -158,16 +171,12 @@ class CommunicationService:
         return VocabularyResponse.model_validate(word)
 
     async def update_vocabulary(self, user_id: str, word_id: str, data: VocabularyUpdate) -> VocabularyResponse:
-        word = await self.repo.get_vocabulary(user_id, word_id)
-        if word is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Word not found")
+        word = get_or_404(await self.repo.get_vocabulary(user_id, word_id), "Word not found")
         updated = await self.repo.update_vocabulary(word, data)
         return VocabularyResponse.model_validate(updated)
 
     async def delete_vocabulary(self, user_id: str, word_id: str) -> None:
-        word = await self.repo.get_vocabulary(user_id, word_id)
-        if word is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Word not found")
+        word = get_or_404(await self.repo.get_vocabulary(user_id, word_id), "Word not found")
         await self.repo.delete_vocabulary(word)
 
     async def list_writing(
@@ -179,9 +188,7 @@ class CommunicationService:
         return [WritingResponse.model_validate(i) for i in items], total
 
     async def get_writing(self, user_id: str, item_id: str) -> WritingResponse:
-        item = await self.repo.get_writing(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        item = get_or_404(await self.repo.get_writing(user_id, item_id), "Writing not found")
         return WritingResponse.model_validate(item)
 
     async def create_writing(self, user_id: str, data: WritingCreate) -> WritingResponse:
@@ -189,16 +196,12 @@ class CommunicationService:
         return WritingResponse.model_validate(item)
 
     async def update_writing(self, user_id: str, item_id: str, data: WritingUpdate) -> WritingResponse:
-        item = await self.repo.get_writing(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        item = get_or_404(await self.repo.get_writing(user_id, item_id), "Writing not found")
         updated = await self.repo.update_writing(item, data)
         return WritingResponse.model_validate(updated)
 
     async def delete_writing(self, user_id: str, item_id: str) -> None:
-        item = await self.repo.get_writing(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        item = get_or_404(await self.repo.get_writing(user_id, item_id), "Writing not found")
         await self.repo.delete_writing(item)
 
     async def list_speaking(
@@ -210,9 +213,7 @@ class CommunicationService:
         return [SpeakingResponse.model_validate(i) for i in items], total
 
     async def get_speaking(self, user_id: str, item_id: str) -> SpeakingResponse:
-        item = await self.repo.get_speaking(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Speaking practice not found")
+        item = get_or_404(await self.repo.get_speaking(user_id, item_id), "Speaking practice not found")
         return SpeakingResponse.model_validate(item)
 
     async def create_speaking(self, user_id: str, data: SpeakingCreate) -> SpeakingResponse:
@@ -220,50 +221,31 @@ class CommunicationService:
         return SpeakingResponse.model_validate(item)
 
     async def update_speaking(self, user_id: str, item_id: str, data: SpeakingUpdate) -> SpeakingResponse:
-        item = await self.repo.get_speaking(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Speaking practice not found")
+        item = get_or_404(await self.repo.get_speaking(user_id, item_id), "Speaking practice not found")
         updated = await self.repo.update_speaking(item, data)
         return SpeakingResponse.model_validate(updated)
 
     async def delete_speaking(self, user_id: str, item_id: str) -> None:
-        item = await self.repo.get_speaking(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Speaking practice not found")
+        item = get_or_404(await self.repo.get_speaking(user_id, item_id), "Speaking practice not found")
         await self.repo.delete_speaking(item)
 
     async def get_writing_feedback(
         self, user_id: str, writing_id: str
     ) -> WritingEvaluationResponse:
-        item = await self.repo.get_writing(user_id, writing_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
-        latest = await self.repo.get_latest_evaluation(user_id, writing_id)
-        if latest is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No AI feedback yet. Click AI Feedback to evaluate this writing.",
-            )
+        get_or_404(await self.repo.get_writing(user_id, writing_id), "Writing not found")
+        latest = get_or_404(await self.repo.get_latest_evaluation(user_id, writing_id), "No AI feedback yet. Click AI Feedback to evaluate this writing.",)
         return _to_evaluation_response(latest, cached=True)
 
     async def evaluate_writing(self, user_id: str, writing_id: str) -> WritingEvaluationResponse:
-        item = await self.repo.get_writing(user_id, writing_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        item = get_or_404(await self.repo.get_writing(user_id, writing_id), "Writing not found")
         if not (item.content or "").strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Write some content before requesting AI Feedback.",
-            )
+            raise BadRequestError("Write some content before requesting AI Feedback.",)
 
         provider_name, model = await AiService(self.db).resolve_model_for_use_case(
             user_id, USE_CASE_WRITING_FEEDBACK
         )
         if provider_name != "sarvam":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Provider '{provider_name}' is not implemented for writing feedback yet.",
-            )
+            raise BadRequestError(f"Provider '{provider_name}' is not implemented for writing feedback yet.",)
 
         key = _evaluation_key(
             content=item.content or "",
@@ -280,13 +262,10 @@ class CommunicationService:
         conn = await IntegrationRepository(self.db).get_by_provider(user_id, "sarvam")
         cfg = parse_sarvam_config(conn.config_json) if conn is not None else None
         if cfg is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
+            raise BadRequestError({
                     "code": "missing_credential",
                     "message": "Connect your Sarvam API key in Integrations before requesting AI Feedback.",
-                },
-            )
+                },)
 
         run = WritingAIRun(
             user_id=user_id,
@@ -314,32 +293,17 @@ class CommunicationService:
             run.error_message = str(exc)
             run.latency_ms = int((time.perf_counter() - started) * 1000)
             await self.repo.update_ai_run(run)
-            http_status = status.HTTP_400_BAD_REQUEST
-            if isinstance(exc, (TimeoutError_, ProviderUnavailableError, RateLimitError)):
-                http_status = status.HTTP_503_SERVICE_UNAVAILABLE
-            elif isinstance(exc, InvalidCredentialError):
-                http_status = status.HTTP_401_UNAUTHORIZED
-            elif isinstance(exc, MissingCredentialError):
-                http_status = status.HTTP_400_BAD_REQUEST
-            elif isinstance(exc, MalformedResponseError):
-                http_status = status.HTTP_502_BAD_GATEWAY
-            raise HTTPException(
-                status_code=http_status,
-                detail={"code": exc.code, "message": str(exc)},
-            ) from exc
+            raise _writing_ai_error(exc) from exc
         except Exception as exc:
             run.status = "error"
             run.error_code = "unknown"
             run.error_message = str(exc)
             run.latency_ms = int((time.perf_counter() - started) * 1000)
             await self.repo.update_ai_run(run)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={
+            raise ServiceUnavailableError({
                     "code": "provider_unavailable",
                     "message": "AI feedback is temporarily unavailable. Your writing has not been changed.",
-                },
-            ) from exc
+                }) from exc
 
         latency_ms = int((time.perf_counter() - started) * 1000)
         usage = result.pop("_usage", {}) or {}
@@ -386,35 +350,20 @@ class CommunicationService:
         return _to_evaluation_response(saved, cached=False)
 
     async def get_writing_rewrite(self, user_id: str, writing_id: str) -> WritingRewriteResponse:
-        item = await self.repo.get_writing(user_id, writing_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
-        latest = await self.repo.get_latest_rewrite(user_id, writing_id)
-        if latest is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No coach rewrite yet. Click “How AI would write this” to generate one.",
-            )
+        get_or_404(await self.repo.get_writing(user_id, writing_id), "Writing not found")
+        latest = get_or_404(await self.repo.get_latest_rewrite(user_id, writing_id), "No coach rewrite yet. Click “How AI would write this” to generate one.",)
         return _to_rewrite_response(latest, cached=True)
 
     async def request_writing_rewrite(self, user_id: str, writing_id: str) -> WritingRewriteResponse:
-        item = await self.repo.get_writing(user_id, writing_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing not found")
+        item = get_or_404(await self.repo.get_writing(user_id, writing_id), "Writing not found")
         if not (item.content or "").strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Write some content before requesting a coach rewrite.",
-            )
+            raise BadRequestError("Write some content before requesting a coach rewrite.",)
 
         provider_name, model = await AiService(self.db).resolve_model_for_use_case(
             user_id, USE_CASE_WRITING_FEEDBACK
         )
         if provider_name != "sarvam":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Provider '{provider_name}' is not implemented for writing rewrite yet.",
-            )
+            raise BadRequestError(f"Provider '{provider_name}' is not implemented for writing rewrite yet.",)
 
         key = _rewrite_key(
             content=item.content or "",
@@ -429,13 +378,10 @@ class CommunicationService:
         conn = await IntegrationRepository(self.db).get_by_provider(user_id, "sarvam")
         cfg = parse_sarvam_config(conn.config_json) if conn is not None else None
         if cfg is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
+            raise BadRequestError({
                     "code": "missing_credential",
                     "message": "Connect your Sarvam API key in Integrations before requesting a coach rewrite.",
-                },
-            )
+                },)
 
         run = WritingAIRun(
             user_id=user_id,
@@ -463,32 +409,17 @@ class CommunicationService:
             run.error_message = str(exc)
             run.latency_ms = int((time.perf_counter() - started) * 1000)
             await self.repo.update_ai_run(run)
-            http_status = status.HTTP_400_BAD_REQUEST
-            if isinstance(exc, (TimeoutError_, ProviderUnavailableError, RateLimitError)):
-                http_status = status.HTTP_503_SERVICE_UNAVAILABLE
-            elif isinstance(exc, InvalidCredentialError):
-                http_status = status.HTTP_401_UNAUTHORIZED
-            elif isinstance(exc, MissingCredentialError):
-                http_status = status.HTTP_400_BAD_REQUEST
-            elif isinstance(exc, MalformedResponseError):
-                http_status = status.HTTP_502_BAD_GATEWAY
-            raise HTTPException(
-                status_code=http_status,
-                detail={"code": exc.code, "message": str(exc)},
-            ) from exc
+            raise _writing_ai_error(exc) from exc
         except Exception as exc:
             run.status = "error"
             run.error_code = "unknown"
             run.error_message = str(exc)
             run.latency_ms = int((time.perf_counter() - started) * 1000)
             await self.repo.update_ai_run(run)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={
+            raise ServiceUnavailableError({
                     "code": "provider_unavailable",
                     "message": "Coach rewrite is temporarily unavailable. Your writing has not been changed.",
-                },
-            ) from exc
+                }) from exc
 
         latency_ms = int((time.perf_counter() - started) * 1000)
         usage = result.pop("_usage", {}) or {}

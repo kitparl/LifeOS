@@ -1,10 +1,10 @@
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.service import FileService
 from app.modules.ocr.repository import OcrRepository
 from app.modules.ocr.schemas import OcrDocumentCreate, OcrDocumentResponse
-
+from app.core.exceptions import get_or_404
 
 class OcrService:
     def __init__(self, db: AsyncSession):
@@ -18,9 +18,7 @@ class OcrService:
         return [OcrDocumentResponse.model_validate(d) for d in docs], total
 
     async def get_document(self, user_id: str, doc_id: str) -> OcrDocumentResponse:
-        doc = await self.repo.get_by_id(user_id, doc_id)
-        if not doc:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "OCR document not found")
+        doc = get_or_404(await self.repo.get_by_id(user_id, doc_id), "OCR document not found")
         return OcrDocumentResponse.model_validate(doc)
 
     async def process_text(self, user_id: str, data: OcrDocumentCreate) -> OcrDocumentResponse:
@@ -68,7 +66,5 @@ class OcrService:
         )
 
     async def delete_document(self, user_id: str, doc_id: str) -> None:
-        doc = await self.repo.get_by_id(user_id, doc_id)
-        if not doc:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "OCR document not found")
+        doc = get_or_404(await self.repo.get_by_id(user_id, doc_id), "OCR document not found")
         await self.repo.delete(doc)

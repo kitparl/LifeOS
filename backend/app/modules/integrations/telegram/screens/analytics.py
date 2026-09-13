@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.modules.analytics_dashboard.service import AnalyticsDashboardService
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram import keyboards as kb
 from app.modules.integrations.telegram.callbacks import CallbackContext, register
 from app.modules.integrations.telegram.navigation import back_home

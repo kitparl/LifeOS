@@ -4,17 +4,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.modules.auth.models import User
 from app.modules.auth.repository import UserRepository
 from app.modules.tasks.activity_service import ActivityService
 from app.modules.tasks.models import Task, TaskNote, TaskTag, TaskTagLink, TaskWatcher
 from app.modules.tasks.permissions import TaskPermissions
-
+from app.core.exceptions import ForbiddenError, NotFoundError, UnprocessableError, get_or_404
 
 class CollaborationService:
     def __init__(self, db: AsyncSession):
@@ -46,12 +44,10 @@ class CollaborationService:
     ) -> TaskWatcher:
         await self.perms.require(actor_id, task, "manage_watchers")
         if username:
-            user = await self.auth.get_by_username(username)
-            if user is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            user = get_or_404(await self.auth.get_by_username(username), "User not found")
             user_id = user.id
         if not user_id:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="username or user_id required")
+            raise UnprocessableError("username or user_id required")
         existing = await self.db.execute(
             select(TaskWatcher).where(TaskWatcher.task_id == task.id, TaskWatcher.user_id == user_id)
         )
@@ -73,7 +69,7 @@ class CollaborationService:
         )
         row = result.scalar_one_or_none()
         if row is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Watcher not found")
+            raise NotFoundError("Watcher not found")
         await self.db.delete(row)
         await self.db.flush()
         await self.activity.log(task.id, actor_id, "watcher_remove", field="watcher", old_value=watcher_user_id)
@@ -102,10 +98,10 @@ class CollaborationService:
         )
         note = result.scalar_one_or_none()
         if note is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+            raise NotFoundError("Note not found")
         role = await self.perms.resolve_role(actor_id, task)
         if note.author_user_id != actor_id and role.value != "owner":
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+            raise ForbiddenError("Permission denied")
         note.deleted_at = datetime.now(timezone.utc)
         await self.db.flush()
         await self.activity.log(task.id, actor_id, "note_delete", field="note", old_value=note_id)
@@ -131,7 +127,7 @@ class CollaborationService:
         await self.perms.require(actor_id, task, "manage_tags")
         clean = name.strip().lower()[:64]
         if not clean:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid tag name")
+            raise UnprocessableError("Invalid tag name")
         result = await self.db.execute(
             select(TaskTag).where(TaskTag.user_id == task.user_id, TaskTag.name == clean)
         )
@@ -162,7 +158,7 @@ class CollaborationService:
         )
         link = result.scalar_one_or_none()
         if link is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not linked")
+            raise NotFoundError("Tag not linked")
         tag_result = await self.db.execute(select(TaskTag).where(TaskTag.id == tag_id))
         tag = tag_result.scalar_one_or_none()
         await self.db.delete(link)

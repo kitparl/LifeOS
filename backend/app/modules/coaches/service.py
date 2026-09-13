@@ -1,4 +1,5 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
+import logging
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,9 @@ from app.modules.habits.models import Habit, HabitLog
 from app.modules.learning.models import LearningItem
 from app.modules.memory.repository import MemoryRepository
 from app.modules.running.models import Run
+from app.core.exceptions import BadRequestError
+
+logger = logging.getLogger(__name__)
 
 
 class CoachesService:
@@ -24,8 +28,7 @@ class CoachesService:
 
     async def chat(self, user_id: str, coach_type: str, message: str) -> CoachChatResponse:
         if coach_type not in COACH_TYPES:
-            from fastapi import HTTPException, status
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown coach type: {coach_type}")
+            raise BadRequestError(f"Unknown coach type: {coach_type}")
 
         context, summary = await self._build_context(user_id, coach_type)
         memories, _ = await self.memory_repo.list_items(user_id, limit=None)
@@ -37,8 +40,12 @@ class CoachesService:
         if self.provider.enabled:
             try:
                 reply = await self.provider.chat(system, message)
-            except Exception as exc:
-                reply = f"Coach context ready but AI provider failed: {exc}\n\nContext:\n{summary}"
+            except Exception:
+                logger.exception("Coach AI provider failed type=%s", coach_type)
+                reply = (
+                    f"Coach context ready but the AI provider is temporarily unavailable.\n\n"
+                    f"Context:\n{summary}"
+                )
         else:
             reply = (
                 f"[{coach_type.title()} Coach — offline mode]\n"

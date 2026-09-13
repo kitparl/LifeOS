@@ -21,7 +21,7 @@ async def test_vocabulary_crud(client):
         json={"word": "eloquent", "meaning": "fluent and persuasive", "mastery": 2},
     )
     assert create.status_code == 201
-    word_id = create.json()["id"]
+    assert create.json()["id"]
 
     listing = await client.get("/api/v1/communication/vocabulary", headers=headers)
     assert listing.status_code == 200

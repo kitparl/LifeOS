@@ -1,7 +1,8 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.finance.repository import FinanceRepository
+from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.finance.schemas import (
     BudgetCreate,
     BudgetResponse,
@@ -10,7 +11,6 @@ from app.modules.finance.schemas import (
     TransactionResponse,
     TransactionUpdate,
 )
-
 
 class FinanceService:
     def __init__(self, db: AsyncSession):
@@ -30,21 +30,17 @@ class FinanceService:
 
     async def create_transaction(self, user_id: str, data: TransactionCreate) -> TransactionResponse:
         if data.txn_type not in ("income", "expense"):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "txn_type must be income or expense")
+            raise BadRequestError("txn_type must be income or expense")
         txn = await self.repo.create_transaction(user_id, data)
         return TransactionResponse.model_validate(txn)
 
     async def update_transaction(self, user_id: str, txn_id: str, data: TransactionUpdate) -> TransactionResponse:
-        txn = await self.repo.get_transaction(user_id, txn_id)
-        if not txn:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Transaction not found")
+        txn = get_or_404(await self.repo.get_transaction(user_id, txn_id), "Transaction not found")
         updated = await self.repo.update_transaction(txn, data)
         return TransactionResponse.model_validate(updated)
 
     async def delete_transaction(self, user_id: str, txn_id: str) -> None:
-        txn = await self.repo.get_transaction(user_id, txn_id)
-        if not txn:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Transaction not found")
+        txn = get_or_404(await self.repo.get_transaction(user_id, txn_id), "Transaction not found")
         await self.repo.delete_transaction(txn)
 
     async def list_budgets(
@@ -58,9 +54,7 @@ class FinanceService:
         return BudgetResponse.model_validate(budget)
 
     async def delete_budget(self, user_id: str, budget_id: str) -> None:
-        budget = await self.repo.delete_budget(user_id, budget_id)
-        if not budget:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Budget not found")
+        get_or_404(await self.repo.delete_budget(user_id, budget_id), "Budget not found")
 
     async def summary(self, user_id: str) -> FinanceSummary:
         txns, _ = await self.repo.list_transactions(user_id, limit=None)

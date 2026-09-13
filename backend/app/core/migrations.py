@@ -230,7 +230,7 @@ async def backfill_telegram_timezone(conn: AsyncConnection) -> None:
     rewritten at most once (see TZ_BACKFILL_KEY) so a deliberate UTC choice
     made afterwards is preserved.
     """
-    from app.modules.integrations.telegram_config import DEFAULT_TIMEZONE, TZ_BACKFILL_KEY
+    from app.modules.integrations.telegram.config import DEFAULT_TIMEZONE, TZ_BACKFILL_KEY
 
     try:
         rows = (

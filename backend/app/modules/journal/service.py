@@ -1,9 +1,9 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.journal.repository import JournalRepository
 from app.modules.journal.schemas import JournalCreate, JournalListItem, JournalResponse, JournalUpdate
-
+from app.core.exceptions import get_or_404
 
 class JournalService:
     def __init__(self, db: AsyncSession):
@@ -23,9 +23,7 @@ class JournalService:
         return [JournalListItem.model_validate(e) for e in entries], total
 
     async def get_entry(self, user_id: str, entry_id: str) -> JournalResponse:
-        entry = await self.repo.get_by_id(user_id, entry_id)
-        if entry is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found")
+        entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Journal entry not found")
         return JournalResponse.model_validate(entry)
 
     async def create_entry(self, user_id: str, data: JournalCreate) -> JournalResponse:
@@ -33,14 +31,10 @@ class JournalService:
         return JournalResponse.model_validate(entry)
 
     async def update_entry(self, user_id: str, entry_id: str, data: JournalUpdate) -> JournalResponse:
-        entry = await self.repo.get_by_id(user_id, entry_id)
-        if entry is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found")
+        entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Journal entry not found")
         updated = await self.repo.update(entry, data)
         return JournalResponse.model_validate(updated)
 
     async def delete_entry(self, user_id: str, entry_id: str) -> None:
-        entry = await self.repo.get_by_id(user_id, entry_id)
-        if entry is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found")
+        entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Journal entry not found")
         await self.repo.delete(entry)

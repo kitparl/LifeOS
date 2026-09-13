@@ -1,12 +1,12 @@
 from datetime import date, timedelta
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.knowledge_notes.repository import KnowledgeNotesRepository
 from app.modules.knowledge_notes.schemas import ChapterCreate, SectionCreate, SubjectCreate
 from app.modules.learning.models import LearningItem
 from app.modules.learning.repository import LearningRepository
+from app.core.exceptions import BadRequestError, ConflictError, NotFoundError, get_or_404
 from app.modules.learning.schemas import (
     ConceptListItem,
     ConceptNoteCreate,
@@ -29,7 +29,6 @@ from app.modules.learning.schemas import (
     TrackProgress,
 )
 
-
 def _study_streak(dates: list[date]) -> int:
     if not dates:
         return 0
@@ -46,7 +45,6 @@ def _study_streak(dates: list[date]) -> int:
         elif d < expected:
             break
     return streak
-
 
 class LearningService:
     def __init__(self, db: AsyncSession):
@@ -66,9 +64,7 @@ class LearningService:
         return [LearningListItem.model_validate(i) for i in items], total
 
     async def get_item(self, user_id: str, item_id: str) -> LearningResponse:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if not item:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Learning item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Learning item not found")
         return LearningResponse.model_validate(item)
 
     async def create_item(self, user_id: str, data: LearningCreate) -> LearningResponse:
@@ -76,9 +72,7 @@ class LearningService:
         return LearningResponse.model_validate(item)
 
     async def update_item(self, user_id: str, item_id: str, data: LearningUpdate) -> LearningResponse:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if not item:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Learning item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Learning item not found")
         patch = data
         if data.progress is None and data.status == "completed":
             patch = data.model_copy(update={"progress": 100})
@@ -86,9 +80,7 @@ class LearningService:
         return LearningResponse.model_validate(updated)
 
     async def delete_item(self, user_id: str, item_id: str) -> None:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if not item:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Learning item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Learning item not found")
         await self.repo.delete(item)
 
     # --- Tracks ---
@@ -102,20 +94,16 @@ class LearningService:
     async def create_track(self, user_id: str, data: TrackCreate) -> TrackListItem:
         existing = await self.repo.get_track_by_slug(user_id, data.slug)
         if existing:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Track slug already exists")
+            raise ConflictError("Track slug already exists")
         track = await self.repo.create_track(user_id, data)
         return TrackListItem.model_validate(track)
 
     async def get_track(self, user_id: str, track_id: str) -> TrackDetail:
-        track = await self.repo.get_track(user_id, track_id)
-        if not track:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Track not found")
+        track = get_or_404(await self.repo.get_track(user_id, track_id), "Track not found")
         return TrackDetail.model_validate(track)
 
     async def track_progress(self, user_id: str, track_id: str) -> TrackProgress:
-        track = await self.repo.get_track(user_id, track_id)
-        if not track:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Track not found")
+        track = get_or_404(await self.repo.get_track(user_id, track_id), "Track not found")
         total, gated = await self.repo.count_concepts_for_track(track_id)
         percent = round(100 * gated / total, 1) if total else 0.0
         today = date.today()
@@ -152,9 +140,7 @@ class LearningService:
         return [ConceptListItem.model_validate(c) for c in concepts], total
 
     async def get_concept(self, user_id: str, concept_id: str) -> ConceptResponse:
-        concept = await self.repo.get_concept(user_id, concept_id)
-        if not concept:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Concept not found")
+        concept = get_or_404(await self.repo.get_concept(user_id, concept_id), "Concept not found")
         return await self._concept_with_inherited(user_id, concept)
 
     async def _concept_with_inherited(self, user_id: str, concept) -> ConceptResponse:
@@ -169,9 +155,7 @@ class LearningService:
     async def update_concept(
         self, user_id: str, concept_id: str, data: ConceptUpdate
     ) -> ConceptResponse:
-        concept = await self.repo.get_concept(user_id, concept_id)
-        if not concept:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Concept not found")
+        concept = get_or_404(await self.repo.get_concept(user_id, concept_id), "Concept not found")
         updated = await self.repo.update_concept(concept, data)
         await self._rollup_item_progress(updated.item_id)
         # reload with resources
@@ -205,26 +189,20 @@ class LearningService:
 
     async def create_resource(self, user_id: str, data: ResourceCreate) -> ResourceResponse:
         if not data.concept_id and not data.item_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "concept_id or item_id required")
+            raise BadRequestError("concept_id or item_id required")
         if data.concept_id:
-            concept = await self.repo.get_concept(user_id, data.concept_id)
-            if not concept:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Concept not found")
+            concept = get_or_404(await self.repo.get_concept(user_id, data.concept_id), "Concept not found")
             if not data.item_id:
                 data = data.model_copy(update={"item_id": concept.item_id})
         elif data.item_id:
-            item = await self.repo.get_by_id(user_id, data.item_id)
-            if not item:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Learning item not found")
+            get_or_404(await self.repo.get_by_id(user_id, data.item_id), "Learning item not found")
         resource = await self.repo.create_resource(user_id, data)
         return ResourceResponse.model_validate(resource)
 
     async def update_resource(
         self, user_id: str, resource_id: str, data: ResourceUpdate
     ) -> ResourceResponse:
-        resource = await self.repo.get_resource(user_id, resource_id)
-        if not resource:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Resource not found")
+        resource = get_or_404(await self.repo.get_resource(user_id, resource_id), "Resource not found")
         updated = await self.repo.update_resource(resource, data)
         return ResourceResponse.model_validate(updated)
 
@@ -244,13 +222,9 @@ class LearningService:
         return [SessionResponse.model_validate(s) for s in rows], total
 
     async def create_session(self, user_id: str, data: SessionCreate) -> SessionResponse:
-        item = await self.repo.get_by_id(user_id, data.item_id)
-        if not item:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Learning item not found")
+        get_or_404(await self.repo.get_by_id(user_id, data.item_id), "Learning item not found")
         if data.concept_id:
-            concept = await self.repo.get_concept(user_id, data.concept_id)
-            if not concept:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Concept not found")
+            concept = get_or_404(await self.repo.get_concept(user_id, data.concept_id), "Concept not found")
             # Roll session signals into concept when provided
             patch: dict = {}
             if data.can_explain:
@@ -270,9 +244,7 @@ class LearningService:
     async def list_concept_notes(
         self, user_id: str, concept_id: str, limit: int = 25, offset: int = 0
     ) -> tuple[list[ConceptNoteResponse], int]:
-        concept = await self.repo.get_concept(user_id, concept_id)
-        if not concept:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Concept not found")
+        get_or_404(await self.repo.get_concept(user_id, concept_id), "Concept not found")
         rows, total = await self.repo.list_concept_notes(
             user_id, concept_id, limit=limit, offset=offset
         )
@@ -284,15 +256,11 @@ class LearningService:
     async def attach_concept_note(
         self, user_id: str, concept_id: str, data: ConceptNoteCreate
     ) -> ConceptNoteResponse:
-        concept = await self.repo.get_concept(user_id, concept_id)
-        if not concept:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Concept not found")
+        concept = get_or_404(await self.repo.get_concept(user_id, concept_id), "Concept not found")
         notes_repo = KnowledgeNotesRepository(self.db)
 
         if data.section_id:
-            section = await notes_repo.get_section(user_id, data.section_id)
-            if not section:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found")
+            section = get_or_404(await notes_repo.get_section(user_id, data.section_id), "Note not found")
         else:
             chapter = await self._resolve_chapter(user_id, concept, data, notes_repo)
             section = await notes_repo.create_section(
@@ -311,22 +279,18 @@ class LearningService:
     async def detach_concept_note(self, user_id: str, concept_id: str, note_id: str) -> None:
         link = await self.repo.get_concept_note(user_id, note_id)
         if not link or link.concept_id != concept_id:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Linked note not found")
+            raise NotFoundError("Linked note not found")
         await self.repo.delete_concept_note(link)
 
     async def _resolve_chapter(
         self, user_id: str, concept, data: ConceptNoteCreate, notes_repo: KnowledgeNotesRepository
     ):
         if data.chapter_id:
-            chapter = await notes_repo.get_chapter(user_id, data.chapter_id)
-            if not chapter:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Chapter not found")
+            chapter = get_or_404(await notes_repo.get_chapter(user_id, data.chapter_id), "Chapter not found")
             return chapter
 
         if data.subject_id:
-            subject = await notes_repo.get_subject(user_id, data.subject_id)
-            if not subject:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Subject not found")
+            subject = get_or_404(await notes_repo.get_subject(user_id, data.subject_id), "Subject not found")
             existing_chapters = list(subject.chapters)
         else:
             subject = await notes_repo.create_subject(

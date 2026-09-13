@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.calendar.service import CalendarService
 from app.modules.goals.service import GoalService
 from app.modules.habits.service import HabitService
-from app.modules.integrations import telegram_templates as tpl
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.routines.service import RoutineService
 from app.modules.tasks.models import Task
 from app.modules.tasks.repository import TaskRepository
@@ -124,8 +124,6 @@ async def _routine_lines(db: AsyncSession, user_id: str, *, limit: int = 12) -> 
 async def _linked_habit_lines_for_today(db: AsyncSession, user_id: str) -> list[str]:
     """Habits attached to today's routine blocks (best-effort; empty if no links)."""
     try:
-        from app.modules.routines.models import Routine, RoutineBlock
-        from sqlalchemy.orm import selectinload
 
         routines = await RoutineService(db).repo.list_routines(user_id, active_only=True, limit=None)
         if not routines:
@@ -288,9 +286,9 @@ async def build_ai_briefing(db: AsyncSession, user_id: str, tz: ZoneInfo) -> Rep
     try:
         review = await ReportsService(db).generate_review(user_id, "daily")
         content = (review.content or "").strip()
-    except Exception as exc:
+    except Exception:
         return ReportBuildResult(
-            text=tpl.join_blocks(tpl._header("AI Daily Briefing"), f"Unavailable: {tpl.esc(str(exc)[:200])}"),
+            text=tpl.join_blocks(tpl._header("AI Daily Briefing"), "Unavailable — check server logs."),
             sections={"ai": 0},
             is_empty=True,
         )

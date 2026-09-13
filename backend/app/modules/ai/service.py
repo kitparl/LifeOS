@@ -1,4 +1,6 @@
-from fastapi import HTTPException, status
+
+import logging
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -16,6 +18,7 @@ from app.modules.ai.schemas import (
     UseCaseHistoryItem,
     UseCaseResponse,
 )
+from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.ai.use_cases import (
     USE_CASE_DISPLAY_NAMES,
     default_option,
@@ -23,6 +26,8 @@ from app.modules.ai.use_cases import (
     known_use_cases,
     options_for,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AiService:
@@ -89,18 +94,12 @@ class AiService:
         self, user_id: str, use_case: str, provider: str, model: str
     ) -> UseCaseResponse:
         if use_case not in known_use_cases():
-            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown use case: {use_case}")
+            raise NotFoundError(f"Unknown use case: {use_case}")
         if not is_valid_option(use_case, provider, model):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"Model {provider}:{model} is not allowed for {use_case}",
-            )
+            raise BadRequestError(f"Model {provider}:{model} is not allowed for {use_case}",)
         connected = await self._connected_providers(user_id)
         if provider not in connected:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"Connect your {provider} API key in Integrations before selecting this model",
-            )
+            raise BadRequestError(f"Connect your {provider} API key in Integrations before selecting this model",)
         await self.repo.set_selection(user_id, use_case, provider, model)
         items = await self.list_use_cases(user_id)
         return next(i for i in items if i.use_case == use_case)
@@ -109,7 +108,7 @@ class AiService:
         self, user_id: str, use_case: str
     ) -> list[UseCaseHistoryItem]:
         if use_case not in known_use_cases():
-            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown use case: {use_case}")
+            raise NotFoundError(f"Unknown use case: {use_case}")
         rows = await self.repo.list_history(user_id, use_case)
         return [
             UseCaseHistoryItem(
@@ -130,10 +129,7 @@ class AiService:
             return sel.provider, sel.model
         default = default_option(use_case)
         if default is None:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"No model configured for use case {use_case}",
-            )
+            raise BadRequestError(f"No model configured for use case {use_case}",)
         return default.provider, default.model
 
     async def status(self, user_id: str) -> AiStatusResponse:
@@ -190,8 +186,12 @@ class AiService:
             )
             try:
                 reply = await self.provider.chat(system, message)
-            except Exception as exc:
-                reply = f"I found relevant records but could not reach the AI provider: {exc}"
+            except Exception:
+                logger.exception("AI chat provider failed")
+                reply = (
+                    "I found relevant records but could not reach the AI provider. "
+                    "Please try again shortly."
+                )
         else:
             reply = (
                 "AI provider is not configured (set OPENAI_API_KEY in backend/.env). "

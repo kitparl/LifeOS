@@ -1,10 +1,10 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.wishlist.models import SUGGESTED_WISHLIST_CATEGORIES
 from app.modules.wishlist.repository import WishlistRepository
 from app.modules.wishlist.schemas import WishlistCreate, WishlistListItem, WishlistResponse, WishlistUpdate
-
+from app.core.exceptions import BadRequestError, get_or_404
 
 class WishlistService:
     def __init__(self, db: AsyncSession):
@@ -36,14 +36,12 @@ class WishlistService:
     async def create_category(self, user_id: str, name: str) -> str:
         clean = name.strip()
         if not clean:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name required")
+            raise BadRequestError("Category name required")
         await self.repo.ensure_category(user_id, clean)
         return clean
 
     async def get_item(self, user_id: str, item_id: str) -> WishlistResponse:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Wishlist item not found")
         return WishlistResponse.model_validate(item)
 
     async def create_item(self, user_id: str, data: WishlistCreate) -> WishlistResponse:
@@ -51,14 +49,10 @@ class WishlistService:
         return WishlistResponse.model_validate(item)
 
     async def update_item(self, user_id: str, item_id: str, data: WishlistUpdate) -> WishlistResponse:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Wishlist item not found")
         updated = await self.repo.update(item, data)
         return WishlistResponse.model_validate(updated)
 
     async def delete_item(self, user_id: str, item_id: str) -> None:
-        item = await self.repo.get_by_id(user_id, item_id)
-        if item is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist item not found")
+        item = get_or_404(await self.repo.get_by_id(user_id, item_id), "Wishlist item not found")
         await self.repo.delete(item)

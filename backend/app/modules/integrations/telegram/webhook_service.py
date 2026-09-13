@@ -6,18 +6,17 @@ import logging
 import secrets
 from typing import Any
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import TelegramWebhookRegisterResponse, TelegramWebhookStatus
 from app.modules.integrations.telegram.update_router import route_update
-from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
-from app.modules.integrations.telegram_config import parse_config
+from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
+from app.modules.integrations.telegram.config import parse_config
+from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError, get_or_404
 
 logger = logging.getLogger(__name__)
-
 
 class TelegramWebhookService:
     def __init__(self, db: AsyncSession):
@@ -33,18 +32,18 @@ class TelegramWebhookService:
     ) -> dict[str, str]:
         conn = await self.repo.get_by_webhook_secret(path_secret)
         if conn is None or not conn.enabled:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown webhook")
+            raise NotFoundError("Unknown webhook")
 
         if conn.webhook_secret and header_secret is not None and header_secret != conn.webhook_secret:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid secret token")
+            raise ForbiddenError("Invalid secret token")
 
         cfg = parse_config(conn.config_json)
         if cfg is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Telegram not configured")
+            raise BadRequestError("Telegram not configured")
 
         result = await route_update(self.db, conn.user_id, cfg.chat_id, payload)
         if result.get("ok") == "rejected_chat":
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Unknown chat")
+            raise ForbiddenError("Unknown chat")
         return result
 
     async def register_webhook(self, user_id: str) -> TelegramWebhookRegisterResponse:
@@ -57,9 +56,7 @@ class TelegramWebhookService:
                 webhook_url=None,
             )
 
-        conn = await self.repo.get_by_provider(user_id, "telegram")
-        if conn is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Telegram not configured")
+        conn = get_or_404(await self.repo.get_by_provider(user_id, "telegram"), "Telegram not configured")
         cfg = parse_config(conn.config_json)
         if cfg is None:
             return TelegramWebhookRegisterResponse(
@@ -75,15 +72,16 @@ class TelegramWebhookService:
         try:
             await client.set_webhook(webhook_url, secret_token=secret, drop_pending_updates=False)
         except TelegramClientError as exc:
-            return TelegramWebhookRegisterResponse(ok=False, detail=str(exc), webhook_url=webhook_url)
+            logger.warning("setWebhook failed: %s", exc)
+            return TelegramWebhookRegisterResponse(
+                ok=False, detail="Failed to register webhook with Telegram", webhook_url=webhook_url
+            )
         return TelegramWebhookRegisterResponse(
             ok=True, detail="Webhook registered", webhook_url=webhook_url
         )
 
     async def delete_webhook(self, user_id: str) -> TelegramWebhookRegisterResponse:
-        conn = await self.repo.get_by_provider(user_id, "telegram")
-        if conn is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Telegram not configured")
+        conn = get_or_404(await self.repo.get_by_provider(user_id, "telegram"), "Telegram not configured")
         cfg = parse_config(conn.config_json)
         if cfg is not None:
             try:
@@ -107,9 +105,10 @@ class TelegramWebhookService:
         try:
             info = await TelegramClient(cfg.bot_token).get_webhook_info()
         except TelegramClientError as exc:
+            logger.warning("getWebhookInfo failed: %s", exc)
             return TelegramWebhookStatus(
                 configured=bool(conn.webhook_secret),
-                detail=str(exc),
+                detail="Could not fetch webhook status from Telegram",
             )
         return TelegramWebhookStatus(
             configured=bool(info.get("url")),

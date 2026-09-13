@@ -155,6 +155,33 @@ async def test_tampered_unlock_token_rejected(gated_client, gate_settings):
 
 
 @pytest.mark.asyncio
+async def test_unlock_token_bound_to_wrong_email_rejected(gated_client, gate_settings):
+    """Unlock JWT whose sub does not match ADMIN_GATE_EMAIL must be rejected."""
+    from datetime import datetime, timedelta, timezone
+
+    wrong = jwt.encode(
+        {
+            "sub": "other@example.com",
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+            "type": "reg_unlock",
+        },
+        gate_settings.secret_key,
+        algorithm=gate_settings.algorithm,
+    )
+    gated_client.cookies.set(REG_UNLOCK_COOKIE, wrong)
+    reg = await gated_client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "wrongbound",
+            "email": "wrongbound@example.com",
+            "password": "password123",
+            "display_name": "Wrong Bound",
+        },
+    )
+    assert reg.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_access_token_cannot_masquerade_as_unlock(gated_client, gate_settings):
     """A normal access JWT must not satisfy the registration unlock cookie."""
     from datetime import datetime, timedelta, timezone

@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
+from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
 
 
 @dataclass(frozen=True)
@@ -63,8 +63,8 @@ class TelegramNotifier(Notifier):
                 reply_markup=message.reply_markup,
             )
             return NotifierResult(ok=True, detail="Message sent")
-        except TelegramClientError as exc:
-            return NotifierResult(ok=False, detail=str(exc) or "Telegram send failed")
+        except TelegramClientError:
+            return NotifierResult(ok=False, detail="Telegram send failed")
 
     async def edit_message(
         self,
@@ -80,8 +80,8 @@ class TelegramNotifier(Notifier):
                 reply_markup=message.reply_markup,
             )
             return NotifierResult(ok=True, detail="Message edited")
-        except TelegramClientError as exc:
-            return NotifierResult(ok=False, detail=str(exc) or "Telegram edit failed")
+        except TelegramClientError:
+            return NotifierResult(ok=False, detail="Telegram edit failed")
 
     async def answer_callback(
         self,
@@ -95,5 +95,5 @@ class TelegramNotifier(Notifier):
                 callback_query_id, text=text, show_alert=show_alert
             )
             return NotifierResult(ok=True, detail="Callback answered")
-        except TelegramClientError as exc:
-            return NotifierResult(ok=False, detail=str(exc) or "Telegram callback failed")
+        except TelegramClientError:
+            return NotifierResult(ok=False, detail="Telegram callback failed")

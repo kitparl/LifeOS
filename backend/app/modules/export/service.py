@@ -3,7 +3,6 @@ import io
 import json
 from typing import Any
 
-from fastapi import HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +17,7 @@ from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
 from app.modules.tasks.models import Task
 from app.modules.wishlist.models import WishlistItem
+from app.core.exceptions import BadRequestError, NotFoundError
 
 EXPORT_MODULES = (
     "goals",
@@ -32,7 +32,6 @@ EXPORT_MODULES = (
     "learning",
     "all",
 )
-
 
 class ExportService:
     def __init__(self, db: AsyncSession):
@@ -160,18 +159,15 @@ class ExportService:
                 }
                 for c in concepts.scalars().all()
             ]
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown export module")
+        raise NotFoundError("Unknown export module")
 
     async def export(self, user_id: str, module: str, fmt: str) -> Response:
         if module not in EXPORT_MODULES:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown export module")
+            raise NotFoundError("Unknown export module")
         if fmt not in ("json", "csv"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Format must be json or csv")
+            raise BadRequestError("Format must be json or csv")
         if module == "all" and fmt == "csv":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Use json format for all-modules export",
-            )
+            raise BadRequestError("Use json format for all-modules export",)
 
         if module == "all":
             payload = {}

@@ -7,18 +7,18 @@ Idempotent: one send per (user + occurrence + offset) via unique dedupe_key.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.repository import CalendarRepository
 from app.modules.calendar.service import _expand_recurring_event
-from app.modules.integrations import telegram_templates as tpl
-from app.modules.integrations.notifier import NotifierMessage
-from app.modules.integrations.notifier_registry import build_user_notifier
-from app.modules.integrations.report_repository import ReportRunRepository
-from app.modules.integrations.telegram_config import parse_preferences
+from app.modules.integrations.telegram import templates as tpl
+from app.modules.integrations.notifications.notifier import NotifierMessage
+from app.modules.integrations.notifications.notifier_registry import build_user_notifier
+from app.modules.integrations.reports.repository import ReportRunRepository
+from app.modules.integrations.telegram.config import parse_preferences
 from app.modules.routines.service import RoutineService
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.ai.models import ContentEmbedding
 from app.modules.calendar.models import CalendarEvent
 from app.modules.career.models import CareerProject, JobApplication
 from app.modules.finance.models import FinanceTransaction

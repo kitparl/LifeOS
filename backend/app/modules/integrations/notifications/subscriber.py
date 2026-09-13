@@ -29,9 +29,9 @@ from app.core.events import (
     EntityCreated,
     event_bus,
 )
-from app.modules.integrations.outbox_repository import OutboxRepository
+from app.modules.integrations.notifications.outbox_repository import OutboxRepository
 from app.modules.integrations.repository import IntegrationRepository
-from app.modules.integrations.telegram_config import parse_preferences
+from app.modules.integrations.telegram.config import parse_preferences
 from app.modules.notifications.schemas import NotificationCreate
 from app.modules.notifications.service import NotificationService
 

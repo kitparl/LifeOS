@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import TASK_COMPLETED, TASK_CREATED, TASK_STATUS_CHANGED, EntityCreated, event_bus
@@ -12,7 +11,7 @@ from app.modules.tasks.permissions import TaskPermissions
 from app.modules.tasks.repository import TaskRepository
 from app.modules.tasks.schemas import SubtaskResponse, TaskCreate, TaskListItem, TaskResponse, TaskUpdate
 from app.modules.tasks.status_service import StatusService
-
+from app.core.exceptions import ConflictError, get_or_404
 
 class TaskService:
     def __init__(self, db: AsyncSession):
@@ -128,9 +127,7 @@ class TaskService:
 
     async def create_task(self, user_id: str, data: TaskCreate) -> TaskResponse:
         if data.parent_id:
-            parent = await self.repo.get_by_id(user_id, data.parent_id)
-            if parent is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent task not found")
+            get_or_404(await self.repo.get_by_id(user_id, data.parent_id), "Parent task not found")
         task = await self.repo.create(user_id, data)
         await self.activity.log(task.id, user_id, "create", field="title", new_value=task.title)
         self.db.add(
@@ -180,7 +177,7 @@ class TaskService:
 
         # Optimistic concurrency
         if data.version is not None and data.version != (task.version or 1):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Version conflict")
+            raise ConflictError("Version conflict")
 
         # Owner-only field edits
         owner_fields = {"title", "description", "priority", "category", "tags", "due_date", "goal_id", "recurrence"}

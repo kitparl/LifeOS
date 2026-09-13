@@ -9,9 +9,9 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
-from app.modules.integrations.notifier import NotifierMessage
-from app.modules.integrations.notifier_registry import build_user_notifier
-from app.modules.integrations.outbox_repository import OutboxRepository
+from app.modules.integrations.notifications.notifier import NotifierMessage
+from app.modules.integrations.notifications.notifier_registry import build_user_notifier
+from app.modules.integrations.notifications.outbox_repository import OutboxRepository
 
 logger = logging.getLogger(__name__)
 

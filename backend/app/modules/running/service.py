@@ -1,7 +1,6 @@
 import json
 from datetime import datetime, time, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import RACE_ADDED, EntityCreated, event_bus
@@ -26,6 +25,7 @@ from app.modules.running.schemas import (
     RunningStatsResponse,
     ShoeTotal,
 )
+from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.running.stats import (
     _race_distance_km,
     compute_distance_over_time,
@@ -36,7 +36,6 @@ from app.modules.running.stats import (
     compute_weekly_totals,
     weekly_km,
 )
-
 
 class RunningService:
     def __init__(self, db: AsyncSession):
@@ -185,14 +184,12 @@ class RunningService:
     async def create_shoe(self, user_id: str, name: str) -> str:
         clean = name.strip()
         if not clean:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shoe name required")
+            raise BadRequestError("Shoe name required")
         await self.repo.ensure_shoe(user_id, clean)
         return clean
 
     async def get_run(self, user_id: str, run_id: str) -> RunResponse:
-        run = await self.repo.get_run(user_id, run_id)
-        if run is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+        run = get_or_404(await self.repo.get_run(user_id, run_id), "Run not found")
         return self._to_run_response(run)
 
     async def create_run(self, user_id: str, data: RunCreate) -> RunResponse:
@@ -200,16 +197,12 @@ class RunningService:
         return self._to_run_response(run)
 
     async def update_run(self, user_id: str, run_id: str, data: RunUpdate) -> RunResponse:
-        run = await self.repo.get_run(user_id, run_id)
-        if run is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+        run = get_or_404(await self.repo.get_run(user_id, run_id), "Run not found")
         updated = await self.repo.update_run(run, data)
         return self._to_run_response(updated)
 
     async def delete_run(self, user_id: str, run_id: str) -> None:
-        run = await self.repo.get_run(user_id, run_id)
-        if run is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+        run = get_or_404(await self.repo.get_run(user_id, run_id), "Run not found")
         await self.repo.delete_run(run)
 
     async def list_races(
@@ -225,9 +218,7 @@ class RunningService:
         return [self._to_race_response(r) for r in races], total
 
     async def get_race(self, user_id: str, race_id: str) -> RaceResponse:
-        race = await self.repo.get_race(user_id, race_id)
-        if race is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Race not found")
+        race = get_or_404(await self.repo.get_race(user_id, race_id), "Race not found")
         return self._to_race_response(race)
 
     async def create_race(self, user_id: str, data: RaceCreate) -> RaceResponse:
@@ -247,17 +238,13 @@ class RunningService:
         return self._to_race_response(race)
 
     async def update_race(self, user_id: str, race_id: str, data: RaceUpdate) -> RaceResponse:
-        race = await self.repo.get_race(user_id, race_id)
-        if race is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Race not found")
+        race = get_or_404(await self.repo.get_race(user_id, race_id), "Race not found")
         updated = await self.repo.update_race(race, data)
         await self._sync_race_to_calendar(user_id, updated)
         return self._to_race_response(updated)
 
     async def delete_race(self, user_id: str, race_id: str) -> None:
-        race = await self.repo.get_race(user_id, race_id)
-        if race is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Race not found")
+        race = get_or_404(await self.repo.get_race(user_id, race_id), "Race not found")
         await self.calendar_sync.delete_from_source(user_id, RUNNING_SOURCE_MODULE, race_id)
         await self.repo.delete_race(race)
 

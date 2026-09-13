@@ -11,10 +11,10 @@ from cryptography.fernet import Fernet
 
 from app.core import crypto
 from app.core.crypto import decrypt, encrypt
-from app.modules.integrations.digest_service import DigestContent, format_digest
-from app.modules.integrations.notifier import NotifierMessage, TelegramNotifier
-from app.modules.integrations.telegram_client import TelegramClient, TelegramClientError
-from app.modules.integrations.telegram_config import mask_config, parse_config, serialize_config
+from app.modules.integrations.scheduling.digest_service import DigestContent, format_digest
+from app.modules.integrations.notifications.notifier import NotifierMessage, TelegramNotifier
+from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
+from app.modules.integrations.telegram.config import mask_config, parse_config, serialize_config
 
 
 @pytest.fixture(autouse=True)
@@ -153,11 +153,11 @@ async def test_telegram_client_api_error():
 
 @pytest.mark.asyncio
 async def test_build_user_notifier_unconfigured():
-    from app.modules.integrations.notifier_registry import build_user_notifier
+    from app.modules.integrations.notifications.notifier_registry import build_user_notifier
 
     db = MagicMock()
     with patch(
-        "app.modules.integrations.notifier_registry.IntegrationRepository"
+        "app.modules.integrations.notifications.notifier_registry.IntegrationRepository"
     ) as Repo:
         repo = Repo.return_value
         repo.get_by_provider = AsyncMock(return_value=None)
@@ -180,7 +180,7 @@ async def test_notifications_send_telegram_fallback_when_unconfigured():
     service.repo.db = db
 
     with patch(
-        "app.modules.integrations.notifier_registry.build_user_notifier",
+        "app.modules.integrations.notifications.notifier_registry.build_user_notifier",
         new=AsyncMock(return_value=None),
     ):
         result = await service.send_telegram("user-1", "n1")

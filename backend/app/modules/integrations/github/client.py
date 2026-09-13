@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 _TRANSIENT_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 _MAX_RETRIES = 3
+DEFAULT_BASE_URL = "https://api.github.com"
+DEFAULT_TIMEOUT_SECONDS = 30.0
+DEFAULT_API_VERSION = "2022-11-28"
+DEFAULT_BRANCH = "main"
 
 
 class GitHubClientError(Exception):
@@ -91,9 +95,9 @@ class GitHubClient:
         owner: str,
         repo: str,
         *,
-        branch: str = "main",
-        base_url: str = "https://api.github.com",
-        timeout: float = 30.0,
+        branch: str = DEFAULT_BRANCH,
+        base_url: str = DEFAULT_BASE_URL,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ):
         if not token or not token.strip():
             raise GitHubClientError("GitHub token is required", code="auth")
@@ -102,12 +106,12 @@ class GitHubClient:
         self._token = token.strip()
         self._owner = owner.strip()
         self._repo = repo.strip()
-        self._branch = (branch or "main").strip()
+        self._branch = (branch or DEFAULT_BRANCH).strip()
         self._base = base_url.rstrip("/")
         self._timeout = timeout
 
     @classmethod
-    def from_repo_slug(cls, token: str, repo_slug: str, *, branch: str = "main") -> GitHubClient:
+    def from_repo_slug(cls, token: str, repo_slug: str, *, branch: str = DEFAULT_BRANCH) -> GitHubClient:
         parts = repo_slug.split("/", 1)
         if len(parts) != 2 or not parts[0] or not parts[1]:
             raise GitHubClientError("Repository must be owner/name", code="validation")
@@ -117,7 +121,7 @@ class GitHubClient:
         return {
             "Authorization": f"Bearer {self._token}",
             "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
+            "X-GitHub-Api-Version": DEFAULT_API_VERSION,
         }
 
     def _repo_url(self, suffix: str = "") -> str:

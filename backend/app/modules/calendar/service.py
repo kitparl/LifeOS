@@ -1,24 +1,22 @@
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import CALENDAR_EVENT_CREATED, EntityCreated, event_bus
 from app.modules.calendar.models import CalendarEvent
 from app.modules.calendar.repository import CalendarRepository
 from app.modules.calendar.schemas import EventCreate, EventListItem, EventResponse, EventUpdate
+from app.core.exceptions import get_or_404
 
 # Modules whose calendar events mirror an owning entity. Editing/deleting such an
 # event from the Calendar propagates back to the source (two-way sync).
 _RUNNING_SOURCE = "running"
-
 
 def _sort_key(dt: datetime) -> datetime:
     """Coerce naive datetimes (e.g. from SQLite) to UTC-aware so mixed lists sort safely."""
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
-
 
 def _expand_recurring_event(
     event: CalendarEvent, start: datetime, end: datetime
@@ -101,7 +99,6 @@ def _expand_recurring_event(
 
     return items or [EventListItem.model_validate(event)]
 
-
 class CalendarService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -138,9 +135,7 @@ class CalendarService:
         return items[offset : offset + limit], total
 
     async def get_event(self, user_id: str, event_id: str) -> EventResponse:
-        event = await self.repo.get_by_id(user_id, event_id)
-        if event is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        event = get_or_404(await self.repo.get_by_id(user_id, event_id), "Event not found")
         return EventResponse.model_validate(event)
 
     async def create_event(self, user_id: str, data: EventCreate) -> EventResponse:
@@ -160,17 +155,13 @@ class CalendarService:
         return EventResponse.model_validate(event)
 
     async def update_event(self, user_id: str, event_id: str, data: EventUpdate) -> EventResponse:
-        event = await self.repo.get_by_id(user_id, event_id)
-        if event is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        event = get_or_404(await self.repo.get_by_id(user_id, event_id), "Event not found")
         updated = await self.repo.update(event, data)
         await self._propagate_to_source(user_id, updated)
         return EventResponse.model_validate(updated)
 
     async def delete_event(self, user_id: str, event_id: str) -> None:
-        event = await self.repo.get_by_id(user_id, event_id)
-        if event is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        event = get_or_404(await self.repo.get_by_id(user_id, event_id), "Event not found")
         await self._delete_source(user_id, event)
         await self.repo.delete(event)
 

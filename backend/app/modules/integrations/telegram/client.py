@@ -13,6 +13,9 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_BASE_URL = "https://api.telegram.org"
+DEFAULT_TIMEOUT_SECONDS = 10.0
+
 
 class TelegramClientError(Exception):
     """Raised when the Telegram Bot API returns an error or the request fails."""
@@ -35,8 +38,8 @@ class TelegramClient:
         self,
         bot_token: str,
         *,
-        base_url: str = "https://api.telegram.org",
-        timeout: float = 10.0,
+        base_url: str = DEFAULT_BASE_URL,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ):
         if not bot_token or not bot_token.strip():
             raise TelegramClientError("Bot token is required")

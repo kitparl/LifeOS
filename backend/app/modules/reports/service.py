@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession

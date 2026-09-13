@@ -5,11 +5,10 @@ from collections.abc import AsyncIterator
 from io import BytesIO
 
 import anyio
-from fastapi import HTTPException, status
 
 from app.core.config import Settings
 from app.modules.files.backends.base import ObjectStat, StorageBackend, StoredObject
-
+from app.core.exceptions import NotFoundError
 
 class S3StorageBackend(StorageBackend):
     def __init__(self, settings: Settings):
@@ -62,7 +61,7 @@ class S3StorageBackend(StorageBackend):
                 resp = self._client().get_object(Bucket=self.bucket, Key=key)
                 return resp["Body"].read()
             except Exception as exc:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File content missing") from exc
+                raise NotFoundError("File content missing") from exc
 
         data = await anyio.to_thread.run_sync(_get)
 

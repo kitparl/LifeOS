@@ -24,6 +24,7 @@ from app.modules.files.schemas import (
     FileUsageResponse,
     PurgeResponse,
 )
+from app.core.exceptions import AppError, BadRequestError, ConflictError, NotFoundError, UnauthorizedError, get_or_404
 from app.modules.files.validation import (
     INLINE_SAFE_TYPES,
     NEVER_INLINE_TYPES,
@@ -36,16 +37,13 @@ logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 64 * 1024
 
-
 def _derived_url(file_id: str) -> str:
     return f"/api/v1/files/{file_id}/content"
-
 
 def _to_response(record: FileRecord) -> FileRecordResponse:
     data = FileRecordResponse.model_validate(record)
     # Derive URL at read time (D2); keep response field for frontend.
     return data.model_copy(update={"url": _derived_url(record.id)})
-
 
 class FileService:
     def __init__(
@@ -95,7 +93,7 @@ class FileService:
         entity_id: str | None = None,
     ) -> FileRecordResponse:
         if not filename:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Filename required")
+            raise BadRequestError("Filename required")
 
         module = validate_module(module)
         await self._enforce_rate_limit(user_id)
@@ -107,7 +105,9 @@ class FileService:
             first = chunk
             break
         if len(first) > self.settings.max_upload_bytes:
-            raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="File too large")
+            _err = AppError("File too large")
+            _err.status_code = status.HTTP_413_CONTENT_TOO_LARGE
+            raise _err
 
         sniffed = sniff_content_type(first[:8192], filename, self.settings)
         ext = extension_for_mime(sniffed)
@@ -133,19 +133,23 @@ class FileService:
             if first:
                 total += len(first)
                 if total > max_bytes:
-                    raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="File too large")
+                    _err = AppError("File too large")
+                    _err.status_code = status.HTTP_413_CONTENT_TOO_LARGE
+                    raise _err
                 hasher.update(first)
                 yield first
             async for chunk in rest_iter:
                 total += len(chunk)
                 if total > max_bytes:
-                    raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="File too large")
+                    _err = AppError("File too large")
+                    _err.status_code = status.HTTP_413_CONTENT_TOO_LARGE
+                    raise _err
                 hasher.update(chunk)
                 yield chunk
 
         try:
             stored = await storage.save(storage_key, limited(), sniffed)
-        except HTTPException:
+        except AppError:
             try:
                 await storage.delete(storage_key)
             except Exception:
@@ -161,10 +165,7 @@ class FileService:
                 await storage.delete(storage_key)
             except Exception:
                 logger.exception("Failed to clean up duplicate upload: %s", storage_key)
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                detail="This file has already been uploaded",
-            )
+            raise ConflictError("This file has already been uploaded",)
 
         await self._enforce_quota(user_id, additional=size_bytes)
 
@@ -221,18 +222,16 @@ class FileService:
     async def _enforce_rate_limit(self, user_id: str) -> None:
         count = await self.repo.uploads_in_last_hour(user_id)
         if count >= self.settings.uploads_per_hour:
-            raise HTTPException(
-                status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Upload rate limit exceeded",
-            )
+            _err = AppError("Upload rate limit exceeded",)
+            _err.status_code = status.HTTP_429_TOO_MANY_REQUESTS
+            raise _err
 
     async def _enforce_quota(self, user_id: str, *, additional: int) -> None:
         used, _ = await self.repo.usage_stats(user_id)
         if used + additional > self.settings.user_storage_quota_bytes:
-            raise HTTPException(
-                status.HTTP_413_CONTENT_TOO_LARGE,
-                detail="User storage quota exceeded",
-            )
+            _err = AppError("User storage quota exceeded",)
+            _err.status_code = status.HTTP_413_CONTENT_TOO_LARGE
+            raise _err
 
     async def list_files(
         self,
@@ -253,9 +252,7 @@ class FileService:
         return [_to_response(r) for r in rows], total
 
     async def get_file(self, user_id: str, file_id: str) -> FileRecordResponse:
-        record = await self.repo.get(user_id, file_id)
-        if not record:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+        record = get_or_404(await self.repo.get(user_id, file_id), "File not found")
         return _to_response(record)
 
     async def get_usage(self, user_id: str) -> FileUsageResponse:
@@ -267,16 +264,12 @@ class FileService:
         )
 
     async def create_download_token(self, user_id: str, file_id: str) -> DownloadTokenResponse:
-        record = await self.repo.get(user_id, file_id)
-        if not record:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+        get_or_404(await self.repo.get(user_id, file_id), "File not found")
         token, expires_at = mint_download_token(file_id, user_id, self.settings)
         return DownloadTokenResponse(token=token, expires_at=expires_at)
 
     async def set_visibility(self, user_id: str, file_id: str, visibility: str) -> FileRecordResponse:
-        record = await self.repo.get(user_id, file_id)
-        if not record:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+        record = get_or_404(await self.repo.get(user_id, file_id), "File not found")
         old = record.visibility
         record.visibility = visibility
         record.updated_at = datetime.now(timezone.utc)
@@ -293,15 +286,11 @@ class FileService:
 
     async def delete_file(self, user_id: str, file_id: str) -> None:
         """Soft-delete: set deleted_at; bytes remain until purge. Soft-deleted rows still count toward quota."""
-        record = await self.repo.get(user_id, file_id)
-        if not record:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+        record = get_or_404(await self.repo.get(user_id, file_id), "File not found")
         await self.repo.soft_delete(record)
 
     async def hard_delete_file(self, user_id: str, file_id: str) -> None:
-        record = await self.repo.get(user_id, file_id, include_deleted=True)
-        if not record:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+        record = get_or_404(await self.repo.get(user_id, file_id, include_deleted=True), "File not found")
         backend = self._backend_for(record)
         await backend.delete(record.storage_key)
         await self.repo.hard_delete(record)
@@ -333,21 +322,17 @@ class FileService:
         if public:
             record = await self.repo.get_by_id(file_id)
             if not record or record.visibility != "public":
-                raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+                raise NotFoundError("File not found")
         elif token:
             try:
                 token_user = verify_download_token(token, file_id, self.settings)
             except ValueError:
-                raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid download token")
-            record = await self.repo.get(token_user, file_id)
-            if not record:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+                raise UnauthorizedError("Invalid download token")
+            record = get_or_404(await self.repo.get(token_user, file_id), "File not found")
         elif user_id:
-            record = await self.repo.get(user_id, file_id)
-            if not record:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, detail="File not found")
+            record = get_or_404(await self.repo.get(user_id, file_id), "File not found")
         else:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+            raise UnauthorizedError("Not authenticated")
 
         etag = f'"{record.checksum_sha256}"' if record.checksum_sha256 else None
         if etag and request.headers.get("if-none-match") == etag:
@@ -439,6 +424,7 @@ class FileService:
                 raise ValueError
             return start, end
         except ValueError:
+            # Keep HTTPException: AppError handler does not forward response headers.
             raise HTTPException(
                 status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
                 detail="Invalid Range",

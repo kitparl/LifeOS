@@ -4,21 +4,21 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.modules.integrations.github_client import (
+from app.modules.integrations.github.client import (
     AtomicCommitResult,
     GitHubClientError,
     user_facing_github_error,
 )
-from app.modules.integrations.github_config import (
+from app.modules.integrations.github.config import (
     _normalize_repo,
     mask_config,
     parse_config,
     parse_preferences,
     serialize_config,
 )
-from app.modules.integrations.github_slug import slugify, strip_leading_number
-from app.modules.integrations.github_sync_planner import build_sync_plan
-from app.modules.integrations.github_sync_service import (
+from app.modules.integrations.github.slug import slugify, strip_leading_number
+from app.modules.integrations.github.sync_planner import build_sync_plan
+from app.modules.integrations.github.sync_service import (
     _asset_filename,
     _content_hash,
     build_paths,
@@ -29,7 +29,7 @@ from app.modules.integrations.github_sync_service import (
     format_number,
     rewrite_markdown,
 )
-from app.modules.integrations.github_sync_models import GitHubSyncState, SYNC_STATUS_FAILED, SYNC_STATUS_SYNCED, SYNC_STATUS_SYNCING, SYNC_STATUS_UNCHANGED
+from app.modules.integrations.github.sync_models import GitHubSyncState, SYNC_STATUS_FAILED, SYNC_STATUS_SYNCED, SYNC_STATUS_SYNCING, SYNC_STATUS_UNCHANGED
 from app.modules.knowledge_notes.models import KnowledgeChapter, KnowledgeSection, KnowledgeSubject
 
 
@@ -335,7 +335,7 @@ def test_user_facing_github_error():
 
 @pytest.mark.asyncio
 async def test_sync_section_unchanged_skips_commit():
-    from app.modules.integrations.github_sync_service import GitHubSyncService
+    from app.modules.integrations.github.sync_service import GitHubSyncService
 
     subject = KnowledgeSubject(id="s1", user_id="u1", title="Python", order_index=0)
     chapter = KnowledgeChapter(id="c1", user_id="u1", subject_id="s1", title="Ch1", order_index=0)
@@ -388,8 +388,8 @@ async def test_sync_section_unchanged_skips_commit():
 
 @pytest.mark.asyncio
 async def test_sync_section_recreates_when_remote_file_missing(monkeypatch):
-    from app.modules.integrations import github_sync_service as sync_mod
-    from app.modules.integrations.github_sync_service import GitHubSyncService
+    from app.modules.integrations.github import sync_service as sync_mod
+    from app.modules.integrations.github.sync_service import GitHubSyncService
 
     monkeypatch.setattr(sync_mod, "notify_github_sync_result", AsyncMock())
 
@@ -445,8 +445,8 @@ async def test_sync_section_recreates_when_remote_file_missing(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_apply_plan_atomic_creates_blobs_and_commit():
-    from app.modules.integrations.github_sync_service import GitHubSyncService
-    from app.modules.integrations.github_sync_planner import PlannedFile, SyncPlan
+    from app.modules.integrations.github.sync_service import GitHubSyncService
+    from app.modules.integrations.github.sync_planner import PlannedFile, SyncPlan
 
     client = MagicMock()
     client.create_blob = AsyncMock(side_effect=["blob1", "blob2"])
@@ -478,7 +478,7 @@ async def test_apply_plan_atomic_creates_blobs_and_commit():
 
 @pytest.mark.asyncio
 async def test_commit_tree_changes_skips_missing_deletes():
-    from app.modules.integrations.github_client import GitHubClient, TreeEntry
+    from app.modules.integrations.github.client import GitHubClient, TreeEntry
 
     client = GitHubClient("tok", "o", "r", branch="main")
     client.get_branch_ref = AsyncMock(return_value={"object": {"sha": "parent"}})
@@ -508,7 +508,7 @@ async def test_commit_tree_changes_skips_missing_deletes():
 
 @pytest.mark.asyncio
 async def test_commit_tree_changes_noop_when_only_missing_deletes():
-    from app.modules.integrations.github_client import GitHubClient, TreeEntry
+    from app.modules.integrations.github.client import GitHubClient, TreeEntry
 
     client = GitHubClient("tok", "o", "r", branch="main")
     client.get_branch_ref = AsyncMock(return_value={"object": {"sha": "parent"}})

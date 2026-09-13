@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from cryptography.fernet import Fernet
-from fastapi import HTTPException
 
 from app.core import crypto
 from app.modules.integrations.telegram import keyboards as kb
@@ -22,7 +21,7 @@ from app.modules.integrations.telegram.state import (
     get_token,
     start_conversation,
 )
-from app.modules.integrations.telegram_config import serialize_config
+from app.modules.integrations.telegram.config import serialize_config
 
 
 @pytest.fixture(autouse=True)
@@ -89,7 +88,7 @@ def test_state_ttl_and_tokens():
 
 @pytest.mark.asyncio
 async def test_handle_command_dashboard_returns_screen():
-    from app.modules.integrations.command_handler import handle_command
+    from app.modules.integrations.telegram.command_handler import handle_command
 
     db = MagicMock()
     result = await handle_command(db, "user-1", "/dashboard")
@@ -100,7 +99,7 @@ async def test_handle_command_dashboard_returns_screen():
 
 @pytest.mark.asyncio
 async def test_handle_command_help_still_text():
-    from app.modules.integrations.command_handler import handle_command
+    from app.modules.integrations.telegram.command_handler import handle_command
 
     db = MagicMock()
     help_text = await handle_command(db, "user-1", "/help")
@@ -189,7 +188,7 @@ async def test_habits_complete_callback():
 
     with patch("app.modules.integrations.telegram.screens.habits.HabitService") as Svc:
         svc = Svc.return_value
-        svc.list_habits = AsyncMock(side_effect=[[habit], [completed]])
+        svc.list_habits = AsyncMock(side_effect=[([habit], 1), ([completed], 1)])
         svc.complete_today = AsyncMock(return_value=completed)
         ctx = CallbackContext(
             db=db,
@@ -210,7 +209,7 @@ async def test_habits_complete_callback():
 
 @pytest.mark.asyncio
 async def test_outbox_enqueue_with_markup():
-    from app.modules.integrations.outbox_repository import OutboxRepository
+    from app.modules.integrations.notifications.outbox_repository import OutboxRepository
 
     db = MagicMock()
     db.add = MagicMock()
@@ -224,9 +223,9 @@ async def test_outbox_enqueue_with_markup():
 
 @pytest.mark.asyncio
 async def test_dispatcher_sends_markup():
-    from app.modules.integrations.dispatcher import NotificationDispatcher
-    from app.modules.integrations.notifier import NotifierResult
-    from app.modules.integrations.outbox_models import PENDING, PendingNotification
+    from app.modules.integrations.notifications.dispatcher import NotificationDispatcher
+    from app.modules.integrations.notifications.notifier import NotifierResult
+    from app.modules.integrations.notifications.outbox_models import PENDING, PendingNotification
 
     db = MagicMock()
     db.commit = AsyncMock()
@@ -249,7 +248,7 @@ async def test_dispatcher_sends_markup():
     notifier.send = AsyncMock(return_value=NotifierResult(ok=True, detail="ok"))
 
     with patch(
-        "app.modules.integrations.dispatcher.build_user_notifier",
+        "app.modules.integrations.notifications.dispatcher.build_user_notifier",
         new=AsyncMock(return_value=notifier),
     ):
         sent = await dispatcher.dispatch_pending()
@@ -262,7 +261,7 @@ async def test_dispatcher_sends_markup():
 @pytest.mark.asyncio
 async def test_subscriber_attaches_task_keyboard():
     from app.core.events import TASK_CREATED, EntityCreated
-    from app.modules.integrations.subscriber import on_entity_created
+    from app.modules.integrations.notifications.subscriber import on_entity_created
 
     db = MagicMock()
     conn = MagicMock()
@@ -272,8 +271,8 @@ async def test_subscriber_attaches_task_keyboard():
     )
 
     with (
-        patch("app.modules.integrations.subscriber.IntegrationRepository") as Repo,
-        patch("app.modules.integrations.subscriber.OutboxRepository") as Outbox,
+        patch("app.modules.integrations.notifications.subscriber.IntegrationRepository") as Repo,
+        patch("app.modules.integrations.notifications.subscriber.OutboxRepository") as Outbox,
     ):
         Repo.return_value.get_by_provider = AsyncMock(return_value=conn)
         Outbox.return_value.enqueue = AsyncMock()
@@ -290,7 +289,7 @@ async def test_subscriber_attaches_task_keyboard():
 
 @pytest.mark.asyncio
 async def test_digest_has_section_buttons():
-    from app.modules.integrations.digest_service import DigestContent, format_digest
+    from app.modules.integrations.scheduling.digest_service import DigestContent, format_digest
 
     msg = format_digest(DigestContent(pending_tasks=["A"]))
     assert msg.reply_markup is not None
@@ -303,19 +302,21 @@ async def test_digest_has_section_buttons():
 
 @pytest.mark.asyncio
 async def test_webhook_rejects_unknown_secret():
-    from app.modules.integrations.webhook_service import TelegramWebhookService
+    from app.core.exceptions import NotFoundError
+    from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 
     db = MagicMock()
     svc = TelegramWebhookService(db)
     svc.repo.get_by_webhook_secret = AsyncMock(return_value=None)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(NotFoundError) as exc:
         await svc.handle_update("bad-secret", {"message": {"text": "/help", "chat": {"id": 1}}})
     assert exc.value.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_webhook_rejects_unknown_chat():
-    from app.modules.integrations.webhook_service import TelegramWebhookService
+    from app.core.exceptions import ForbiddenError
+    from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 
     db = MagicMock()
     conn = MagicMock()
@@ -327,7 +328,7 @@ async def test_webhook_rejects_unknown_chat():
     svc = TelegramWebhookService(db)
     svc.repo.get_by_webhook_secret = AsyncMock(return_value=conn)
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ForbiddenError) as exc:
         await svc.handle_update(
             "sec",
             {"message": {"text": "/help", "chat": {"id": 999}}},
@@ -381,7 +382,7 @@ async def test_ai_parse_and_create_task_fallback():
 
 @pytest.mark.asyncio
 async def test_telegram_client_send_with_markup():
-    from app.modules.integrations.telegram_client import TelegramClient
+    from app.modules.integrations.telegram.client import TelegramClient
 
     client = TelegramClient("123:ABC")
     with patch.object(client, "_post", new=AsyncMock(return_value={"message_id": 1})) as post:
@@ -396,7 +397,7 @@ async def test_telegram_client_send_with_markup():
 
 @pytest.mark.asyncio
 async def test_handle_command_done_still_works():
-    from app.modules.integrations.command_handler import handle_command
+    from app.modules.integrations.telegram.command_handler import handle_command
 
     db = MagicMock()
     msg = await handle_command(db, "user-1", "/done")

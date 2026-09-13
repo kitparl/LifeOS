@@ -1,7 +1,8 @@
-from fastapi import HTTPException, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.career.repository import CareerRepository
+from app.core.exceptions import get_or_404
 from app.modules.career.schemas import (
     ApplicationCreate,
     ApplicationResponse,
@@ -12,7 +13,6 @@ from app.modules.career.schemas import (
     ProjectResponse,
     ProjectUpdate,
 )
-
 
 class CareerService:
     def __init__(self, db: AsyncSession):
@@ -34,9 +34,7 @@ class CareerService:
         return [ProjectResponse.model_validate(p) for p in projects], total
 
     async def get_project(self, user_id: str, project_id: str) -> ProjectResponse:
-        project = await self.repo.get_project(user_id, project_id)
-        if not project:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+        project = get_or_404(await self.repo.get_project(user_id, project_id), "Project not found")
         return ProjectResponse.model_validate(project)
 
     async def create_project(self, user_id: str, data: ProjectCreate) -> ProjectResponse:
@@ -44,16 +42,12 @@ class CareerService:
         return ProjectResponse.model_validate(project)
 
     async def update_project(self, user_id: str, project_id: str, data: ProjectUpdate) -> ProjectResponse:
-        project = await self.repo.get_project(user_id, project_id)
-        if not project:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+        project = get_or_404(await self.repo.get_project(user_id, project_id), "Project not found")
         updated = await self.repo.update_project(project, data)
         return ProjectResponse.model_validate(updated)
 
     async def delete_project(self, user_id: str, project_id: str) -> None:
-        project = await self.repo.get_project(user_id, project_id)
-        if not project:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+        project = get_or_404(await self.repo.get_project(user_id, project_id), "Project not found")
         await self.repo.delete_project(project)
 
     async def list_applications(
@@ -63,9 +57,7 @@ class CareerService:
         return [ApplicationResponse.model_validate(a) for a in apps], total
 
     async def get_application(self, user_id: str, app_id: str) -> ApplicationResponse:
-        app = await self.repo.get_application(user_id, app_id)
-        if not app:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+        app = get_or_404(await self.repo.get_application(user_id, app_id), "Application not found")
         return ApplicationResponse.model_validate(app)
 
     async def create_application(self, user_id: str, data: ApplicationCreate) -> ApplicationResponse:
@@ -73,16 +65,12 @@ class CareerService:
         return ApplicationResponse.model_validate(app)
 
     async def update_application(self, user_id: str, app_id: str, data: ApplicationUpdate) -> ApplicationResponse:
-        app = await self.repo.get_application(user_id, app_id)
-        if not app:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+        app = get_or_404(await self.repo.get_application(user_id, app_id), "Application not found")
         updated = await self.repo.update_application(app, data)
         return ApplicationResponse.model_validate(updated)
 
     async def delete_application(self, user_id: str, app_id: str) -> None:
-        app = await self.repo.get_application(user_id, app_id)
-        if not app:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+        app = get_or_404(await self.repo.get_application(user_id, app_id), "Application not found")
         await self.repo.delete_application(app)
 
     async def analytics(self, user_id: str) -> dict:

@@ -10,8 +10,8 @@ from httpx import AsyncClient
 
 from app.modules.calendar.models import CalendarEvent
 from app.modules.calendar.service import _expand_recurring_event
-from app.modules.integrations.telegram_config import parse_preferences, serialize_config
-from app.modules.integrations.telegram_templates import chunk_text
+from app.modules.integrations.telegram.config import parse_preferences, serialize_config
+from app.modules.integrations.telegram.templates import chunk_text
 # CalendarService unused — expansion tested via _expand_recurring_event
 
 
@@ -261,8 +261,8 @@ async def test_reminder_dedupe_claim():
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
     from app.core.database import Base
-    from app.modules.integrations.report_repository import ReportRunRepository
-    import app.modules.integrations.report_models  # noqa: F401
+    from app.modules.integrations.reports.repository import ReportRunRepository
+    import app.modules.integrations.reports.models  # noqa: F401
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
@@ -311,7 +311,7 @@ async def test_telegram_prefs_status_exposes_new_fields(client: AsyncClient):
 
 
 def test_immutable_offset_window_helper():
-    from app.modules.integrations.reminder_scanner import _in_window, POLL_GRACE
+    from app.modules.integrations.scheduling.reminder_scanner import _in_window, POLL_GRACE
 
     tz = ZoneInfo("Asia/Kolkata")
     now = datetime(2026, 7, 25, 12, 0, tzinfo=tz)
@@ -326,7 +326,7 @@ def test_immutable_offset_window_helper():
 @pytest.mark.asyncio
 async def test_registered_cron_fires_at_local_time():
     """A report set for 18:16 in Asia/Kolkata must fire at 18:16 IST, not 18:16 UTC."""
-    from app.modules.integrations import scheduler as sched_mod
+    from app.modules.integrations.scheduling import scheduler as sched_mod
 
     sched_mod.start_scheduler()
     try:
@@ -383,7 +383,7 @@ async def _backfill(config: dict) -> dict:
 
 @pytest.mark.asyncio
 async def test_backfill_rewrites_legacy_utc_timezone():
-    from app.modules.integrations.telegram_config import TZ_BACKFILL_KEY
+    from app.modules.integrations.telegram.config import TZ_BACKFILL_KEY
 
     data = await _backfill({"timezone": "UTC", "midday_time": "18:16"})
     assert data["timezone"] == "Asia/Kolkata"
@@ -393,7 +393,7 @@ async def test_backfill_rewrites_legacy_utc_timezone():
 
 @pytest.mark.asyncio
 async def test_backfill_keeps_deliberate_utc_choice():
-    from app.modules.integrations.telegram_config import TZ_BACKFILL_KEY
+    from app.modules.integrations.telegram.config import TZ_BACKFILL_KEY
 
     data = await _backfill({"timezone": "UTC", TZ_BACKFILL_KEY: True})
     assert data["timezone"] == "UTC"
@@ -402,7 +402,7 @@ async def test_backfill_keeps_deliberate_utc_choice():
 def test_serialize_config_preserves_backfill_marker():
     import json
 
-    from app.modules.integrations.telegram_config import TZ_BACKFILL_KEY
+    from app.modules.integrations.telegram.config import TZ_BACKFILL_KEY
 
     existing = json.dumps({"timezone": "UTC", TZ_BACKFILL_KEY: True})
     saved = json.loads(serialize_config(existing_json=existing, midday_time="18:16"))
