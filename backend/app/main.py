@@ -6,7 +6,6 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from app.core.config import get_settings
-from app.core.database import Base, engine
 from app.core.exceptions import AppError
 from app.core.logging_config import configure_logging
 from app.modules.ai.api import router as ai_router
@@ -52,27 +51,12 @@ configure_logging(level=logging.DEBUG if settings.is_development else logging.IN
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Register models with Base.metadata BEFORE create_all so new tables exist.
-    import app.modules.auth.models  # noqa: F401 — User + UsernameHistory
-    import app.modules.files.models  # noqa: F401 — FileRecord
-    import app.modules.ai.models  # noqa: F401 — ContentEmbedding + use-case model selection
-    import app.modules.communication.models  # noqa: F401 — WritingEvaluation + AIRun
-    import app.modules.integrations.notifications.outbox_models  # noqa: F401
-    import app.modules.integrations.reports.models  # noqa: F401
-    import app.modules.integrations.github.sync_models  # noqa: F401
-    import app.modules.routines.models  # noqa: F401
-    import app.modules.preferences.models  # noqa: F401
-    import app.modules.tasks.models  # noqa: F401 — Task + assignment/history/collab tables
-    import app.modules.finance.models  # noqa: F401 — transactions + recurring + loans/EMIs
+    from app.core.schema_bootstrap import apply_schema
     from app.modules.integrations.notifications.subscriber import register_subscribers
 
     register_subscribers()
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        # Idempotent column migrations for schema evolution without Alembic
-        from app.core.migrations import ensure_columns
-        await ensure_columns(conn)
+    # Serialised across workers — see schema_bootstrap module docstring.
+    await apply_schema()
 
     from app.modules.integrations.scheduling.scheduler import (
         load_all_scheduled_jobs,

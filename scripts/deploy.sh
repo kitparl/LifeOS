@@ -136,6 +136,13 @@ setup_backend() {
     source "$VENV_DIR/bin/activate"
     pip install --upgrade pip
     pip install -r requirements.txt
+
+    # Apply create_all + column migrations once BEFORE multi-worker restart.
+    # Lifespan still re-runs them under a file lock; doing it here avoids a
+    # first-boot race where both workers mutate SQLite and /health never answers.
+    log "Applying database schema..."
+    (cd "$BACKEND_DIR" && "$VENV_DIR/bin/python" -m app.core.schema_bootstrap)
+
     deactivate
 }
 
@@ -159,14 +166,19 @@ health_check() {
 
     log "Health check: $HEALTH_URL (up to ${HEALTH_RETRIES} attempts)"
     local attempt
+    local curl_err=""
     for ((attempt = 1; attempt <= HEALTH_RETRIES; attempt++)); do
-        if curl -sf "$HEALTH_URL" >/dev/null; then
+        if curl -sf --max-time 3 "$HEALTH_URL" >/dev/null; then
             log "Health check passed (attempt $attempt)."
             return 0
         fi
-        log "Health check attempt $attempt/$HEALTH_RETRIES failed — retrying in ${HEALTH_RETRY_DELAY}s..."
+        # Capture why curl failed (connection refused vs HTTP error vs timeout).
+        curl_err="$(curl -sS --max-time 3 -o /dev/null -w '%{http_code} err=%{errormsg}' "$HEALTH_URL" 2>&1 || true)"
+        log "Health check attempt $attempt/$HEALTH_RETRIES failed (${curl_err}) — retrying in ${HEALTH_RETRY_DELAY}s..."
         sleep "$HEALTH_RETRY_DELAY"
     done
+    log "Health check exhausted. Recent $SERVICE_NAME journal:"
+    sudo journalctl -u "$SERVICE_NAME" -n 80 --no-pager 2>&1 | tee -a "$LOG_FILE" || true
     return 1
 }
 
