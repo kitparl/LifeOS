@@ -6,9 +6,11 @@ import { ExpenseFormComponent } from './components/expense-form.component';
 import { ExpensesTabComponent } from './components/expenses-tab.component';
 import { IncomeFormComponent } from './components/income-form.component';
 import { IncomeTabComponent } from './components/income-tab.component';
+import { ForecloseFormComponent } from './components/foreclose-form.component';
 import { LoanFormComponent } from './components/loan-form.component';
 import { LoansTabComponent } from './components/loans-tab.component';
 import { OverviewTabComponent } from './components/overview-tab.component';
+import { PartPaymentFormComponent } from './components/part-payment-form.component';
 import { PeriodFilterComponent } from './components/period-filter.component';
 import { RecurringFormComponent } from './components/recurring-form.component';
 import { RecurringTabComponent } from './components/recurring-tab.component';
@@ -22,6 +24,8 @@ import {
   IncomePayload,
   Loan,
   LoanEMI,
+  LoanForeclosurePayload,
+  LoanPartPaymentPayload,
   LoanPayload,
   LoanSummary,
   PeriodSelection,
@@ -53,21 +57,19 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
     IncomeFormComponent,
     RecurringFormComponent,
     LoanFormComponent,
+    PartPaymentFormComponent,
+    ForecloseFormComponent,
   ],
   template: `
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 class="text-lg font-semibold">Finance</h1>
-          @if (overview()) {
-            <p class="text-sm" style="color: var(--text-muted)">{{ overview()!.label }}</p>
-          }
-        </div>
-      </div>
-
-      <app-finance-period-filter [period]="period()" (periodChange)="setPeriod($event)" />
-
+    <div class="space-y-3">
       <app-tab-hub [tabs]="tabs" [activeId]="activeTab()" [wrap]="true" (tabChange)="setTab($event)" />
+
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <app-finance-period-filter [period]="period()" (periodChange)="setPeriod($event)" />
+        @if (overview()) {
+          <p class="text-xs" style="color: var(--text-muted)">{{ overview()!.label }}</p>
+        }
+      </div>
 
       @if (error()) {
         <p class="text-sm" style="color: var(--danger)">{{ error() }}</p>
@@ -127,8 +129,10 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
             [emis]="emis()"
             (add)="openLoanForm(null)"
             (edit)="openLoanForm($event)"
-            (closeLoan)="confirmCloseLoan($event)"
-            (reopen)="reopenLoan($event)"
+            (partPayment)="openPartPaymentForm($event)"
+            (foreclose)="openForecloseForm($event)"
+            (reactivate)="reactivateLoan($event)"
+            (deleteLoan)="confirmDeleteLoan($event)"
             (toggleSchedule)="toggleSchedule($event)"
             (pay)="payEmi($event)"
           />
@@ -168,6 +172,18 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
         [loan]="editingLoan()"
         (closed)="loanFormOpen.set(false)"
         (saved)="saveLoan($event)"
+      />
+
+      <app-part-payment-form
+        [open]="partPaymentFormOpen()"
+        (closed)="partPaymentFormOpen.set(false)"
+        (saved)="savePartPayment($event)"
+      />
+
+      <app-foreclose-form
+        [open]="forecloseFormOpen()"
+        (closed)="forecloseFormOpen.set(false)"
+        (saved)="saveForeclosure($event)"
       />
     </div>
   `,
@@ -210,10 +226,14 @@ export class FinancePageComponent implements OnInit {
   readonly incomeFormOpen = signal(false);
   readonly recurringFormOpen = signal(false);
   readonly loanFormOpen = signal(false);
+  readonly partPaymentFormOpen = signal(false);
+  readonly forecloseFormOpen = signal(false);
   readonly editingExpense = signal<Expense | null>(null);
   readonly editingIncome = signal<Income | null>(null);
   readonly editingRecurring = signal<RecurringExpense | null>(null);
   readonly editingLoan = signal<Loan | null>(null);
+  readonly partPaymentLoan = signal<Loan | null>(null);
+  readonly forecloseLoan = signal<Loan | null>(null);
 
   readonly expensePaging = new PaginatedListState();
   readonly incomePaging = new PaginatedListState();
@@ -503,50 +523,87 @@ export class FinancePageComponent implements OnInit {
 
   saveLoan(payload: LoanPayload): void {
     const editing = this.editingLoan();
-    const request = editing
-      ? this.finance.updateLoan(editing.id, {
-          name: payload.name,
-          lender: payload.lender,
-          principal_amount: payload.principal_amount,
-          emi_amount: payload.emi_amount,
-          interest_rate: payload.interest_rate,
-          notes: payload.notes,
-        })
-      : this.finance.createLoan(payload);
+    const request = editing ? this.finance.updateLoan(editing.id, payload) : this.finance.createLoan(payload);
     request.subscribe({
       next: () => {
         this.loanFormOpen.set(false);
         this.loadLoans();
         this.loadOverview();
+        // Editing tenure/dates/EMI day regenerates the unpaid tail of the
+        // schedule (new row ids) — an already-open schedule view must refetch.
+        if (editing) this.refreshScheduleIfOpen(editing.id);
       },
       error: () => this.error.set('Could not save the loan.'),
     });
   }
 
-  confirmCloseLoan(loan: Loan): void {
-    this.confirm
-      .confirm(
-        `Close "${loan.name}"? Pending EMIs are cancelled. Paid EMIs and their expenses are kept.`,
-        'Close loan',
-      )
-      .then((confirmed) => {
-        if (!confirmed) return;
-        this.finance.updateLoan(loan.id, { status: 'CLOSED' }).subscribe({
-          next: () => {
-            this.loadLoans();
-            this.refreshScheduleIfOpen(loan.id);
-          },
-        });
-      });
+  openPartPaymentForm(loan: Loan): void {
+    this.partPaymentLoan.set(loan);
+    this.partPaymentFormOpen.set(true);
   }
 
-  reopenLoan(loan: Loan): void {
-    this.finance.updateLoan(loan.id, { status: 'ACTIVE' }).subscribe({
+  savePartPayment(payload: LoanPartPaymentPayload): void {
+    const loan = this.partPaymentLoan();
+    if (!loan) return;
+    this.finance.addPartPayment(loan.id, payload).subscribe({
+      next: () => {
+        this.partPaymentFormOpen.set(false);
+        this.loadLoans();
+        this.loadOverview();
+        this.refreshScheduleIfOpen(loan.id);
+      },
+      error: () => this.error.set('Could not record the part payment.'),
+    });
+  }
+
+  openForecloseForm(loan: Loan): void {
+    this.forecloseLoan.set(loan);
+    this.forecloseFormOpen.set(true);
+  }
+
+  saveForeclosure(payload: LoanForeclosurePayload): void {
+    const loan = this.forecloseLoan();
+    if (!loan) return;
+    this.finance.foreclose(loan.id, payload).subscribe({
+      next: () => {
+        this.forecloseFormOpen.set(false);
+        this.loadLoans();
+        this.refreshScheduleIfOpen(loan.id);
+      },
+      error: () => this.error.set('Could not foreclose the loan.'),
+    });
+  }
+
+  reactivateLoan(loan: Loan): void {
+    this.finance.reactivate(loan.id).subscribe({
       next: () => {
         this.loadLoans();
         this.refreshScheduleIfOpen(loan.id);
       },
     });
+  }
+
+  confirmDeleteLoan(loan: Loan): void {
+    this.confirm
+      .confirm(
+        `Are you sure you want to delete "${loan.name}"? This will also remove its EMI schedule and ` +
+          `repayment records. This action cannot be undone.`,
+        'Delete loan',
+      )
+      .then((confirmed) => {
+        if (!confirmed) return;
+        this.finance.deleteLoan(loan.id).subscribe({
+          next: () => {
+            if (this.expandedLoanId() === loan.id) {
+              this.expandedLoanId.set(null);
+              this.emis.set([]);
+            }
+            this.loadLoans();
+            this.loadOverview();
+          },
+          error: () => this.error.set('Could not delete the loan.'),
+        });
+      });
   }
 
   toggleSchedule(loan: Loan): void {

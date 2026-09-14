@@ -97,6 +97,9 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("finance_transactions", "recurring_id", "VARCHAR(36)"),
     ("finance_transactions", "loan_id", "VARCHAR(36)"),
     ("finance_transactions", "loan_emi_id", "VARCHAR(36)"),
+    # Finance: loan foreclosure tracking (user-entered amount, never calculated)
+    ("finance_loans", "foreclosure_amount", "FLOAT"),
+    ("finance_loans", "foreclosure_notes", "TEXT"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
@@ -184,6 +187,7 @@ async def ensure_columns(conn: AsyncConnection) -> None:
     await backfill_telegram_timezone(conn)
     await backfill_usernames(conn)
     await backfill_finance_expense_kind(conn)
+    await backfill_finance_loan_status(conn)
 
 
 async def drop_obsolete_columns(conn: AsyncConnection, dialect: str) -> None:
@@ -367,3 +371,18 @@ async def backfill_finance_expense_kind(conn: AsyncConnection) -> None:
         )
     except Exception as exc:
         logger.warning("Could not backfill finance_transactions.expense_kind: %s", exc)
+
+
+async def backfill_finance_loan_status(conn: AsyncConnection) -> None:
+    """Rename the old `CLOSED` loan status to `FORECLOSED` (terminology change only).
+
+    "Close Loan" was renamed to "Foreclose Loan" to avoid ambiguity with a loan
+    finishing its schedule normally (`COMPLETED`). Safe to re-run: a second pass
+    finds no `CLOSED` rows left.
+    """
+    try:
+        await conn.execute(
+            text("UPDATE finance_loans SET status = 'FORECLOSED' WHERE status = 'CLOSED'")
+        )
+    except Exception as exc:
+        logger.warning("Could not backfill finance_loans.status: %s", exc)

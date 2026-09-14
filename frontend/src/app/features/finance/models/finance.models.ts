@@ -1,6 +1,7 @@
 export type ExpenseKind = 'soft' | 'hard';
-export type LoanStatus = 'ACTIVE' | 'CLOSED';
+export type LoanStatus = 'ACTIVE' | 'COMPLETED' | 'FORECLOSED';
 export type EMIStatus = 'PENDING' | 'PAID' | 'CANCELLED';
+export type PartPaymentImpact = 'REDUCE_TENURE' | 'REDUCE_EMI';
 export type PeriodPreset = 'this_month' | 'last_month' | 'this_year' | 'custom';
 
 export interface PeriodSelection {
@@ -107,6 +108,9 @@ export interface Loan {
   emi_day: number;
   status: LoanStatus;
   notes: string | null;
+  foreclosed_at: string | null;
+  foreclosure_amount: number | null;
+  foreclosure_notes: string | null;
   created_at: string;
   emis_total: number;
   emis_paid: number;
@@ -115,6 +119,7 @@ export interface Loan {
   next_emi_amount: number | null;
 }
 
+/** Exactly one of tenure_months / last_emi_date is required. */
 export interface LoanPayload {
   name: string;
   lender: string | null;
@@ -123,7 +128,8 @@ export interface LoanPayload {
   interest_rate: number | null;
   start_date: string;
   emi_start_date: string;
-  tenure_months: number;
+  tenure_months?: number | null;
+  last_emi_date?: string | null;
   emi_day: number;
   notes: string | null;
 }
@@ -143,6 +149,33 @@ export interface LoanEMI {
 export interface LoanSummary {
   active_loans: number;
   monthly_emi_total: number;
+}
+
+export interface LoanPartPayment {
+  id: string;
+  loan_id: string;
+  payment_date: string;
+  amount: number;
+  notes: string | null;
+  impact: PartPaymentImpact;
+  resulting_emi_amount: number | null;
+  resulting_tenure_months: number | null;
+  created_at: string;
+}
+
+export interface LoanPartPaymentPayload {
+  payment_date: string;
+  amount: number;
+  notes: string | null;
+  impact: PartPaymentImpact;
+  new_emi_amount?: number | null;
+  new_tenure_months?: number | null;
+}
+
+export interface LoanForeclosurePayload {
+  foreclosure_date: string;
+  foreclosure_amount: number;
+  notes: string | null;
 }
 
 export interface CategoryTotal {

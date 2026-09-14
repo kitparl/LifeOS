@@ -12,18 +12,20 @@ import { PERIOD_OPTIONS, startOfMonthIso, todayIso } from '../utils/period';
   standalone: true,
   imports: [FormsModule],
   template: `
-    <div class="flex flex-wrap items-center gap-2">
-      @for (option of periodOptions; track option.value) {
-        <button
-          type="button"
-          class="text-xs"
-          [class.btn-primary]="period.preset === option.value"
-          [class.btn-secondary]="period.preset !== option.value"
-          (click)="choose(option.value)"
+    <div class="flex flex-wrap items-center gap-2 text-xs" style="color: var(--text-muted)">
+      <label class="flex items-center gap-1.5" for="finance-period-select">
+        <span>Period:</span>
+        <select
+          id="finance-period-select"
+          class="input-field !w-auto !py-1 text-xs"
+          [ngModel]="period.preset"
+          (ngModelChange)="choose($event)"
         >
-          {{ option.label }}
-        </button>
-      }
+          @for (option of periodOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
 
       @if (period.preset === 'custom') {
         <div class="flex flex-wrap items-center gap-2">
@@ -33,7 +35,7 @@ import { PERIOD_OPTIONS, startOfMonthIso, todayIso } from '../utils/period';
             [ngModel]="customStart()"
             (ngModelChange)="setStart($event)"
           />
-          <span class="text-xs" style="color: var(--text-muted)">to</span>
+          <span>to</span>
           <input
             class="input-field !w-auto text-xs"
             type="date"

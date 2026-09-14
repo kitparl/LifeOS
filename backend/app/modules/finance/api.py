@@ -20,6 +20,9 @@ from app.modules.finance.schemas import (
     IncomeUpdate,
     LoanCreate,
     LoanEMIResponse,
+    LoanForecloseRequest,
+    LoanPartPaymentCreate,
+    LoanPartPaymentResponse,
     LoanResponse,
     LoanSummary,
     LoanUpdate,
@@ -255,7 +258,7 @@ async def generate_due(
 
 @router.get("/loans", response_model=list[LoanResponse])
 async def list_loans(
-    loan_status: str | None = Query(default=None, pattern="^(ACTIVE|CLOSED)$"),
+    loan_status: str | None = Query(default=None, pattern="^(ACTIVE|COMPLETED|FORECLOSED)$"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -296,6 +299,57 @@ async def update_loan(
     db: AsyncSession = Depends(get_db),
 ):
     return await FinanceService(db).update_loan(user.id, loan_id, data)
+
+
+@router.delete("/loans/{loan_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_loan(
+    loan_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await FinanceService(db).delete_loan(user.id, loan_id)
+
+
+@router.post("/loans/{loan_id}/foreclose", response_model=LoanResponse)
+async def foreclose_loan(
+    loan_id: str,
+    data: LoanForecloseRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await FinanceService(db).foreclose_loan(user.id, loan_id, data)
+
+
+@router.post("/loans/{loan_id}/reactivate", response_model=LoanResponse)
+async def reactivate_loan(
+    loan_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await FinanceService(db).reactivate_loan(user.id, loan_id)
+
+
+@router.get("/loans/{loan_id}/part-payments", response_model=list[LoanPartPaymentResponse])
+async def list_loan_part_payments(
+    loan_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await FinanceService(db).list_part_payments(user.id, loan_id)
+
+
+@router.post(
+    "/loans/{loan_id}/part-payments",
+    response_model=LoanPartPaymentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_loan_part_payment(
+    loan_id: str,
+    data: LoanPartPaymentCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await FinanceService(db).add_part_payment(user.id, loan_id, data)
 
 
 @router.get("/loans/{loan_id}/emis", response_model=list[LoanEMIResponse])

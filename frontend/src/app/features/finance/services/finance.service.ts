@@ -14,7 +14,11 @@ import {
   IncomePayload,
   Loan,
   LoanEMI,
+  LoanForeclosurePayload,
+  LoanPartPayment,
+  LoanPartPaymentPayload,
   LoanPayload,
+  LoanStatus,
   LoanSummary,
   PeriodSelection,
   RecurringExpense,
@@ -136,7 +140,7 @@ export class FinanceService {
 
   // ---- Loans ----------------------------------------------------------
 
-  listLoans(status?: 'ACTIVE' | 'CLOSED'): Observable<Loan[]> {
+  listLoans(status?: LoanStatus): Observable<Loan[]> {
     let params = new HttpParams();
     if (status) params = params.set('loan_status', status);
     return this.http.get<Loan[]>(`${this.api}/loans`, { params });
@@ -150,8 +154,24 @@ export class FinanceService {
     return this.http.post<Loan>(`${this.api}/loans`, data);
   }
 
-  updateLoan(id: string, data: Partial<LoanPayload> & { status?: 'ACTIVE' | 'CLOSED' }): Observable<Loan> {
+  updateLoan(id: string, data: Partial<LoanPayload>): Observable<Loan> {
     return this.http.patch<Loan>(`${this.api}/loans/${id}`, data);
+  }
+
+  deleteLoan(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/loans/${id}`);
+  }
+
+  foreclose(id: string, data: LoanForeclosurePayload): Observable<Loan> {
+    return this.http.post<Loan>(`${this.api}/loans/${id}/foreclose`, data);
+  }
+
+  reactivate(id: string): Observable<Loan> {
+    return this.http.post<Loan>(`${this.api}/loans/${id}/reactivate`, {});
+  }
+
+  addPartPayment(id: string, data: LoanPartPaymentPayload): Observable<LoanPartPayment> {
+    return this.http.post<LoanPartPayment>(`${this.api}/loans/${id}/part-payments`, data);
   }
 
   listEmis(loanId: string): Observable<LoanEMI[]> {

@@ -22,8 +22,9 @@ TRANSACTION_TYPES = ("income", "expense")
 # accounting classification.
 EXPENSE_KINDS = ("soft", "hard")
 
-LOAN_STATUSES = ("ACTIVE", "CLOSED")
+LOAN_STATUSES = ("ACTIVE", "COMPLETED", "FORECLOSED")
 EMI_STATUSES = ("PENDING", "PAID", "CANCELLED")
+PART_PAYMENT_IMPACTS = ("REDUCE_TENURE", "REDUCE_EMI")
 RECURRING_FREQUENCIES = ("monthly",)
 
 # Category reserved for loan EMI expenses. EMI expenses are always Hard.
@@ -203,7 +204,10 @@ class Loan(Base):
     emi_day: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="ACTIVE", index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    closed_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Physical column stays `closed_at` (predates the Foreclosed rename) — no migration needed.
+    foreclosed_at: Mapped[date | None] = mapped_column("closed_at", Date, nullable=True)
+    foreclosure_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    foreclosure_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -234,3 +238,25 @@ class LoanEMI(Base):
     expense_generated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class LoanPartPayment(Base):
+    """A part-payment recorded against a loan — a tracking event, not a calculation.
+
+    `resulting_emi_amount` / `resulting_tenure_months` record whichever value the
+    user chose to track after this payment (mutually exclusive with `impact`).
+    """
+
+    __tablename__ = "finance_loan_part_payments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    loan_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("finance_loans.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    payment_date: Mapped[date] = mapped_column(Date, nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    impact: Mapped[str] = mapped_column(String(16), nullable=False)
+    resulting_emi_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    resulting_tenure_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

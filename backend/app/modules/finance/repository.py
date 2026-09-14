@@ -9,6 +9,7 @@ from app.modules.finance.models import (
     FinanceTransaction,
     Loan,
     LoanEMI,
+    LoanPartPayment,
 )
 from app.modules.finance.schemas import BudgetCreate, TransactionCreate, TransactionUpdate
 from sqlalchemy import case, delete, func, select
@@ -275,6 +276,19 @@ class FinanceRepository:
         await self.db.refresh(loan)
         return loan
 
+    async def delete_loan(self, loan: Loan) -> None:
+        await self.db.delete(loan)
+
+    async def delete_transactions_for_loan(self, loan_id: str) -> None:
+        """Remove the expenses this loan's EMIs generated (SQLite has no FK cascade)."""
+        await self.db.execute(delete(FinanceTransaction).where(FinanceTransaction.loan_id == loan_id))
+
+    async def delete_emis_for_loan(self, loan_id: str) -> None:
+        await self.db.execute(delete(LoanEMI).where(LoanEMI.loan_id == loan_id))
+
+    async def delete_part_payments_for_loan(self, loan_id: str) -> None:
+        await self.db.execute(delete(LoanPartPayment).where(LoanPartPayment.loan_id == loan_id))
+
     # ------------------------------------------------------------------
     # Loan EMIs — the source of truth for loan progress
     # ------------------------------------------------------------------
@@ -309,6 +323,20 @@ class FinanceRepository:
             return
         self.db.add_all(emis)
         await self.db.flush()
+
+    async def paid_emis(self, loan_id: str) -> list[LoanEMI]:
+        result = await self.db.execute(
+            select(LoanEMI)
+            .where(LoanEMI.loan_id == loan_id, LoanEMI.status == "PAID")
+            .order_by(LoanEMI.emi_number.asc())
+        )
+        return list(result.scalars().all())
+
+    async def delete_non_paid_emis(self, loan_id: str) -> None:
+        """Clear the unpaid tail so it can be regenerated. Paid rows are never touched."""
+        await self.db.execute(
+            delete(LoanEMI).where(LoanEMI.loan_id == loan_id, LoanEMI.status != "PAID")
+        )
 
     async def emi_counts(self, loan_id: str) -> dict[str, int]:
         rows = await self.db.execute(
@@ -360,6 +388,20 @@ class FinanceRepository:
             .order_by(LoanEMI.due_date.asc())
         )
         return [(emi, loan) for emi, loan in rows.all()]
+
+    async def add_part_payment(self, part_payment: LoanPartPayment) -> LoanPartPayment:
+        self.db.add(part_payment)
+        await self.db.flush()
+        await self.db.refresh(part_payment)
+        return part_payment
+
+    async def list_part_payments(self, loan_id: str) -> list[LoanPartPayment]:
+        result = await self.db.execute(
+            select(LoanPartPayment)
+            .where(LoanPartPayment.loan_id == loan_id)
+            .order_by(LoanPartPayment.payment_date.desc(), LoanPartPayment.created_at.desc())
+        )
+        return list(result.scalars().all())
 
     async def monthly_emi_obligation(self, user_id: str) -> tuple[int, float]:
         row = (

@@ -98,6 +98,34 @@ def emi_schedule(
     return schedule
 
 
+def tenure_between(first_year: int, first_month: int, last_year: int, last_month: int) -> int:
+    """Number of months from `first` to `last`, inclusive (e.g. Apr..Dec = 9)."""
+    return (last_year * 12 + last_month) - (first_year * 12 + first_month) + 1
+
+
+def continue_schedule(
+    anchor_year: int,
+    anchor_month: int,
+    emi_day: int,
+    start_number: int,
+    count: int,
+    amount: float,
+) -> list[tuple[int, date, float]]:
+    """The `(emi_number, due_date, amount)` tail starting at `start_number`.
+
+    Same walk as `emi_schedule`, but starting from an arbitrary anchor month and
+    emi_number — used to regenerate the unpaid tail of a schedule after a tenure,
+    EMI-day or part-payment change, without touching already-paid rows.
+    """
+    if count < 1:
+        return []
+    schedule: list[tuple[int, date, float]] = []
+    for offset in range(count):
+        emi_year, emi_month = add_months(anchor_year, anchor_month, offset)
+        schedule.append((start_number + offset, clamp_day(emi_year, emi_month, emi_day), amount))
+    return schedule
+
+
 def month_bounds(value: date) -> tuple[date, date]:
     return value.replace(day=1), clamp_day(value.year, value.month, 31)
 

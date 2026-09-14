@@ -48,24 +48,49 @@ import { todayIso } from '../utils/period';
             <input class="input-field" type="number" step="0.01" min="0" formControlName="interest_rate" />
           </div>
           <div>
-            <label class="mb-1 block">Tenure (months)</label>
-            <input class="input-field" type="number" min="1" formControlName="tenure_months" [attr.disabled]="loan ? true : null" />
+            <label class="mb-1 block">EMI day</label>
+            <input class="input-field" type="number" min="1" max="31" formControlName="emi_day" />
           </div>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-3">
+        <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="mb-1 block">Start date</label>
             <input class="input-field" type="date" formControlName="start_date" [attr.disabled]="loan ? true : null" />
           </div>
           <div>
-            <label class="mb-1 block">EMI start date</label>
-            <input class="input-field" type="date" formControlName="emi_start_date" [attr.disabled]="loan ? true : null" />
+            <label class="mb-1 block">
+              First EMI date
+              @if (loan && loan.emis_paid > 0) {
+                <span class="text-xs" style="color: var(--text-muted)"> (locked — an EMI is already paid)</span>
+              }
+            </label>
+            <input
+              class="input-field"
+              type="date"
+              formControlName="emi_start_date"
+              [attr.disabled]="loan && loan.emis_paid > 0 ? true : null"
+            />
           </div>
-          <div>
-            <label class="mb-1 block">EMI day</label>
-            <input class="input-field" type="number" min="1" max="31" formControlName="emi_day" [attr.disabled]="loan ? true : null" />
+        </div>
+
+        <div>
+          <label class="mb-1 block">Schedule length</label>
+          <div class="mb-2 flex flex-wrap gap-4 text-xs">
+            <label class="flex items-center gap-2">
+              <input type="radio" formControlName="scheduleMode" value="tenure" />
+              Tenure (months)
+            </label>
+            <label class="flex items-center gap-2">
+              <input type="radio" formControlName="scheduleMode" value="last_emi_date" />
+              Last EMI date
+            </label>
           </div>
+          @if (form.value.scheduleMode === 'tenure') {
+            <input class="input-field" type="number" min="1" formControlName="tenure_months" />
+          } @else {
+            <input class="input-field" type="date" formControlName="last_emi_date" />
+          }
         </div>
 
         <div>
@@ -75,14 +100,14 @@ import { todayIso } from '../utils/period';
 
         @if (loan) {
           <p class="text-xs" style="color: var(--text-muted)">
-            Changing the EMI amount updates pending instalments only — paid EMIs and
-            the expenses behind them stay as recorded. Schedule dates cannot be
-            changed once the loan exists.
+            Changing the EMI amount updates upcoming instalments only. Changing the
+            tenure/last EMI date or EMI day keeps paid EMIs exactly as recorded and
+            only regenerates what's still upcoming.
           </p>
         } @else {
           <p class="text-xs" style="color: var(--text-muted)">
-            The full EMI schedule is created automatically from the EMI start date,
-            EMI day and tenure.
+            The full EMI schedule is created automatically from the first EMI date,
+            EMI day and tenure (or last EMI date).
           </p>
         }
       </form>
@@ -113,7 +138,9 @@ export class LoanFormComponent implements OnChanges {
     interest_rate: [0],
     start_date: [todayIso(), Validators.required],
     emi_start_date: [todayIso(), Validators.required],
-    tenure_months: [12, [Validators.required, Validators.min(1)]],
+    scheduleMode: ['tenure' as 'tenure' | 'last_emi_date', Validators.required],
+    tenure_months: [12, [Validators.min(1)]],
+    last_emi_date: [todayIso()],
     emi_day: [1, [Validators.required, Validators.min(1), Validators.max(31)]],
     notes: [''],
   });
@@ -131,7 +158,9 @@ export class LoanFormComponent implements OnChanges {
         interest_rate: this.loan.interest_rate ?? 0,
         start_date: this.loan.start_date,
         emi_start_date: this.loan.emi_start_date,
+        scheduleMode: 'tenure',
         tenure_months: this.loan.tenure_months,
+        last_emi_date: this.loan.next_due_date ?? todayIso(),
         emi_day: this.loan.emi_day,
         notes: this.loan.notes ?? '',
       });
@@ -145,7 +174,9 @@ export class LoanFormComponent implements OnChanges {
         interest_rate: 0,
         start_date: today,
         emi_start_date: today,
+        scheduleMode: 'tenure',
         tenure_months: 12,
+        last_emi_date: today,
         emi_day: Number(today.slice(8, 10)),
         notes: '',
       });
@@ -155,7 +186,7 @@ export class LoanFormComponent implements OnChanges {
   submit(): void {
     if (this.form.invalid) return;
     const raw = this.form.getRawValue();
-    this.saved.emit({
+    const payload: LoanPayload = {
       name: raw.name.trim(),
       lender: raw.lender.trim() || null,
       principal_amount: Number(raw.principal_amount),
@@ -163,9 +194,14 @@ export class LoanFormComponent implements OnChanges {
       interest_rate: Number(raw.interest_rate) || null,
       start_date: raw.start_date,
       emi_start_date: raw.emi_start_date,
-      tenure_months: Number(raw.tenure_months),
       emi_day: Number(raw.emi_day),
       notes: raw.notes.trim() || null,
-    });
+    };
+    if (raw.scheduleMode === 'tenure') {
+      payload.tenure_months = Number(raw.tenure_months);
+    } else {
+      payload.last_emi_date = raw.last_emi_date;
+    }
+    this.saved.emit(payload);
   }
 }

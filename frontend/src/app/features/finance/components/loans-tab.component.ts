@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { CurrencyPreferencesService } from '../../../core/services/currency-preferences.service';
 import { Loan, LoanEMI, LoanSummary } from '../models/finance.models';
 
@@ -31,7 +31,7 @@ import { Loan, LoanEMI, LoanSummary } from '../models/finance.models';
           <div class="panel !p-0 overflow-hidden">
             <div class="title-bar rounded-none border-x-0 border-t-0 flex items-center justify-between gap-2">
               <span class="truncate">{{ loan.name }}</span>
-              <span class="text-xs">{{ loan.status === 'ACTIVE' ? 'Active' : 'Closed' }}</span>
+              <span class="text-xs">{{ statusLabelFor(loan) }}</span>
             </div>
 
             <div class="grid gap-2 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -55,21 +55,47 @@ import { Loan, LoanEMI, LoanSummary } from '../models/finance.models';
               </div>
             </div>
 
-            <div class="flex flex-wrap gap-2 border-t border-[var(--xp-border)] px-3 py-2">
+            <div class="flex flex-wrap items-center gap-2 border-t border-[var(--xp-border)] px-3 py-2">
               <button type="button" class="btn-secondary text-xs" (click)="toggleSchedule.emit(loan)">
                 {{ expandedLoanId === loan.id ? 'Hide schedule' : 'View schedule' }}
               </button>
               <button type="button" class="btn-secondary text-xs" (click)="edit.emit(loan)">Edit</button>
-              @if (loan.status === 'ACTIVE') {
-                <button type="button" class="btn-secondary text-xs" (click)="closeLoan.emit(loan)">
-                  Close loan
-                </button>
-              } @else {
-                <button type="button" class="btn-secondary text-xs" (click)="reopen.emit(loan)">
-                  Reopen
-                </button>
-              }
+              <button type="button" class="btn-secondary text-xs" (click)="toggleMenu(loan.id)">
+                {{ openMenuLoanId() === loan.id ? 'Close' : 'More ⋮' }}
+              </button>
             </div>
+
+            @if (openMenuLoanId() === loan.id) {
+              <div class="flex flex-wrap gap-2 border-t border-[var(--xp-border)] px-3 py-2 text-xs">
+                @if (loan.status === 'ACTIVE') {
+                  <button type="button" class="btn-secondary text-xs" (click)="choose(partPayment, loan)">
+                    Make Part Payment
+                  </button>
+                  <button type="button" class="btn-secondary text-xs" (click)="choose(foreclose, loan)">
+                    Foreclose Loan
+                  </button>
+                }
+                @if (loan.status === 'FORECLOSED') {
+                  <button type="button" class="btn-secondary text-xs" (click)="choose(reactivate, loan)">
+                    Reactivate
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="btn-secondary text-xs"
+                  style="color: var(--danger)"
+                  (click)="choose(deleteLoan, loan)"
+                >
+                  Delete Loan
+                </button>
+              </div>
+            }
+
+            @if (loan.status === 'FORECLOSED' && loan.foreclosure_amount != null) {
+              <p class="border-t border-[var(--xp-border)] px-3 py-2 text-xs" style="color: var(--text-muted)">
+                Foreclosed {{ loan.foreclosed_at | date: 'dd MMM yyyy' }} · {{ money(loan.foreclosure_amount) }}
+              </p>
+            }
 
             @if (expandedLoanId === loan.id) {
               <ul class="divide-y divide-[var(--xp-border)] border-t border-[var(--xp-border)] text-sm">
@@ -114,15 +140,34 @@ export class LoansTabComponent {
 
   @Output() readonly add = new EventEmitter<void>();
   @Output() readonly edit = new EventEmitter<Loan>();
-  @Output() readonly closeLoan = new EventEmitter<Loan>();
-  @Output() readonly reopen = new EventEmitter<Loan>();
+  @Output() readonly partPayment = new EventEmitter<Loan>();
+  @Output() readonly foreclose = new EventEmitter<Loan>();
+  @Output() readonly reactivate = new EventEmitter<Loan>();
+  @Output() readonly deleteLoan = new EventEmitter<Loan>();
   @Output() readonly toggleSchedule = new EventEmitter<Loan>();
   @Output() readonly pay = new EventEmitter<LoanEMI>();
+
+  readonly openMenuLoanId = signal<string | null>(null);
+
+  toggleMenu(loanId: string): void {
+    this.openMenuLoanId.set(this.openMenuLoanId() === loanId ? null : loanId);
+  }
+
+  choose(emitter: EventEmitter<Loan>, loan: Loan): void {
+    this.openMenuLoanId.set(null);
+    emitter.emit(loan);
+  }
+
+  statusLabelFor(loan: Loan): string {
+    if (loan.status === 'COMPLETED') return 'Completed';
+    if (loan.status === 'FORECLOSED') return 'Foreclosed';
+    return 'Active';
+  }
 
   statusLabel(emi: LoanEMI): string {
     if (emi.status === 'PAID') return 'Paid';
     if (emi.status === 'CANCELLED') return 'Cancelled';
-    return 'Pending';
+    return 'Upcoming';
   }
 
   money(amount: number | null | undefined): string {

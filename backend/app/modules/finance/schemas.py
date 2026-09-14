@@ -4,8 +4,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 ExpenseKind = Literal["soft", "hard"]
-LoanStatus = Literal["ACTIVE", "CLOSED"]
+LoanStatus = Literal["ACTIVE", "COMPLETED", "FORECLOSED"]
 EMIStatus = Literal["PENDING", "PAID", "CANCELLED"]
+PartPaymentImpact = Literal["REDUCE_TENURE", "REDUCE_EMI"]
 
 
 # --------------------------------------------------------------------------
@@ -166,7 +167,9 @@ class LoanCreate(BaseModel):
     interest_rate: float | None = Field(default=None, ge=0)
     start_date: date
     emi_start_date: date
-    tenure_months: int = Field(gt=0, le=600)
+    # Provide exactly one of tenure_months / last_emi_date (or both, if consistent).
+    tenure_months: int | None = Field(default=None, gt=0, le=600)
+    last_emi_date: date | None = None
     emi_day: int = Field(default=1, ge=1, le=31)
     notes: str | None = None
 
@@ -178,7 +181,11 @@ class LoanUpdate(BaseModel):
     emi_amount: float | None = Field(default=None, gt=0)
     interest_rate: float | None = Field(default=None, ge=0)
     notes: str | None = None
-    status: LoanStatus | None = None
+    # Schedule fields — editable via the same "provide one of tenure/last_emi_date" rule.
+    emi_start_date: date | None = None
+    emi_day: int | None = Field(default=None, ge=1, le=31)
+    tenure_months: int | None = Field(default=None, gt=0, le=600)
+    last_emi_date: date | None = None
 
 
 class LoanEMIResponse(BaseModel):
@@ -215,6 +222,9 @@ class LoanResponse(BaseModel):
     emi_day: int
     status: str
     notes: str | None
+    foreclosed_at: date | None
+    foreclosure_amount: float | None
+    foreclosure_notes: str | None
     created_at: datetime
 
     # Derived
@@ -230,6 +240,35 @@ class LoanSummary(BaseModel):
 
     active_loans: int
     monthly_emi_total: float
+
+
+class LoanForecloseRequest(BaseModel):
+    foreclosure_date: date
+    foreclosure_amount: float = Field(gt=0)
+    notes: str | None = None
+
+
+class LoanPartPaymentCreate(BaseModel):
+    payment_date: date
+    amount: float = Field(gt=0)
+    notes: str | None = None
+    impact: PartPaymentImpact
+    new_emi_amount: float | None = Field(default=None, gt=0)
+    new_tenure_months: int | None = Field(default=None, gt=0, le=600)
+
+
+class LoanPartPaymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    loan_id: str
+    payment_date: date
+    amount: float
+    notes: str | None
+    impact: str
+    resulting_emi_amount: float | None
+    resulting_tenure_months: int | None
+    created_at: datetime
 
 
 # --------------------------------------------------------------------------

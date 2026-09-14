@@ -13,10 +13,14 @@ from datetime import date
 
 from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.finance.generation import (
+    add_months,
+    clamp_day,
+    continue_schedule,
     emi_schedule,
     period_bounds,
     period_key,
     recurring_due_dates,
+    tenure_between,
 )
 from app.modules.finance.models import (
     DEFAULT_EXPENSE_CATEGORIES,
@@ -26,6 +30,7 @@ from app.modules.finance.models import (
     FinanceTransaction,
     Loan,
     LoanEMI,
+    LoanPartPayment,
 )
 from app.modules.finance.repository import FinanceRepository
 from app.modules.finance.schemas import (
@@ -45,6 +50,9 @@ from app.modules.finance.schemas import (
     IncomeUpdate,
     LoanCreate,
     LoanEMIResponse,
+    LoanForecloseRequest,
+    LoanPartPaymentCreate,
+    LoanPartPaymentResponse,
     LoanResponse,
     LoanSummary,
     LoanUpdate,
@@ -501,6 +509,38 @@ class FinanceService:
         active, total = await self.repo.monthly_emi_obligation(user_id)
         return LoanSummary(active_loans=active, monthly_emi_total=total)
 
+    @staticmethod
+    def _first_emi_month(emi_start_date: date, emi_day: int) -> tuple[int, int]:
+        """The (year, month) EMI #1 falls in — mirrors `emi_schedule`'s roll-forward rule."""
+        year, month = emi_start_date.year, emi_start_date.month
+        if clamp_day(year, month, emi_day) < emi_start_date:
+            year, month = add_months(year, month, 1)
+        return year, month
+
+    def _resolve_tenure(
+        self,
+        emi_start_date: date,
+        emi_day: int,
+        tenure_months: int | None,
+        last_emi_date: date | None,
+    ) -> int:
+        """Exactly one of tenure/last_emi_date is required; both must agree if both given."""
+        if tenure_months is None and last_emi_date is None:
+            raise BadRequestError("Provide either a tenure or a last EMI date")
+        if last_emi_date is not None:
+            if last_emi_date < emi_start_date:
+                raise BadRequestError("Last EMI date cannot be before the first EMI date")
+            first_year, first_month = self._first_emi_month(emi_start_date, emi_day)
+            derived = tenure_between(first_year, first_month, last_emi_date.year, last_emi_date.month)
+            if tenure_months is not None and tenure_months != derived:
+                raise BadRequestError(
+                    f"Tenure ({tenure_months} months) does not match the Last EMI Date, "
+                    f"which implies {derived} months — provide a consistent value or only one of the two"
+                )
+            return derived
+        assert tenure_months is not None
+        return tenure_months
+
     async def create_loan(self, user_id: str, data: LoanCreate) -> LoanResponse:
         """Create the loan and its whole EMI schedule in one go.
 
@@ -508,6 +548,9 @@ class FinanceService:
         """
         if data.emi_start_date < data.start_date:
             raise BadRequestError("EMI start date cannot be before the loan start date")
+        tenure_months = self._resolve_tenure(
+            data.emi_start_date, data.emi_day, data.tenure_months, data.last_emi_date
+        )
         loan = await self.repo.add_loan(
             Loan(
                 user_id=user_id,
@@ -518,7 +561,7 @@ class FinanceService:
                 interest_rate=data.interest_rate,
                 start_date=data.start_date,
                 emi_start_date=data.emi_start_date,
-                tenure_months=data.tenure_months,
+                tenure_months=tenure_months,
                 emi_day=data.emi_day,
                 notes=data.notes,
             )
@@ -543,10 +586,72 @@ class FinanceService:
             ]
         )
 
+    async def _resync_schedule(
+        self,
+        loan: Loan,
+        *,
+        emi_start_date: date | None = None,
+        emi_day: int | None = None,
+        tenure_months: int | None = None,
+    ) -> None:
+        """Regenerate the schedule after a date/tenure edit, preserving paid history.
+
+        Moving the first EMI date only makes sense before anything has been paid
+        against the old one, so that case requires a clean slate. A tenure or
+        EMI-day change instead keeps every PAID row untouched and only
+        regenerates the unpaid tail, continuing from the month after the last
+        paid EMI (or from the normal roll-forward start if nothing is paid yet).
+        """
+        if emi_start_date is not None and emi_start_date != loan.emi_start_date:
+            counts = await self.repo.emi_counts(loan.id)
+            if counts["paid"] > 0:
+                raise BadRequestError("Cannot change the first EMI date after EMIs have been paid")
+            await self.repo.delete_emis_for_loan(loan.id)
+            loan.emi_start_date = emi_start_date
+            if emi_day is not None:
+                loan.emi_day = emi_day
+            if tenure_months is not None:
+                loan.tenure_months = tenure_months
+            await self.repo.flush()
+            await self._sync_schedule(loan)
+            return
+
+        if emi_day is not None:
+            loan.emi_day = emi_day
+        new_tenure = tenure_months if tenure_months is not None else loan.tenure_months
+
+        paid = await self.repo.paid_emis(loan.id)
+        paid_count = len(paid)
+        if new_tenure < paid_count:
+            raise BadRequestError(f"Tenure cannot be less than the {paid_count} EMI(s) already paid")
+
+        if paid:
+            last_paid = paid[-1]
+            anchor_year, anchor_month = add_months(last_paid.due_date.year, last_paid.due_date.month, 1)
+        else:
+            anchor_year, anchor_month = self._first_emi_month(loan.emi_start_date, loan.emi_day)
+
+        await self.repo.delete_non_paid_emis(loan.id)
+        loan.tenure_months = new_tenure
+        remaining = new_tenure - paid_count
+        schedule = continue_schedule(
+            anchor_year, anchor_month, loan.emi_day, paid_count + 1, remaining, loan.emi_amount
+        )
+        await self.repo.add_emis(
+            [LoanEMI(loan_id=loan.id, emi_number=n, due_date=d, amount=a) for n, d, a in schedule]
+        )
+
+        if remaining == 0 and paid_count > 0:
+            loan.status = "COMPLETED"
+        elif loan.status == "COMPLETED" and remaining > 0:
+            loan.status = "ACTIVE"
+        await self.repo.flush()
+
     async def update_loan(self, user_id: str, loan_id: str, data: LoanUpdate) -> LoanResponse:
         loan = get_or_404(await self.repo.get_loan(user_id, loan_id), "Loan not found")
         fields = data.model_dump(exclude_unset=True)
-        new_status = fields.pop("status", None)
+        schedule_keys = {"emi_start_date", "emi_day", "tenure_months", "last_emi_date"}
+        schedule_fields = {k: fields.pop(k) for k in list(fields) if k in schedule_keys}
 
         for key, value in fields.items():
             setattr(loan, key, value)
@@ -558,29 +663,109 @@ class FinanceService:
                 if emi.status == "PENDING":
                     emi.amount = loan.emi_amount
 
-        if new_status and new_status != loan.status:
-            await self._apply_status(loan, new_status)
+        if schedule_fields:
+            last_emi_date = schedule_fields.get("last_emi_date")
+            tenure_months = schedule_fields.get("tenure_months")
+            effective_start = schedule_fields.get("emi_start_date", loan.emi_start_date)
+            effective_day = schedule_fields.get("emi_day", loan.emi_day)
+            if last_emi_date is not None:
+                tenure_months = self._resolve_tenure(effective_start, effective_day, tenure_months, last_emi_date)
+            effective_tenure = tenure_months if tenure_months is not None else loan.tenure_months
+
+            # The form always resends every schedule field, changed or not (same
+            # convention as the rest of this API) — only resync if something
+            # actually differs, so an unrelated edit never rewrites the schedule.
+            if (
+                effective_start != loan.emi_start_date
+                or effective_day != loan.emi_day
+                or effective_tenure != loan.tenure_months
+            ):
+                await self._resync_schedule(
+                    loan,
+                    emi_start_date=schedule_fields.get("emi_start_date"),
+                    emi_day=schedule_fields.get("emi_day"),
+                    tenure_months=tenure_months,
+                )
 
         await self.repo.flush()
         return await self._loan_response(loan)
 
-    async def _apply_status(self, loan: Loan, status: str) -> None:
-        """Close or reopen a loan without destroying any history."""
-        emis = await self.repo.list_emis(loan.id)
-        if status == "CLOSED":
-            loan.status = "CLOSED"
-            loan.closed_at = self._today()
-            # Pending instalments are cancelled, not deleted: paid history,
-            # generated expenses and the schedule itself all survive.
-            for emi in emis:
+    async def foreclose_loan(self, user_id: str, loan_id: str, data: LoanForecloseRequest) -> LoanResponse:
+        loan = get_or_404(await self.repo.get_loan(user_id, loan_id), "Loan not found")
+        loan.status = "FORECLOSED"
+        loan.foreclosed_at = data.foreclosure_date
+        loan.foreclosure_amount = data.foreclosure_amount
+        loan.foreclosure_notes = data.notes
+        # Pending instalments are cancelled, not deleted: paid history and the
+        # schedule itself both survive.
+        for emi in await self.repo.list_emis(loan.id):
+            if emi.status == "PENDING":
+                emi.status = "CANCELLED"
+        await self.repo.flush()
+        return await self._loan_response(loan)
+
+    async def reactivate_loan(self, user_id: str, loan_id: str) -> LoanResponse:
+        loan = get_or_404(await self.repo.get_loan(user_id, loan_id), "Loan not found")
+        loan.status = "ACTIVE"
+        loan.foreclosed_at = None
+        loan.foreclosure_amount = None
+        loan.foreclosure_notes = None
+        for emi in await self.repo.list_emis(loan.id):
+            if emi.status == "CANCELLED":
+                emi.status = "PENDING"
+        await self.repo.flush()
+        return await self._loan_response(loan)
+
+    async def delete_loan(self, user_id: str, loan_id: str) -> None:
+        loan = get_or_404(await self.repo.get_loan(user_id, loan_id), "Loan not found")
+        await self.repo.delete_transactions_for_loan(loan.id)
+        await self.repo.delete_emis_for_loan(loan.id)
+        await self.repo.delete_part_payments_for_loan(loan.id)
+        await self.repo.delete_loan(loan)
+        await self.repo.flush()
+
+    async def add_part_payment(
+        self, user_id: str, loan_id: str, data: LoanPartPaymentCreate
+    ) -> LoanPartPaymentResponse:
+        loan = get_or_404(await self.repo.get_loan(user_id, loan_id), "Loan not found")
+
+        resulting_emi_amount: float | None = None
+        resulting_tenure_months: int | None = None
+
+        if data.impact == "REDUCE_EMI":
+            if data.new_emi_amount is None:
+                raise BadRequestError("new_emi_amount is required when reducing the EMI")
+            loan.emi_amount = data.new_emi_amount
+            for emi in await self.repo.list_emis(loan.id):
                 if emi.status == "PENDING":
-                    emi.status = "CANCELLED"
+                    emi.amount = loan.emi_amount
+            resulting_emi_amount = data.new_emi_amount
         else:
-            loan.status = "ACTIVE"
-            loan.closed_at = None
-            for emi in emis:
-                if emi.status == "CANCELLED":
-                    emi.status = "PENDING"
+            if data.new_tenure_months is None:
+                raise BadRequestError("new_tenure_months is required when reducing the tenure")
+            await self._resync_schedule(loan, tenure_months=data.new_tenure_months)
+            resulting_tenure_months = data.new_tenure_months
+
+        part_payment = await self.repo.add_part_payment(
+            LoanPartPayment(
+                loan_id=loan.id,
+                payment_date=data.payment_date,
+                amount=data.amount,
+                notes=data.notes,
+                impact=data.impact,
+                resulting_emi_amount=resulting_emi_amount,
+                resulting_tenure_months=resulting_tenure_months,
+            )
+        )
+        await self.repo.flush()
+        return LoanPartPaymentResponse.model_validate(part_payment)
+
+    async def list_part_payments(self, user_id: str, loan_id: str) -> list[LoanPartPaymentResponse]:
+        get_or_404(await self.repo.get_loan(user_id, loan_id), "Loan not found")
+        return [
+            LoanPartPaymentResponse.model_validate(row)
+            for row in await self.repo.list_part_payments(loan_id)
+        ]
 
     async def list_emis(self, user_id: str, loan_id: str) -> list[LoanEMIResponse]:
         get_or_404(await self.repo.get_loan(user_id, loan_id), "Loan not found")
@@ -598,6 +783,12 @@ class FinanceService:
         # Paying early still records the expense, so the money shows up the month
         # it actually left the account.
         await self._materialise_emi_expense(user_id, emi, loan)
+
+        # All instalments accounted for (paid or cancelled) — the loan is done.
+        remaining = await self.repo.list_emis(loan.id)
+        if loan.status == "ACTIVE" and all(e.status != "PENDING" for e in remaining):
+            loan.status = "COMPLETED"
+
         await self.repo.flush()
         return LoanEMIResponse.model_validate(emi)
 
