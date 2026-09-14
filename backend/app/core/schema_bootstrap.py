@@ -2,8 +2,8 @@
 
 With uvicorn ``--workers N`` (N>1), every worker runs the FastAPI lifespan.
 Running ``create_all`` / column migrations concurrently against SQLite races
-(database locked / duplicate column) and can leave workers dead so ``/health``
-never answers. A cross-process file lock serialises the work.
+and can leave workers dead so ``/health`` never answers. A cross-process file
+lock serialises the work.
 """
 
 from __future__ import annotations
@@ -13,25 +13,13 @@ import logging
 from contextlib import contextmanager
 from pathlib import Path
 
-from app.core.config import get_settings
 from app.core.database import Base, engine
 
 logger = logging.getLogger(__name__)
 
-
-def _lock_path() -> Path:
-    settings = get_settings()
-    # Prefer a stable path next to the SQLite file when possible; otherwise
-    # fall back to the backend working directory.
-    url = settings.database_url
-    if url.startswith("sqlite"):
-        # sqlite+aiosqlite:///./lifeos.db  or  sqlite+aiosqlite:////var/.../lifeos.db
-        raw = url.split(":///", 1)[-1]
-        db_path = Path(raw)
-        if not db_path.is_absolute():
-            db_path = Path.cwd() / db_path
-        return db_path.parent / ".lifeos_schema.lock"
-    return Path.cwd() / ".lifeos_schema.lock"
+# Always under backend/ (service WorkingDirectory), not beside the DB file —
+# production DB paths may be unwritable for creating a sibling lock file.
+_LOCK_PATH = Path(__file__).resolve().parents[2] / ".lifeos_schema.lock"
 
 
 @contextmanager
@@ -39,10 +27,9 @@ def _schema_lock():
     """Exclusive flock so only one process mutates schema at a time."""
     import fcntl
 
-    path = _lock_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as lock_file:
-        logger.info("Waiting for schema lock (%s)", path)
+    _LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _LOCK_PATH.open("w") as lock_file:
+        logger.info("Waiting for schema lock (%s)", _LOCK_PATH)
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         try:
             yield

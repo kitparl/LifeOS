@@ -25,6 +25,8 @@ HEALTH_RETRY_DELAY="${HEALTH_RETRY_DELAY:-2}"
 DEPLOY_BACKEND=true
 DEPLOY_FRONTEND=true
 DO_ROLLBACK=false
+# Preserved across post-pull re-exec so flag parsing stays identical.
+ORIGINAL_ARGS=("$@")
 
 usage() {
     cat <<EOF
@@ -142,6 +144,9 @@ setup_backend() {
     # first-boot race where both workers mutate SQLite and /health never answers.
     log "Applying database schema..."
     (cd "$BACKEND_DIR" && "$VENV_DIR/bin/python" -m app.core.schema_bootstrap)
+
+    log "Preflight: import app.main..."
+    (cd "$BACKEND_DIR" && "$VENV_DIR/bin/python" -c "from app.main import app; print('import ok', app.title)")
 
     deactivate
 }
@@ -289,20 +294,36 @@ trap on_error ERR
 log "===== Starting LifeOS deployment ($DEPLOY_SCOPE) ====="
 
 # ---- 1. Pull latest code (save pre-deploy commit for auto-rollback) ----
-cd "$REPO_DIR"
-restore_clean_worktree
+# Bash keeps the already-loaded script in memory. After reset --hard, re-exec
+# so schema bootstrap / health diagnostics from the new commit actually run.
+if [[ "${LIFEOS_DEPLOY_POST_PULL:-}" == "1" ]]; then
+    PREVIOUS_SHA="${LIFEOS_DEPLOY_PREVIOUS_SHA:?missing LIFEOS_DEPLOY_PREVIOUS_SHA}"
+    DEPLOY_START="${LIFEOS_DEPLOY_START:-$DEPLOY_START}"
+    cd "$REPO_DIR"
+    COMMIT_SHA="$(git rev-parse --short HEAD)"
+    log "Continuing after pull re-exec at $COMMIT_SHA (rollback target $(git rev-parse --short "$PREVIOUS_SHA"))"
+else
+    cd "$REPO_DIR"
+    restore_clean_worktree
 
-PREVIOUS_SHA="$(git rev-parse HEAD)"
-log "Current commit before pull: $(git rev-parse --short HEAD)"
+    PREVIOUS_SHA="$(git rev-parse HEAD)"
+    log "Current commit before pull: $(git rev-parse --short HEAD)"
 
-log "Pulling latest changes from $BRANCH..."
-git fetch origin
-git checkout "$BRANCH"
-# Deploy scripts should match remote exactly. A plain `git pull` fails when
-# main was force-pushed (diverged history). Reset hard to origin after fetch.
-git reset --hard "origin/$BRANCH"
-COMMIT_SHA="$(git rev-parse --short HEAD)"
-log "Deploying commit $COMMIT_SHA ($(git log -1 --format='%s'))"
+    log "Pulling latest changes from $BRANCH..."
+    git fetch origin
+    git checkout "$BRANCH"
+    # Deploy scripts should match remote exactly. A plain `git pull` fails when
+    # main was force-pushed (diverged history). Reset hard to origin after fetch.
+    git reset --hard "origin/$BRANCH"
+    COMMIT_SHA="$(git rev-parse --short HEAD)"
+    log "Deploying commit $COMMIT_SHA ($(git log -1 --format='%s'))"
+
+    export LIFEOS_DEPLOY_POST_PULL=1
+    export LIFEOS_DEPLOY_PREVIOUS_SHA="$PREVIOUS_SHA"
+    export LIFEOS_DEPLOY_START="$DEPLOY_START"
+    log "Re-executing deploy.sh from $COMMIT_SHA so script changes take effect..."
+    exec bash "$SCRIPT_DIR/deploy.sh" "${ORIGINAL_ARGS[@]}"
+fi
 
 # ---- 2–5. Build + restart ----
 if ! run_deploy_steps; then
