@@ -1,50 +1,171 @@
 import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import {
+  CategoryOptions,
+  Expense,
+  ExpenseBreakdown,
+  ExpenseKind,
+  ExpensePayload,
   FinanceListResult,
-  FinanceSummary,
-  FinanceTransaction,
-  FinanceTransactionCreate,
+  FinanceOverview,
+  Income,
+  IncomePayload,
+  Loan,
+  LoanEMI,
+  LoanPayload,
+  LoanSummary,
+  PeriodSelection,
+  RecurringExpense,
+  RecurringPayload,
+  UpcomingItem,
 } from '../models/finance.models';
+
+function periodParams(period: PeriodSelection): HttpParams {
+  let params = new HttpParams().set('preset', period.preset);
+  if (period.preset === 'custom') {
+    if (period.start) params = params.set('start', period.start);
+    if (period.end) params = params.set('end', period.end);
+  }
+  return params;
+}
 
 @Injectable({ providedIn: 'root' })
 export class FinanceService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/finance`;
 
-  summary(): Observable<FinanceSummary> {
-    return this.http.get<FinanceSummary>(`${this.api}/summary`);
+  // ---- Overview -------------------------------------------------------
+
+  overview(period: PeriodSelection): Observable<FinanceOverview> {
+    return this.http.get<FinanceOverview>(`${this.api}/overview`, { params: periodParams(period) });
   }
 
-  listTransactions(opts?: { limit?: number; offset?: number }): Observable<FinanceListResult> {
-    let params = new HttpParams();
+  breakdown(period: PeriodSelection): Observable<ExpenseBreakdown> {
+    return this.http.get<ExpenseBreakdown>(`${this.api}/breakdown`, { params: periodParams(period) });
+  }
+
+  upcoming(days = 30): Observable<UpcomingItem[]> {
+    return this.http.get<UpcomingItem[]>(`${this.api}/upcoming`, {
+      params: new HttpParams().set('days', String(days)),
+    });
+  }
+
+  // ---- Expenses -------------------------------------------------------
+
+  listExpenses(
+    period: PeriodSelection,
+    opts?: { kind?: ExpenseKind | null; category?: string | null; limit?: number; offset?: number },
+  ): Observable<FinanceListResult<Expense>> {
+    let params = periodParams(period);
+    if (opts?.kind) params = params.set('expense_kind', opts.kind);
+    if (opts?.category) params = params.set('category', opts.category);
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http
-      .get<FinanceTransaction[]>(`${this.api}/transactions`, { params, observe: 'response' })
-      .pipe(
-        map((response: HttpResponse<FinanceTransaction[]>) => ({
-          items: response.body ?? [],
-          total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-        })),
-      );
+      .get<Expense[]>(`${this.api}/expenses`, { params, observe: 'response' })
+      .pipe(map((res) => this.toListResult(res)));
   }
 
-  createTransaction(data: FinanceTransactionCreate): Observable<FinanceTransaction> {
-    return this.http.post<FinanceTransaction>(`${this.api}/transactions`, data);
+  createExpense(data: ExpensePayload): Observable<Expense> {
+    return this.http.post<Expense>(`${this.api}/expenses`, data);
   }
 
-  deleteTransaction(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.api}/transactions/${id}`);
+  updateExpense(id: string, data: Partial<ExpensePayload>): Observable<Expense> {
+    return this.http.patch<Expense>(`${this.api}/expenses/${id}`, data);
   }
 
-  listBudgets(): Observable<Record<string, unknown>[]> {
-    return this.http.get<Record<string, unknown>[]>(`${this.api}/budgets`);
+  deleteExpense(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/expenses/${id}`);
   }
 
-  upsertBudget(data: Record<string, unknown>): Observable<Record<string, unknown>> {
-    return this.http.post<Record<string, unknown>>(`${this.api}/budgets`, data);
+  // ---- Income ---------------------------------------------------------
+
+  listIncome(
+    period: PeriodSelection,
+    opts?: { limit?: number; offset?: number },
+  ): Observable<FinanceListResult<Income>> {
+    let params = periodParams(period);
+    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
+    return this.http
+      .get<Income[]>(`${this.api}/income`, { params, observe: 'response' })
+      .pipe(map((res) => this.toListResult(res)));
+  }
+
+  createIncome(data: IncomePayload): Observable<Income> {
+    return this.http.post<Income>(`${this.api}/income`, data);
+  }
+
+  updateIncome(id: string, data: Partial<IncomePayload>): Observable<Income> {
+    return this.http.patch<Income>(`${this.api}/income/${id}`, data);
+  }
+
+  deleteIncome(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/income/${id}`);
+  }
+
+  // ---- Categories -----------------------------------------------------
+
+  categories(): Observable<CategoryOptions> {
+    return this.http.get<CategoryOptions>(`${this.api}/categories`);
+  }
+
+  createCategory(name: string, txnType: 'expense' | 'income' = 'expense'): Observable<CategoryOptions> {
+    return this.http.post<CategoryOptions>(`${this.api}/categories`, { name, txn_type: txnType });
+  }
+
+  // ---- Recurring ------------------------------------------------------
+
+  listRecurring(): Observable<RecurringExpense[]> {
+    return this.http.get<RecurringExpense[]>(`${this.api}/recurring`);
+  }
+
+  createRecurring(data: RecurringPayload): Observable<RecurringExpense> {
+    return this.http.post<RecurringExpense>(`${this.api}/recurring`, data);
+  }
+
+  updateRecurring(id: string, data: Partial<RecurringPayload> & { is_active?: boolean }): Observable<RecurringExpense> {
+    return this.http.patch<RecurringExpense>(`${this.api}/recurring/${id}`, data);
+  }
+
+  deleteRecurring(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/recurring/${id}`);
+  }
+
+  // ---- Loans ----------------------------------------------------------
+
+  listLoans(status?: 'ACTIVE' | 'CLOSED'): Observable<Loan[]> {
+    let params = new HttpParams();
+    if (status) params = params.set('loan_status', status);
+    return this.http.get<Loan[]>(`${this.api}/loans`, { params });
+  }
+
+  loanSummary(): Observable<LoanSummary> {
+    return this.http.get<LoanSummary>(`${this.api}/loans/summary`);
+  }
+
+  createLoan(data: LoanPayload): Observable<Loan> {
+    return this.http.post<Loan>(`${this.api}/loans`, data);
+  }
+
+  updateLoan(id: string, data: Partial<LoanPayload> & { status?: 'ACTIVE' | 'CLOSED' }): Observable<Loan> {
+    return this.http.patch<Loan>(`${this.api}/loans/${id}`, data);
+  }
+
+  listEmis(loanId: string): Observable<LoanEMI[]> {
+    return this.http.get<LoanEMI[]>(`${this.api}/loans/${loanId}/emis`);
+  }
+
+  payEmi(loanId: string, emiId: string): Observable<LoanEMI> {
+    return this.http.post<LoanEMI>(`${this.api}/loans/${loanId}/emis/${emiId}/pay`, {});
+  }
+
+  private toListResult<T>(response: HttpResponse<T[]>): FinanceListResult<T> {
+    return {
+      items: response.body ?? [],
+      total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
+    };
   }
 }

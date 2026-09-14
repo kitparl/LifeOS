@@ -14,11 +14,13 @@ import { AnalyticsService } from './services/analytics.service';
     <div class="space-y-4">
       <h1 class="text-lg font-semibold">Analytics</h1>
       @if (summary) {
+        <!-- Finance is reported in the Finance module as activity and obligations.
+             Income minus expenses is deliberately not surfaced as a metric. -->
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div class="panel text-sm"><p class="text-gray-600">Tasks done</p><p class="text-xl font-semibold">{{ summary.tasks_completed }}</p></div>
           <div class="panel text-sm"><p class="text-gray-600">Habits (30d)</p><p class="text-xl font-semibold">{{ summary.habits_logged_30d }}</p></div>
           <div class="panel text-sm"><p class="text-gray-600">Runs (30d)</p><p class="text-xl font-semibold">{{ summary.runs_30d }}</p></div>
-          <div class="panel text-sm"><p class="text-gray-600">Finance net</p><p class="text-xl font-semibold">{{ summary.finance_net }}</p></div>
+          <div class="panel text-sm"><p class="text-gray-600">Journal (30d)</p><p class="text-xl font-semibold">{{ summary.journal_entries_30d }}</p></div>
         </div>
         <div class="panel text-sm">
           <p class="mb-2 font-medium">Module counts</p>

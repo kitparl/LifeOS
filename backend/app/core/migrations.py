@@ -92,6 +92,11 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("github_sync_state", "sync_status", "VARCHAR(16) DEFAULT 'never_synced'"),
     ("github_sync_state", "last_error", "TEXT"),
     ("github_sync_state", "source_hash", "VARCHAR(64)"),
+    # Finance: Soft/Hard classification + origin links (recurring definition, loan EMI)
+    ("finance_transactions", "expense_kind", "VARCHAR(8)"),
+    ("finance_transactions", "recurring_id", "VARCHAR(36)"),
+    ("finance_transactions", "loan_id", "VARCHAR(36)"),
+    ("finance_transactions", "loan_emi_id", "VARCHAR(36)"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
@@ -178,6 +183,7 @@ async def ensure_columns(conn: AsyncConnection) -> None:
     await drop_obsolete_columns(conn, dialect)
     await backfill_telegram_timezone(conn)
     await backfill_usernames(conn)
+    await backfill_finance_expense_kind(conn)
 
 
 async def drop_obsolete_columns(conn: AsyncConnection, dialect: str) -> None:
@@ -328,3 +334,36 @@ async def backfill_usernames(conn: AsyncConnection) -> None:
             logger.debug("Unique index ix_users_username already exists — skipping")
         else:
             logger.warning("Could not create unique index on users.username: %s", exc)
+
+
+async def backfill_finance_expense_kind(conn: AsyncConnection) -> None:
+    """Classify pre-existing expense rows as Soft or Hard exactly once.
+
+    Rows that predate the Soft/Hard split have expense_kind IS NULL. Fixed and
+    committed categories (rent, utilities, loan, insurance, health, education)
+    become Hard; everything else becomes Soft. Only NULL rows are touched, so
+    this never re-tags a row the user has since corrected, and re-running it is
+    a no-op. Income rows keep expense_kind NULL.
+    """
+    from app.modules.finance.models import HARD_CATEGORY_HINTS
+
+    try:
+        clauses = " OR ".join(
+            f"lower(category) LIKE :hint_{i}" for i in range(len(HARD_CATEGORY_HINTS))
+        )
+        params = {f"hint_{i}": f"%{hint}%" for i, hint in enumerate(HARD_CATEGORY_HINTS)}
+        await conn.execute(
+            text(
+                "UPDATE finance_transactions SET expense_kind = 'hard' "
+                f"WHERE txn_type = 'expense' AND expense_kind IS NULL AND ({clauses})"
+            ),
+            params,
+        )
+        await conn.execute(
+            text(
+                "UPDATE finance_transactions SET expense_kind = 'soft' "
+                "WHERE txn_type = 'expense' AND expense_kind IS NULL"
+            )
+        )
+    except Exception as exc:
+        logger.warning("Could not backfill finance_transactions.expense_kind: %s", exc)

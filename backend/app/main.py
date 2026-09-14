@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
     import app.modules.routines.models  # noqa: F401
     import app.modules.preferences.models  # noqa: F401
     import app.modules.tasks.models  # noqa: F401 — Task + assignment/history/collab tables
+    import app.modules.finance.models  # noqa: F401 — transactions + recurring + loans/EMIs
     from app.modules.integrations.notifications.subscriber import register_subscribers
 
     register_subscribers()

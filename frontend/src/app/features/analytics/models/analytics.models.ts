@@ -12,6 +12,9 @@ export interface AnalyticsSummary {
   tasks_completed?: number;
   habits_logged_30d?: number;
   runs_30d?: number;
+  journal_entries_30d?: number;
+  learning_in_progress?: number;
+  /** Still returned by the API; deliberately not surfaced as a metric. */
   finance_net?: number;
   modules?: AnalyticsModuleCount[];
 }
