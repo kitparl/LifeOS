@@ -141,6 +141,7 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
         [categories]="expenseCategories()"
         (closed)="expenseFormOpen.set(false)"
         (saved)="saveExpense($event)"
+        (savedRecurring)="saveExpenseAsRecurring($event)"
         (categoryCreated)="rememberCategory($event, 'expense')"
       />
 
@@ -380,6 +381,21 @@ export class FinancePageComponent implements OnInit {
         this.loadExpenses();
       },
       error: () => this.error.set('Could not save the expense.'),
+    });
+  }
+
+  /** "Repeat monthly" from the expense form creates a recurring definition,
+   * not a one-off expense — generation immediately materialises today's row. */
+  saveExpenseAsRecurring(payload: RecurringPayload): void {
+    this.finance.createRecurring(payload).subscribe({
+      next: () => {
+        this.expenseFormOpen.set(false);
+        this.loadCategories();
+        this.loadOverview();
+        this.loadExpenses();
+        if (this.activeTab() === 'recurring') this.loadRecurring();
+      },
+      error: () => this.error.set('Could not save the recurring expense.'),
     });
   }
 

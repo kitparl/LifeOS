@@ -476,6 +476,13 @@ kbd {
   background: var(--surface-2);
 }
 
+/* Native checkboxes/radios default to the browser's blue/black rather than the
+   theme — tint them with the app's own accent so they read as part of it. */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--primary);
+}
+
 /* =========================================================
    FOCUS RINGS (global keyboard navigation)
    ========================================================= */
