@@ -45,6 +45,7 @@ def _import_models() -> None:
     import app.modules.communication.vocabulary.models  # noqa: F401
     import app.modules.files.models  # noqa: F401
     import app.modules.finance.models  # noqa: F401
+    import app.modules.habits.models  # noqa: F401  # RoutineBlock.habits -> Habit
     import app.modules.integrations.github.sync_models  # noqa: F401
     import app.modules.integrations.notifications.outbox_models  # noqa: F401
     import app.modules.integrations.reports.models  # noqa: F401

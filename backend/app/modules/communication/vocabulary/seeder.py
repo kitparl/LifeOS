@@ -287,13 +287,44 @@ async def import_records(
         logger.info("Upserted %s / %s vocabulary rows", done, total)
 
 
+async def _ensure_vocabulary_tables(engine) -> None:
+    """Create only vocabulary tables. Do not run full schema bootstrap — that
+    imports every module's mappers (and can fail if a cross-module relationship
+    is not loaded, e.g. RoutineBlock -> Habit)."""
+    from app.core.database import Base
+    from app.modules.communication.vocabulary.models import (
+        GameQuestion,
+        GameSession,
+        UserVocabulary,
+        UserVocabularyExample,
+        UserVocabularyProgress,
+        Vocabulary,
+        VocabularyBookmark,
+        VocabularyCollection,
+        VocabularySet,
+        VocabularySetItem,
+    )
+
+    tables = [
+        VocabularyCollection.__table__,
+        Vocabulary.__table__,
+        VocabularySet.__table__,
+        UserVocabularyProgress.__table__,
+        VocabularySetItem.__table__,
+        UserVocabulary.__table__,
+        VocabularyBookmark.__table__,
+        UserVocabularyExample.__table__,
+        GameSession.__table__,
+        GameQuestion.__table__,
+    ]
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, tables=tables))
+
+
 async def run_import(path: Path) -> ImportSummary:
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from app.core.config import get_settings
-    from app.core.schema_bootstrap import apply_schema
-
-    await apply_schema()
 
     settings = get_settings()
     connect_args: dict[str, Any] = {}
@@ -320,6 +351,7 @@ async def run_import(path: Path) -> ImportSummary:
         len(summary.errors),
     )
     try:
+        await _ensure_vocabulary_tables(engine)
         async with session_factory() as db:
             await import_records(db, records, summary, commit_batches=True)
     finally:
