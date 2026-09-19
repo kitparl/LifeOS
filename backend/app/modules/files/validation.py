@@ -36,6 +36,8 @@ _TEXT_EXT_MIME = {
     ".md": "text/markdown",
     ".markdown": "text/markdown",
     ".csv": "text/csv",
+    ".json": "application/json",
+    ".xml": "text/xml",
 }
 
 # Sniffed MIME → preferred extension (server-generated keys never use client filename).
@@ -54,11 +56,22 @@ _MIME_TO_EXT = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
     "application/vnd.ms-powerpoint": ".ppt",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+    "application/vnd.oasis.opendocument.text": ".odt",
+    "application/vnd.oasis.opendocument.spreadsheet": ".ods",
+    "application/vnd.oasis.opendocument.presentation": ".odp",
+    "application/rtf": ".rtf",
+    "application/json": ".json",
+    "text/xml": ".xml",
+    "image/bmp": ".bmp",
+    "image/tiff": ".tiff",
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
     "audio/mp4": ".m4a",
     "audio/mpeg": ".mp3",
     "audio/ogg": ".ogg",
     "audio/webm": ".webm",
     "audio/x-m4a": ".m4a",
+    "audio/x-wav": ".wav",
 }
 
 # Client extension must not contradict these sniffed types.
@@ -80,6 +93,17 @@ _EXT_EXPECTED_MIME: dict[str, set[str]] = {
     ".m4a": {"audio/mp4", "audio/x-m4a"},
     ".ogg": {"audio/ogg"},
     ".webm": {"audio/webm", "video/webm"},
+    ".wav": {"audio/x-wav"},
+    ".mp4": {"video/mp4"},
+    ".odt": {"application/vnd.oasis.opendocument.text"},
+    ".ods": {"application/vnd.oasis.opendocument.spreadsheet"},
+    ".odp": {"application/vnd.oasis.opendocument.presentation"},
+    ".rtf": {"application/rtf"},
+    ".json": {"application/json", "text/plain"},
+    ".xml": {"text/xml", "text/plain"},
+    ".bmp": {"image/bmp"},
+    ".tiff": {"image/tiff"},
+    ".tif": {"image/tiff"},
 }
 
 INLINE_SAFE_TYPES = frozenset(

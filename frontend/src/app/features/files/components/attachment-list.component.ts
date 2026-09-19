@@ -1,17 +1,16 @@
 import { DatePipe } from '@angular/common';
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { filesFromClipboard, filesFromDataTransfer } from '../../../shared/file-upload/clipboard-files';
 import { fileFingerprint, sha256Hex } from '../../../shared/file-upload/file-hash';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
-import { ModalComponent } from '../../../shared/modal/modal.component';
+import { DocumentViewerService } from '../../../shared/document-viewer/document-viewer.service';
 import { FileRecord } from '../models/file.models';
 import { FilesService } from '../services/files.service';
 
 @Component({
   selector: 'app-attachment-list',
   standalone: true,
-  imports: [DatePipe, ModalComponent],
+  imports: [DatePipe],
   template: `
     <div class="panel !p-0 overflow-hidden">
       <div class="title-bar rounded-none border-x-0 border-t-0">{{ title }}</div>
@@ -96,47 +95,12 @@ import { FilesService } from '../services/files.service';
         }
       </div>
     </div>
-
-    <app-modal
-      [open]="!!previewing"
-      [title]="previewing?.filename ?? 'Preview'"
-      [maxWidth]="'880px'"
-      [maximizable]="true"
-      [hasFooter]="true"
-      (closed)="closePreview()"
-    >
-      <div body>
-        @if (previewing) {
-          @if (isImage(previewing) && previewSrc) {
-            <img
-              [src]="previewSrc"
-              [alt]="previewing.filename"
-              style="display:block;margin:0 auto;max-width:100%;max-height:70vh"
-            />
-          } @else if (isPdf(previewing) && previewFrame) {
-            <iframe
-              [src]="previewFrame"
-              [title]="previewing.filename"
-              style="width:100%;height:70vh;border:0"
-            ></iframe>
-          } @else {
-            <p class="text-sm" style="color: var(--text-muted)">No inline preview for this file type. Open it in a new tab or download it.</p>
-          }
-        }
-      </div>
-      <div footer class="flex flex-wrap justify-end gap-2">
-        @if (previewing) {
-          <button type="button" class="btn-ghost text-xs" (click)="open(previewing)">Open</button>
-          <button type="button" class="btn-secondary text-xs" (click)="download(previewing)">Download</button>
-        }
-      </div>
-    </app-modal>
   `,
 })
 export class AttachmentListComponent implements OnChanges {
   private readonly filesService = inject(FilesService);
   private readonly confirm = inject(ConfirmService);
-  private readonly sanitizer = inject(DomSanitizer);
+  private readonly documentViewer = inject(DocumentViewerService);
 
   @Input({ required: true }) module!: string;
   @Input() entityId: string | null = null;
@@ -153,9 +117,6 @@ export class AttachmentListComponent implements OnChanges {
   dragOver = false;
   error = '';
   previewUrl: Record<string, string> = {};
-  previewing: FileRecord | null = null;
-  previewSrc: string | null = null;
-  previewFrame: SafeResourceUrl | null = null;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['entityId'] || changes['module']) {
@@ -280,30 +241,8 @@ export class AttachmentListComponent implements OnChanges {
     return f.content_type.startsWith('image/');
   }
 
-  isPdf(f: FileRecord): boolean {
-    return f.content_type === 'application/pdf' || /\.pdf$/i.test(f.filename);
-  }
-
   preview(f: FileRecord): void {
-    this.previewing = f;
-    this.previewSrc = this.previewUrl[f.id] ?? null;
-    this.previewFrame = this.previewSrc && this.isPdf(f)
-      ? this.sanitizer.bypassSecurityTrustResourceUrl(this.previewSrc)
-      : null;
-    this.filesService.tokenUrl(f.id).subscribe({
-      next: (url) => {
-        if (this.previewing?.id !== f.id) return;
-        this.previewUrl[f.id] = url;
-        this.previewSrc = url;
-        this.previewFrame = this.isPdf(f) ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;
-      },
-    });
-  }
-
-  closePreview(): void {
-    this.previewing = null;
-    this.previewSrc = null;
-    this.previewFrame = null;
+    this.documentViewer.open({ documentId: f.id, fileName: f.filename, mimeType: f.content_type });
   }
 
   download(f: FileRecord): void {

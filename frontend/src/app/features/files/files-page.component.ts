@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { DocumentViewerService } from '../../shared/document-viewer/document-viewer.service';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { FileRecord } from './models/file.models';
 import { FilesService } from './services/files.service';
@@ -48,6 +49,7 @@ import { FilesService } from './services/files.service';
 })
 export class FilesPageComponent implements OnInit {
   private readonly filesService = inject(FilesService);
+  private readonly documentViewer = inject(DocumentViewerService);
 
   files: FileRecord[] = [];
   total = 0;
@@ -87,7 +89,7 @@ export class FilesPageComponent implements OnInit {
   }
 
   open(f: FileRecord): void {
-    this.filesService.openInNewTab(f.id);
+    this.documentViewer.open({ documentId: f.id, fileName: f.filename, mimeType: f.content_type });
   }
 
   download(f: FileRecord): void {

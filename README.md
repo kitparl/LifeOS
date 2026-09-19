@@ -128,6 +128,27 @@ Key variables in `backend/.env` (see `.env.example` for the full list):
 | `PUBLIC_BASE_URL` | Your public HTTPS URL, needed for Telegram webhooks |
 | `TELEGRAM_POLLING_ENABLED` | Set `true` to use Telegram locally without HTTPS |
 | `DATABASE_URL` | Defaults to SQLite; point it at Postgres in production if you prefer |
+| `PREVIEW_CACHE_DIR` | Where converted (Office→PDF) previews are cached — keep it outside the repo, same reasoning as `UPLOAD_DIR` |
+
+## Document Viewer
+
+A universal preview dialog (`documentViewerService.open({ documentId })`) is available anywhere in the frontend and backs it with one set of backend endpoints (`GET /api/v1/files/{id}/preview-info`, `/preview`, `/download`) built on top of the existing Files/`FileRecord` module — there is no separate "Document" model. Office/OpenDocument formats (doc/docx/odt/rtf, ppt/pptx/odp, xls/xlsx/ods) are converted to PDF on first preview by headless LibreOffice and cached by content checksum; everything else renders natively in the browser.
+
+**Local dev** — install LibreOffice once:
+
+```bash
+# macOS
+brew install --cask libreoffice
+
+# Debian/Ubuntu
+sudo apt-get install -y libreoffice libreoffice-writer libreoffice-calc libreoffice-impress libmagic1 fonts-dejavu fonts-liberation
+```
+
+No new Python dependency was needed (the repo already sniffs file types with the pure-Python `filetype` package, not `python-magic`/`libmagic`); `pdfjs-dist` is the one new frontend dependency, lazy-loaded so it stays out of the main bundle.
+
+**Production (VPS, bare-metal — see "Deploying" below):** this repo has no Docker setup for the backend/frontend today (only Postgres/Redis run in Docker, see `infra/docker-compose.yml`), so LibreOffice is installed directly on the VPS rather than added to a "backend image," a deliberate deviation from a container-first brief to match how this app actually deploys.
+
+Known limitations: TIFF previews are unsupported (download-only) rather than converted to PNG, to avoid a new Pillow dependency for one rare format; wide spreadsheets paginate across pages the way LibreOffice's PDF export naturally does (no custom table view was built); the conversion single-flight lock is per-worker-process only, so with multiple uvicorn workers two workers could each convert the same document once concurrently — wasteful but not corrupting, since the cache write is atomic (temp file + rename, same pattern as local file storage).
 
 ## Project layout
 
@@ -157,6 +178,9 @@ aidlc-docs/        AI-DLC planning artifacts and summaries
 In production, FastAPI serves both the API and the built Angular app (from `backend/static/`), sitting behind Caddy for HTTPS, run as a systemd service (`lifeos`).
 
 ```bash
+# One-time: LibreOffice for Office->PDF document previews (see "Document Viewer" above)
+sudo apt-get install -y libreoffice libreoffice-writer libreoffice-calc libreoffice-impress libmagic1 fonts-dejavu fonts-liberation
+
 # On the VPS, from the repo root:
 npm run build:frontend          # builds Angular → backend/static/
 
@@ -164,7 +188,7 @@ cd backend
 source .venv/bin/activate
 pip install -r requirements.txt
 # Make sure .env has: ENV=production, SECRET_KEY, INTEGRATION_ENC_KEY,
-# COOKIE_SECURE=true, CORS_ORIGINS, ADMIN_GATE_*, PUBLIC_BASE_URL
+# COOKIE_SECURE=true, CORS_ORIGINS, ADMIN_GATE_*, PUBLIC_BASE_URL, PREVIEW_CACHE_DIR
 
 sudo systemctl restart lifeos
 ```

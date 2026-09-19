@@ -19,6 +19,7 @@ import { NavPreferencesService } from '../../core/services/nav-preferences.servi
 import { AssistantShellService } from '../../core/services/assistant-shell.service';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { ConfirmHostComponent } from '../confirm/confirm-host.component';
+import { DocumentViewerHostComponent } from '../document-viewer/document-viewer-host.component';
 import { MarkdownImportChoiceHostComponent } from '../markdown/markdown-import-choice-host.component';
 import { resolvePageTitle } from './nav-registry';
 
@@ -38,11 +39,13 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
     LucideDynamicIcon,
     ConfirmHostComponent,
     MarkdownImportChoiceHostComponent,
+    DocumentViewerHostComponent,
   ],
   template: `
     <app-command-palette />
     <app-confirm-host />
     <app-markdown-import-choice-host />
+    <app-document-viewer-host />
 
     <!-- Mobile overlays backdrop -->
     @if (drawerOpen() || assistantShell.mobileOpen()) {

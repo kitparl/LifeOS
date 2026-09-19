@@ -8,15 +8,19 @@ import {
   LucideChartColumn,
   LucideChartLine,
   LucideCircleHelp,
+  LucideFileQuestion,
   LucideFileText,
+  LucideFilm,
   LucideFlame,
   LucideFootprints,
   LucideGraduationCap,
+  LucideImage,
   LucideLayoutDashboard,
   LucideListTodo,
   LucideMenu,
   LucideMessageSquare,
   LucideMic,
+  LucideMusic,
   LucideNotebookPen,
   LucidePin,
   LucidePinOff,
@@ -28,6 +32,7 @@ import {
   LucideSmile,
   LucideSparkles,
   LucideStar,
+  LucideTable,
   LucideTarget,
   LucideUsers,
   LucideWallet,
@@ -36,10 +41,15 @@ import {
   provideLucideIcons,
 } from '@lucide/angular';
 
-/** Icons used by sidebar / drawer / mobile nav / pin controls. */
+/** Icons used by sidebar / drawer / mobile nav / pin controls, plus other app-wide dynamic icon usages. */
 export const NAV_LUCIDE_ICON_PROVIDERS = [
   provideLucideIcons(
     LucideLayoutDashboard,
+    LucideImage,
+    LucideFilm,
+    LucideMusic,
+    LucideTable,
+    LucideFileQuestion,
     LucideListTodo,
     LucideCalendarDays,
     LucideRefreshCw,

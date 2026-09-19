@@ -154,7 +154,7 @@ sudo systemctl restart lifeos
 
 # Confirm production-critical vars are set (values redacted)
 cd ~/LifeOS/backend
-grep -E '^(ENV|SECRET_KEY|INTEGRATION_ENC_KEY|COOKIE_SECURE|CORS_ORIGINS|PUBLIC_BASE_URL|ADMIN_GATE_|DATABASE_URL|UPLOAD_DIR|STORAGE_BACKEND)=' .env \
+grep -E '^(ENV|SECRET_KEY|INTEGRATION_ENC_KEY|COOKIE_SECURE|CORS_ORIGINS|PUBLIC_BASE_URL|ADMIN_GATE_|DATABASE_URL|UPLOAD_DIR|STORAGE_BACKEND|PREVIEW_CACHE_DIR)=' .env \
   | sed -E 's/(SECRET_KEY|INTEGRATION_ENC_KEY|ADMIN_GATE_PASSWORD_HASH)=.*/\1=***/'
 ```
 
@@ -180,12 +180,13 @@ cp ~/LifeOS/backend/lifeos_dev.db ~/backups/lifeos-$(date +%F).db
 
 ## Uploads / disk
 
-Keep `UPLOAD_DIR` outside the repo so deploys do not wipe files (see `docs/FILE_STORAGE.md`).
+Keep `UPLOAD_DIR` outside the repo so deploys do not wipe files (see `docs/FILE_STORAGE.md`). Same for `PREVIEW_CACHE_DIR` (converted Office→PDF document previews) — it's just a cache, safe to delete entirely if disk pressure hits; it repopulates on next preview.
 
 ```bash
 # Disk pressure
 df -h
 du -sh /var/lib/lifeos/uploads 2>/dev/null || du -sh ~/LifeOS/backend/uploads
+du -sh /var/lib/lifeos/preview-cache 2>/dev/null || du -sh ~/LifeOS/backend/cache/document_previews 2>/dev/null
 
 # Permissions (service user must own the upload dir)
 sudo chown -R ubuntu:ubuntu /var/lib/lifeos/uploads

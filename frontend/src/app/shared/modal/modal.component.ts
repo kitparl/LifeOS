@@ -44,6 +44,7 @@ import {
           (click)="$event.stopPropagation()"
         >
           <div class="modal-header">
+            <ng-content select="[titleIcon]"></ng-content>
             <span class="modal-header__title">{{ title }}</span>
             <div class="modal-header__actions">
               <ng-content select="[headerActions]"></ng-content>

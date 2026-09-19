@@ -5,6 +5,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 from urllib.parse import quote
 
 from fastapi import HTTPException, Request, UploadFile, status
@@ -318,6 +319,7 @@ class FileService:
         user_id: str | None = None,
         token: str | None = None,
         public: bool = False,
+        force_disposition: Literal["inline", "attachment"] | None = None,
     ) -> Response:
         if public:
             record = await self.repo.get_by_id(file_id)
@@ -340,7 +342,7 @@ class FileService:
 
         backend = self._backend_for(record)
         content_type = record.content_type
-        disposition = self._content_disposition(record)
+        disposition = self._content_disposition(record, force_disposition=force_disposition)
 
         range_header = request.headers.get("range")
         size = record.size_bytes
@@ -399,12 +401,20 @@ class FileService:
 
         return StreamingResponse(full(), media_type=content_type, headers=headers)
 
-    def _content_disposition(self, record: FileRecord) -> str:
+    def _content_disposition(
+        self,
+        record: FileRecord,
+        *,
+        force_disposition: Literal["inline", "attachment"] | None = None,
+    ) -> str:
         filename = record.filename.replace('"', "").replace("\\", "")
         encoded = quote(filename, safe="")
         ascii_name = "".join(ch if 32 <= ord(ch) < 127 else "_" for ch in filename).strip("._") or "file"
         if record.content_type in NEVER_INLINE_TYPES:
+            # Never serve these inline regardless of caller intent (e.g. SVG/HTML).
             kind = "attachment"
+        elif force_disposition is not None:
+            kind = force_disposition
         elif record.content_type in INLINE_SAFE_TYPES:
             kind = "inline"
         else:
