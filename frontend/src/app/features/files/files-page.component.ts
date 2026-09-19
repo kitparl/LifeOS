@@ -11,7 +11,6 @@ import { FilesService } from './services/files.service';
   imports: [DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
-      <h1 class="text-lg font-semibold">Files</h1>
       <p class="text-sm" style="color: var(--text-muted)">Uploaded files stored via the LifeOS files API.</p>
 
       @if (loading) {

@@ -10,7 +10,6 @@ import { LifeTimelineItem, LifeTimelineService } from './services/life-timeline.
   imports: [ReactiveFormsModule, RouterLink, DatePipe],
   template: `
     <div class="space-y-4">
-      <h1 class="text-lg font-semibold">Complete Life Timeline</h1>
       <div class="panel !p-0 overflow-hidden max-w-lg">
         <div class="title-bar rounded-none border-x-0 border-t-0">Add milestone</div>
         <form class="space-y-2 p-3 text-sm" [formGroup]="form" (ngSubmit)="addMilestone()">

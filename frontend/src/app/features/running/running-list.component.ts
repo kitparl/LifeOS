@@ -34,14 +34,6 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
   ],
   template: `
     <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold" style="color: var(--text)">Running</h1>
-        <div class="flex gap-2">
-          <a routerLink="/running/races/new" class="btn-secondary text-xs no-underline">Add Event</a>
-          <a routerLink="/running/new" class="btn-primary text-xs no-underline">Log Run</a>
-        </div>
-      </div>
-
       @if (stats) {
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="panel">
@@ -86,15 +78,21 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
         </div>
       }
 
-      <div class="flex gap-0 overflow-x-auto" style="border-bottom: 1px solid var(--border)">
-        @for (tab of tabs; track tab.id) {
-          <button
-            type="button"
-            class="tab-btn shrink-0"
-            [class.tab-btn--active]="activeTab() === tab.id"
-            (click)="setTab(tab.id)"
-          >{{ tab.label }}</button>
-        }
+      <div class="flex flex-wrap items-end justify-between gap-2" style="border-bottom: 1px solid var(--border)">
+        <div class="flex gap-0 overflow-x-auto">
+          @for (tab of tabs; track tab.id) {
+            <button
+              type="button"
+              class="tab-btn shrink-0"
+              [class.tab-btn--active]="activeTab() === tab.id"
+              (click)="setTab(tab.id)"
+            >{{ tab.label }}</button>
+          }
+        </div>
+        <div class="flex shrink-0 gap-2 pb-1">
+          <a routerLink="/running/races/new" class="btn-secondary text-xs no-underline">Add Event</a>
+          <a routerLink="/running/new" class="btn-primary text-xs no-underline">Log Run</a>
+        </div>
       </div>
 
       @if (activeTab() === 'runs') {

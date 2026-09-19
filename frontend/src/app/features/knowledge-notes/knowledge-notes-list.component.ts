@@ -14,22 +14,20 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink, ModalComponent, ListPaginatorComponent],
   template: `
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Knowledge Notes</h1>
+    <div class="space-y-3">
+      <form class="flex flex-wrap items-center justify-between gap-2 text-sm" (ngSubmit)="runSearch()">
+        <div class="flex flex-wrap items-center gap-2">
+          <input
+            class="input-field !w-64 max-w-full"
+            [formControl]="searchControl"
+            placeholder="Search across all notes…"
+          />
+          <button type="submit" class="btn-secondary text-xs">Search</button>
+          @if (hits() !== null) {
+            <button type="button" class="btn-ghost text-xs" (click)="clearSearch()">Clear</button>
+          }
+        </div>
         <button type="button" class="btn-primary text-xs" (click)="openCreate()">New Subject</button>
-      </div>
-
-      <form class="flex flex-wrap gap-2 text-sm" (ngSubmit)="runSearch()">
-        <input
-          class="input-field !w-64 max-w-full"
-          [formControl]="searchControl"
-          placeholder="Search across all notes…"
-        />
-        <button type="submit" class="btn-secondary text-xs">Search</button>
-        @if (hits() !== null) {
-          <button type="button" class="btn-ghost text-xs" (click)="clearSearch()">Clear</button>
-        }
       </form>
 
       @if (hits(); as results) {

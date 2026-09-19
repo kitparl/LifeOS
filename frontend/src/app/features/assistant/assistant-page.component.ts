@@ -8,7 +8,6 @@ import { AiChatPanelComponent } from '../dashboard/widgets/ai-chat-panel.compone
   template: `
     <!-- Desktop: embedded chat page filling the main column -->
     <div class="assistant-page assistant-page--desktop">
-      <h1 class="assistant-page__title">AI Assistant</h1>
       <div class="assistant-page__panel">
         <app-ai-chat-panel />
       </div>
@@ -43,19 +42,12 @@ import { AiChatPanelComponent } from '../dashboard/widgets/ai-chat-panel.compone
     .assistant-page--desktop {
       display: none;
     }
-    .assistant-page__title {
-      margin: 0;
-      padding: 1rem 1.25rem 0.75rem;
-      font-size: 1.125rem;
-      font-weight: 600;
-      flex-shrink: 0;
-    }
     .assistant-page__panel {
       display: flex;
       flex-direction: column;
       flex: 1;
       min-height: 0;
-      margin: 0 1.25rem 1.25rem;
+      margin: 1.25rem;
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       overflow: hidden;

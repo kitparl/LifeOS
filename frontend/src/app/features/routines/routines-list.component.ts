@@ -12,22 +12,15 @@ import { RoutinesService } from './services/routines.service';
   imports: [ReactiveFormsModule, RouterLink, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 class="text-lg font-semibold">Routines</h1>
-          <p class="text-xs" style="color: var(--text-muted)">
-            Day schedules for DSA, gym, learning, books, and more — shown on Calendar.
-          </p>
+      <form class="flex flex-wrap items-center justify-between gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="flex items-center gap-1 text-xs">
+            <input type="checkbox" formControlName="active_only" />
+            Active only
+          </label>
+          <button type="submit" class="btn-primary text-xs">Refresh</button>
         </div>
         <a routerLink="/routines/new" class="btn-primary text-xs no-underline">New Routine</a>
-      </div>
-
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
-        <label class="flex items-center gap-1 text-xs">
-          <input type="checkbox" formControlName="active_only" />
-          Active only
-        </label>
-        <button type="submit" class="btn-primary text-xs">Refresh</button>
       </form>
 
       @if (loading) {

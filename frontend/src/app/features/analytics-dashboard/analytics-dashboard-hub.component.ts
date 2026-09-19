@@ -24,8 +24,6 @@ import { AnalyticsAiPageComponent } from './pages/analytics-ai-page.component';
   ],
   template: `
     <div class="space-y-3">
-      <h1 class="text-lg font-semibold">Analytics</h1>
-
       <app-tab-hub [tabs]="tabs" [activeId]="tab()" [wrap]="true" (tabChange)="setTab($event)" />
 
       @if (tab() === 'overview') {

@@ -26,8 +26,6 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
   ],
   template: `
     <div class="space-y-8">
-      <h1 class="text-lg font-semibold">Settings</h1>
-
       <nav class="flex flex-wrap gap-2 text-sm">
         @for (s of sections; track s.id) {
           <a class="rounded-lg border border-[var(--xp-border)] px-3 py-1.5 no-underline hover:bg-[var(--surface-3)]"

@@ -13,16 +13,12 @@ import { NotificationsService } from './services/notifications.service';
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Notifications</h1>
-        <div class="flex gap-2">
-          <button type="button" class="btn-primary text-xs" (click)="markAllRead()">Mark all read</button>
-        </div>
+        <p class="text-sm text-[var(--text-muted)]">
+          Notification delivery settings are in
+          <a routerLink="/settings" fragment="integrations" class="link">Settings</a>.
+        </p>
+        <button type="button" class="btn-primary text-xs" (click)="markAllRead()">Mark all read</button>
       </div>
-
-      <p class="text-sm text-[var(--text-muted)]">
-        Notification delivery settings are in
-        <a routerLink="/settings" fragment="integrations" class="link">Settings</a>.
-      </p>
 
       @if (paging.loading) {
         <div class="empty-state"><div class="skeleton" style="width: 120px; height: 14px"></div></div>

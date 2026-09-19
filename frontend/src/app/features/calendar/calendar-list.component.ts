@@ -217,8 +217,17 @@ interface QuickCreateState {
 
     <!-- ====== Calendar ====== -->
     <div class="space-y-0">
-      <div class="flex items-center justify-between mb-3">
-        <h1 class="text-lg font-semibold">Calendar</h1>
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex flex-wrap gap-1.5">
+          @for (cat of categories; track cat.value) {
+            <span
+              class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
+              [style.background]="categoryColor(cat.value)"
+            >
+              {{ cat.label }}
+            </span>
+          }
+        </div>
         <div class="flex items-center gap-2">
           @if (keyboardHint()) {
             <span class="hidden sm:inline text-xs" style="color: var(--text-faint)">
@@ -233,18 +242,6 @@ interface QuickCreateState {
             + New event
           </button>
         </div>
-      </div>
-
-      <!-- Category legend -->
-      <div class="flex flex-wrap gap-1.5 mb-3">
-        @for (cat of categories; track cat.value) {
-          <span
-            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-            [style.background]="categoryColor(cat.value)"
-          >
-            {{ cat.label }}
-          </span>
-        }
       </div>
 
       <div class="calendar-page">

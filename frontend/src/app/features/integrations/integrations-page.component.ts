@@ -14,7 +14,6 @@ import {
   imports: [TelegramConfigComponent, GithubConfigComponent, SarvamConfigComponent],
   template: `
     <div class="space-y-4">
-      <h1 class="text-lg font-semibold">Integration Hub</h1>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         @for (p of providers; track p.provider) {
           @if (p.provider === 'telegram') {

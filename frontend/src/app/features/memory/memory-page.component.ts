@@ -10,7 +10,6 @@ import { MemoryItem, MemoryService } from './services/memory.service';
   imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
-      <h1 class="text-lg font-semibold">AI Memory</h1>
       @if (summary) {
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="panel text-sm"><p class="text-gray-600">Total memories</p><p class="text-xl font-semibold">{{ summary.total }}</p></div>

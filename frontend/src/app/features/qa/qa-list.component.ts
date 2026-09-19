@@ -30,22 +30,20 @@ interface ViewTab {
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Personal Q&A</h1>
+        <div class="flex flex-wrap gap-1.5 text-xs">
+          @for (tab of viewTabs; track tab.id) {
+            <button
+              type="button"
+              class="rounded-lg border px-3 py-1.5"
+              [class.bg-[var(--primary-soft)]]="view === tab.id"
+              [style.border-color]="'var(--xp-border)'"
+              (click)="setView(tab.id)"
+            >
+              {{ tab.label }}
+            </button>
+          }
+        </div>
         <a routerLink="/qa/new" class="btn-primary text-xs no-underline">New Q&A</a>
-      </div>
-
-      <div class="flex flex-wrap gap-1.5 text-xs">
-        @for (tab of viewTabs; track tab.id) {
-          <button
-            type="button"
-            class="rounded-lg border px-3 py-1.5"
-            [class.bg-[var(--primary-soft)]]="view === tab.id"
-            [style.border-color]="'var(--xp-border)'"
-            (click)="setView(tab.id)"
-          >
-            {{ tab.label }}
-          </button>
-        }
       </div>
 
       <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">

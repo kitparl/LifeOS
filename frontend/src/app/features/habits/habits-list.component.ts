@@ -12,17 +12,15 @@ import { HabitsService } from './services/habits.service';
   imports: [ReactiveFormsModule, RouterLink, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Habits</h1>
+      <form class="flex flex-wrap items-center justify-between gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="flex items-center gap-1 text-xs">
+            <input type="checkbox" formControlName="active_only" />
+            Active only
+          </label>
+          <button type="submit" class="btn-primary text-xs">Refresh</button>
+        </div>
         <a routerLink="/habits/new" class="btn-primary text-xs no-underline">New Habit</a>
-      </div>
-
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
-        <label class="flex items-center gap-1 text-xs">
-          <input type="checkbox" formControlName="active_only" />
-          Active only
-        </label>
-        <button type="submit" class="btn-primary text-xs">Refresh</button>
       </form>
 
       @if (loading) {

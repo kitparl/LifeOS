@@ -34,33 +34,33 @@ interface TaskListState {
   imports: [NgTemplateOutlet, ReactiveFormsModule, FormsModule, RouterLink, TaskListSectionComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 class="text-lg font-semibold">Tasks</h1>
-          @if (scope === 'owned') {
-            <p class="text-xs mt-0.5" style="color: var(--text-muted)">
-              {{ stats.completedToday }} done today
-              @if (stats.streakDays > 0) {
-                · {{ stats.streakDays }}-day streak
-              }
-            </p>
-          }
-        </div>
-        <a routerLink="/tasks/new" class="btn-primary text-xs no-underline">New Task</a>
-      </div>
-
-      <div class="flex flex-wrap gap-1.5 text-xs">
-        @for (tab of scopeTabs; track tab.value) {
-          <button
-            type="button"
-            class="rounded-lg border px-3 py-1.5"
-            [class.bg-[var(--primary-soft)]]="scope === tab.value"
-            [style.border-color]="'var(--xp-border)'"
-            (click)="setScope(tab.value)"
-          >
-            {{ tab.label }}
-          </button>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        @if (scope === 'owned') {
+          <p class="text-xs" style="color: var(--text-muted)">
+            {{ stats.completedToday }} done today
+            @if (stats.streakDays > 0) {
+              · {{ stats.streakDays }}-day streak
+            }
+          </p>
+        } @else {
+          <span></span>
         }
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-wrap gap-1.5 text-xs">
+            @for (tab of scopeTabs; track tab.value) {
+              <button
+                type="button"
+                class="rounded-lg border px-3 py-1.5"
+                [class.bg-[var(--primary-soft)]]="scope === tab.value"
+                [style.border-color]="'var(--xp-border)'"
+                (click)="setScope(tab.value)"
+              >
+                {{ tab.label }}
+              </button>
+            }
+          </div>
+          <a routerLink="/tasks/new" class="btn-primary text-xs no-underline">New Task</a>
+        </div>
       </div>
 
       @if (scope === 'owned') {

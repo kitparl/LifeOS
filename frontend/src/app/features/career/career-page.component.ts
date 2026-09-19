@@ -9,8 +9,6 @@ import { CareerService } from './services/career.service';
   imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
-      <h1 class="text-lg font-semibold">Career</h1>
-
       <div class="panel !p-0 overflow-hidden">
         <div class="title-bar rounded-none border-x-0 border-t-0">Profile</div>
         <form class="grid gap-2 p-3 text-sm sm:grid-cols-2" [formGroup]="profileForm" (ngSubmit)="saveProfile()">

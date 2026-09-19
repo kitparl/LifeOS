@@ -15,22 +15,20 @@ type PeriodTab = 'all' | GoalPeriod;
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Goals</h1>
+        <div class="flex flex-wrap gap-1.5 text-xs">
+          @for (tab of periodTabs; track tab.value) {
+            <button
+              type="button"
+              class="rounded-lg border px-3 py-1.5"
+              [class.bg-[var(--primary-soft)]]="periodTab() === tab.value"
+              [style.border-color]="'var(--xp-border)'"
+              (click)="setPeriodTab(tab.value)"
+            >
+              {{ tab.label }}
+            </button>
+          }
+        </div>
         <a routerLink="/goals/new" class="btn-primary text-xs no-underline">New Goal</a>
-      </div>
-
-      <div class="flex flex-wrap gap-1.5 text-xs">
-        @for (tab of periodTabs; track tab.value) {
-          <button
-            type="button"
-            class="rounded-lg border px-3 py-1.5"
-            [class.bg-[var(--primary-soft)]]="periodTab() === tab.value"
-            [style.border-color]="'var(--xp-border)'"
-            (click)="setPeriodTab(tab.value)"
-          >
-            {{ tab.label }}
-          </button>
-        }
       </div>
 
       <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">

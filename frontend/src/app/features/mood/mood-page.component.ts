@@ -10,8 +10,6 @@ import { MoodService } from './services/mood.service';
   imports: [ReactiveFormsModule, DatePipe],
   template: `
     <div class="space-y-3">
-      <h1 class="text-lg font-semibold">Mood</h1>
-
       <div class="grid gap-3 lg:grid-cols-2">
         <div class="panel !p-0 overflow-hidden">
           <div class="title-bar rounded-none border-x-0 border-t-0">Today's Check-in</div>

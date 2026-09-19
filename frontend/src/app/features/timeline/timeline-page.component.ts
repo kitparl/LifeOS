@@ -9,7 +9,6 @@ import { TimelineItem, TimelineService } from './services/timeline.service';
   imports: [DatePipe, RouterLink],
   template: `
     <div class="space-y-3">
-      <h1 class="text-lg font-semibold">Life Timeline</h1>
       <p class="text-sm" style="color: var(--text-muted)">Chronological view across all modules.</p>
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading…</p>

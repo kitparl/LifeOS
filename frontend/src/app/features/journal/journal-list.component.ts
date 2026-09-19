@@ -13,20 +13,18 @@ import { JournalService } from './services/journal.service';
   imports: [ReactiveFormsModule, RouterLink, DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Journal</h1>
+      <form class="flex flex-wrap items-center justify-between gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
+        <div class="flex flex-wrap items-center gap-2">
+          <select class="input-field !w-auto" formControlName="entry_type">
+            <option value="">All types</option>
+            @for (t of types; track t.value) {
+              <option [value]="t.value">{{ t.label }}</option>
+            }
+          </select>
+          <input class="input-field !w-40" formControlName="search" placeholder="Search…" />
+          <button type="submit" class="btn-primary text-xs">Filter</button>
+        </div>
         <a routerLink="/journal/new" class="btn-primary text-xs no-underline">New Entry</a>
-      </div>
-
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
-        <select class="input-field !w-auto" formControlName="entry_type">
-          <option value="">All types</option>
-          @for (t of types; track t.value) {
-            <option [value]="t.value">{{ t.label }}</option>
-          }
-        </select>
-        <input class="input-field !w-40" formControlName="search" placeholder="Search…" />
-        <button type="submit" class="btn-primary text-xs">Filter</button>
       </form>
 
       @if (loading) {

@@ -11,7 +11,6 @@ import { OcrDocument, OcrService } from './services/ocr.service';
   imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
-      <h1 class="text-lg font-semibold">OCR Pipeline</h1>
       <div class="grid gap-4 lg:grid-cols-2">
         <div class="panel !p-0 overflow-hidden">
           <div class="title-bar rounded-none border-x-0 border-t-0">Upload document</div>

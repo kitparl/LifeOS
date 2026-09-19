@@ -14,8 +14,6 @@ type InsightsTab = 'overview' | 'reports' | 'predictions';
   imports: [TabHubComponent, AnalyticsPageComponent, ReportsPageComponent, PredictionsPageComponent],
   template: `
     <div class="space-y-3">
-      <h1 class="text-lg font-semibold">Insights</h1>
-
       <app-tab-hub [tabs]="tabs" [activeId]="tab()" (tabChange)="setTab($event)" />
 
       @if (tab() === 'overview') {

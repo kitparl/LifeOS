@@ -11,22 +11,21 @@ import { LearningService } from './services/learning.service';
   imports: [ReactiveFormsModule, RouterLink, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Learning</h1>
-        <div class="flex gap-2">
+      <form class="flex flex-wrap items-center justify-between gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
+        <div class="flex flex-wrap items-center gap-2">
+          <select class="input-field !w-auto" formControlName="item_type">
+            <option value="">All types</option>
+            @for (t of types; track t.value) {
+              <option [value]="t.value">{{ t.label }}</option>
+            }
+          </select>
+          <button type="submit" class="btn-primary text-xs">Filter</button>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
           <a routerLink="/learning/tracks" class="input-field !w-auto inline-flex items-center no-underline text-xs">Tracks</a>
           <a routerLink="/learning/today" class="input-field !w-auto inline-flex items-center no-underline text-xs">Today</a>
           <a routerLink="/learning/new" class="btn-primary text-xs no-underline">New Item</a>
         </div>
-      </div>
-      <form class="flex gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
-        <select class="input-field !w-auto" formControlName="item_type">
-          <option value="">All types</option>
-          @for (t of types; track t.value) {
-            <option [value]="t.value">{{ t.label }}</option>
-          }
-        </select>
-        <button type="submit" class="btn-primary text-xs">Filter</button>
       </form>
       @if (loading) {
         <p class="text-sm" style="color: var(--text-muted)">Loading…</p>

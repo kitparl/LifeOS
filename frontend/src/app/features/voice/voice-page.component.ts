@@ -11,7 +11,6 @@ import { VoiceNote, VoiceService } from './services/voice.service';
   imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4 max-w-2xl">
-      <h1 class="text-lg font-semibold">Voice</h1>
       <p class="text-sm" style="color: var(--text-muted)">Type transcripts to simulate voice notes and commands (e.g. "go to tasks", "search goals").</p>
       <form class="panel space-y-2 text-sm" [formGroup]="commandForm" (ngSubmit)="runCommand()">
         <textarea class="input-field min-h-[60px]" formControlName="transcript" placeholder="Voice command…"></textarea>

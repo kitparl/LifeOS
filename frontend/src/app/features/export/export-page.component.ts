@@ -8,7 +8,6 @@ import { ExportService } from './services/export.service';
   imports: [ReactiveFormsModule],
   template: `
     <div class="max-w-lg space-y-3">
-      <h1 class="text-lg font-semibold">Export Data</h1>
       <p class="text-sm" style="color: var(--text-muted)">Download your LifeOS data as JSON or CSV (CSV opens in Excel).</p>
 
       <div class="panel !p-0 overflow-hidden">

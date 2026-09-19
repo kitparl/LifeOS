@@ -11,7 +11,6 @@ import { SearchService } from './services/search.service';
   imports: [ReactiveFormsModule, RouterLink],
   template: `
     <div class="space-y-3">
-      <h1 class="text-lg font-semibold">Search</h1>
       <form class="flex flex-wrap gap-2 text-sm" [formGroup]="form" (ngSubmit)="search()">
         <input class="input-field flex-1 min-w-[12rem]" formControlName="q" placeholder="Search across all modules…" />
         <label class="flex items-center gap-1 text-xs">

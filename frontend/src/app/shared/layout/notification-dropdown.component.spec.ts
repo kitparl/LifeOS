@@ -183,4 +183,32 @@ describe('NotificationDropdownComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="notification-panel"]')).toBeNull();
   });
+
+  it('should not open on hover alone', () => {
+    fixture.detectChanges();
+    flushUnread(0);
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('.notif-wrap').dispatchEvent(new Event('mouseenter'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="notification-panel"]')).toBeNull();
+  });
+
+  it('should close when the pointer leaves the wrap', fakeAsync(() => {
+    fixture.detectChanges();
+    flushUnread(0);
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('[data-testid="notification-bell"]').click();
+    fixture.detectChanges();
+    flushPreview([]);
+    flushUnread(0);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="notification-panel"]')).toBeTruthy();
+
+    fixture.nativeElement.querySelector('.notif-wrap').dispatchEvent(new Event('mouseleave'));
+    tick(120);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="notification-panel"]')).toBeNull();
+  }));
 });

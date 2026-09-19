@@ -76,6 +76,7 @@ const POLL_MS = 60_000;
           data-testid="notification-panel"
           (click)="$event.stopPropagation()"
         >
+          <div class="notif-panel__card">
           <div class="notif-panel__header">
             <span class="notif-panel__title">Notifications</span>
             @if (unreadCount() > 0) {
@@ -138,6 +139,7 @@ const POLL_MS = 60_000;
               More
             </button>
           </div>
+          </div>
         </div>
       }
     </div>
@@ -184,7 +186,11 @@ const POLL_MS = 60_000;
         z-index: 60;
         width: 280px;
         max-width: min(280px, calc(100vw - 1rem));
-        margin-top: 2px;
+        /* Invisible bridge so pointer can move from bell → panel without closing */
+        padding-top: 6px;
+        margin-top: -2px;
+      }
+      .notif-panel__card {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 6px;
@@ -318,17 +324,11 @@ export class NotificationDropdownComponent implements OnInit, OnDestroy {
   readonly items = signal<Notification[]>([]);
   readonly loading = signal(false);
 
-  /** After click-close, ignore hover-open until pointer leaves the wrap. */
-  private suppressHover = false;
-  private hoverCapable = false;
+  private leaveCloseTimer: ReturnType<typeof setTimeout> | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private routerSub: Subscription | null = null;
 
   ngOnInit(): void {
-    this.hoverCapable =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-
     this.refreshUnreadCount();
     this.pollTimer = setInterval(() => this.refreshUnreadCount(), POLL_MS);
     this.routerSub = this.router.events
@@ -340,6 +340,7 @@ export class NotificationDropdownComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.clearLeaveTimer();
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.routerSub?.unsubscribe();
   }
@@ -354,20 +355,22 @@ export class NotificationDropdownComponent implements OnInit, OnDestroy {
     return MODULE_STYLES[module] ?? FALLBACK_STYLE;
   }
 
+  /** Cancel a pending leave-close when the pointer returns to bell/panel. */
   onWrapEnter(): void {
-    if (!this.hoverCapable || this.suppressHover) return;
-    this.openPanel();
+    this.clearLeaveTimer();
   }
 
+  /** Close shortly after the pointer leaves bell + panel (desktop). */
   onWrapLeave(): void {
-    this.suppressHover = false;
-    if (this.hoverCapable) this.close();
+    if (!this.open()) return;
+    this.clearLeaveTimer();
+    this.leaveCloseTimer = setTimeout(() => this.close(), 120);
   }
 
   onBellClick(event: Event): void {
     event.stopPropagation();
+    this.clearLeaveTimer();
     if (this.open()) {
-      this.suppressHover = true;
       this.close();
     } else {
       this.openPanel();
@@ -434,7 +437,15 @@ export class NotificationDropdownComponent implements OnInit, OnDestroy {
   }
 
   private close(): void {
+    this.clearLeaveTimer();
     this.open.set(false);
+  }
+
+  private clearLeaveTimer(): void {
+    if (this.leaveCloseTimer) {
+      clearTimeout(this.leaveCloseTimer);
+      this.leaveCloseTimer = null;
+    }
   }
 
   private refreshUnreadCount(): void {

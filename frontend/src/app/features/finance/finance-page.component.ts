@@ -62,14 +62,14 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
   ],
   template: `
     <div class="space-y-3">
-      <app-tab-hub [tabs]="tabs" [activeId]="activeTab()" [wrap]="true" (tabChange)="setTab($event)" />
-
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <app-finance-period-filter [period]="period()" (periodChange)="setPeriod($event)" />
-        @if (overview()) {
-          <p class="text-xs" style="color: var(--text-muted)">{{ overview()!.label }}</p>
-        }
-      </div>
+      <app-tab-hub [tabs]="tabs" [activeId]="activeTab()" [wrap]="true" (tabChange)="setTab($event)">
+        <div class="flex flex-wrap items-center gap-2 pb-1">
+          <app-finance-period-filter [period]="period()" (periodChange)="setPeriod($event)" />
+          @if (overview()) {
+            <p class="text-xs" style="color: var(--text-muted)">{{ overview()!.label }}</p>
+          }
+        </div>
+      </app-tab-hub>
 
       @if (error()) {
         <p class="text-sm" style="color: var(--danger)">{{ error() }}</p>

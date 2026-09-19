@@ -10,12 +10,11 @@ import { AutomationRule, AutomationsService } from './services/automations.servi
   imports: [ReactiveFormsModule, ListPaginatorComponent],
   template: `
     <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Automation Engine</h1>
-        <button type="button" class="btn-primary text-xs" (click)="evaluate()">Evaluate rules</button>
-      </div>
       <div class="panel !p-0 overflow-hidden">
-        <div class="title-bar rounded-none border-x-0 border-t-0">New rule</div>
+        <div class="title-bar rounded-none border-x-0 border-t-0">
+          <span>New rule</span>
+          <button type="button" class="btn-primary text-xs ml-auto" (click)="evaluate()">Evaluate rules</button>
+        </div>
         <form class="grid gap-2 p-3 text-sm sm:grid-cols-2" [formGroup]="form" (ngSubmit)="add()">
           <input class="input-field" formControlName="name" placeholder="Rule name" />
           <select class="input-field" formControlName="trigger_type">

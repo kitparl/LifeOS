@@ -6,7 +6,6 @@ import { ReportsService } from './services/reports.service';
   standalone: true,
   template: `
     <div class="space-y-4">
-      <h1 class="text-lg font-semibold">Reports & AI Reviews</h1>
       <div class="flex flex-wrap gap-2">
         <button type="button" class="btn-primary text-xs" (click)="loadReport('weekly')">Weekly report</button>
         <button type="button" class="btn-primary text-xs" (click)="loadReport('monthly')">Monthly report</button>

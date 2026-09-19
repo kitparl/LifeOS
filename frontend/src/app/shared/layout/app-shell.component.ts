@@ -190,7 +190,7 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
               ☰
             </button>
             <div class="min-w-0">
-              <p class="truncate text-sm font-semibold" style="color: var(--text)">{{ currentTitle() }}</p>
+              <h1 class="truncate text-sm font-semibold" style="color: var(--text); margin: 0">{{ currentTitle() }}</h1>
             </div>
           </div>
 
@@ -247,7 +247,7 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
             [class.overflow-hidden]="fullHeightRoute()"
             [class.flex]="fullHeightRoute()"
             [class.flex-col]="fullHeightRoute()"
-            [style.padding]="fullHeightRoute() ? '0' : '1.25rem 1.5rem 5rem'"
+            [style.padding]="fullHeightRoute() ? '0' : '0.75rem 1.5rem 5rem'"
           >
             <router-outlet />
           </main>

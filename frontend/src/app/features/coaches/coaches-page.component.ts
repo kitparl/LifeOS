@@ -8,7 +8,6 @@ import { CoachesService } from './services/coaches.service';
   imports: [ReactiveFormsModule],
   template: `
     <div class="space-y-4 max-w-2xl">
-      <h1 class="text-lg font-semibold">AI Life Coaches</h1>
       <form class="panel space-y-2 text-sm" [formGroup]="form" (ngSubmit)="ask()">
         <select class="input-field" formControlName="coach_type">
           @for (t of types; track t) {

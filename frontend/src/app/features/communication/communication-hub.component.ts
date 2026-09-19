@@ -18,29 +18,25 @@ import { VocabularyHubComponent } from './vocabulary/vocabulary-hub.component';
   imports: [DatePipe, RouterLink, ListPaginatorComponent, VocabularyHubComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Communication</h1>
-        <div class="flex gap-2">
-          @if (tab() === 'writing') {
-            <a routerLink="/communication/writing/new" class="btn-primary text-xs no-underline">New Writing</a>
-          } @else if (tab() === 'speaking') {
-            <a routerLink="/communication/speaking/new" class="btn-primary text-xs no-underline">New Practice</a>
+      <div class="flex flex-wrap items-end justify-between gap-2" style="border-bottom: 1px solid var(--border)">
+        <div class="tab-bar" role="tablist" style="border-bottom: none">
+          @for (t of tabs; track t.id) {
+            <button
+              type="button"
+              role="tab"
+              class="tab-bar__btn"
+              [class.active]="tab() === t.id"
+              [attr.aria-selected]="tab() === t.id"
+              (click)="setTab(t.id)"
+            >
+              {{ t.label }}
+            </button>
           }
         </div>
-      </div>
-
-      <div class="tab-bar" role="tablist">
-        @for (t of tabs; track t.id) {
-          <button
-            type="button"
-            role="tab"
-            class="tab-bar__btn"
-            [class.active]="tab() === t.id"
-            [attr.aria-selected]="tab() === t.id"
-            (click)="setTab(t.id)"
-          >
-            {{ t.label }}
-          </button>
+        @if (tab() === 'writing') {
+          <a routerLink="/communication/writing/new" class="btn-primary text-xs no-underline mb-1">New Writing</a>
+        } @else if (tab() === 'speaking') {
+          <a routerLink="/communication/speaking/new" class="btn-primary text-xs no-underline mb-1">New Practice</a>
         }
       </div>
 

@@ -18,31 +18,29 @@ import { WishlistService } from './services/wishlist.service';
   imports: [ReactiveFormsModule, RouterLink, DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-lg font-semibold">Wishlist</h1>
-        <a routerLink="/wishlist/new" class="btn-primary text-xs no-underline">New Item</a>
-      </div>
-
-      <form class="flex flex-wrap items-center gap-2 text-sm" [formGroup]="filters">
-        <div class="flex flex-wrap gap-1">
-          @for (s of statusFilters; track s.value) {
-            <button
-              type="button"
-              class="text-xs"
-              [class.btn-primary]="isStatusSelected(s.value)"
-              [class.btn-secondary]="!isStatusSelected(s.value)"
-              (click)="setStatus(s.value)"
-            >
-              {{ s.label }}
-            </button>
-          }
+      <form class="flex flex-wrap items-center justify-between gap-2 text-sm" [formGroup]="filters">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-wrap gap-1">
+            @for (s of statusFilters; track s.value) {
+              <button
+                type="button"
+                class="text-xs"
+                [class.btn-primary]="isStatusSelected(s.value)"
+                [class.btn-secondary]="!isStatusSelected(s.value)"
+                (click)="setStatus(s.value)"
+              >
+                {{ s.label }}
+              </button>
+            }
+          </div>
+          <select class="input-field !w-auto" formControlName="category" (change)="applyFilters()">
+            <option value="">All categories</option>
+            @for (c of categories(); track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
         </div>
-        <select class="input-field !w-auto" formControlName="category" (change)="applyFilters()">
-          <option value="">All categories</option>
-          @for (c of categories(); track c) {
-            <option [value]="c">{{ c }}</option>
-          }
-        </select>
+        <a routerLink="/wishlist/new" class="btn-primary text-xs no-underline">New Item</a>
       </form>
 
       @if (loading) {

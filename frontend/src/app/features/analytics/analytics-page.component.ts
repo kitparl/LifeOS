@@ -12,7 +12,6 @@ import { AnalyticsService } from './services/analytics.service';
   standalone: true,
   template: `
     <div class="space-y-4">
-      <h1 class="text-lg font-semibold">Analytics</h1>
       @if (summary) {
         <!-- Finance is reported in the Finance module as activity and obligations.
              Income minus expenses is deliberately not surfaced as a metric. -->

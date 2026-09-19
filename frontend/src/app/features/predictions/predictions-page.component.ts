@@ -6,7 +6,6 @@ import { PredictionItem, PredictionsService } from './services/predictions.servi
   standalone: true,
   template: `
     <div class="space-y-4">
-      <h1 class="text-lg font-semibold">AI Predictions</h1>
       @if (items.length) {
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           @for (p of items; track p.key) {
