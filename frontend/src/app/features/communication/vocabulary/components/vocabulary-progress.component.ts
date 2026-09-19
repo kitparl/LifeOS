@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
 import { VocabularyProgress } from '../models/vocabulary.models';
 import { VocabularyService } from '../services/vocabulary.service';
 
@@ -27,10 +27,10 @@ import { VocabularyService } from '../services/vocabulary.service';
             <p style="color: var(--text-muted)">Today's Progress</p>
             <p class="text-lg font-semibold">{{ d.todays_progress_count }} / {{ d.todays_progress_total }}</p>
           </div>
-          <div class="panel text-sm">
+          <button type="button" class="panel text-left text-sm" (click)="openBookmarks.emit()">
             <p style="color: var(--text-muted)">Bookmarks</p>
             <p class="text-lg font-semibold">{{ d.bookmarks_count }}</p>
-          </div>
+          </button>
           <div class="panel text-sm">
             <p style="color: var(--text-muted)">Needs Revision</p>
             <p class="text-lg font-semibold">{{ d.needs_revision_count }}</p>
@@ -46,6 +46,7 @@ import { VocabularyService } from '../services/vocabulary.service';
 })
 export class VocabularyProgressComponent implements OnInit {
   private readonly vocabularyService = inject(VocabularyService);
+  @Output() readonly openBookmarks = new EventEmitter<void>();
 
   readonly data = signal<VocabularyProgress | null>(null);
   readonly error = signal<string | null>(null);
