@@ -7,8 +7,9 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.calendar.models import CalendarEvent
-from app.modules.communication.models import VocabularyWord
+from app.modules.communication.vocabulary.models import UserVocabulary, Vocabulary
 from app.modules.goals.models import Goal
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
@@ -17,7 +18,6 @@ from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
 from app.modules.tasks.models import Task
 from app.modules.wishlist.models import WishlistItem
-from app.core.exceptions import BadRequestError, NotFoundError
 
 EXPORT_MODULES = (
     "goals",
@@ -133,10 +133,19 @@ class ExportService:
                 for w in result.scalars().all()
             ]
         if module == "vocabulary":
-            result = await self.db.execute(select(VocabularyWord).where(VocabularyWord.user_id == user_id))
+            result = await self.db.execute(
+                select(UserVocabulary, Vocabulary)
+                .join(Vocabulary, Vocabulary.id == UserVocabulary.vocabulary_id)
+                .where(UserVocabulary.user_id == user_id, UserVocabulary.accepted_at.is_not(None))
+            )
             return [
-                {"id": w.id, "word": w.word, "meaning": w.meaning, "mastery": w.mastery}
-                for w in result.scalars().all()
+                {
+                    "id": uv.vocabulary_id,
+                    "word": v.term,
+                    "meaning": v.simple_meaning,
+                    "mastery": uv.mastery_level,
+                }
+                for uv, v in result.all()
             ]
         if module == "learning":
             concepts = await self.db.execute(

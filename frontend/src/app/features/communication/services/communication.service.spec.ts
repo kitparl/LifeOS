@@ -18,18 +18,14 @@ describe('CommunicationService', () => {
 
   afterEach(() => http.verify());
 
-  it('should create vocabulary', () => {
-    service.createVocabulary({ word: 'test', meaning: 'a test' }).subscribe((w) => expect(w.word).toBe('test'));
-    const req = http.expectOne(`${environment.apiUrl}/communication/vocabulary`);
+  it('should create writing practice', () => {
+    service.createWriting({ title: 'test', content: 'a test' }).subscribe((w) => expect(w.title).toBe('test'));
+    const req = http.expectOne(`${environment.apiUrl}/communication/writing`);
     req.flush({
       id: '1',
-      word: 'test',
-      meaning: 'a test',
-      examples: null,
-      pronunciation: null,
-      synonyms: null,
-      mastery: 1,
-      notes: null,
+      title: 'test',
+      content: 'a test',
+      category: 'notes',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });

@@ -1,0 +1,60 @@
+import { Component, signal } from '@angular/core';
+import { TabHubComponent, TabHubItem } from '../../../shared/tab-hub/tab-hub.component';
+import { VocabularyGamesComponent } from './components/vocabulary-games.component';
+import { VocabularyHistoryComponent } from './components/vocabulary-history.component';
+import { VocabularyLibraryComponent } from './components/vocabulary-library.component';
+import { VocabularyProgressComponent } from './components/vocabulary-progress.component';
+import { VocabularyDailyComponent } from './vocabulary-daily.component';
+
+type VocabTab = 'today' | 'library' | 'history' | 'progress' | 'games';
+
+@Component({
+  selector: 'app-vocabulary-hub',
+  standalone: true,
+  imports: [
+    TabHubComponent,
+    VocabularyDailyComponent,
+    VocabularyLibraryComponent,
+    VocabularyHistoryComponent,
+    VocabularyProgressComponent,
+    VocabularyGamesComponent,
+  ],
+  template: `
+    <div class="space-y-3">
+      <app-tab-hub [tabs]="tabs" [activeId]="activeTab()" [wrap]="true" (tabChange)="setTab($event)" />
+
+      @switch (activeTab()) {
+        @case ('today') {
+          <app-vocabulary-daily />
+        }
+        @case ('library') {
+          <app-vocabulary-library />
+        }
+        @case ('history') {
+          <app-vocabulary-history />
+        }
+        @case ('progress') {
+          <app-vocabulary-progress />
+        }
+        @case ('games') {
+          <app-vocabulary-games />
+        }
+      }
+    </div>
+  `,
+})
+export class VocabularyHubComponent {
+  readonly tabs: TabHubItem[] = [
+    { id: 'today', label: "Today's Words" },
+    { id: 'library', label: 'Library' },
+    { id: 'history', label: 'History' },
+    { id: 'progress', label: 'Progress' },
+    { id: 'games', label: 'Games' },
+  ];
+
+  readonly activeTab = signal<VocabTab>('today');
+
+  setTab(id: string): void {
+    this.activeTab.set(id as VocabTab);
+  }
+}

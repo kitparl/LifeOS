@@ -1,20 +1,19 @@
-from datetime import date, timedelta
 import logging
-
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import date, timedelta
 
 from app.core.config import Settings, get_settings
+from app.core.exceptions import BadRequestError
 from app.modules.ai.provider import OpenAiProvider
 from app.modules.career.models import CareerProject, JobApplication
 from app.modules.coaches.schemas import COACH_TYPES, CoachChatResponse
-from app.modules.communication.models import VocabularyWord
+from app.modules.communication.vocabulary.models import UserVocabulary
 from app.modules.finance.models import FinanceBudget, FinanceTransaction
 from app.modules.habits.models import Habit, HabitLog
 from app.modules.learning.models import LearningItem
 from app.modules.memory.repository import MemoryRepository
 from app.modules.running.models import Run
-from app.core.exceptions import BadRequestError
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -127,9 +126,11 @@ class CoachesService:
 
         elif coach_type == "communication":
             vocab = await self.db.execute(
-                select(func.count()).select_from(VocabularyWord).where(VocabularyWord.user_id == user_id)
+                select(func.count())
+                .select_from(UserVocabulary)
+                .where(UserVocabulary.user_id == user_id, UserVocabulary.accepted_at.is_not(None))
             )
-            lines.append(f"Vocabulary items: {int(vocab.scalar() or 0)}")
+            lines.append(f"Vocabulary learned: {int(vocab.scalar() or 0)}")
 
         elif coach_type == "habits":
             habits = await self.db.execute(select(Habit).where(Habit.user_id == user_id))

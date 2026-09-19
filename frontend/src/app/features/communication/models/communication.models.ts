@@ -1,19 +1,6 @@
 export type WritingCategory = 'linkedin' | 'blog' | 'essay' | 'notes' | 'hr_answer' | 'technical_answer';
 export type SpeakingCategory = 'hr' | 'technical' | 'elevator' | 'mock_interview';
 
-export interface VocabularyWord {
-  id: string;
-  word: string;
-  meaning: string;
-  examples: string | null;
-  pronunciation: string | null;
-  synonyms: string | null;
-  mastery: number;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface WritingPractice {
   id: string;
   title: string;

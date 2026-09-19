@@ -2,7 +2,7 @@ import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { SpeakingPractice, VocabularyWord, WritingEvaluation, WritingPractice, WritingRewrite } from '../models/communication.models';
+import { SpeakingPractice, WritingEvaluation, WritingPractice, WritingRewrite } from '../models/communication.models';
 
 export interface CommunicationListResult<T> {
   items: T[];
@@ -13,39 +13,6 @@ export interface CommunicationListResult<T> {
 export class CommunicationService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/communication`;
-
-  listVocabulary(opts?: {
-    search?: string;
-    limit?: number;
-    offset?: number;
-  }): Observable<CommunicationListResult<VocabularyWord>> {
-    let params = new HttpParams();
-    if (opts?.search) params = params.set('search', opts.search);
-    if (opts?.limit != null) params = params.set('limit', String(opts.limit));
-    if (opts?.offset != null) params = params.set('offset', String(opts.offset));
-    return this.http.get<VocabularyWord[]>(`${this.api}/vocabulary`, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<VocabularyWord[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
-    );
-  }
-
-  getVocabulary(id: string): Observable<VocabularyWord> {
-    return this.http.get<VocabularyWord>(`${this.api}/vocabulary/${id}`);
-  }
-
-  createVocabulary(data: Partial<VocabularyWord>): Observable<VocabularyWord> {
-    return this.http.post<VocabularyWord>(`${this.api}/vocabulary`, data);
-  }
-
-  updateVocabulary(id: string, data: Partial<VocabularyWord>): Observable<VocabularyWord> {
-    return this.http.patch<VocabularyWord>(`${this.api}/vocabulary/${id}`, data);
-  }
-
-  deleteVocabulary(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.api}/vocabulary/${id}`);
-  }
 
   listWriting(opts?: {
     category?: string;

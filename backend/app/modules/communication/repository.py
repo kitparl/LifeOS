@@ -1,10 +1,9 @@
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Pagination, paginate
 from app.modules.communication.models import (
     SpeakingPractice,
-    VocabularyWord,
     WritingAIRun,
     WritingEvaluation,
     WritingPractice,
@@ -13,8 +12,6 @@ from app.modules.communication.models import (
 from app.modules.communication.schemas import (
     SpeakingCreate,
     SpeakingUpdate,
-    VocabularyCreate,
-    VocabularyUpdate,
     WritingCreate,
     WritingUpdate,
 )
@@ -23,44 +20,6 @@ from app.modules.communication.schemas import (
 class CommunicationRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
-
-    async def list_vocabulary(
-        self,
-        user_id: str,
-        search: str | None = None,
-        limit: int = 25,
-        offset: int = 0,
-    ) -> tuple[list[VocabularyWord], int]:
-        q = select(VocabularyWord).where(VocabularyWord.user_id == user_id)
-        if search:
-            pattern = f"%{search}%"
-            q = q.where(or_(VocabularyWord.word.ilike(pattern), VocabularyWord.meaning.ilike(pattern)))
-        q = q.order_by(VocabularyWord.word.asc())
-        return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
-
-    async def get_vocabulary(self, user_id: str, word_id: str) -> VocabularyWord | None:
-        result = await self.db.execute(
-            select(VocabularyWord).where(VocabularyWord.id == word_id, VocabularyWord.user_id == user_id)
-        )
-        return result.scalar_one_or_none()
-
-    async def create_vocabulary(self, user_id: str, data: VocabularyCreate) -> VocabularyWord:
-        word = VocabularyWord(user_id=user_id, **data.model_dump())
-        self.db.add(word)
-        await self.db.flush()
-        await self.db.refresh(word)
-        return word
-
-    async def update_vocabulary(self, word: VocabularyWord, data: VocabularyUpdate) -> VocabularyWord:
-        for key, value in data.model_dump(exclude_unset=True).items():
-            setattr(word, key, value)
-        await self.db.flush()
-        await self.db.refresh(word)
-        return word
-
-    async def delete_vocabulary(self, word: VocabularyWord) -> None:
-        await self.db.delete(word)
-        await self.db.flush()
 
     async def list_writing(
         self,

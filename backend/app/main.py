@@ -1,10 +1,11 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-import logging
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.logging_config import configure_logging
@@ -12,9 +13,10 @@ from app.modules.ai.api import router as ai_router
 from app.modules.analytics.api import router as analytics_router
 from app.modules.analytics_dashboard.api import router as analytics_dashboard_router
 from app.modules.auth.api import router as auth_router
-from app.modules.users.api import router as users_router
+from app.modules.automations.api import router as automations_router
 from app.modules.calendar.api import router as calendar_router
 from app.modules.career.api import router as career_router
+from app.modules.coaches.api import router as coaches_router
 from app.modules.communication.api import router as communication_router
 from app.modules.dashboard.api import router as dashboard_router
 from app.modules.export.api import router as export_router
@@ -22,28 +24,27 @@ from app.modules.files.api import router as files_router
 from app.modules.finance.api import router as finance_router
 from app.modules.goals.api import router as goals_router
 from app.modules.habits.api import router as habits_router
+from app.modules.integrations.api import router as integrations_router
 from app.modules.journal.api import router as journal_router
 from app.modules.knowledge_notes.api import router as knowledge_notes_router
 from app.modules.learning.api import router as learning_router
+from app.modules.life_timeline.api import router as life_timeline_router
+from app.modules.memory.api import router as memory_router
 from app.modules.mood.api import router as mood_router
 from app.modules.notifications.api import router as notifications_router
+from app.modules.ocr.api import router as ocr_router
+from app.modules.predictions.api import router as predictions_router
+from app.modules.preferences.api import router as preferences_router
 from app.modules.qa.api import router as qa_router
 from app.modules.reports.api import router as reports_router
+from app.modules.routines.api import router as routines_router
 from app.modules.running.api import router as running_router
 from app.modules.search.api import router as search_router
 from app.modules.tasks.api import router as tasks_router
-from app.modules.life_timeline.api import router as life_timeline_router
-from app.modules.memory.api import router as memory_router
-from app.modules.coaches.api import router as coaches_router
-from app.modules.ocr.api import router as ocr_router
-from app.modules.voice.api import router as voice_router
-from app.modules.integrations.api import router as integrations_router
-from app.modules.automations.api import router as automations_router
-from app.modules.predictions.api import router as predictions_router
 from app.modules.timeline.api import router as timeline_router
+from app.modules.users.api import router as users_router
+from app.modules.voice.api import router as voice_router
 from app.modules.wishlist.api import router as wishlist_router
-from app.modules.routines.api import router as routines_router
-from app.modules.preferences.api import router as preferences_router
 
 settings = get_settings()
 configure_logging(level=logging.DEBUG if settings.is_development else logging.INFO)

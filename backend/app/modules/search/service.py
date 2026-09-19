@@ -1,15 +1,16 @@
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.ai.service import AiService
 from app.modules.calendar.models import CalendarEvent
-from app.modules.communication.models import SpeakingPractice, VocabularyWord, WritingPractice
+from app.modules.communication.models import SpeakingPractice, WritingPractice
+from app.modules.communication.vocabulary.models import UserVocabulary, Vocabulary
 from app.modules.goals.models import Goal
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
 from app.modules.learning.models import LearningConcept, LearningItem
 from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
-from app.modules.ai.service import AiService
 from app.modules.search.schemas import SearchResponse, SearchResultItem
 from app.modules.tasks.models import Task
 from app.modules.wishlist.models import WishlistItem
@@ -146,20 +147,23 @@ class SearchService:
 
         async def add_vocab_rows():
             rows = await self.db.execute(
-                select(VocabularyWord).where(
-                    VocabularyWord.user_id == user_id,
-                    or_(VocabularyWord.word.ilike(pattern), VocabularyWord.meaning.ilike(pattern)),
+                select(Vocabulary)
+                .join(UserVocabulary, UserVocabulary.vocabulary_id == Vocabulary.id)
+                .where(
+                    UserVocabulary.user_id == user_id,
+                    UserVocabulary.accepted_at.is_not(None),
+                    or_(Vocabulary.term.ilike(pattern), Vocabulary.simple_meaning.ilike(pattern)),
                 )
             )
-            for w in rows.scalars().all():
+            for v in rows.scalars().all():
                 results.append(
                     SearchResultItem(
                         module="communication",
                         entity_type="vocabulary",
-                        id=w.id,
-                        title=w.word,
-                        subtitle=w.meaning[:80] if w.meaning else None,
-                        route=f"/communication/vocabulary/{w.id}",
+                        id=v.id,
+                        title=v.term,
+                        subtitle=v.simple_meaning[:80] if v.simple_meaning else None,
+                        route=f"/communication/vocabulary/{v.id}",
                     )
                 )
 

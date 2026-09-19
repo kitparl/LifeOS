@@ -97,7 +97,7 @@ class DashboardService:
                 QuickActionItem(id="add_event", label="New Event", route="/calendar/new", enabled=True),
                 QuickActionItem(id="add_routine", label="New Routine", route="/routines/new", enabled=True),
                 QuickActionItem(id="add_journal", label="New Journal", route="/journal/new", enabled=True),
-                QuickActionItem(id="add_word", label="Add Word", route="/communication/vocabulary/new", enabled=True),
+                QuickActionItem(id="add_word", label="Vocabulary", route="/communication/vocabulary", enabled=True),
                 QuickActionItem(id="add_qa", label="New Q&A", route="/qa/new", enabled=True),
                 QuickActionItem(id="add_wishlist", label="New Wishlist", route="/wishlist/new", enabled=True),
                 QuickActionItem(id="export_data", label="Export Data", route="/export", enabled=True),

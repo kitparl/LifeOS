@@ -5,6 +5,7 @@ import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { CommunicationHubComponent } from './communication-hub.component';
 import { CommunicationService } from './services/communication.service';
 import { WritingPractice } from './models/communication.models';
+import { VocabularyService } from './vocabulary/services/vocabulary.service';
 
 const now = new Date().toISOString();
 const writing: WritingPractice = {
@@ -20,18 +21,22 @@ describe('CommunicationHubComponent', () => {
   let fixture: ComponentFixture<CommunicationHubComponent>;
   let component: CommunicationHubComponent;
   let communication: {
-    listVocabulary: jasmine.Spy;
     listWriting: jasmine.Spy;
     listSpeaking: jasmine.Spy;
     deleteWriting: jasmine.Spy;
   };
+  let vocabulary: { today: jasmine.Spy };
 
   beforeEach(async () => {
     communication = {
-      listVocabulary: jasmine.createSpy('listVocabulary').and.returnValue(of({ items: [], total: 0 })),
       listWriting: jasmine.createSpy('listWriting').and.returnValue(of({ items: [writing], total: 1 })),
       listSpeaking: jasmine.createSpy('listSpeaking').and.returnValue(of({ items: [], total: 0 })),
       deleteWriting: jasmine.createSpy('deleteWriting').and.returnValue(of(void 0)),
+    };
+    vocabulary = {
+      today: jasmine.createSpy('today').and.returnValue(
+        of({ state: 'ACTIVE', current_set: null, progress_count: 0, progress_total: 0, end_of_dataset: true }),
+      ),
     };
 
     await TestBed.configureTestingModule({
@@ -39,6 +44,7 @@ describe('CommunicationHubComponent', () => {
       providers: [
         provideRouter([]),
         { provide: CommunicationService, useValue: communication },
+        { provide: VocabularyService, useValue: vocabulary },
         { provide: ConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
       ],
     }).compileComponents();

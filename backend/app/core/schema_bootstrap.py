@@ -39,17 +39,18 @@ def _schema_lock():
 
 def _import_models() -> None:
     """Register ORM tables on Base.metadata before create_all."""
-    import app.modules.auth.models  # noqa: F401
-    import app.modules.files.models  # noqa: F401
     import app.modules.ai.models  # noqa: F401
+    import app.modules.auth.models  # noqa: F401
     import app.modules.communication.models  # noqa: F401
+    import app.modules.communication.vocabulary.models  # noqa: F401
+    import app.modules.files.models  # noqa: F401
+    import app.modules.finance.models  # noqa: F401
+    import app.modules.integrations.github.sync_models  # noqa: F401
     import app.modules.integrations.notifications.outbox_models  # noqa: F401
     import app.modules.integrations.reports.models  # noqa: F401
-    import app.modules.integrations.github.sync_models  # noqa: F401
-    import app.modules.routines.models  # noqa: F401
     import app.modules.preferences.models  # noqa: F401
+    import app.modules.routines.models  # noqa: F401
     import app.modules.tasks.models  # noqa: F401
-    import app.modules.finance.models  # noqa: F401
 
 
 async def apply_schema() -> None:

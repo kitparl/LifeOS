@@ -42,9 +42,6 @@ from app.modules.communication.schemas import (
     SpeakingCreate,
     SpeakingResponse,
     SpeakingUpdate,
-    VocabularyCreate,
-    VocabularyResponse,
-    VocabularyUpdate,
     WritingCreate,
     WritingEvaluationResponse,
     WritingIssueItem,
@@ -153,31 +150,6 @@ class CommunicationService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repo = CommunicationRepository(db)
-
-    async def list_vocabulary(
-        self, user_id: str, search: str | None = None, limit: int = 25, offset: int = 0
-    ) -> tuple[list[VocabularyResponse], int]:
-        words, total = await self.repo.list_vocabulary(
-            user_id, search=search, limit=limit, offset=offset
-        )
-        return [VocabularyResponse.model_validate(w) for w in words], total
-
-    async def get_vocabulary(self, user_id: str, word_id: str) -> VocabularyResponse:
-        word = get_or_404(await self.repo.get_vocabulary(user_id, word_id), "Word not found")
-        return VocabularyResponse.model_validate(word)
-
-    async def create_vocabulary(self, user_id: str, data: VocabularyCreate) -> VocabularyResponse:
-        word = await self.repo.create_vocabulary(user_id, data)
-        return VocabularyResponse.model_validate(word)
-
-    async def update_vocabulary(self, user_id: str, word_id: str, data: VocabularyUpdate) -> VocabularyResponse:
-        word = get_or_404(await self.repo.get_vocabulary(user_id, word_id), "Word not found")
-        updated = await self.repo.update_vocabulary(word, data)
-        return VocabularyResponse.model_validate(updated)
-
-    async def delete_vocabulary(self, user_id: str, word_id: str) -> None:
-        word = get_or_404(await self.repo.get_vocabulary(user_id, word_id), "Word not found")
-        await self.repo.delete_vocabulary(word)
 
     async def list_writing(
         self, user_id: str, category: str | None = None, limit: int = 25, offset: int = 0

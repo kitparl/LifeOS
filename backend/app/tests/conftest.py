@@ -1,23 +1,22 @@
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+import app.modules.ai.models  # noqa: F401
+import app.modules.communication.models  # noqa: F401
+import app.modules.goals.models  # noqa: F401
 
 # Register Cycle 8 tables on Base before create_all (must run before importing FastAPI app,
 # because `import app.modules...` would rebind the name `app` if done after `from app.main import app`).
 import app.modules.habits.models  # noqa: F401
-import app.modules.goals.models  # noqa: F401
-import app.modules.integrations.reports.models  # noqa: F401
 import app.modules.integrations.github.sync_models  # noqa: F401
-import app.modules.routines.models  # noqa: F401
-import app.modules.wishlist.models  # noqa: F401
-import app.modules.tasks.models  # noqa: F401
-import app.modules.ai.models  # noqa: F401
-import app.modules.communication.models  # noqa: F401
 import app.modules.integrations.models  # noqa: F401
-
+import app.modules.integrations.reports.models  # noqa: F401
+import app.modules.routines.models  # noqa: F401
+import app.modules.tasks.models  # noqa: F401
+import app.modules.wishlist.models  # noqa: F401
+import pytest_asyncio
 from app.core.database import Base, get_db
 from app.main import app
 from app.modules.auth.registration_gate import require_registration_unlock
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 TEST_DB = "sqlite+aiosqlite:///:memory:"
 
@@ -42,6 +41,10 @@ async def client():
     app.dependency_overrides[require_registration_unlock] = lambda: None
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Exposed so tests that need to seed rows directly (bypassing the HTTP API —
+        # e.g. master vocabulary fixture data) can open a session against the same
+        # in-memory test database. See test_communication_vocabulary_sequencing.py.
+        ac.session_factory = session_factory
         yield ac
     app.dependency_overrides.clear()
     await engine.dispose()

@@ -233,19 +233,11 @@ export const routes: Routes = [
           import('./features/communication/communication-hub.component').then((m) => m.CommunicationHubComponent),
       },
       {
-        path: 'communication/vocabulary/new',
-        loadComponent: () =>
-          import('./features/communication/vocabulary-form.component').then((m) => m.VocabularyFormComponent),
-      },
-      {
-        path: 'communication/vocabulary/:id/edit',
-        loadComponent: () =>
-          import('./features/communication/vocabulary-form.component').then((m) => m.VocabularyFormComponent),
-      },
-      {
         path: 'communication/vocabulary/:id',
         loadComponent: () =>
-          import('./features/communication/vocabulary-detail.component').then((m) => m.VocabularyDetailComponent),
+          import('./features/communication/vocabulary/vocabulary-detail.component').then(
+            (m) => m.VocabularyDetailComponent,
+          ),
       },
       {
         path: 'communication/writing/new',
