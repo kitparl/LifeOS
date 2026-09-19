@@ -36,6 +36,7 @@ export interface QAListResult {
   total: number;
 }
 
+export const QA_PURGE_AFTER_DAYS = 30;
 export type QAViewMode = 'all' | 'month' | 'deep';
 export type QASortBy = 'created_at' | 'updated_at';
 

@@ -31,6 +31,7 @@ from app.modules.communication.ai.rubric import (
     RUBRIC_VERSION,
 )
 from app.modules.communication.models import (
+    WRITING_CATEGORIES,
     WritingAIRun,
     WritingEvaluation,
     WritingRewritePreview,
@@ -158,6 +159,23 @@ class CommunicationService:
             user_id, category=category, limit=limit, offset=offset
         )
         return [WritingResponse.model_validate(i) for i in items], total
+
+    async def list_writing_categories(self, user_id: str) -> list[str]:
+        stored = await self.repo.list_category_names(user_id)
+        used = await self.repo.list_used_category_names(user_id)
+        seen: dict[str, str] = {}
+        for name in [*WRITING_CATEGORIES, *stored, *used]:
+            key = name.strip().lower()
+            if key and key not in seen:
+                seen[key] = name.strip()
+        return sorted(seen.values(), key=str.lower)
+
+    async def create_writing_category(self, user_id: str, name: str) -> str:
+        clean = name.strip()
+        if not clean:
+            raise BadRequestError("Category name required")
+        await self.repo.ensure_category(user_id, clean)
+        return clean
 
     async def get_writing(self, user_id: str, item_id: str) -> WritingResponse:
         item = get_or_404(await self.repo.get_writing(user_id, item_id), "Writing not found")

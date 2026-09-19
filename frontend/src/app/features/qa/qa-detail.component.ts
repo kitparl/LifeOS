@@ -2,7 +2,8 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
-import { QAEntry } from './models/qa.models';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { QAEntry, QA_PURGE_AFTER_DAYS } from './models/qa.models';
 import { QAService } from './services/qa.service';
 
 @Component({
@@ -61,6 +62,7 @@ export class QADetailComponent implements OnInit {
   private readonly qaService = inject(QAService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly confirm = inject(ConfirmService);
 
   entry: QAEntry | null = null;
   loading = false;
@@ -82,8 +84,13 @@ export class QADetailComponent implements OnInit {
     }
   }
 
-  remove(): void {
-    if (!this.entry || !confirm('Delete this Q&A entry?')) return;
+  async remove(): Promise<void> {
+    if (!this.entry) return;
+    const ok = await this.confirm.confirm(
+      `Delete “${this.entry.question}”? It will be hidden now and permanently removed after ${QA_PURGE_AFTER_DAYS} days.`,
+      'Delete Q&A',
+    );
+    if (!ok) return;
     this.qaService.delete(this.entry.id).subscribe({
       next: () => this.router.navigate(['/qa']),
     });

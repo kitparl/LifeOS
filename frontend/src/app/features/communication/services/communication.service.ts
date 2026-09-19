@@ -39,6 +39,14 @@ export class CommunicationService {
     return this.http.post<WritingPractice>(`${this.api}/writing`, data);
   }
 
+  listWritingCategories(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.api}/writing/categories`);
+  }
+
+  createWritingCategory(name: string): Observable<string[]> {
+    return this.http.post<string[]>(`${this.api}/writing/categories`, { name });
+  }
+
   updateWriting(id: string, data: Partial<WritingPractice>): Observable<WritingPractice> {
     return this.http.patch<WritingPractice>(`${this.api}/writing/${id}`, data);
   }

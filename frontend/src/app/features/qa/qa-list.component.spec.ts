@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { groupEntriesByMonth } from './qa-expandable-entry.component';
 import { QAListComponent } from './qa-list.component';
 
@@ -87,6 +88,33 @@ describe('QAListComponent', () => {
       versions: [],
     });
     expect(fixture.componentInstance.getAnswer(fixture.componentInstance.entries[0])).toBe('Because.');
+  });
+
+  it('should soft-delete after confirmation', async () => {
+    const confirm = TestBed.inject(ConfirmService);
+    spyOn(confirm, 'confirm').and.resolveTo(true);
+    fixture.detectChanges();
+    flushTypesAndList();
+    fixture.componentInstance.entries = [
+      {
+        id: 'e1',
+        question: 'Why?',
+        current_answer: null,
+        type: 'Personal',
+        tags: [],
+        is_deep_personal: true,
+        created_at: '2026-08-17T00:00:00Z',
+        updated_at: '2026-08-18T00:00:00Z',
+      },
+    ];
+    await fixture.componentInstance.removeEntry('e1');
+    expect(confirm.confirm).toHaveBeenCalled();
+    const delReq = http.expectOne(`${environment.apiUrl}/qa/entries/e1`);
+    expect(delReq.request.method).toBe('DELETE');
+    delReq.flush(null);
+    http.expectOne((r) => r.url === `${environment.apiUrl}/qa/entries`).flush([], {
+      headers: { 'X-Total-Count': '0' },
+    });
   });
 });
 

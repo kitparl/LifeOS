@@ -7,7 +7,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
-WRITING_CATEGORIES = ("linkedin", "blog", "essay", "notes", "hr_answer", "technical_answer")
+WRITING_CATEGORIES = (
+    "LinkedIn",
+    "Blog",
+    "Essay",
+    "Notes",
+    "HR Answer",
+    "Technical Answer",
+)
 SPEAKING_CATEGORIES = ("hr", "technical", "elevator", "mock_interview")
 
 
@@ -18,11 +25,24 @@ class WritingPractice(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    category: Mapped[str] = mapped_column(String(32), nullable=False, default="notes")
+    category: Mapped[str] = mapped_column(String(64), nullable=False, default="Notes")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
+
+
+class WritingCategory(Base):
+    """User-defined, reusable writing category registry (extensible taxonomy)."""
+
+    __tablename__ = "writing_categories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_writing_categories_user_name"),)
 
 
 class SpeakingPractice(Base):

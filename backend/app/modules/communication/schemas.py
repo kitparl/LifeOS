@@ -3,20 +3,19 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-WritingCategory = Literal["linkedin", "blog", "essay", "notes", "hr_answer", "technical_answer"]
 SpeakingCategory = Literal["hr", "technical", "elevator", "mock_interview"]
 
 
 class WritingCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     content: str = ""
-    category: WritingCategory = "notes"
+    category: str = Field(default="Notes", min_length=1, max_length=64)
 
 
 class WritingUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     content: str | None = None
-    category: WritingCategory | None = None
+    category: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class WritingResponse(BaseModel):
@@ -28,6 +27,10 @@ class WritingResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class WritingCategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
 
 
 class SpeakingCreate(BaseModel):

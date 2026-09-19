@@ -25,6 +25,12 @@ class AnalyticsService:
         )
         return int(result.scalar() or 0)
 
+    async def _count_qa(self, user_id: str) -> int:
+        result = await self.db.execute(
+            select(func.count()).select_from(QAEntry).where(QAEntry.user_id == user_id, QAEntry.deleted_at.is_(None))
+        )
+        return int(result.scalar() or 0)
+
     async def summary(self, user_id: str) -> AnalyticsSummary:
         since = datetime.now(timezone.utc) - timedelta(days=30)
         since_date = date.today() - timedelta(days=30)
@@ -40,7 +46,7 @@ class AnalyticsService:
             ModuleCount(module="runs", count=await count(Run, Run.user_id)),
             ModuleCount(module="journal", count=await count(JournalEntry, JournalEntry.user_id)),
             ModuleCount(module="learning", count=await count(LearningItem, LearningItem.user_id)),
-            ModuleCount(module="qa", count=await count(QAEntry, QAEntry.user_id)),
+            ModuleCount(module="qa", count=await self._count_qa(user_id)),
             ModuleCount(module="calendar", count=await count(CalendarEvent, CalendarEvent.user_id)),
         ]
 

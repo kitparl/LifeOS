@@ -23,19 +23,26 @@ import { WishlistService } from './services/wishlist.service';
         <a routerLink="/wishlist/new" class="btn-primary text-xs no-underline">New Item</a>
       </div>
 
-      <form class="flex flex-wrap gap-2 text-sm" [formGroup]="filters" (ngSubmit)="applyFilters()">
-        <select class="input-field !w-auto" formControlName="status">
+      <form class="flex flex-wrap items-center gap-2 text-sm" [formGroup]="filters">
+        <div class="flex flex-wrap gap-1">
           @for (s of statusFilters; track s.value) {
-            <option [value]="s.value">{{ s.label }}</option>
+            <button
+              type="button"
+              class="text-xs"
+              [class.btn-primary]="isStatusSelected(s.value)"
+              [class.btn-secondary]="!isStatusSelected(s.value)"
+              (click)="setStatus(s.value)"
+            >
+              {{ s.label }}
+            </button>
           }
-        </select>
-        <select class="input-field !w-auto" formControlName="category">
+        </div>
+        <select class="input-field !w-auto" formControlName="category" (change)="applyFilters()">
           <option value="">All categories</option>
           @for (c of categories(); track c) {
             <option [value]="c">{{ c }}</option>
           }
         </select>
-        <button type="submit" class="btn-primary text-xs">Filter</button>
       </form>
 
       @if (loading) {
@@ -141,6 +148,15 @@ export class WishlistListComponent implements OnInit {
 
   priorityLabel(priority: string): string {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
+  }
+
+  isStatusSelected(status: WishlistStatusFilter): boolean {
+    return this.filters.getRawValue().status === status;
+  }
+
+  setStatus(status: WishlistStatusFilter): void {
+    this.filters.patchValue({ status });
+    this.applyFilters();
   }
 
   applyFilters(): void {

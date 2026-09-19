@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
@@ -5,8 +6,8 @@ import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.c
 import {
   SPEAKING_CATEGORIES,
   SpeakingPractice,
-  WRITING_CATEGORIES,
   WritingPractice,
+  writingCategoryLabel,
 } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 import { VocabularyHubComponent } from './vocabulary/vocabulary-hub.component';
@@ -14,7 +15,7 @@ import { VocabularyHubComponent } from './vocabulary/vocabulary-hub.component';
 @Component({
   selector: 'app-communication-hub',
   standalone: true,
-  imports: [RouterLink, ListPaginatorComponent, VocabularyHubComponent],
+  imports: [DatePipe, RouterLink, ListPaginatorComponent, VocabularyHubComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -56,7 +57,12 @@ import { VocabularyHubComponent } from './vocabulary/vocabulary-hub.component';
               <li class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-[var(--surface-2)]">
                 <div>
                   <a [routerLink]="['/communication/writing', w.id]" class="link">{{ w.title }}</a>
-                  <p class="text-xs capitalize" style="color: var(--text-muted)">{{ w.category }}</p>
+                  <p class="text-xs capitalize" style="color: var(--text-muted)">
+                    {{ categoryLabel(w.category) }}
+                  </p>
+                  <p class="text-xs" style="color: var(--text-muted)">
+                    Created {{ w.created_at | date: 'mediumDate' }} · Updated {{ w.updated_at | date: 'mediumDate' }}
+                  </p>
                 </div>
                 <div class="flex items-center gap-2">
                   <a [routerLink]="['/communication/writing', w.id, 'edit']" class="text-xs underline">Edit</a>
@@ -104,7 +110,6 @@ export class CommunicationHubComponent implements OnInit {
   private readonly communication = inject(CommunicationService);
   private readonly confirm = inject(ConfirmService);
 
-  writingCategories = WRITING_CATEGORIES;
   speakingCategories = SPEAKING_CATEGORIES;
   tab = signal<'vocabulary' | 'writing' | 'speaking'>('vocabulary');
   tabs = [
@@ -184,5 +189,9 @@ export class CommunicationHubComponent implements OnInit {
     this.communication.deleteWriting(item.id).subscribe({
       next: () => this.loadWriting(),
     });
+  }
+
+  categoryLabel(value: string): string {
+    return writingCategoryLabel(value);
   }
 }

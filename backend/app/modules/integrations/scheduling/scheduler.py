@@ -137,6 +137,20 @@ async def _run_outbox_drain() -> None:
     await dispatch_pending_notifications(limit=50)
 
 
+async def _run_qa_purge() -> None:
+    from app.modules.qa.service import QAService
+
+    async with async_session_factory() as session:
+        try:
+            n = await QAService(session).purge_expired()
+            await session.commit()
+            if n:
+                logger.info("Purged %s expired Q&A entries", n)
+        except Exception:
+            await session.rollback()
+            logger.exception("Q&A purge job failed")
+
+
 async def _run_routines_expire() -> None:
     from datetime import date
 
@@ -302,9 +316,17 @@ def start_scheduler() -> AsyncIOScheduler:
         max_instances=1,
         misfire_grace_time=3600,
     )
+    _scheduler.add_job(
+        _run_qa_purge,
+        trigger=CronTrigger(hour=0, minute=5, timezone=_safe_zone("Asia/Kolkata")),
+        id="qa_purge",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=3600,
+    )
     _scheduler.start()
     _install_after_commit_hook()
-    logger.info("APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST)")
+    logger.info("APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST, qa purge 00:05 IST)")
     return _scheduler
 
 

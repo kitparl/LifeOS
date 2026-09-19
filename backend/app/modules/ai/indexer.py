@@ -70,7 +70,9 @@ class AiIndexer:
             )
             docs.append(IndexDocument("journal", j.id, j.title or "Journal", text, f"/journal/{j.id}"))
 
-        qa_rows = await self.db.execute(select(QAEntry).where(QAEntry.user_id == user_id))
+        qa_rows = await self.db.execute(
+            select(QAEntry).where(QAEntry.user_id == user_id, QAEntry.deleted_at.is_(None))
+        )
         for q in qa_rows.scalars().all():
             text = f"{q.question} {q.current_answer}"
             docs.append(IndexDocument("qa", q.id, q.question[:120], text, f"/qa/{q.id}"))

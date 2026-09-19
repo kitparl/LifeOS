@@ -7,6 +7,8 @@ from app.modules.qa.repository import QARepository
 from app.modules.qa.schemas import QACreate, QAListItem, QAResponse, QAUpdate, QAVersionResponse
 from app.core.exceptions import BadRequestError, get_or_404
 
+QA_PURGE_AFTER_DAYS = 30
+
 class QAService:
     def __init__(self, db: AsyncSession):
         self.repo = QARepository(db)
@@ -54,6 +56,7 @@ class QAService:
         offset: int = 0,
         include_answer: bool = True,
     ) -> tuple[list[QAListItem], int]:
+        await self.purge_expired()
         entries, total = await self.repo.list_entries(
             user_id,
             search=search,
@@ -87,6 +90,7 @@ class QAService:
         return clean
 
     async def get_entry(self, user_id: str, entry_id: str) -> QAResponse:
+        await self.purge_expired()
         entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Q&A entry not found")
         return self._to_response(entry)
 
@@ -100,8 +104,12 @@ class QAService:
         return self._to_response(updated)
 
     async def delete_entry(self, user_id: str, entry_id: str) -> None:
+        await self.purge_expired()
         entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Q&A entry not found")
-        await self.repo.delete(entry)
+        await self.repo.soft_delete(entry)
+
+    async def purge_expired(self, days: int | None = None) -> int:
+        return await self.repo.purge_expired(days if days is not None else QA_PURGE_AFTER_DAYS)
 
     async def list_versions(self, user_id: str, entry_id: str) -> list[QAVersionResponse]:
         entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Q&A entry not found")

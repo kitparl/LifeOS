@@ -223,6 +223,51 @@ async def test_goal_create_category_endpoint(client):
     assert "family" in resp.json()
 
 
+@pytest.mark.asyncio
+async def test_writing_categories_suggested_and_custom(client):
+    token = await _auth_token(client, "writecats@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    cats = await client.get("/api/v1/communication/writing/categories", headers=headers)
+    assert cats.status_code == 200
+    assert "Notes" in cats.json()
+    assert "LinkedIn" in cats.json()
+
+    created = await client.post(
+        "/api/v1/communication/writing",
+        headers=headers,
+        json={"title": "Journal dump", "content": "Today I wrote.", "category": "Journal"},
+    )
+    assert created.status_code == 201
+    body = created.json()
+    assert body["category"] == "Journal"
+    assert body["created_at"]
+    assert body["updated_at"]
+
+    cats = await client.get("/api/v1/communication/writing/categories", headers=headers)
+    assert "Journal" in cats.json()
+
+    listed = await client.get("/api/v1/communication/writing?category=Journal", headers=headers)
+    assert listed.status_code == 200
+    assert len(listed.json()) == 1
+    assert listed.json()[0]["created_at"]
+    assert listed.json()[0]["updated_at"]
+
+
+@pytest.mark.asyncio
+async def test_writing_create_category_endpoint(client):
+    token = await _auth_token(client, "writecats2@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = await client.post(
+        "/api/v1/communication/writing/categories",
+        headers=headers,
+        json={"name": "Reflection"},
+    )
+    assert resp.status_code == 201
+    assert "Reflection" in resp.json()
+
+
 # =========================================================
 # Knowledge Notes module
 # =========================================================

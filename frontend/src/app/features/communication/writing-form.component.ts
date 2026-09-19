@@ -1,17 +1,27 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CodeWorkspaceComponent } from '../../shared/code-workspace';
 import { MarkdownImportButtonComponent } from '../../shared/markdown/markdown-import-button.component';
 import { MarkdownImportResult } from '../../shared/markdown/markdown-import.service';
 import { MarkdownExportButtonComponent } from '../../shared/markdown/markdown-export-button.component';
-import { WRITING_CATEGORIES, WritingCategory } from './models/communication.models';
+import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
+import { WRITING_CATEGORIES } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 
 @Component({
   selector: 'app-writing-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, CodeWorkspaceComponent, MarkdownImportButtonComponent, MarkdownExportButtonComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    DatePipe,
+    CodeWorkspaceComponent,
+    MarkdownImportButtonComponent,
+    MarkdownExportButtonComponent,
+    TypeSelectComponent,
+  ],
   template: `
     <div style="max-width: 760px">
       <div class="panel !p-0 overflow-hidden">
@@ -38,14 +48,22 @@ import { CommunicationService } from './services/communication.service';
               <input id="title" class="input-field mt-1" formControlName="title" placeholder="Give it a title…" />
             </div>
             <div>
-              <label class="form-label" for="category">Category</label>
-              <select id="category" class="input-field mt-1" formControlName="category">
-                @for (c of categories; track c.value) {
-                  <option [value]="c.value">{{ c.label }}</option>
-                }
-              </select>
+              <label class="form-label">Category</label>
+              <div class="mt-1">
+                <app-type-select
+                  formControlName="category"
+                  placeholder="Select or create a category…"
+                  [options]="categories()"
+                  (created)="onCategoryCreated($event)"
+                />
+              </div>
             </div>
           </div>
+          @if (isEdit && createdAt) {
+            <p class="text-xs" style="color: var(--text-muted)">
+              Created {{ createdAt | date: 'medium' }} · Updated {{ updatedAt | date: 'medium' }}
+            </p>
+          }
 
           <div>
             <label class="form-label" style="margin-bottom: 0.35rem; display: block">Content</label>
@@ -85,21 +103,26 @@ export class WritingFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  categories = WRITING_CATEGORIES;
+  readonly categories = signal<string[]>([...WRITING_CATEGORIES]);
   isEdit = false;
   itemId: string | null = null;
   saving = false;
   error = '';
   editorReady = false;
   editorContent = '';
+  createdAt: string | null = null;
+  updatedAt: string | null = null;
 
   form = this.fb.nonNullable.group({
     title: ['', Validators.required],
-    category: ['notes' as WritingCategory, Validators.required],
+    category: ['Notes', Validators.required],
     content: [''],
   });
 
   ngOnInit(): void {
+    this.communication.listWritingCategories().subscribe({
+      next: (c) => this.categories.set(c.length ? c : [...WRITING_CATEGORIES]),
+    });
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id && url.endsWith('edit')) {
@@ -110,12 +133,19 @@ export class WritingFormComponent implements OnInit {
           const content = w.content ?? '';
           this.form.patchValue({ title: w.title, category: w.category, content });
           this.editorContent = content;
+          this.createdAt = w.created_at;
+          this.updatedAt = w.updated_at;
           this.editorReady = true;
         },
       });
     } else {
       this.editorReady = true;
     }
+  }
+
+  onCategoryCreated(name: string): void {
+    this.categories.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.communication.createWritingCategory(name).subscribe({ next: (c) => this.categories.set(c) });
   }
 
   onContentChange(content: string): void {

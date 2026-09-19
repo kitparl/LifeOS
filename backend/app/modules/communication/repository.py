@@ -5,6 +5,7 @@ from app.core.pagination import Pagination, paginate
 from app.modules.communication.models import (
     SpeakingPractice,
     WritingAIRun,
+    WritingCategory,
     WritingEvaluation,
     WritingPractice,
     WritingRewritePreview,
@@ -40,16 +41,44 @@ class CommunicationRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_category_names(self, user_id: str) -> list[str]:
+        result = await self.db.execute(
+            select(WritingCategory.name).where(WritingCategory.user_id == user_id).order_by(WritingCategory.name.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_used_category_names(self, user_id: str) -> list[str]:
+        result = await self.db.execute(
+            select(WritingPractice.category).where(WritingPractice.user_id == user_id).distinct()
+        )
+        return [name for name in result.scalars().all() if name]
+
+    async def ensure_category(self, user_id: str, name: str) -> None:
+        clean = (name or "").strip()
+        if not clean:
+            return
+        existing = await self.db.execute(select(WritingCategory).where(WritingCategory.user_id == user_id))
+        for row in existing.scalars().all():
+            if row.name.lower() == clean.lower():
+                return
+        self.db.add(WritingCategory(user_id=user_id, name=clean))
+        await self.db.flush()
+
     async def create_writing(self, user_id: str, data: WritingCreate) -> WritingPractice:
         item = WritingPractice(user_id=user_id, **data.model_dump())
         self.db.add(item)
         await self.db.flush()
+        if item.category:
+            await self.ensure_category(user_id, item.category)
         await self.db.refresh(item)
         return item
 
     async def update_writing(self, item: WritingPractice, data: WritingUpdate) -> WritingPractice:
-        for key, value in data.model_dump(exclude_unset=True).items():
+        fields = data.model_dump(exclude_unset=True)
+        for key, value in fields.items():
             setattr(item, key, value)
+        if fields.get("category"):
+            await self.ensure_category(item.user_id, fields["category"])
         await self.db.flush()
         await self.db.refresh(item)
         return item

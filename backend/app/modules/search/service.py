@@ -209,6 +209,7 @@ class SearchService:
             rows = await self.db.execute(
                 select(QAEntry).where(
                     QAEntry.user_id == user_id,
+                    QAEntry.deleted_at.is_(None),
                     or_(QAEntry.question.ilike(pattern), QAEntry.current_answer.ilike(pattern)),
                 )
             )

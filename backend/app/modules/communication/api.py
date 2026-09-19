@@ -11,6 +11,7 @@ from app.modules.communication.schemas import (
     SpeakingCreate,
     SpeakingResponse,
     SpeakingUpdate,
+    WritingCategoryCreate,
     WritingCreate,
     WritingEvaluationResponse,
     WritingResponse,
@@ -298,6 +299,24 @@ async def list_writing(
     )
     response.headers["X-Total-Count"] = str(total)
     return items
+
+
+@router.get("/writing/categories", response_model=list[str])
+async def list_writing_categories(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await CommunicationService(db).list_writing_categories(user.id)
+
+
+@router.post("/writing/categories", response_model=list[str], status_code=status.HTTP_201_CREATED)
+async def create_writing_category(
+    data: WritingCategoryCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await CommunicationService(db).create_writing_category(user.id, data.name)
+    return await CommunicationService(db).list_writing_categories(user.id)
 
 
 @router.post("/writing", response_model=WritingResponse, status_code=status.HTTP_201_CREATED)

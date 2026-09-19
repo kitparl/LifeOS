@@ -90,7 +90,9 @@ class TimelineService:
                 )
             )
 
-        qa = await self.db.execute(select(QAEntry).where(QAEntry.user_id == user_id))
+        qa = await self.db.execute(
+            select(QAEntry).where(QAEntry.user_id == user_id, QAEntry.deleted_at.is_(None))
+        )
         for q in qa.scalars().all():
             items.append(
                 TimelineItem(

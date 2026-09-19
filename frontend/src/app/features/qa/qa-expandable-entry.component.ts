@@ -43,7 +43,17 @@ import { QAListItem } from './models/qa.models';
           <p class="mt-2 text-xs" style="color: var(--text-muted)">
             Tags: {{ entry.tags.join(', ') || '—' }}
           </p>
-          <a [routerLink]="['/qa', entry.id, 'edit']" class="mt-2 inline-block text-xs underline">Edit</a>
+          <div class="mt-2 flex items-center gap-3">
+            <a [routerLink]="['/qa', entry.id, 'edit']" class="text-xs underline">Edit</a>
+            <button
+              type="button"
+              class="text-xs underline"
+              style="color: var(--danger)"
+              (click)="onRemove($event)"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       }
     </article>
@@ -60,9 +70,15 @@ export class QAExpandableEntryComponent {
   @Input() dateFormat = 'mediumDate';
 
   @Output() toggle = new EventEmitter<string>();
+  @Output() remove = new EventEmitter<string>();
 
   get dateValue(): string {
     return this.dateField === 'created_at' ? this.entry.created_at : this.entry.updated_at;
+  }
+
+  onRemove(event: Event): void {
+    event.stopPropagation();
+    this.remove.emit(this.entry.id);
   }
 }
 

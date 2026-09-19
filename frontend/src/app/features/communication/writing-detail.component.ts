@@ -1,23 +1,27 @@
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MarkdownService } from '../../shared/markdown/markdown.service';
-import { WritingPractice } from './models/communication.models';
+import { WritingPractice, writingCategoryLabel } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
 import { WritingFeedbackPanelComponent } from './writing-feedback-panel.component';
 
 @Component({
   selector: 'app-writing-detail',
   standalone: true,
-  imports: [RouterLink, WritingFeedbackPanelComponent],
+  imports: [DatePipe, RouterLink, WritingFeedbackPanelComponent],
   template: `
     @if (item; as w) {
       <div class="writing-detail-page w-full max-w-6xl mx-auto space-y-3">
         <div class="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h1 class="text-lg font-semibold" style="color: var(--text)">{{ w.title }}</h1>
-            <p class="text-xs capitalize" style="color: var(--text-muted)">{{ w.category.replace('_', ' ') }}</p>
+            <p class="text-xs capitalize" style="color: var(--text-muted)">{{ categoryLabel(w.category) }}</p>
+            <p class="text-xs mt-0.5" style="color: var(--text-muted)">
+              Created {{ w.created_at | date: 'medium' }} · Updated {{ w.updated_at | date: 'medium' }}
+            </p>
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/communication/writing', w.id, 'edit']" class="btn-secondary text-xs no-underline">Edit</a>
@@ -84,6 +88,10 @@ export class WritingDetailComponent implements OnInit {
 
   item: WritingPractice | null = null;
   loading = false;
+
+  categoryLabel(value: string): string {
+    return writingCategoryLabel(value);
+  }
 
   safeMarkdown(markdown: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(this.markdown.render(markdown));

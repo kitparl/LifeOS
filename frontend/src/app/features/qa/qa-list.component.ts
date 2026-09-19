@@ -3,12 +3,13 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import {
   QAExpandableEntryComponent,
   groupEntriesByMonth,
 } from './qa-expandable-entry.component';
-import { QAListItem, QAViewMode } from './models/qa.models';
+import { QAListItem, QAViewMode, QA_PURGE_AFTER_DAYS } from './models/qa.models';
 import { QAService } from './services/qa.service';
 
 interface ViewTab {
@@ -78,6 +79,7 @@ interface ViewTab {
               [loadingAnswer]="isLoadingAnswer(entry.id)"
               dateField="updated_at"
               (toggle)="toggleExpand($event)"
+              (remove)="removeEntry($event)"
             />
           }
         </div>
@@ -125,6 +127,14 @@ interface ViewTab {
                         class="mt-2 inline-block text-xs underline"
                         (click)="$event.stopPropagation()"
                       >Edit</a>
+                      <button
+                        type="button"
+                        class="ml-3 text-xs underline"
+                        style="color: var(--danger)"
+                        (click)="$event.stopPropagation(); removeEntry(entry.id)"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 }
@@ -154,6 +164,7 @@ interface ViewTab {
                     [showDate]="false"
                     dateField="created_at"
                     (toggle)="toggleExpand($event)"
+                    (remove)="removeEntry($event)"
                   />
                 }
               </div>
@@ -176,6 +187,7 @@ export class QAListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirm = inject(ConfirmService);
 
   readonly viewTabs: ViewTab[] = [
     { id: 'all', label: 'All Q&A' },
@@ -305,6 +317,23 @@ export class QAListComponent implements OnInit {
         error: () => this.loadingAnswerIds.delete(id),
       });
     }
+  }
+
+  async removeEntry(id: string): Promise<void> {
+    const entry = this.entries.find((item) => item.id === id);
+    const label = entry?.question ? `“${entry.question}”` : 'this Q&A';
+    const ok = await this.confirm.confirm(
+      `Delete ${label}? It will be hidden now and permanently removed after ${QA_PURGE_AFTER_DAYS} days.`,
+      'Delete Q&A',
+    );
+    if (!ok) return;
+    this.qaService.delete(id).subscribe({
+      next: () => {
+        this.expandedIds.delete(id);
+        this.answerCache.delete(id);
+        this.load();
+      },
+    });
   }
 
   private clampPage(total: number): void {

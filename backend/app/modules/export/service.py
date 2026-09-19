@@ -107,7 +107,9 @@ class ExportService:
                 for e in result.scalars().all()
             ]
         if module == "qa":
-            result = await self.db.execute(select(QAEntry).where(QAEntry.user_id == user_id))
+            result = await self.db.execute(
+                select(QAEntry).where(QAEntry.user_id == user_id, QAEntry.deleted_at.is_(None))
+            )
             return [
                 {
                     "id": e.id,

@@ -39,7 +39,7 @@ import {
         </ol>
       </details>
 
-      <details class="mt-3 text-xs" open>
+      <details class="mt-3 text-xs">
         <summary class="cursor-pointer font-medium">Credentials &amp; configuration</summary>
         <div class="mt-3 flex flex-col gap-2 max-w-xl">
           <div class="flex flex-col gap-1">

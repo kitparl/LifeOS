@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,7 @@ class QARepository:
         created_from: datetime | None = None,
         created_to: datetime | None = None,
     ):
-        q = q.where(QAEntry.user_id == user_id)
+        q = q.where(QAEntry.user_id == user_id, QAEntry.deleted_at.is_(None))
         if search:
             pattern = f"%{search}%"
             q = q.where(or_(QAEntry.question.ilike(pattern), QAEntry.current_answer.ilike(pattern)))
@@ -102,7 +102,11 @@ class QARepository:
     async def get_by_id(self, user_id: str, entry_id: str) -> QAEntry | None:
         result = await self.db.execute(
             select(QAEntry)
-            .where(QAEntry.id == entry_id, QAEntry.user_id == user_id)
+            .where(
+                QAEntry.id == entry_id,
+                QAEntry.user_id == user_id,
+                QAEntry.deleted_at.is_(None),
+            )
             .options(selectinload(QAEntry.versions))
         )
         return result.scalar_one_or_none()
@@ -151,9 +155,24 @@ class QARepository:
         await self.db.refresh(entry, ["versions"])
         return entry
 
-    async def delete(self, entry: QAEntry) -> None:
-        await self.db.delete(entry)
+    async def soft_delete(self, entry: QAEntry) -> None:
+        entry.deleted_at = datetime.now(timezone.utc)
         await self.db.flush()
+
+    async def purge_expired(self, days: int) -> int:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        result = await self.db.execute(
+            select(QAEntry).where(
+                QAEntry.deleted_at.is_not(None),
+                QAEntry.deleted_at < cutoff,
+            )
+        )
+        rows = list(result.scalars().all())
+        for row in rows:
+            await self.db.delete(row)
+        if rows:
+            await self.db.flush()
+        return len(rows)
 
     async def list_versions(self, user_id: str, entry_id: str) -> list[QAVersion]:
         entry = await self.get_by_id(user_id, entry_id)

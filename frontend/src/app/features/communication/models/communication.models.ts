@@ -1,11 +1,10 @@
-export type WritingCategory = 'linkedin' | 'blog' | 'essay' | 'notes' | 'hr_answer' | 'technical_answer';
 export type SpeakingCategory = 'hr' | 'technical' | 'elevator' | 'mock_interview';
 
 export interface WritingPractice {
   id: string;
   title: string;
   content: string;
-  category: WritingCategory;
+  category: string;
   created_at: string;
   updated_at: string;
 }
@@ -21,14 +20,18 @@ export interface SpeakingPractice {
   updated_at: string;
 }
 
-export const WRITING_CATEGORIES: { value: WritingCategory; label: string }[] = [
-  { value: 'linkedin', label: 'LinkedIn' },
-  { value: 'blog', label: 'Blog' },
-  { value: 'essay', label: 'Essay' },
-  { value: 'notes', label: 'Notes' },
-  { value: 'hr_answer', label: 'HR Answer' },
-  { value: 'technical_answer', label: 'Technical Answer' },
+export const WRITING_CATEGORIES: string[] = [
+  'LinkedIn',
+  'Blog',
+  'Essay',
+  'Notes',
+  'HR Answer',
+  'Technical Answer',
 ];
+
+export function writingCategoryLabel(value: string): string {
+  return (value || '').replace(/_/g, ' ');
+}
 
 export const SPEAKING_CATEGORIES: { value: SpeakingCategory; label: string }[] = [
   { value: 'hr', label: 'HR' },

@@ -40,6 +40,7 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     # Q&A: extensible type/category
     ("qa_entries", "type", "VARCHAR(64)"),
     ("qa_entries", "is_deep_personal", "BOOLEAN DEFAULT FALSE"),
+    ("qa_entries", "deleted_at", "TIMESTAMP"),
     # Integrations: digest bookkeeping for Telegram (and future schedulers)
     ("integration_connections", "last_digest_at", "TIMESTAMP"),
     # Integrations: per-connection Telegram webhook path secret

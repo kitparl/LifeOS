@@ -124,3 +124,54 @@ async def test_qa_create_update_is_deep_personal(client):
 
     listed = await client.get("/api/v1/qa/entries?deep_personal=true", headers=headers)
     assert len(listed.json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_qa_soft_delete_hides_entry_then_purges_after_month(client):
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import select
+
+    from app.modules.qa.models import QAEntry
+
+    token = await _auth_token(client, "qadel@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    created = await _create_entry(client, headers, question="Should I delete this?")
+    entry_id = created.json()["id"]
+
+    deleted = await client.delete(f"/api/v1/qa/entries/{entry_id}", headers=headers)
+    assert deleted.status_code == 204
+
+    listed = await client.get("/api/v1/qa/entries", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json() == []
+    assert listed.headers.get("X-Total-Count") == "0"
+
+    missing = await client.get(f"/api/v1/qa/entries/{entry_id}", headers=headers)
+    assert missing.status_code == 404
+
+    async with client.session_factory() as db:
+        rec = (await db.execute(select(QAEntry).where(QAEntry.id == entry_id))).scalar_one()
+        assert rec.deleted_at is not None
+        rec.deleted_at = datetime.now(timezone.utc) - timedelta(days=31)
+        await db.commit()
+
+    listed_again = await client.get("/api/v1/qa/entries", headers=headers)
+    assert listed_again.status_code == 200
+    assert listed_again.json() == []
+
+    async with client.session_factory() as db:
+        rec = (await db.execute(select(QAEntry).where(QAEntry.id == entry_id))).scalar_one_or_none()
+        assert rec is None
+
+
+@pytest.mark.asyncio
+async def test_qa_purge_job_registered():
+    from app.modules.integrations.scheduling import scheduler as sched_mod
+
+    sched_mod.start_scheduler()
+    try:
+        assert sched_mod.get_scheduler().get_job("qa_purge") is not None
+    finally:
+        await sched_mod.shutdown_scheduler()
