@@ -34,7 +34,7 @@ import { DevFavoritesService } from './shared/dev-favorites.service';
       @if (!query() && favoriteTools().length) {
         <section>
           <h2 class="mb-2 flex items-center gap-2 text-sm font-semibold">
-            <svg class="h-4 w-4" lucideIcon="star" fill="currentColor" aria-hidden="true"></svg>
+            <svg class="star-favorite h-4 w-4" lucideIcon="star" fill="currentColor" aria-hidden="true"></svg>
             Favorites
           </h2>
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -78,11 +78,18 @@ import { DevFavoritesService } from './shared/dev-favorites.service';
             type="button"
             class="btn-ghost shrink-0"
             style="padding: 0.2rem"
+            [class.star-favorite]="isFavorite(tool.id)"
             [attr.aria-pressed]="isFavorite(tool.id)"
             [attr.aria-label]="isFavorite(tool.id) ? 'Unfavorite' : 'Favorite'"
             (click)="toggleFavorite(tool.id)"
           >
-            <svg class="h-4 w-4" lucideIcon="star" [attr.fill]="isFavorite(tool.id) ? 'currentColor' : 'none'" aria-hidden="true"></svg>
+            <svg
+              class="h-4 w-4"
+              [class.star-favorite]="isFavorite(tool.id)"
+              lucideIcon="star"
+              [color]="isFavorite(tool.id) ? 'var(--favorite)' : 'currentColor'"
+              aria-hidden="true"
+            ></svg>
           </button>
         </div>
         <p class="flex-1 text-xs text-[var(--text-muted)]">{{ tool.description }}</p>

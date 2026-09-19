@@ -26,10 +26,17 @@ import { DevFavoritesService } from './dev-favorites.service';
           <button
             type="button"
             class="btn-ghost shrink-0"
+            [class.star-favorite]="favorites.isFavorite(toolId)"
             [attr.aria-pressed]="favorites.isFavorite(toolId)"
             (click)="favorites.toggle(toolId)"
           >
-            <svg class="h-4 w-4" lucideIcon="star" [attr.fill]="favorites.isFavorite(toolId) ? 'currentColor' : 'none'" aria-hidden="true"></svg>
+            <svg
+              class="h-4 w-4"
+              [class.star-favorite]="favorites.isFavorite(toolId)"
+              lucideIcon="star"
+              [color]="favorites.isFavorite(toolId) ? 'var(--favorite)' : 'currentColor'"
+              aria-hidden="true"
+            ></svg>
             {{ favorites.isFavorite(toolId) ? 'Favorited' : 'Favorite' }}
           </button>
         }

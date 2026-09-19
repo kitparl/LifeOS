@@ -42,6 +42,7 @@
   --success-soft:  #EAFBF1;
   --warning:       #E67E22;
   --warning-soft:  #FEF5EC;
+  --favorite:      #C9A227;
   --info:          #2980B9;
   --info-soft:     #EBF5FB;
 
@@ -119,6 +120,7 @@
     --success-soft:  #142A1E;
     --warning:       #F0A030;
     --warning-soft:  #2E1E08;
+    --favorite:      #E8C547;
     --info:          #4AA8E0;
     --info-soft:     #0E2030;
 
@@ -174,6 +176,7 @@ html.dark {
   --success-soft:  #142A1E;
   --warning:       #F0A030;
   --warning-soft:  #2E1E08;
+  --favorite:      #E8C547;
   --info:          #4AA8E0;
   --info-soft:     #0E2030;
   --note-yellow:   #3A311A;
@@ -253,6 +256,22 @@ kbd {
   border-radius: var(--radius-lg);
   box-shadow: none;
   padding: 1rem;
+}
+
+.star-favorite {
+  color: var(--favorite);
+  fill: var(--favorite);
+  stroke: var(--favorite);
+}
+
+.star-favorite :is(path, polygon) {
+  fill: var(--favorite);
+  stroke: var(--favorite);
+}
+
+.btn-ghost.star-favorite,
+.btn-ghost.star-favorite:hover:not(:disabled) {
+  color: var(--favorite);
 }
 
 /* =========================================================
