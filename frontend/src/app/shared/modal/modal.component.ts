@@ -37,7 +37,9 @@ import {
         <div
           class="modal"
           [class.modal--maximized]="maximized()"
+          [class.modal--plain]="plain"
           [style.maxWidth]="maximized() ? '' : maxWidth"
+          [style.background]="background"
           role="dialog"
           aria-modal="true"
           [attr.aria-label]="title || 'Dialog'"
@@ -88,6 +90,10 @@ export class ModalComponent implements OnChanges, OnDestroy {
   @Input() maximizable = false;
   /** Set false to hide the footer region entirely. */
   @Input() hasFooter = true;
+  /** Overrides the modal's background (e.g. to tint it with a note/item color). Null keeps the default surface color. */
+  @Input() background: string | null = null;
+  /** Removes the header/footer divider borders, for a seamless single-surface look (e.g. a Google Keep–style card). */
+  @Input() plain = false;
 
   @Output() closed = new EventEmitter<void>();
 

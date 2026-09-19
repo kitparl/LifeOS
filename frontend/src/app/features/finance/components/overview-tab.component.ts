@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { LucideDynamicIcon, LucideEye, LucideEyeOff, provideLucideIcons } from '@lucide/angular';
 import { CurrencyPreferencesService } from '../../../core/services/currency-preferences.service';
 import { BarChartComponent } from '../../../shared/charts/bar-chart.component';
 import { ChartPoint } from '../../../shared/charts/chart-types';
@@ -22,18 +23,47 @@ import {
 @Component({
   selector: 'app-finance-overview-tab',
   standalone: true,
-  imports: [DatePipe, BarChartComponent],
+  imports: [DatePipe, BarChartComponent, LucideDynamicIcon],
+  providers: [provideLucideIcons(LucideEye, LucideEyeOff)],
   template: `
     <div class="space-y-4">
       @if (overview) {
         <div class="grid gap-3 sm:grid-cols-2">
           <div class="panel text-sm">
-            <p style="color: var(--text-muted)">Income</p>
-            <p class="text-lg font-semibold">{{ money(overview.total_income) }}</p>
+            <div class="flex items-start justify-between gap-2">
+              <p style="color: var(--text-muted)">Income</p>
+              <button
+                type="button"
+                class="btn-ghost !min-h-auto !px-1 !py-0.5"
+                data-testid="finance-toggle-income"
+                [attr.title]="headlineVisible() ? 'Hide amounts' : 'Show amounts'"
+                [attr.aria-label]="headlineVisible() ? 'Hide income and total expenses' : 'Show income and total expenses'"
+                (click)="toggleHeadline()"
+              >
+                <svg class="h-4 w-4 pointer-events-none" [lucideIcon]="headlineVisible() ? 'eye-off' : 'eye'" aria-hidden="true"></svg>
+              </button>
+            </div>
+            <p class="text-lg font-semibold tabular-nums tracking-wide">
+              {{ headlineVisible() ? money(overview.total_income) : '••••••' }}
+            </p>
           </div>
           <div class="panel text-sm">
-            <p style="color: var(--text-muted)">Total Expenses</p>
-            <p class="text-lg font-semibold">{{ money(overview.total_expenses) }}</p>
+            <div class="flex items-start justify-between gap-2">
+              <p style="color: var(--text-muted)">Total Expenses</p>
+              <button
+                type="button"
+                class="btn-ghost !min-h-auto !px-1 !py-0.5"
+                data-testid="finance-toggle-expenses"
+                [attr.title]="headlineVisible() ? 'Hide amounts' : 'Show amounts'"
+                [attr.aria-label]="headlineVisible() ? 'Hide income and total expenses' : 'Show income and total expenses'"
+                (click)="toggleHeadline()"
+              >
+                <svg class="h-4 w-4 pointer-events-none" [lucideIcon]="headlineVisible() ? 'eye-off' : 'eye'" aria-hidden="true"></svg>
+              </button>
+            </div>
+            <p class="text-lg font-semibold tabular-nums tracking-wide">
+              {{ headlineVisible() ? money(overview.total_expenses) : '••••••' }}
+            </p>
           </div>
         </div>
 
@@ -179,6 +209,12 @@ export class OverviewTabComponent {
   @Input() loanSummary: LoanSummary | null = null;
 
   @Output() readonly openLoans = new EventEmitter<void>();
+
+  readonly headlineVisible = signal(false);
+
+  toggleHeadline(): void {
+    this.headlineVisible.update((visible) => !visible);
+  }
 
   get chartPoints(): ChartPoint[] {
     return (this.breakdown?.categories ?? []).map((row) => ({

@@ -320,6 +320,11 @@ export const routes: Routes = [
           import('./features/wishlist/wishlist-detail.component').then((m) => m.WishlistDetailComponent),
       },
       {
+        path: 'notes',
+        loadComponent: () =>
+          import('./features/sticky-notes/sticky-notes-page.component').then((m) => m.StickyNotesPageComponent),
+      },
+      {
         path: 'search',
         loadComponent: () =>
           import('./features/search/search-page.component').then((m) => m.SearchPageComponent),

@@ -9,6 +9,7 @@ Two rules shape this module:
    is idempotent, and edits to definitions affect only what has not happened yet.
 """
 
+import calendar
 from datetime import date
 
 from app.core.exceptions import BadRequestError, get_or_404
@@ -66,17 +67,12 @@ from app.modules.finance.schemas import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-_MONTH_LABELS = (
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-)
-
 
 def _period_label(start: date, end: date) -> str:
     """Human label for a range: 'September 2026', '2026', or an explicit span."""
     if start.year == end.year:
         if start.month == end.month:
-            return f"{_MONTH_LABELS[start.month - 1]} {start.year}"
+            return f"{calendar.month_name[start.month]} {start.year}"
         if (start.month, start.day) == (1, 1) and (end.month, end.day) == (12, 31):
             return str(start.year)
     return f"{start.isoformat()} — {end.isoformat()}"

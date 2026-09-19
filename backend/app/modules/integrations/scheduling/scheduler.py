@@ -151,6 +151,20 @@ async def _run_qa_purge() -> None:
             logger.exception("Q&A purge job failed")
 
 
+async def _run_sticky_notes_purge() -> None:
+    from app.modules.sticky_notes.service import StickyNoteService
+
+    async with async_session_factory() as session:
+        try:
+            n = await StickyNoteService(session).purge_expired()
+            await session.commit()
+            if n:
+                logger.info("Purged %s expired sticky notes", n)
+        except Exception:
+            await session.rollback()
+            logger.exception("Sticky notes purge job failed")
+
+
 async def _run_routines_expire() -> None:
     from datetime import date
 
@@ -324,9 +338,20 @@ def start_scheduler() -> AsyncIOScheduler:
         max_instances=1,
         misfire_grace_time=3600,
     )
+    _scheduler.add_job(
+        _run_sticky_notes_purge,
+        trigger=CronTrigger(hour=0, minute=6, timezone=_safe_zone("Asia/Kolkata")),
+        id="sticky_notes_purge",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=3600,
+    )
     _scheduler.start()
     _install_after_commit_hook()
-    logger.info("APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST, qa purge 00:05 IST)")
+    logger.info(
+        "APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST, "
+        "qa purge 00:05 IST, sticky notes purge 00:06 IST)"
+    )
     return _scheduler
 
 

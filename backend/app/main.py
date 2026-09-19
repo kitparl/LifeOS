@@ -40,6 +40,7 @@ from app.modules.reports.api import router as reports_router
 from app.modules.routines.api import router as routines_router
 from app.modules.running.api import router as running_router
 from app.modules.search.api import router as search_router
+from app.modules.sticky_notes.api import router as sticky_notes_router
 from app.modules.tasks.api import router as tasks_router
 from app.modules.timeline.api import router as timeline_router
 from app.modules.users.api import router as users_router
@@ -142,6 +143,7 @@ app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(automations_router, prefix="/api/v1")
 app.include_router(predictions_router, prefix="/api/v1")
 app.include_router(life_timeline_router, prefix="/api/v1")
+app.include_router(sticky_notes_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health():

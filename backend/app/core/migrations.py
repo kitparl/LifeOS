@@ -101,6 +101,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     # Finance: loan foreclosure tracking (user-entered amount, never calculated)
     ("finance_loans", "foreclosure_amount", "FLOAT"),
     ("finance_loans", "foreclosure_notes", "TEXT"),
+    # Sticky notes: soft-delete (60-day retention before purge)
+    ("sticky_notes", "deleted_at", "TIMESTAMP"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [

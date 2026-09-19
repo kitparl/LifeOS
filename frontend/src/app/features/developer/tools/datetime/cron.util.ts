@@ -1,4 +1,6 @@
-const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+import { MONTH_NAMES } from '../../../../core/constants/months';
+
+const MONTH_NAMES_BY_NUMBER = ['', ...MONTH_NAMES];
 const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function validateField(field: string, label: string): void {
@@ -52,7 +54,7 @@ export function explainCron(expr: string): string {
 
   const parts = [timePhrase];
   if (dom !== '*') parts.push(`on day-of-month ${describeField(dom, 'day')}`);
-  if (mon !== '*') parts.push(`in ${describeField(mon, 'month', MONTH_NAMES)}`);
+  if (mon !== '*') parts.push(`in ${describeField(mon, 'month', MONTH_NAMES_BY_NUMBER)}`);
   if (dow !== '*') parts.push(`on ${describeField(dow, 'day', DOW_NAMES)}`);
 
   const sentence = parts.join(', ');

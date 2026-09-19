@@ -1,11 +1,18 @@
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { PeriodPreset, PeriodSelection } from '../models/finance.models';
-import { PERIOD_OPTIONS, startOfMonthIso, todayIso } from '../utils/period';
+import { MONTH_OPTIONS } from '../../../core/constants/months';
+import { PeriodSelection } from '../models/finance.models';
+import {
+  ALL_MONTHS,
+  currentMonth,
+  currentYear,
+  periodFromYearMonth,
+  yearOptions,
+} from '../utils/period';
 
 /**
- * Period selector for the whole Finance module. Defaults to This Month and
- * never moves off it on its own, even when the month has no activity.
+ * Year + month selector for the whole Finance module. Defaults to the current
+ * calendar month. "All months" covers the selected year.
  */
 @Component({
   selector: 'app-finance-period-filter',
@@ -13,37 +20,36 @@ import { PERIOD_OPTIONS, startOfMonthIso, todayIso } from '../utils/period';
   imports: [FormsModule],
   template: `
     <div class="flex flex-wrap items-center gap-2 text-xs" style="color: var(--text-muted)">
-      <label class="flex items-center gap-1.5" for="finance-period-select">
-        <span>Period:</span>
+      <label class="flex items-center gap-1.5" for="finance-year-select">
+        <span>Year:</span>
         <select
-          id="finance-period-select"
+          id="finance-year-select"
           class="input-field !w-auto !py-1 text-xs"
-          [ngModel]="period.preset"
-          (ngModelChange)="choose($event)"
+          data-testid="finance-year-filter"
+          [ngModel]="year()"
+          (ngModelChange)="setYear($event)"
         >
-          @for (option of periodOptions; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
+          @for (option of years; track option) {
+            <option [ngValue]="option">{{ option }}</option>
           }
         </select>
       </label>
 
-      @if (period.preset === 'custom') {
-        <div class="flex flex-wrap items-center gap-2">
-          <input
-            class="input-field !w-auto text-xs"
-            type="date"
-            [ngModel]="customStart()"
-            (ngModelChange)="setStart($event)"
-          />
-          <span>to</span>
-          <input
-            class="input-field !w-auto text-xs"
-            type="date"
-            [ngModel]="customEnd()"
-            (ngModelChange)="setEnd($event)"
-          />
-        </div>
-      }
+      <label class="flex items-center gap-1.5" for="finance-month-select">
+        <span>Month:</span>
+        <select
+          id="finance-month-select"
+          class="input-field !w-auto !py-1 text-xs"
+          data-testid="finance-month-filter"
+          [ngModel]="month()"
+          (ngModelChange)="setMonth($event)"
+        >
+          <option [ngValue]="allMonths">All months</option>
+          @for (option of monthOptions; track option.value) {
+            <option [ngValue]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
     </div>
   `,
 })
@@ -51,33 +57,23 @@ export class PeriodFilterComponent {
   @Input({ required: true }) period!: PeriodSelection;
   @Output() readonly periodChange = new EventEmitter<PeriodSelection>();
 
-  readonly periodOptions = PERIOD_OPTIONS;
-  readonly customStart = signal(startOfMonthIso());
-  readonly customEnd = signal(todayIso());
+  readonly allMonths = ALL_MONTHS;
+  readonly monthOptions = MONTH_OPTIONS;
+  readonly years = yearOptions();
+  readonly year = signal(currentYear());
+  readonly month = signal(currentMonth());
 
-  choose(preset: PeriodPreset): void {
-    if (preset === 'custom') {
-      this.emitCustom();
-      return;
-    }
-    this.periodChange.emit({ preset });
+  setYear(year: number): void {
+    this.year.set(Number(year));
+    this.emit();
   }
 
-  setStart(value: string): void {
-    this.customStart.set(value);
-    this.emitCustom();
+  setMonth(month: number): void {
+    this.month.set(Number(month));
+    this.emit();
   }
 
-  setEnd(value: string): void {
-    this.customEnd.set(value);
-    this.emitCustom();
-  }
-
-  private emitCustom(): void {
-    this.periodChange.emit({
-      preset: 'custom',
-      start: this.customStart(),
-      end: this.customEnd(),
-    });
+  private emit(): void {
+    this.periodChange.emit(periodFromYearMonth(this.year(), this.month()));
   }
 }
