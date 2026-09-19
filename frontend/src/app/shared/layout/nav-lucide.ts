@@ -1,5 +1,6 @@
 import {
   LucideBell,
+  LucideBookmark,
   LucideBookOpen,
   LucideBrain,
   LucideBriefcaseBusiness,
@@ -52,6 +53,7 @@ export const NAV_LUCIDE_ICON_PROVIDERS = [
     LucideChartLine,
     LucideFileText,
     LucideBell,
+    LucideBookmark,
     LucideSparkles,
     LucideSettings,
     LucideSmile,

@@ -190,6 +190,15 @@ class VocabularyRepository:
         )
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
+    async def list_bookmarked_ids(self, user_id: str, vocabulary_ids: list[str]) -> set[str]:
+        if not vocabulary_ids:
+            return set()
+        stmt = select(VocabularyBookmark.vocabulary_id).where(
+            VocabularyBookmark.user_id == user_id,
+            VocabularyBookmark.vocabulary_id.in_(vocabulary_ids),
+        )
+        return set((await self.db.execute(stmt)).scalars().all())
+
     def new_bookmark(self, user_id: str, vocabulary_id: str) -> VocabularyBookmark:
         bookmark = VocabularyBookmark(user_id=user_id, vocabulary_id=vocabulary_id)
         self.db.add(bookmark)

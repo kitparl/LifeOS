@@ -18,6 +18,7 @@ export interface VocabularyCard {
 export interface VocabularySetItem {
   position: number;
   was_changed: boolean;
+  is_bookmarked: boolean;
   vocabulary: VocabularyCard;
 }
 

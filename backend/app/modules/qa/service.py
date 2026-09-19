@@ -23,6 +23,7 @@ class QAService:
             is_deep_personal=entry.is_deep_personal,
             created_at=entry.created_at,
             updated_at=entry.updated_at,
+            deleted_at=entry.deleted_at,
         )
 
     def _to_response(self, entry) -> QAResponse:
@@ -55,6 +56,7 @@ class QAService:
         limit: int | None = None,
         offset: int = 0,
         include_answer: bool = True,
+        deleted: bool = False,
     ) -> tuple[list[QAListItem], int]:
         await self.purge_expired()
         entries, total = await self.repo.list_entries(
@@ -68,6 +70,7 @@ class QAService:
             sort_by=sort_by,
             limit=limit,
             offset=offset,
+            deleted=deleted,
         )
         return [self._to_list_item(e, include_answer=include_answer) for e in entries], total
 
@@ -107,6 +110,16 @@ class QAService:
         await self.purge_expired()
         entry = get_or_404(await self.repo.get_by_id(user_id, entry_id), "Q&A entry not found")
         await self.repo.soft_delete(entry)
+
+    async def restore_entry(self, user_id: str, entry_id: str) -> QAResponse:
+        await self.purge_expired()
+        entry = get_or_404(
+            await self.repo.get_by_id(user_id, entry_id, include_deleted=True),
+            "Q&A entry not found",
+        )
+        if entry.deleted_at is not None:
+            await self.repo.restore(entry)
+        return self._to_response(entry)
 
     async def purge_expired(self, days: int | None = None) -> int:
         return await self.repo.purge_expired(days if days is not None else QA_PURGE_AFTER_DAYS)

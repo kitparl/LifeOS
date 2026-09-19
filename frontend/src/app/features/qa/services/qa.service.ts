@@ -30,6 +30,7 @@ export class QAService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     if (opts?.include_answer === false) params = params.set('include_answer', 'false');
+    if (opts?.deleted === true) params = params.set('deleted', 'true');
     return this.http.get<QAListItem[]>(this.api, { params, observe: 'response' }).pipe(
       map((response: HttpResponse<QAListItem[]>) => ({
         items: response.body ?? [],
@@ -52,6 +53,10 @@ export class QAService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/${id}`);
+  }
+
+  restore(id: string): Observable<QAEntry> {
+    return this.http.post<QAEntry>(`${this.api}/${id}/restore`, {});
   }
 
   listTypes(): Observable<string[]> {

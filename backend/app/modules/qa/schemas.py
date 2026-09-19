@@ -45,6 +45,7 @@ class QAListItem(BaseModel):
     is_deep_personal: bool = False
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class QAResponse(BaseModel):

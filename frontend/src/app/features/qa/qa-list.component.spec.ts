@@ -108,10 +108,60 @@ describe('QAListComponent', () => {
       },
     ];
     await fixture.componentInstance.removeEntry('e1');
-    expect(confirm.confirm).toHaveBeenCalled();
+    expect(confirm.confirm).toHaveBeenCalledWith(
+      jasmine.stringMatching(/Deleted tab/),
+      'Delete Q&A',
+    );
     const delReq = http.expectOne(`${environment.apiUrl}/qa/entries/e1`);
     expect(delReq.request.method).toBe('DELETE');
     delReq.flush(null);
+    http.expectOne((r) => r.url === `${environment.apiUrl}/qa/entries`).flush([], {
+      headers: { 'X-Total-Count': '0' },
+    });
+  });
+
+  it('should list deleted entries and restore them', () => {
+    fixture.detectChanges();
+    flushTypesAndList();
+    queryParams$.next(convertToParamMap({ view: 'deleted' }));
+    const listReq = http.expectOne((r) => r.url === `${environment.apiUrl}/qa/entries`);
+    expect(listReq.request.params.get('deleted')).toBe('true');
+    listReq.flush(
+      [
+        {
+          id: 'e1',
+          question: 'Should I save money?',
+          current_answer: 'Yes.',
+          type: 'Personal',
+          tags: [],
+          is_deep_personal: false,
+          created_at: '2026-08-17T00:00:00Z',
+          updated_at: '2026-08-18T00:00:00Z',
+          deleted_at: '2026-09-19T00:00:00Z',
+        },
+      ],
+      { headers: { 'X-Total-Count': '1' } },
+    );
+    expect(fixture.componentInstance.view).toBe('deleted');
+    expect(fixture.componentInstance.entries.length).toBe(1);
+
+    fixture.componentInstance.restoreEntry('e1');
+    const restoreReq = http.expectOne(`${environment.apiUrl}/qa/entries/e1/restore`);
+    expect(restoreReq.request.method).toBe('POST');
+    restoreReq.flush({
+      id: 'e1',
+      question: 'Should I save money?',
+      current_answer: 'Yes.',
+      type: 'Personal',
+      tags: [],
+      is_deep_personal: false,
+      linked_goal_id: null,
+      linked_journal_id: null,
+      ai_summary: null,
+      created_at: '2026-08-17T00:00:00Z',
+      updated_at: '2026-08-18T00:00:00Z',
+      versions: [],
+    });
     http.expectOne((r) => r.url === `${environment.apiUrl}/qa/entries`).flush([], {
       headers: { 'X-Total-Count': '0' },
     });

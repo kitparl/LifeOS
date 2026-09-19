@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { QAListItem } from './models/qa.models';
+import { QAListItem, qaDaysUntilPurge } from './models/qa.models';
 
 @Component({
   selector: 'app-qa-expandable-entry',
@@ -28,6 +28,9 @@ import { QAListItem } from './models/qa.models';
               @if (!showDayPrefix && showDate) {
                 <span>{{ dateValue | date: dateFormat }}</span>
               }
+              @if (deletedMode) {
+                <span>Deletes in {{ daysLeft }}d</span>
+              }
             </p>
           </div>
           <span class="shrink-0 text-xs" aria-hidden="true">{{ expanded ? '▲' : '▼' }}</span>
@@ -44,15 +47,21 @@ import { QAListItem } from './models/qa.models';
             Tags: {{ entry.tags.join(', ') || '—' }}
           </p>
           <div class="mt-2 flex items-center gap-3">
-            <a [routerLink]="['/qa', entry.id, 'edit']" class="text-xs underline">Edit</a>
-            <button
-              type="button"
-              class="text-xs underline"
-              style="color: var(--danger)"
-              (click)="onRemove($event)"
-            >
-              Delete
-            </button>
+            @if (deletedMode) {
+              <button type="button" class="text-xs underline" (click)="onRestore($event)">
+                Restore
+              </button>
+            } @else {
+              <a [routerLink]="['/qa', entry.id, 'edit']" class="text-xs underline">Edit</a>
+              <button
+                type="button"
+                class="text-xs underline"
+                style="color: var(--danger)"
+                (click)="onRemove($event)"
+              >
+                Delete
+              </button>
+            }
           </div>
         </div>
       }
@@ -68,17 +77,28 @@ export class QAExpandableEntryComponent {
   @Input() showDate = true;
   @Input() dateField: 'created_at' | 'updated_at' = 'updated_at';
   @Input() dateFormat = 'mediumDate';
+  @Input() deletedMode = false;
 
   @Output() toggle = new EventEmitter<string>();
   @Output() remove = new EventEmitter<string>();
+  @Output() restore = new EventEmitter<string>();
 
   get dateValue(): string {
     return this.dateField === 'created_at' ? this.entry.created_at : this.entry.updated_at;
   }
 
+  get daysLeft(): number {
+    return qaDaysUntilPurge(this.entry.deleted_at);
+  }
+
   onRemove(event: Event): void {
     event.stopPropagation();
     this.remove.emit(this.entry.id);
+  }
+
+  onRestore(event: Event): void {
+    event.stopPropagation();
+    this.restore.emit(this.entry.id);
   }
 }
 

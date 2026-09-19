@@ -32,6 +32,7 @@ async def list_qa_entries(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     include_answer: bool = Query(default=True),
+    deleted: bool = Query(default=False),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -47,6 +48,7 @@ async def list_qa_entries(
         limit=limit,
         offset=offset,
         include_answer=include_answer,
+        deleted=deleted,
     )
     response.headers["X-Total-Count"] = str(total)
     return items
@@ -105,6 +107,15 @@ async def delete_qa_entry(
     db: AsyncSession = Depends(get_db),
 ):
     await QAService(db).delete_entry(user.id, entry_id)
+
+
+@router.post("/entries/{entry_id}/restore", response_model=QAResponse)
+async def restore_qa_entry(
+    entry_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await QAService(db).restore_entry(user.id, entry_id)
 
 
 @router.get("/entries/{entry_id}/versions", response_model=list[QAVersionResponse])

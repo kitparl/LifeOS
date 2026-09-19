@@ -167,6 +167,40 @@ async def test_qa_soft_delete_hides_entry_then_purges_after_month(client):
 
 
 @pytest.mark.asyncio
+async def test_qa_restore_soft_deleted_entry(client):
+    token = await _auth_token(client, "qarest@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    created = await _create_entry(client, headers, question="Should I save money?", answer="Yes, start small.")
+    entry_id = created.json()["id"]
+
+    deleted = await client.delete(f"/api/v1/qa/entries/{entry_id}", headers=headers)
+    assert deleted.status_code == 204
+
+    hidden = await client.get("/api/v1/qa/entries", headers=headers)
+    assert hidden.json() == []
+
+    shown = await client.get("/api/v1/qa/entries?deleted=true", headers=headers)
+    assert shown.status_code == 200
+    assert len(shown.json()) == 1
+    assert shown.json()[0]["question"] == "Should I save money?"
+    assert shown.json()[0]["deleted_at"] is not None
+    assert shown.json()[0]["current_answer"] == "Yes, start small."
+
+    restored = await client.post(f"/api/v1/qa/entries/{entry_id}/restore", headers=headers)
+    assert restored.status_code == 200
+    assert restored.json()["question"] == "Should I save money?"
+
+    listed = await client.get("/api/v1/qa/entries", headers=headers)
+    assert len(listed.json()) == 1
+    assert listed.json()[0]["id"] == entry_id
+    assert listed.json()[0]["deleted_at"] is None
+
+    gone = await client.get("/api/v1/qa/entries?deleted=true", headers=headers)
+    assert gone.json() == []
+
+
+@pytest.mark.asyncio
 async def test_qa_purge_job_registered():
     from app.modules.integrations.scheduling import scheduler as sched_mod
 

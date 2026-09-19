@@ -14,6 +14,7 @@ export interface QAListItem {
   is_deep_personal: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface QAEntry {
@@ -37,7 +38,7 @@ export interface QAListResult {
 }
 
 export const QA_PURGE_AFTER_DAYS = 30;
-export type QAViewMode = 'all' | 'month' | 'deep';
+export type QAViewMode = 'all' | 'month' | 'deep' | 'deleted';
 export type QASortBy = 'created_at' | 'updated_at';
 
 export interface QAListOptions {
@@ -45,8 +46,15 @@ export interface QAListOptions {
   type?: string;
   tag?: string;
   deep_personal?: boolean;
+  deleted?: boolean;
   sort_by?: QASortBy;
   limit?: number;
   offset?: number;
   include_answer?: boolean;
+}
+
+export function qaDaysUntilPurge(deletedAt: string | null | undefined): number {
+  if (!deletedAt) return QA_PURGE_AFTER_DAYS;
+  const expires = new Date(deletedAt).getTime() + QA_PURGE_AFTER_DAYS * 24 * 60 * 60 * 1000;
+  return Math.max(0, Math.ceil((expires - Date.now()) / (24 * 60 * 60 * 1000)));
 }

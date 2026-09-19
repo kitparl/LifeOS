@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { PersonalExample, VocabularyDetailResponse } from './models/vocabulary.models';
 import { VocabularyService } from './services/vocabulary.service';
 
@@ -8,7 +9,7 @@ import { VocabularyService } from './services/vocabulary.service';
 @Component({
   selector: 'app-vocabulary-detail',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, LucideDynamicIcon],
   template: `
     <div class="space-y-3">
       <a class="text-xs underline" [routerLink]="['/communication']">← Back to Communication</a>
@@ -19,10 +20,19 @@ import { VocabularyService } from './services/vocabulary.service';
 
       @if (data(); as d) {
         <div class="panel space-y-2 text-sm">
-          <div class="flex items-center justify-between">
+          <div class="flex items-start justify-between gap-2">
             <h2 class="text-lg font-semibold">{{ d.vocabulary.term }}</h2>
-            <button type="button" class="btn-secondary !min-h-8 text-xs" [disabled]="busy()" (click)="toggleBookmark()">
-              {{ d.is_bookmarked ? '♥ Bookmarked' : '♡ Bookmark' }}
+            <button
+              type="button"
+              class="vocab-bookmark"
+              [class.vocab-bookmark--active]="d.is_bookmarked"
+              [disabled]="busy()"
+              [attr.aria-pressed]="d.is_bookmarked"
+              [attr.aria-label]="d.is_bookmarked ? 'Remove bookmark' : 'Bookmark'"
+              [title]="d.is_bookmarked ? 'Remove bookmark' : 'Bookmark'"
+              (click)="toggleBookmark()"
+            >
+              <svg class="vocab-bookmark__icon" lucideIcon="bookmark" aria-hidden="true"></svg>
             </button>
           </div>
           <p style="color: var(--text-muted)">
@@ -95,6 +105,41 @@ import { VocabularyService } from './services/vocabulary.service';
         </div>
       }
     </div>
+  `,
+  styles: `
+    .vocab-bookmark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      margin: -0.25rem -0.25rem 0 0;
+      padding: 0;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .vocab-bookmark:hover:not(:disabled) {
+      background: var(--surface-3);
+      color: var(--text);
+    }
+    .vocab-bookmark--active {
+      color: var(--primary);
+    }
+    .vocab-bookmark--active .vocab-bookmark__icon {
+      fill: currentColor;
+    }
+    .vocab-bookmark:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+    .vocab-bookmark__icon {
+      width: 1rem;
+      height: 1rem;
+      stroke: currentColor;
+    }
   `,
 })
 export class VocabularyDetailComponent implements OnInit {

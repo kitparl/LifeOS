@@ -63,6 +63,10 @@ async def test_bookmark_unbookmark_does_not_change_sequence(client):
     assert add.status_code == 200, add.text
     assert add.json()["vocabulary"]["id"] == "v000001"
 
+    today_bookmarked = await client.get("/api/v1/communication/vocabulary/today", headers=h)
+    flags = {it["vocabulary"]["id"]: it["is_bookmarked"] for it in today_bookmarked.json()["current_set"]["items"]}
+    assert flags.get("v000001") is True
+
     listed = await client.get("/api/v1/communication/vocabulary/bookmarks", headers=h)
     assert listed.status_code == 200
     assert listed.json()["total"] == 1

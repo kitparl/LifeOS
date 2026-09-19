@@ -22,8 +22,13 @@ class QARepository:
         deep_personal: bool | None = None,
         created_from: datetime | None = None,
         created_to: datetime | None = None,
+        deleted: bool = False,
     ):
-        q = q.where(QAEntry.user_id == user_id, QAEntry.deleted_at.is_(None))
+        q = q.where(QAEntry.user_id == user_id)
+        if deleted:
+            q = q.where(QAEntry.deleted_at.is_not(None))
+        else:
+            q = q.where(QAEntry.deleted_at.is_(None))
         if search:
             pattern = f"%{search}%"
             q = q.where(or_(QAEntry.question.ilike(pattern), QAEntry.current_answer.ilike(pattern)))
@@ -54,6 +59,7 @@ class QARepository:
         sort_by: str = "updated_at",
         limit: int | None = None,
         offset: int = 0,
+        deleted: bool = False,
     ) -> tuple[list[QAEntry], int]:
         q = select(QAEntry)
         q = self._apply_filters(
@@ -65,12 +71,18 @@ class QARepository:
             deep_personal=deep_personal,
             created_from=created_from,
             created_to=created_to,
+            deleted=deleted,
         )
 
         count_q = select(func.count()).select_from(q.order_by(None).subquery())
         total = (await self.db.execute(count_q)).scalar_one()
 
-        order_col = QAEntry.created_at if sort_by == "created_at" else QAEntry.updated_at
+        if deleted:
+            order_col = QAEntry.deleted_at
+        elif sort_by == "created_at":
+            order_col = QAEntry.created_at
+        else:
+            order_col = QAEntry.updated_at
         q = q.order_by(order_col.desc())
         if offset:
             q = q.offset(offset)
@@ -99,16 +111,11 @@ class QARepository:
         self.db.add(QAType(user_id=user_id, name=clean))
         await self.db.flush()
 
-    async def get_by_id(self, user_id: str, entry_id: str) -> QAEntry | None:
-        result = await self.db.execute(
-            select(QAEntry)
-            .where(
-                QAEntry.id == entry_id,
-                QAEntry.user_id == user_id,
-                QAEntry.deleted_at.is_(None),
-            )
-            .options(selectinload(QAEntry.versions))
-        )
+    async def get_by_id(self, user_id: str, entry_id: str, *, include_deleted: bool = False) -> QAEntry | None:
+        q = select(QAEntry).where(QAEntry.id == entry_id, QAEntry.user_id == user_id)
+        if not include_deleted:
+            q = q.where(QAEntry.deleted_at.is_(None))
+        result = await self.db.execute(q.options(selectinload(QAEntry.versions)))
         return result.scalar_one_or_none()
 
     async def create(self, user_id: str, data: QACreate) -> QAEntry:
@@ -157,6 +164,10 @@ class QARepository:
 
     async def soft_delete(self, entry: QAEntry) -> None:
         entry.deleted_at = datetime.now(timezone.utc)
+        await self.db.flush()
+
+    async def restore(self, entry: QAEntry) -> None:
+        entry.deleted_at = None
         await self.db.flush()
 
     async def purge_expired(self, days: int) -> int:

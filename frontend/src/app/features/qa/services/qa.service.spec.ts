@@ -55,4 +55,34 @@ describe('QAService', () => {
     expect(req.request.params.get('sort_by')).toBe('created_at');
     req.flush([], { headers: { 'X-Total-Count': '0' } });
   });
+
+  it('should pass deleted filter', () => {
+    service.list({ deleted: true, include_answer: true }).subscribe();
+    const req = http.expectOne((r) => r.url === `${environment.apiUrl}/qa/entries`);
+    expect(req.request.params.get('deleted')).toBe('true');
+    expect(req.request.params.get('include_answer')).toBeNull();
+    req.flush([], { headers: { 'X-Total-Count': '0' } });
+  });
+
+  it('should restore an entry', () => {
+    service.restore('e1').subscribe((entry) => {
+      expect(entry.id).toBe('e1');
+    });
+    const req = http.expectOne(`${environment.apiUrl}/qa/entries/e1/restore`);
+    expect(req.request.method).toBe('POST');
+    req.flush({
+      id: 'e1',
+      question: 'Should I save money?',
+      current_answer: 'Yes.',
+      type: null,
+      tags: [],
+      is_deep_personal: false,
+      linked_goal_id: null,
+      linked_journal_id: null,
+      ai_summary: null,
+      created_at: '2026-08-01T00:00:00Z',
+      updated_at: '2026-08-02T00:00:00Z',
+      versions: [],
+    });
+  });
 });

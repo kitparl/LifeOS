@@ -148,6 +148,27 @@ interface ViewTab {
           [currentPage]="currentPage"
           (pageChange)="setPage($event)"
         />
+      } @else if (view === 'deleted') {
+        <div class="space-y-2">
+          @for (entry of entries; track entry.id) {
+            <app-qa-expandable-entry
+              [entry]="entry"
+              [expanded]="isExpanded(entry.id)"
+              [answer]="getAnswer(entry)"
+              [loadingAnswer]="isLoadingAnswer(entry.id)"
+              dateField="updated_at"
+              [deletedMode]="true"
+              (toggle)="toggleExpand($event)"
+              (restore)="restoreEntry($event)"
+            />
+          }
+        </div>
+        <app-list-paginator
+          [total]="total"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="setPage($event)"
+        />
       } @else {
         <div class="space-y-4">
           @for (group of monthGroups; track group.key) {
@@ -193,6 +214,7 @@ export class QAListComponent implements OnInit {
     { id: 'all', label: 'All Q&A' },
     { id: 'month', label: 'By Month' },
     { id: 'deep', label: 'Deep Personal' },
+    { id: 'deleted', label: 'Deleted' },
   ];
 
   view: QAViewMode = 'all';
@@ -214,7 +236,7 @@ export class QAListComponent implements OnInit {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const paramView = params.get('view');
       const nextView: QAViewMode =
-        paramView === 'month' || paramView === 'deep' ? paramView : 'all';
+        paramView === 'month' || paramView === 'deep' || paramView === 'deleted' ? paramView : 'all';
       const viewChanged = nextView !== this.view;
       this.view = nextView;
       if (viewChanged) {
@@ -233,6 +255,9 @@ export class QAListComponent implements OnInit {
     if (this.view === 'month') return 'No Q&A for this period.';
     if (this.view === 'deep') {
       return 'No deep personal questions yet. Mark a Q&A as Deep Personal when you want to track your more personal thinking.';
+    }
+    if (this.view === 'deleted') {
+      return `No deleted Q&A. Hidden items stay here for ${QA_PURGE_AFTER_DAYS} days, then they are permanently removed.`;
     }
     return 'No Q&A yet. Start capturing questions that come to mind.';
   }
@@ -268,10 +293,11 @@ export class QAListComponent implements OnInit {
         type: type || undefined,
         tag: tag || undefined,
         deep_personal: this.view === 'deep' ? true : undefined,
-        sort_by: this.view === 'all' ? 'updated_at' : 'created_at',
+        deleted: this.view === 'deleted' ? true : undefined,
+        sort_by: this.view === 'all' || this.view === 'deleted' ? 'updated_at' : 'created_at',
         limit: this.pageSize,
         offset,
-        include_answer: false,
+        include_answer: this.view === 'deleted',
       })
       .subscribe({
         next: (result) => {
@@ -303,9 +329,10 @@ export class QAListComponent implements OnInit {
     }
     this.expandedIds.add(id);
     if (!this.answerCache.has(id)) {
-      const cached = this.entries.find((e) => e.id === id)?.current_answer;
-      if (cached) {
-        this.answerCache.set(id, cached);
+      const entry = this.entries.find((e) => e.id === id);
+      const cached = entry?.current_answer;
+      if (cached || this.view === 'deleted' || entry?.deleted_at) {
+        if (cached) this.answerCache.set(id, cached);
         return;
       }
       this.loadingAnswerIds.add(id);
@@ -323,11 +350,21 @@ export class QAListComponent implements OnInit {
     const entry = this.entries.find((item) => item.id === id);
     const label = entry?.question ? `“${entry.question}”` : 'this Q&A';
     const ok = await this.confirm.confirm(
-      `Delete ${label}? It will be hidden now and permanently removed after ${QA_PURGE_AFTER_DAYS} days.`,
+      `Delete ${label}? It will be hidden now and moved to the Deleted tab. You can restore it for ${QA_PURGE_AFTER_DAYS} days, then it is permanently removed.`,
       'Delete Q&A',
     );
     if (!ok) return;
     this.qaService.delete(id).subscribe({
+      next: () => {
+        this.expandedIds.delete(id);
+        this.answerCache.delete(id);
+        this.load();
+      },
+    });
+  }
+
+  restoreEntry(id: string): void {
+    this.qaService.restore(id).subscribe({
       next: () => {
         this.expandedIds.delete(id);
         this.answerCache.delete(id);

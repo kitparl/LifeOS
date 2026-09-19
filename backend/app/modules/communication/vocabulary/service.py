@@ -53,8 +53,9 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def _set_response(repo: VocabularyRepository, vset: VocabularySet) -> VocabularySetResponse:
+async def _set_response(repo: VocabularyRepository, vset: VocabularySet, user_id: str) -> VocabularySetResponse:
     items = await repo.get_set_items(vset.id)
+    bookmarked_ids = await repo.list_bookmarked_ids(user_id, [item.vocabulary_id for item in items])
     item_responses: list[VocabularySetItemResponse] = []
     for item in items:
         vocab = await repo.get_vocabulary(item.vocabulary_id)
@@ -64,6 +65,7 @@ async def _set_response(repo: VocabularyRepository, vset: VocabularySet) -> Voca
             VocabularySetItemResponse(
                 position=item.position,
                 was_changed=item.was_changed,
+                is_bookmarked=item.vocabulary_id in bookmarked_ids,
                 vocabulary=VocabularyCard.model_validate(vocab),
             )
         )
@@ -85,7 +87,7 @@ class VocabularyService:
 
     async def get_daily_set(self, user: User) -> DailySetResponse:
         result = await resolve_daily_state(self.db, self.repo, user)
-        current = await _set_response(self.repo, result.current_set) if result.current_set else None
+        current = await _set_response(self.repo, result.current_set, user.id) if result.current_set else None
         total = len(current.items) if current else 0
         count = total if (current and current.status == "accepted") else 0
         return DailySetResponse(
@@ -118,7 +120,7 @@ class VocabularyService:
                 uv.accepted_at = now
 
         await self.db.flush()
-        return await _set_response(self.repo, vset)
+        return await _set_response(self.repo, vset, user.id)
 
     async def change_vocabulary_item(self, user: User, set_id: str, position: int) -> VocabularySetResponse:
         vset = await self._get_owned_set(user, set_id)
@@ -136,7 +138,7 @@ class VocabularyService:
         item.sequence_number = new_vocab.sequence_number
         item.was_changed = True
         await self.db.flush()
-        return await _set_response(self.repo, vset)
+        return await _set_response(self.repo, vset, user.id)
 
     async def get_next_set(self, user: User) -> VocabularySetResponse:
         latest = await self.repo.get_latest_set(user.id)
@@ -146,7 +148,7 @@ class VocabularyService:
         vset = await create_set(self.db, self.repo, user, "manual")
         if vset is None:
             raise ConflictError("No more unused vocabulary available")
-        return await _set_response(self.repo, vset)
+        return await _set_response(self.repo, vset, user.id)
 
     # ------------------------------------------------------------------
     # Vocabulary detail (PRD §25)

@@ -76,6 +76,7 @@ class VocabularySetItemResponse(BaseModel):
 
     position: int
     was_changed: bool
+    is_bookmarked: bool = False
     vocabulary: VocabularyCard
 
 

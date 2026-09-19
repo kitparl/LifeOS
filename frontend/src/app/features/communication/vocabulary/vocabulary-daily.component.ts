@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { DailySetResponse } from './models/vocabulary.models';
 import { VocabularyService } from './services/vocabulary.service';
 
@@ -12,13 +13,11 @@ import { VocabularyService } from './services/vocabulary.service';
 @Component({
   selector: 'app-vocabulary-daily',
   standalone: true,
+  imports: [LucideDynamicIcon],
   template: `
     <div class="space-y-3">
       @if (error()) {
         <p class="text-sm" style="color: var(--danger)">{{ error() }}</p>
-      }
-      @if (bookmarkedId()) {
-        <p class="text-xs" style="color: var(--text-muted)">Bookmarked "{{ bookmarkedId() }}".</p>
       }
 
       @if (data(); as d) {
@@ -38,11 +37,25 @@ import { VocabularyService } from './services/vocabulary.service';
                 (click)="openDetail(item.vocabulary.id)"
                 (keydown.enter)="openDetail(item.vocabulary.id)"
               >
-                <div class="flex items-center justify-between">
+                <div class="flex items-start justify-between gap-2">
                   <p class="font-semibold">{{ item.vocabulary.term }}</p>
-                  @if (item.was_changed) {
-                    <span class="text-xs" style="color: var(--text-muted)">changed</span>
-                  }
+                  <div class="flex shrink-0 items-center gap-1">
+                    @if (item.was_changed) {
+                      <span class="text-xs" style="color: var(--text-muted)">changed</span>
+                    }
+                    <button
+                      type="button"
+                      class="vocab-bookmark"
+                      [class.vocab-bookmark--active]="item.is_bookmarked"
+                      [disabled]="busy()"
+                      [attr.aria-pressed]="item.is_bookmarked"
+                      [attr.aria-label]="item.is_bookmarked ? 'Remove bookmark' : 'Bookmark'"
+                      [title]="item.is_bookmarked ? 'Remove bookmark' : 'Bookmark'"
+                      (click)="$event.stopPropagation(); toggleBookmark(item.vocabulary.id, item.is_bookmarked)"
+                    >
+                      <svg class="vocab-bookmark__icon" lucideIcon="bookmark" aria-hidden="true"></svg>
+                    </button>
+                  </div>
                 </div>
                 <p class="text-xs" style="color: var(--text-muted)">
                   {{ item.vocabulary.part_of_speech }} · {{ item.vocabulary.level }}
@@ -50,16 +63,8 @@ import { VocabularyService } from './services/vocabulary.service';
                 <p>{{ item.vocabulary.simple_meaning }}</p>
                 <p class="text-xs italic" style="color: var(--text-muted)">{{ item.vocabulary.example }}</p>
 
-                <div class="flex items-center gap-3 pt-1 text-xs">
-                  <button
-                    type="button"
-                    class="underline"
-                    [disabled]="busy()"
-                    (click)="$event.stopPropagation(); bookmark(item.vocabulary.id)"
-                  >
-                    ♡ Bookmark
-                  </button>
-                  @if (d.current_set!.status === 'active') {
+                @if (d.current_set!.status === 'active') {
+                  <div class="flex items-center gap-3 pt-1 text-xs">
                     <button
                       type="button"
                       class="underline"
@@ -68,8 +73,8 @@ import { VocabularyService } from './services/vocabulary.service';
                     >
                       Change
                     </button>
-                  }
-                </div>
+                  </div>
+                }
               </div>
             }
           </div>
@@ -97,6 +102,41 @@ import { VocabularyService } from './services/vocabulary.service';
       }
     </div>
   `,
+  styles: `
+    .vocab-bookmark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      margin: -0.25rem -0.25rem 0 0;
+      padding: 0;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .vocab-bookmark:hover:not(:disabled) {
+      background: var(--surface-3);
+      color: var(--text);
+    }
+    .vocab-bookmark--active {
+      color: var(--primary);
+    }
+    .vocab-bookmark--active .vocab-bookmark__icon {
+      fill: currentColor;
+    }
+    .vocab-bookmark:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+    .vocab-bookmark__icon {
+      width: 1rem;
+      height: 1rem;
+      stroke: currentColor;
+    }
+  `,
 })
 export class VocabularyDailyComponent implements OnInit {
   private readonly vocabularyService = inject(VocabularyService);
@@ -105,7 +145,6 @@ export class VocabularyDailyComponent implements OnInit {
   readonly data = signal<DailySetResponse | null>(null);
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
-  readonly bookmarkedId = signal<string | null>(null);
 
   ngOnInit(): void {
     this.load();
@@ -141,9 +180,10 @@ export class VocabularyDailyComponent implements OnInit {
     if (!setId) return;
     this.busy.set(true);
     this.vocabularyService.changeItem(setId, position).subscribe({
-      next: () => {
+      next: (updated) => {
+        const current = this.data();
+        if (current) this.data.set({ ...current, current_set: updated });
         this.busy.set(false);
-        this.load();
       },
       error: () => {
         this.busy.set(false);
@@ -152,11 +192,17 @@ export class VocabularyDailyComponent implements OnInit {
     });
   }
 
-  bookmark(vocabularyId: string): void {
-    this.vocabularyService.addBookmark(vocabularyId).subscribe({
-      next: () => this.bookmarkedId.set(vocabularyId),
-      error: () => this.error.set('Could not bookmark that word — please try again.'),
-    });
+  toggleBookmark(vocabularyId: string, currentlyBookmarked: boolean): void {
+    this.setBookmarked(vocabularyId, !currentlyBookmarked);
+    const onError = () => {
+      this.setBookmarked(vocabularyId, currentlyBookmarked);
+      this.error.set('Could not update the bookmark — please try again.');
+    };
+    if (currentlyBookmarked) {
+      this.vocabularyService.removeBookmark(vocabularyId).subscribe({ error: onError });
+    } else {
+      this.vocabularyService.addBookmark(vocabularyId).subscribe({ error: onError });
+    }
   }
 
   nextSet(): void {
@@ -169,6 +215,20 @@ export class VocabularyDailyComponent implements OnInit {
       error: () => {
         this.busy.set(false);
         this.error.set('Could not start the next set — please try again.');
+      },
+    });
+  }
+
+  private setBookmarked(vocabularyId: string, isBookmarked: boolean): void {
+    const current = this.data();
+    if (!current?.current_set) return;
+    this.data.set({
+      ...current,
+      current_set: {
+        ...current.current_set,
+        items: current.current_set.items.map((item) =>
+          item.vocabulary.id === vocabularyId ? { ...item, is_bookmarked: isBookmarked } : item,
+        ),
       },
     });
   }
