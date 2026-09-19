@@ -341,6 +341,13 @@ class FileService:
             return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers={"ETag": etag})
 
         backend = self._backend_for(record)
+        if not await backend.exists(record.storage_key):
+            # Checked before any headers are sent: raising once the StreamingResponse
+            # body generator has started would leave the client holding a "200 OK"
+            # with a promised Content-Length and zero bytes ever delivered — a hang,
+            # not a clean error.
+            logger.warning("File record %s has no bytes at its storage key", record.id)
+            raise NotFoundError("File content missing")
         content_type = record.content_type
         disposition = self._content_disposition(record, force_disposition=force_disposition)
 

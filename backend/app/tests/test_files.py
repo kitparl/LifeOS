@@ -356,6 +356,42 @@ async def test_soft_delete_then_purge(client, tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_missing_bytes_returns_clean_404_not_a_hung_stream(client, tmp_path, monkeypatch):
+    """A FileRecord whose bytes are gone from storage (moved/deleted/lost disk)
+    must fail BEFORE headers are sent. Otherwise the client already has a
+    200 + Content-Length promise it will wait forever to fill — a hang, not
+    an error the caller can react to."""
+    from pathlib import Path
+
+    from app.core.config import get_settings
+
+    upload_dir = tmp_path / "uploads"
+    settings = get_settings()
+    monkeypatch.setattr(settings, "upload_dir", str(upload_dir))
+
+    token = await _auth_token(client, "missingbytes@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upload = await client.post(
+        "/api/v1/files/upload",
+        headers=headers,
+        files={"file": ("gone.txt", b"will be deleted from disk", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    # Simulate lost bytes (disk issue, manual deletion, incomplete migration —
+    # not something achievable through the API, which is the point).
+    candidates = list(Path(upload_dir).rglob("original.txt"))
+    assert candidates, "expected the uploaded file's bytes to exist on disk first"
+    for path in candidates:
+        path.unlink()
+
+    res = await client.get(f"/api/v1/files/{file_id}/content", headers=headers)
+    assert res.status_code == 404
+    assert str(upload_dir) not in res.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_public_visibility(client, tmp_path, monkeypatch):
     from app.core.config import get_settings
 
