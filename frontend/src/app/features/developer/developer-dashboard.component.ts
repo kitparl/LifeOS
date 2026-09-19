@@ -13,24 +13,22 @@ import { DevFavoritesService } from './shared/dev-favorites.service';
   standalone: true,
   imports: [RouterLink, FormsModule, LucideDynamicIcon, NgTemplateOutlet],
   template: `
-    <div class="space-y-6">
-      <div>
-        <h1 class="text-lg font-semibold">Developer Tools</h1>
+    <div class="space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <p class="text-sm text-[var(--text-muted)]">
-          A self-contained toolbox of fast, client-side developer utilities. Nothing you type here is stored or sent to a server.
+          Fast client-side utilities. Nothing you type here is stored or sent to a server.
         </p>
-      </div>
-
-      <div class="relative max-w-md">
-        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-faint)]" lucideIcon="search" aria-hidden="true"></svg>
-        <input
-          class="input-field"
-          style="padding-left: 2.5rem"
-          type="text"
-          placeholder="Search tools by name, category, or keyword…"
-          [ngModel]="query()"
-          (ngModelChange)="query.set($event)"
-        />
+        <div class="relative w-full max-w-md">
+          <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-faint)]" lucideIcon="search" aria-hidden="true"></svg>
+          <input
+            class="input-field"
+            style="padding-left: 2.5rem"
+            type="text"
+            placeholder="Search tools by name, category, or keyword…"
+            [ngModel]="query()"
+            (ngModelChange)="query.set($event)"
+          />
+        </div>
       </div>
 
       @if (!query() && favoriteTools().length) {

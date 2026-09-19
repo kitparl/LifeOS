@@ -47,6 +47,9 @@ const POLL_MS = 60_000;
   selector: 'app-notification-dropdown',
   standalone: true,
   imports: [DatePipe, LucideDynamicIcon],
+  host: {
+    class: 'notif-host',
+  },
   template: `
     <div
       class="notif-wrap"
@@ -145,9 +148,17 @@ const POLL_MS = 60_000;
     </div>
 
     <style>
+      :host,
+      .notif-host {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        vertical-align: middle;
+      }
       .notif-wrap {
         position: relative;
         display: inline-flex;
+        align-items: center;
       }
       .notif-bell {
         position: relative;
@@ -155,7 +166,8 @@ const POLL_MS = 60_000;
         align-items: center;
         justify-content: center;
         padding: 0.35rem 0.5rem !important;
-        min-height: auto !important;
+        min-height: 32px !important;
+        min-width: 32px;
       }
       .notif-bell__icon {
         width: 1.1rem;
@@ -189,6 +201,19 @@ const POLL_MS = 60_000;
         /* Invisible bridge so pointer can move from bell → panel without closing */
         padding-top: 6px;
         margin-top: -2px;
+      }
+      @media (max-width: 640px) {
+        /* Parent column uses overflow:hidden; keep the flyout on-screen on phones */
+        .notif-panel {
+          position: fixed;
+          top: 48px;
+          right: 0.5rem;
+          left: auto;
+          margin-top: 0;
+          padding-top: 0;
+          width: min(280px, calc(100vw - 1rem));
+          max-width: calc(100vw - 1rem);
+        }
       }
       .notif-panel__card {
         background: var(--surface);

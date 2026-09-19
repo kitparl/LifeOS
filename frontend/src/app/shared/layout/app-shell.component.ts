@@ -207,10 +207,10 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
               </span>
             }
             <app-notification-dropdown />
-            <button type="button" class="btn-ghost !px-2 text-xs hidden sm:inline-flex" (click)="openSearch()">
+            <button type="button" class="btn-ghost !px-2 text-xs !hidden sm:!inline-flex" (click)="openSearch()">
               Search <kbd style="font-size: 10px; opacity: 0.7; margin-left: 4px">⌘K</kbd>
             </button>
-            <button type="button" class="btn-ghost !px-2 text-xs hidden sm:inline-flex" (click)="cycleTheme()" style="color: var(--text-muted)">
+            <button type="button" class="btn-ghost !px-2 text-xs !hidden sm:!inline-flex" (click)="cycleTheme()" style="color: var(--text-muted)">
               {{ theme.label() }}
             </button>
             @if (desktopLayout()) {
