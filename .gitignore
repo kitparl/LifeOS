@@ -16,6 +16,9 @@ frontend/dist/
 backend/.venv/
 backend/*.db
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 .lifeos_schema.lock
 backend/.lifeos_schema.lock
 backend/.env
