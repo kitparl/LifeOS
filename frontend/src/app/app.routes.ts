@@ -325,6 +325,536 @@ export const routes: Routes = [
           import('./features/search/search-page.component').then((m) => m.SearchPageComponent),
       },
       {
+        path: 'developer',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./features/developer/developer-dashboard.component').then(
+            (m) => m.DeveloperDashboardComponent,
+          ),
+      },
+      {
+        path: 'developer/base64',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/base64.component').then((m) => m.Base64ToolComponent),
+      },
+      {
+        path: 'developer/url-encoder',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/url-encoder.component').then(
+            (m) => m.UrlEncoderToolComponent,
+          ),
+      },
+      {
+        path: 'developer/html-encoder',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/html-encoder.component').then(
+            (m) => m.HtmlEncoderToolComponent,
+          ),
+      },
+      {
+        path: 'developer/jwt-decoder',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/jwt-decoder.component').then(
+            (m) => m.JwtDecoderToolComponent,
+          ),
+      },
+      {
+        path: 'developer/hex-text',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/hex-text.component').then((m) => m.HexTextToolComponent),
+      },
+      {
+        path: 'developer/binary-text',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/binary-text.component').then(
+            (m) => m.BinaryTextToolComponent,
+          ),
+      },
+      {
+        path: 'developer/ascii-text',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/ascii-text.component').then(
+            (m) => m.AsciiTextToolComponent,
+          ),
+      },
+      {
+        path: 'developer/unicode-converter',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/unicode-converter.component').then(
+            (m) => m.UnicodeConverterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/base32',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/base32.component').then((m) => m.Base32ToolComponent),
+      },
+      {
+        path: 'developer/base58',
+        loadComponent: () =>
+          import('./features/developer/tools/encoding/base58.component').then((m) => m.Base58ToolComponent),
+      },
+      {
+        path: 'developer/json-formatter',
+        loadComponent: () =>
+          import('./features/developer/tools/json/json-formatter.component').then(
+            (m) => m.JsonFormatterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-validator',
+        loadComponent: () =>
+          import('./features/developer/tools/json/json-validator.component').then(
+            (m) => m.JsonValidatorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-minifier',
+        loadComponent: () =>
+          import('./features/developer/tools/json/json-minifier.component').then(
+            (m) => m.JsonMinifierToolComponent,
+          ),
+      },
+      {
+        path: 'developer/csv-json',
+        loadComponent: () =>
+          import('./features/developer/tools/json/csv-json.component').then((m) => m.CsvJsonToolComponent),
+      },
+      {
+        path: 'developer/json-to-yaml',
+        loadComponent: () =>
+          import('./features/developer/tools/json/json-to-yaml.component').then(
+            (m) => m.JsonToYamlToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-to-typescript',
+        loadComponent: () =>
+          import('./features/developer/tools/json/json-to-typescript.component').then(
+            (m) => m.JsonToTypeScriptToolComponent,
+          ),
+      },
+      {
+        path: 'developer/jsonpath-tester',
+        loadComponent: () =>
+          import('./features/developer/tools/json/jsonpath-tester.component').then(
+            (m) => m.JsonpathTesterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-diff',
+        loadComponent: () =>
+          import('./features/developer/tools/json/json-diff.component').then((m) => m.JsonDiffToolComponent),
+      },
+      {
+        path: 'developer/xml-formatter',
+        loadComponent: () =>
+          import('./features/developer/tools/xml-yaml/xml-formatter.component').then(
+            (m) => m.XmlFormatterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/xml-validator',
+        loadComponent: () =>
+          import('./features/developer/tools/xml-yaml/xml-validator.component').then(
+            (m) => m.XmlValidatorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/xml-json',
+        loadComponent: () =>
+          import('./features/developer/tools/xml-yaml/xml-json.component').then((m) => m.XmlJsonToolComponent),
+      },
+      {
+        path: 'developer/yaml-formatter',
+        loadComponent: () =>
+          import('./features/developer/tools/xml-yaml/yaml-formatter.component').then(
+            (m) => m.YamlFormatterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/yaml-json',
+        loadComponent: () =>
+          import('./features/developer/tools/xml-yaml/yaml-json.component').then((m) => m.YamlJsonToolComponent),
+      },
+      {
+        path: 'developer/hash-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/hashing/hash-generator.component').then(
+            (m) => m.HashGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/hmac-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/hashing/hmac-generator.component').then(
+            (m) => m.HmacGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/uuid-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/generators/uuid-generator.component').then(
+            (m) => m.UuidGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/random-string-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/generators/random-string-generator.component').then(
+            (m) => m.RandomStringGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/password-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/generators/password-generator.component').then(
+            (m) => m.PasswordGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/lorem-ipsum-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/generators/lorem-ipsum-generator.component').then(
+            (m) => m.LoremIpsumGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/fake-json-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/generators/fake-json-generator.component').then(
+            (m) => m.FakeJsonGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/api-key-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/generators/api-key-generator.component').then(
+            (m) => m.ApiKeyGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/timestamp',
+        loadComponent: () =>
+          import('./features/developer/tools/datetime/timestamp.component').then(
+            (m) => m.TimestampToolComponent,
+          ),
+      },
+      {
+        path: 'developer/iso8601-formatter',
+        loadComponent: () =>
+          import('./features/developer/tools/datetime/iso8601-formatter.component').then(
+            (m) => m.Iso8601FormatterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/date-difference',
+        loadComponent: () =>
+          import('./features/developer/tools/datetime/date-difference.component').then(
+            (m) => m.DateDifferenceToolComponent,
+          ),
+      },
+      {
+        path: 'developer/cron-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/datetime/cron-generator.component').then(
+            (m) => m.CronGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/cron-parser',
+        loadComponent: () =>
+          import('./features/developer/tools/datetime/cron-parser.component').then(
+            (m) => m.CronParserToolComponent,
+          ),
+      },
+      {
+        path: 'developer/timezone-converter',
+        loadComponent: () =>
+          import('./features/developer/tools/datetime/timezone-converter.component').then(
+            (m) => m.TimezoneConverterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/html-formatter',
+        loadComponent: () =>
+          import('./features/developer/tools/web/html-formatter.component').then(
+            (m) => m.HtmlFormatterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/css-formatter',
+        loadComponent: () =>
+          import('./features/developer/tools/web/css-formatter.component').then(
+            (m) => m.CssFormatterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/js-formatter',
+        loadComponent: () =>
+          import('./features/developer/tools/web/js-formatter.component').then((m) => m.JsFormatterToolComponent),
+      },
+      {
+        path: 'developer/html-preview',
+        loadComponent: () =>
+          import('./features/developer/tools/web/html-preview.component').then(
+            (m) => m.HtmlPreviewToolComponent,
+          ),
+      },
+      {
+        path: 'developer/regex-tester',
+        loadComponent: () =>
+          import('./features/developer/tools/web/regex-tester.component').then(
+            (m) => m.RegexTesterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/regex-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/web/regex-generator.component').then(
+            (m) => m.RegexGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/url-parser',
+        loadComponent: () =>
+          import('./features/developer/tools/web/url-parser.component').then((m) => m.UrlParserToolComponent),
+      },
+      {
+        path: 'developer/querystring-parser',
+        loadComponent: () =>
+          import('./features/developer/tools/web/querystring-parser.component').then(
+            (m) => m.QuerystringParserToolComponent,
+          ),
+      },
+      {
+        path: 'developer/text-case-converter',
+        loadComponent: () =>
+          import('./features/developer/tools/web/text-case-converter.component').then(
+            (m) => m.TextCaseConverterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/html-escape',
+        loadComponent: () =>
+          import('./features/developer/tools/web/html-escape.component').then(
+            (m) => m.HtmlEscapeToolComponent,
+          ),
+      },
+      {
+        path: 'developer/sql-formatter',
+        loadComponent: () =>
+          import('./features/developer/tools/sql/sql-formatter.component').then(
+            (m) => m.SqlFormatterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/sql-validator',
+        loadComponent: () =>
+          import('./features/developer/tools/sql/sql-validator.component').then(
+            (m) => m.SqlValidatorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/sql-to-json',
+        loadComponent: () =>
+          import('./features/developer/tools/sql/sql-to-json.component').then(
+            (m) => m.SqlToJsonToolComponent,
+          ),
+      },
+      {
+        path: 'developer/diff',
+        loadComponent: () =>
+          import('./features/developer/tools/dev-utils/diff.component').then((m) => m.DiffToolComponent),
+      },
+      {
+        path: 'developer/code-beautifier',
+        loadComponent: () =>
+          import('./features/developer/tools/dev-utils/code-beautifier.component').then(
+            (m) => m.CodeBeautifierToolComponent,
+          ),
+      },
+      {
+        path: 'developer/code-minifier',
+        loadComponent: () =>
+          import('./features/developer/tools/dev-utils/code-minifier.component').then(
+            (m) => m.CodeMinifierToolComponent,
+          ),
+      },
+      {
+        path: 'developer/text-counter',
+        loadComponent: () =>
+          import('./features/developer/tools/dev-utils/text-counter.component').then(
+            (m) => m.TextCounterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/string-escape',
+        loadComponent: () =>
+          import('./features/developer/tools/dev-utils/string-escape.component').then(
+            (m) => m.StringEscapeToolComponent,
+          ),
+      },
+      {
+        path: 'developer/markdown-preview',
+        loadComponent: () =>
+          import('./features/developer/tools/dev-utils/markdown-preview.component').then(
+            (m) => m.MarkdownPreviewToolComponent,
+          ),
+      },
+      {
+        path: 'developer/http-status-lookup',
+        loadComponent: () =>
+          import('./features/developer/tools/network/http-status-lookup.component').then(
+            (m) => m.HttpStatusLookupToolComponent,
+          ),
+      },
+      {
+        path: 'developer/http-header-parser',
+        loadComponent: () =>
+          import('./features/developer/tools/network/http-header-parser.component').then(
+            (m) => m.HttpHeaderParserToolComponent,
+          ),
+      },
+      {
+        path: 'developer/cidr-calculator',
+        loadComponent: () =>
+          import('./features/developer/tools/network/cidr-calculator.component').then(
+            (m) => m.CidrCalculatorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/ipv4-ipv6-converter',
+        loadComponent: () =>
+          import('./features/developer/tools/network/ipv4-ipv6-converter.component').then(
+            (m) => m.Ipv4Ipv6ConverterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/user-agent-parser',
+        loadComponent: () =>
+          import('./features/developer/tools/network/user-agent-parser.component').then(
+            (m) => m.UserAgentParserToolComponent,
+          ),
+      },
+      {
+        path: 'developer/git-command-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/git/git-command-generator.component').then(
+            (m) => m.GitCommandGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/gitignore',
+        loadComponent: () =>
+          import('./features/developer/tools/git/gitignore.component').then((m) => m.GitignoreToolComponent),
+      },
+      {
+        path: 'developer/git-diff-viewer',
+        loadComponent: () =>
+          import('./features/developer/tools/git/git-diff-viewer.component').then(
+            (m) => m.GitDiffViewerToolComponent,
+          ),
+      },
+      {
+        path: 'developer/commit-message-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/git/commit-message-generator.component').then(
+            (m) => m.CommitMessageGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-to-python',
+        loadComponent: () =>
+          import('./features/developer/tools/codegen/json-to-python.component').then(
+            (m) => m.JsonToPythonToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-to-pydantic',
+        loadComponent: () =>
+          import('./features/developer/tools/codegen/json-to-pydantic.component').then(
+            (m) => m.JsonToPydanticToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-to-go',
+        loadComponent: () =>
+          import('./features/developer/tools/codegen/json-to-go.component').then(
+            (m) => m.JsonToGoToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-to-kotlin',
+        loadComponent: () =>
+          import('./features/developer/tools/codegen/json-to-kotlin.component').then(
+            (m) => m.JsonToKotlinToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-to-dart',
+        loadComponent: () =>
+          import('./features/developer/tools/codegen/json-to-dart.component').then(
+            (m) => m.JsonToDartToolComponent,
+          ),
+      },
+      {
+        path: 'developer/password-strength-checker',
+        loadComponent: () =>
+          import('./features/developer/tools/security/password-strength-checker.component').then(
+            (m) => m.PasswordStrengthCheckerToolComponent,
+          ),
+      },
+      {
+        path: 'developer/csp-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/security/csp-generator.component').then(
+            (m) => m.CspGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/sri-hash-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/security/sri-hash-generator.component').then(
+            (m) => m.SriHashGeneratorToolComponent,
+          ),
+      },
+      {
+        path: 'developer/csv-yaml',
+        loadComponent: () =>
+          import('./features/developer/tools/data-conversion/csv-yaml.component').then(
+            (m) => m.CsvYamlToolComponent,
+          ),
+      },
+      {
+        path: 'developer/json-toml',
+        loadComponent: () =>
+          import('./features/developer/tools/data-conversion/json-toml.component').then(
+            (m) => m.JsonTomlToolComponent,
+          ),
+      },
+      {
+        path: 'developer/number-base-converter',
+        loadComponent: () =>
+          import('./features/developer/tools/data-conversion/number-base-converter.component').then(
+            (m) => m.NumberBaseConverterToolComponent,
+          ),
+      },
+      {
+        path: 'developer/image-base64',
+        loadComponent: () =>
+          import('./features/developer/tools/data-conversion/image-base64.component').then(
+            (m) => m.ImageBase64ToolComponent,
+          ),
+      },
+      {
+        path: 'developer/data-uri-generator',
+        loadComponent: () =>
+          import('./features/developer/tools/data-conversion/data-uri-generator.component').then(
+            (m) => m.DataUriGeneratorToolComponent,
+          ),
+      },
+      {
         path: 'notifications',
         loadComponent: () =>
           import('./features/notifications/notifications-page.component').then(

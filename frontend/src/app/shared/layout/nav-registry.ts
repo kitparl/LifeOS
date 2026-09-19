@@ -39,6 +39,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'integrations', label: 'Integrations', route: '/integrations', icon: 'plug', category: 'System' },
   { id: 'automations', label: 'Automations', route: '/automations', icon: 'zap', category: 'System' },
   { id: 'search', label: 'Search', route: '/search', icon: 'search', category: 'Core' },
+  { id: 'developer', label: 'Developer', route: '/developer', icon: 'terminal', category: 'System' },
 ];
 
 export const DEFAULT_PINNED_IDS: string[] = [

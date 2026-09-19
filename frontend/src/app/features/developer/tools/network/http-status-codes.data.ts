@@ -1,0 +1,45 @@
+export interface HttpStatusEntry {
+  code: number;
+  name: string;
+  description: string;
+}
+
+export const HTTP_STATUS_CODES: HttpStatusEntry[] = [
+  { code: 100, name: 'Continue', description: 'The server has received the request headers and the client should proceed to send the request body.' },
+  { code: 101, name: 'Switching Protocols', description: 'The requester asked the server to switch protocols.' },
+  { code: 200, name: 'OK', description: 'The request succeeded.' },
+  { code: 201, name: 'Created', description: 'The request succeeded and a new resource was created.' },
+  { code: 202, name: 'Accepted', description: 'The request has been accepted for processing, but processing is not complete.' },
+  { code: 204, name: 'No Content', description: 'The server successfully processed the request and is not returning any content.' },
+  { code: 206, name: 'Partial Content', description: 'The server is delivering only part of the resource due to a range header.' },
+  { code: 301, name: 'Moved Permanently', description: 'The resource has been permanently moved to a new URL.' },
+  { code: 302, name: 'Found', description: 'The resource resides temporarily under a different URL.' },
+  { code: 303, name: 'See Other', description: 'The response can be found under a different URL using GET.' },
+  { code: 304, name: 'Not Modified', description: 'The resource has not been modified since the version specified.' },
+  { code: 307, name: 'Temporary Redirect', description: 'The request should be repeated with another URL, using the same method.' },
+  { code: 308, name: 'Permanent Redirect', description: 'The resource has permanently moved, request method should not change.' },
+  { code: 400, name: 'Bad Request', description: 'The server could not understand the request due to invalid syntax.' },
+  { code: 401, name: 'Unauthorized', description: 'Authentication is required and has failed or not been provided.' },
+  { code: 402, name: 'Payment Required', description: 'Reserved for future use.' },
+  { code: 403, name: 'Forbidden', description: 'The client does not have access rights to the content.' },
+  { code: 404, name: 'Not Found', description: 'The server cannot find the requested resource.' },
+  { code: 405, name: 'Method Not Allowed', description: 'The request method is known but not supported by the target resource.' },
+  { code: 406, name: 'Not Acceptable', description: 'The server cannot produce a response matching the Accept headers.' },
+  { code: 408, name: 'Request Timeout', description: 'The server timed out waiting for the request.' },
+  { code: 409, name: 'Conflict', description: 'The request conflicts with the current state of the server.' },
+  { code: 410, name: 'Gone', description: 'The resource requested is no longer available and will not be available again.' },
+  { code: 411, name: 'Length Required', description: 'The request did not specify the length of its content.' },
+  { code: 413, name: 'Payload Too Large', description: 'The request entity is larger than limits defined by the server.' },
+  { code: 414, name: 'URI Too Long', description: 'The URI requested by the client is too long.' },
+  { code: 415, name: 'Unsupported Media Type', description: 'The media format of the requested data is not supported.' },
+  { code: 418, name: "I'm a teapot", description: 'The server refuses to brew coffee because it is a teapot (RFC 2324, April Fools).' },
+  { code: 422, name: 'Unprocessable Entity', description: 'The request was well-formed but had semantic errors.' },
+  { code: 429, name: 'Too Many Requests', description: 'The user has sent too many requests in a given amount of time.' },
+  { code: 431, name: 'Request Header Fields Too Large', description: 'The server is unwilling to process the request because its header fields are too large.' },
+  { code: 500, name: 'Internal Server Error', description: 'The server has encountered a situation it does not know how to handle.' },
+  { code: 501, name: 'Not Implemented', description: 'The request method is not supported by the server.' },
+  { code: 502, name: 'Bad Gateway', description: 'The server got an invalid response while acting as a gateway.' },
+  { code: 503, name: 'Service Unavailable', description: 'The server is not ready to handle the request.' },
+  { code: 504, name: 'Gateway Timeout', description: 'The server did not get a response in time while acting as a gateway.' },
+  { code: 505, name: 'HTTP Version Not Supported', description: 'The HTTP version used in the request is not supported.' },
+];
