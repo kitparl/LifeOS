@@ -132,3 +132,31 @@ async def test_import_against_real_dataset_sample():
         await db.commit()
         assert import_summary.inserted == 50
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_import_records_batches_across_page_size():
+    """Regression: bulk upsert must work for more than one page (Postgres hung on per-row flush)."""
+    from app.modules.communication.vocabulary.seeder import BATCH_SIZE
+
+    n = BATCH_SIZE + 25
+    records = [
+        {
+            **VALID_RECORD,
+            "id": f"v{i:06d}",
+            "term": f"term-{i}",
+        }
+        for i in range(1, n + 1)
+    ]
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    async with session_factory() as db:
+        summary = ImportSummary(imported=n)
+        await import_records(db, records, summary)
+        await db.commit()
+        assert summary.inserted == n
+        count = (await db.execute(select(Vocabulary.id))).scalars().all()
+        assert len(count) == n
+    await engine.dispose()

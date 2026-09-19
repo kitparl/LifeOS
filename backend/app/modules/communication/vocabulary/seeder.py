@@ -5,8 +5,10 @@ that would break existing user state), but simpler: this import is global, not p
 and reports an aggregate summary since it processes ~15,000 records at once rather than
 one small per-user seed file.
 
-Usage (run manually, once, or repeatably — never at app startup):
-    python -m app.modules.communication.vocabulary.seeder [--file path/to/dataset.json]
+Usage (run from the backend/ directory, never at app startup):
+    cd backend
+    python -m app.modules.communication.vocabulary.seeder
+    python -m app.modules.communication.vocabulary.seeder --file /absolute/path/to/dataset.json
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +56,31 @@ REQUIRED_STR_FIELDS = (
     "learning_priority",
 )
 LIST_FIELDS = ("communication_intents", "topics", "common_collocations", "synonyms", "antonyms")
+BATCH_SIZE = 200
+# Content columns refreshed on re-import. sequence_number / created_at stay frozen (PRD §7).
+_UPSERT_UPDATE_COLUMNS = (
+    "collection_id",
+    "term",
+    "type",
+    "level",
+    "part_of_speech",
+    "simple_meaning",
+    "meaning_in_context",
+    "communication_intents",
+    "topics",
+    "example",
+    "example_context",
+    "usage_note",
+    "common_collocations",
+    "synonyms",
+    "antonyms",
+    "commonness",
+    "formality",
+    "pronunciation",
+    "learning_priority",
+    "updated_at",
+    "dataset_version",
+)
 
 
 class SeedValidationError(ValueError):
@@ -166,71 +194,155 @@ async def _get_or_create_collection(db: AsyncSession, dataset_version: str) -> V
     return collection
 
 
-async def import_records(db: AsyncSession, records: list[dict[str, Any]], summary: ImportSummary) -> None:
+def _dialect_name(db: AsyncSession) -> str:
+    bind = db.bind
+    if bind is None:
+        bind = db.sync_session.get_bind()
+    return bind.dialect.name
+
+
+def _row_from_record(record: dict[str, Any], collection_id: str, dataset_version: str) -> dict[str, Any]:
+    rid = record["id"]
+    now = datetime.now(timezone.utc)
+    return {
+        "id": rid,
+        "collection_id": collection_id,
+        "sequence_number": int(ID_RE.match(rid).group(1)),  # type: ignore[union-attr]
+        "term": record["term"],
+        "type": record["type"],
+        "level": record["level"],
+        "part_of_speech": record["part_of_speech"],
+        "simple_meaning": record["simple_meaning"],
+        "meaning_in_context": record.get("meaning_in_context"),
+        "communication_intents": record.get("communication_intents", []),
+        "topics": record.get("topics", []),
+        "example": record["example"],
+        "example_context": record.get("example_context"),
+        "usage_note": record.get("usage_note"),
+        "common_collocations": record.get("common_collocations", []),
+        "synonyms": record.get("synonyms", []),
+        "antonyms": record.get("antonyms", []),
+        "commonness": record["commonness"],
+        "formality": record["formality"],
+        "pronunciation": record.get("pronunciation"),
+        "learning_priority": record["learning_priority"],
+        "created_at": now,
+        "updated_at": now,
+        "dataset_version": record.get("dataset_version", dataset_version),
+    }
+
+
+def _upsert_stmt(dialect_name: str, rows: list[dict[str, Any]]):
+    if dialect_name == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert as dialect_insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert as dialect_insert
+
+    stmt = dialect_insert(Vocabulary).values(rows)
+    return stmt.on_conflict_do_update(
+        index_elements=["id"],
+        set_={col: stmt.excluded[col] for col in _UPSERT_UPDATE_COLUMNS},
+    )
+
+
+async def import_records(
+    db: AsyncSession,
+    records: list[dict[str, Any]],
+    summary: ImportSummary,
+    *,
+    commit_batches: bool = False,
+) -> None:
     dataset_version = "1.0"
     collection = await _get_or_create_collection(db, dataset_version)
 
-    existing_ids = set(
-        (await db.execute(select(Vocabulary.id))).scalars().all()
-    )
-
-    for record in records:
-        rid = record["id"]
-        sequence_number = int(ID_RE.match(rid).group(1))  # type: ignore[union-attr]
-        fields = {
-            "collection_id": collection.id,
-            "sequence_number": sequence_number,
-            "term": record["term"],
-            "type": record["type"],
-            "level": record["level"],
-            "part_of_speech": record["part_of_speech"],
-            "simple_meaning": record["simple_meaning"],
-            "meaning_in_context": record.get("meaning_in_context"),
-            "communication_intents": record.get("communication_intents", []),
-            "topics": record.get("topics", []),
-            "example": record["example"],
-            "example_context": record.get("example_context"),
-            "usage_note": record.get("usage_note"),
-            "common_collocations": record.get("common_collocations", []),
-            "synonyms": record.get("synonyms", []),
-            "antonyms": record.get("antonyms", []),
-            "commonness": record["commonness"],
-            "formality": record["formality"],
-            "pronunciation": record.get("pronunciation"),
-            "learning_priority": record["learning_priority"],
-            "dataset_version": record.get("dataset_version", dataset_version),
-        }
-        if rid in existing_ids:
-            row = await db.get(Vocabulary, rid)
-            for k, v in fields.items():
-                if k == "sequence_number":
-                    continue  # never renumber an existing item (PRD §7)
-                setattr(row, k, v)
+    existing_ids = set((await db.execute(select(Vocabulary.id))).scalars().all())
+    rows = [_row_from_record(record, collection.id, dataset_version) for record in records]
+    for row in rows:
+        if row["id"] in existing_ids:
             summary.updated += 1
         else:
-            db.add(Vocabulary(id=rid, **fields))
             summary.inserted += 1
-        await db.flush()
+
+    if commit_batches:
+        await db.commit()
+
+    dialect = _dialect_name(db)
+    total = len(rows)
+    for start in range(0, total, BATCH_SIZE):
+        batch = rows[start : start + BATCH_SIZE]
+        try:
+            await db.execute(_upsert_stmt(dialect, batch))
+        except ValueError as exc:
+            if "not enough values to unpack" not in str(exc):
+                raise
+            raise RuntimeError(
+                "Postgres closed the connection mid-import (asyncpg protocol error). "
+                "Re-run the seeder from backend/; it is idempotent and will resume."
+            ) from exc
+        if commit_batches:
+            await db.commit()
+        else:
+            await db.flush()
+        done = min(start + BATCH_SIZE, total)
+        logger.info("Upserted %s / %s vocabulary rows", done, total)
 
 
 async def run_import(path: Path) -> ImportSummary:
-    from app.core.database import async_session_factory
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.core.config import get_settings
+    from app.core.schema_bootstrap import apply_schema
+
+    await apply_schema()
+
+    settings = get_settings()
+    connect_args: dict[str, Any] = {}
+    if "asyncpg" in settings.database_url:
+        # Prepared-statement cache + a 15k-row ORM flush loop is what surfaces
+        # asyncpg's "expected 3, got 0" unpack error when the server/proxy
+        # drops the connection. Disable the cache for this CLI process.
+        connect_args = {"statement_cache_size": 0, "timeout": 120}
+
+    engine = create_async_engine(
+        settings.database_url,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=1,
+        connect_args=connect_args,
+    )
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     records, summary = load_and_validate(path)
-    async with async_session_factory() as db:
-        await import_records(db, records, summary)
-        await db.commit()
+    logger.info(
+        "Validated %s records (%s skipped, %s errors)",
+        len(records),
+        summary.skipped,
+        len(summary.errors),
+    )
+    try:
+        async with session_factory() as db:
+            await import_records(db, records, summary, commit_batches=True)
+    finally:
+        await engine.dispose()
     return summary
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    parser = argparse.ArgumentParser(description="Import the master vocabulary dataset")
-    parser.add_argument("--file", type=Path, default=DEFAULT_SEED_PATH, help="Path to the dataset JSON")
+    parser = argparse.ArgumentParser(
+        description="Import the master vocabulary dataset (run from the backend/ directory)",
+    )
+    parser.add_argument(
+        "--file",
+        type=Path,
+        default=DEFAULT_SEED_PATH,
+        help="Path to the dataset JSON (defaults to the bundled 15,000-item file)",
+    )
     args = parser.parse_args()
 
     if not args.file.is_file():
         logger.error("Seed file not found: %s", args.file)
+        logger.error("Run from backend/: python -m app.modules.communication.vocabulary.seeder")
         sys.exit(1)
 
     summary = asyncio.run(run_import(args.file))
