@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { DailySetResponse } from './models/vocabulary.models';
 import { VocabularyService } from './services/vocabulary.service';
 
@@ -12,7 +12,6 @@ import { VocabularyService } from './services/vocabulary.service';
 @Component({
   selector: 'app-vocabulary-daily',
   standalone: true,
-  imports: [RouterLink],
   template: `
     <div class="space-y-3">
       @if (error()) {
@@ -32,7 +31,13 @@ import { VocabularyService } from './services/vocabulary.service';
 
           <div class="grid gap-3 sm:grid-cols-2">
             @for (item of d.current_set.items; track item.position) {
-              <div class="panel text-sm space-y-1">
+              <div
+                class="panel text-sm space-y-1 cursor-pointer hover:bg-[var(--surface-2)]"
+                role="link"
+                tabindex="0"
+                (click)="openDetail(item.vocabulary.id)"
+                (keydown.enter)="openDetail(item.vocabulary.id)"
+              >
                 <div class="flex items-center justify-between">
                   <p class="font-semibold">{{ item.vocabulary.term }}</p>
                   @if (item.was_changed) {
@@ -46,12 +51,21 @@ import { VocabularyService } from './services/vocabulary.service';
                 <p class="text-xs italic" style="color: var(--text-muted)">{{ item.vocabulary.example }}</p>
 
                 <div class="flex items-center gap-3 pt-1 text-xs">
-                  <button type="button" class="underline" [disabled]="busy()" (click)="bookmark(item.vocabulary.id)">
+                  <button
+                    type="button"
+                    class="underline"
+                    [disabled]="busy()"
+                    (click)="$event.stopPropagation(); bookmark(item.vocabulary.id)"
+                  >
                     ♡ Bookmark
                   </button>
-                  <a class="underline" [routerLink]="['/communication/vocabulary', item.vocabulary.id]">Details</a>
                   @if (d.current_set!.status === 'active') {
-                    <button type="button" class="underline" [disabled]="busy()" (click)="change(item.position)">
+                    <button
+                      type="button"
+                      class="underline"
+                      [disabled]="busy()"
+                      (click)="$event.stopPropagation(); change(item.position)"
+                    >
                       Change
                     </button>
                   }
@@ -86,6 +100,7 @@ import { VocabularyService } from './services/vocabulary.service';
 })
 export class VocabularyDailyComponent implements OnInit {
   private readonly vocabularyService = inject(VocabularyService);
+  private readonly router = inject(Router);
 
   readonly data = signal<DailySetResponse | null>(null);
   readonly error = signal<string | null>(null);
@@ -94,6 +109,10 @@ export class VocabularyDailyComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+  }
+
+  openDetail(vocabularyId: string): void {
+    this.router.navigate(['/communication/vocabulary', vocabularyId]);
   }
 
   load(): void {
