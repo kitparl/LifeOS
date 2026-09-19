@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,7 +50,7 @@ _GAME_SOURCE_TO_REVISION_SOURCE = {
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 async def _set_response(repo: VocabularyRepository, vset: VocabularySet) -> VocabularySetResponse:

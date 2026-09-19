@@ -6,7 +6,7 @@ each user's independent progression through it.
 """
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     JSON,
@@ -48,7 +48,7 @@ def _uuid() -> str:
 
 
 def _now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 class VocabularyCollection(Base):
