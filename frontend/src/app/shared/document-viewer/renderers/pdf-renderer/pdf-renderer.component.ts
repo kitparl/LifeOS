@@ -87,10 +87,11 @@ export class PdfRendererComponent implements OnChanges, OnDestroy {
     this.error = null;
     try {
       const pdfjs = await import('pdfjs-dist');
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-        'pdfjs-dist/build/pdf.worker.min.mjs',
-        import.meta.url,
-      ).toString();
+      // Served as a static asset (see angular.json "assets") — a `new URL(pkg-path,
+      // import.meta.url)` pattern only gets rewritten by the Angular/esbuild builder
+      // for worker files inside this project's own src tree, not for paths reaching
+      // into node_modules, so that form silently 404s here.
+      pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
 
       void this.pdfDoc?.destroy();
       const loadingTask = pdfjs.getDocument(this.src);
@@ -103,8 +104,9 @@ export class PdfRendererComponent implements OnChanges, OnDestroy {
       this.pageCountChange.emit(doc.numPages);
       this.loading = false;
       await this.renderPage();
-    } catch {
+    } catch (err) {
       if (this.destroyed) return;
+      console.error('[PdfRenderer] failed to load PDF', err);
       this.error = 'Could not load this PDF.';
       this.loading = false;
       this.loadError.emit(this.error);
