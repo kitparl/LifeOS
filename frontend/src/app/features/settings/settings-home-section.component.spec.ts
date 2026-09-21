@@ -29,25 +29,50 @@ describe('SettingsHomeSectionComponent', () => {
     localStorage.clear();
   });
 
-  function selectEl(): HTMLSelectElement {
-    return fixture.nativeElement.querySelector('select') as HTMLSelectElement;
+  function trigger(): HTMLButtonElement {
+    return fixture.nativeElement.querySelector('#default-home-module') as HTMLButtonElement;
+  }
+
+  function openMenu(): void {
+    trigger().click();
+    fixture.detectChanges();
   }
 
   it('lists every module the user can open and selects the default', () => {
-    const select = selectEl();
-    const labels = Array.from(select.options).map((option) => option.textContent?.trim());
+    expect(trigger().textContent).toContain('Analytics');
 
-    expect(select.options.length).toBe(availableHomeDestinations().length);
+    openMenu();
+
+    const options = Array.from(
+      fixture.nativeElement.querySelectorAll('[role="option"]') as NodeListOf<HTMLButtonElement>,
+    );
+    const labels = options.map((option) => option.textContent?.trim());
+
+    expect(options.length).toBe(availableHomeDestinations().length);
     expect(labels).toContain('Analytics');
     expect(labels).toContain('Tasks');
     expect(labels).not.toContain('Mood');
-    expect(select.value).toBe('analytics');
+    expect(options.find((option) => option.textContent?.trim() === 'Analytics')?.classList.contains('active')).toBe(true);
+  });
+
+  it('keeps the option list scrollable when open', () => {
+    openMenu();
+
+    const menu = fixture.nativeElement.querySelector('.type-select__menu') as HTMLElement;
+    expect(menu).toBeTruthy();
+    expect(getComputedStyle(menu).overflowY).toBe('auto');
+    expect(parseFloat(getComputedStyle(menu).maxHeight)).toBeGreaterThan(0);
   });
 
   it('selects only one module and saves the preference', () => {
-    const select = selectEl();
-    select.value = 'tasks';
-    select.dispatchEvent(new Event('change'));
+    openMenu();
+
+    const tasks = Array.from(
+      fixture.nativeElement.querySelectorAll('[role="option"]') as NodeListOf<HTMLButtonElement>,
+    ).find((option) => option.textContent?.trim() === 'Tasks');
+    expect(tasks).toBeTruthy();
+
+    tasks!.click();
     fixture.detectChanges();
 
     const req = httpMock.expectOne(`${environment.apiUrl}/preferences/home`);
@@ -56,6 +81,7 @@ describe('SettingsHomeSectionComponent', () => {
     req.flush({ key: 'home', value: { moduleId: 'tasks' } });
 
     expect(homePrefs.moduleId()).toBe('tasks');
-    expect(selectEl().value).toBe('tasks');
+    expect(trigger().textContent).toContain('Tasks');
+    expect(fixture.nativeElement.querySelector('.type-select__menu')).toBeNull();
   });
 });
