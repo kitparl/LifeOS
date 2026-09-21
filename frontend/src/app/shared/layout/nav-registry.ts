@@ -43,6 +43,9 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'developer', label: 'Developer', route: '/developer', icon: 'terminal', category: 'System' },
 ];
 
+/** Module that opens at `/` when the user has no valid home preference. */
+export const DEFAULT_HOME_MODULE_ID = 'analytics';
+
 export const DEFAULT_PINNED_IDS: string[] = [
   'analytics',
   'dashboard',
@@ -67,6 +70,38 @@ const destinationById = new Map(NAV_DESTINATIONS.map((d) => [d.id, d]));
 
 export function getDestinationById(id: string): NavDestination | undefined {
   return destinationById.get(id);
+}
+
+export function isAvailableHomeModule(id: string): boolean {
+  const dest = getDestinationById(id);
+  return Boolean(dest && !dest.hidden);
+}
+
+export function availableHomeDestinations(): NavDestination[] {
+  return NAV_DESTINATIONS.filter((d) => !d.hidden);
+}
+
+export function groupedHomeDestinations(): { category: string; items: NavDestination[] }[] {
+  const groups: { category: string; items: NavDestination[] }[] = [];
+  const index = new Map<string, number>();
+  for (const dest of availableHomeDestinations()) {
+    const category = dest.category ?? 'Other';
+    let i = index.get(category);
+    if (i === undefined) {
+      i = groups.length;
+      index.set(category, i);
+      groups.push({ category, items: [] });
+    }
+    groups[i].items.push(dest);
+  }
+  return groups;
+}
+
+export function homeRouteFor(moduleId: string): string {
+  const dest = isAvailableHomeModule(moduleId)
+    ? getDestinationById(moduleId)
+    : getDestinationById(DEFAULT_HOME_MODULE_ID);
+  return dest?.route ?? '/analytics/dashboard';
 }
 
 export function getDestinationByRoute(url: string): NavDestination | undefined {

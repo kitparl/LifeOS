@@ -309,7 +309,7 @@ export class LoginComponent {
     this.submitting.set(true);
     this.error.set(null);
     this.auth.login(this.form.getRawValue()).subscribe({
-      next: () => this.router.navigate(['/analytics/dashboard']),
+      next: () => this.router.navigateByUrl('/'),
       error: () => {
         this.error.set('Invalid email, username, or password. Please try again.');
         this.submitting.set(false);

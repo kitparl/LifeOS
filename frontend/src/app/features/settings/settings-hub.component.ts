@@ -6,6 +6,7 @@ import { ProfileComponent } from '../profile/profile.component';
 import { SettingsAppSectionComponent } from './settings-app-section.component';
 import { SettingsIntegrationsSectionComponent } from './settings-integrations-section.component';
 import { SettingsSidebarSectionComponent } from './settings-sidebar-section.component';
+import { SettingsHomeSectionComponent } from './settings-home-section.component';
 import { SettingsEditorSectionComponent } from './settings-editor-section.component';
 import { SettingsCurrencySectionComponent } from './settings-currency-section.component';
 import { SettingsChangePasswordComponent } from './settings-change-password.component';
@@ -19,6 +20,7 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
     SettingsIntegrationsSectionComponent,
     ExportPageComponent,
     SettingsSidebarSectionComponent,
+    SettingsHomeSectionComponent,
     SettingsEditorSectionComponent,
     SettingsCurrencySectionComponent,
     SettingsChangePasswordComponent,
@@ -64,6 +66,11 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
         <app-settings-sidebar-section />
       </section>
 
+      <section id="home" class="scroll-mt-24 space-y-3">
+        <h2 class="text-base font-semibold">Default Home Module</h2>
+        <app-settings-home-section />
+      </section>
+
       <section id="editor" class="scroll-mt-24 space-y-3">
         <h2 class="text-base font-semibold">Editor</h2>
         <app-settings-editor-section />
@@ -91,6 +98,7 @@ export class SettingsHubComponent implements OnInit {
     { id: 'integrations', label: 'Integrations' },
     { id: 'export', label: 'Export' },
     { id: 'sidebar', label: 'Sidebar' },
+    { id: 'home', label: 'Default Home Module' },
     { id: 'editor', label: 'Editor' },
     { id: 'currency', label: 'Currency' },
     { id: 'app', label: 'App updates' },

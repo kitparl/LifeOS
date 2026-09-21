@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
+import { defaultHomeRedirect } from './core/guards/default-home.guard';
 import { registrationUnlockGuard } from './core/guards/registration-unlock.guard';
 
 export const routes: Routes = [
@@ -35,7 +36,7 @@ export const routes: Routes = [
       import('./shared/layout/app-shell.component').then((m) => m.AppShellComponent),
     canActivate: [authGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'analytics/dashboard' },
+      { path: '', pathMatch: 'full', redirectTo: defaultHomeRedirect },
       {
         path: 'quick-action',
         loadComponent: () =>
@@ -1008,5 +1009,5 @@ export const routes: Routes = [
       },
     ],
   },
-  { path: '**', redirectTo: 'analytics/dashboard' },
+  { path: '**', redirectTo: defaultHomeRedirect },
 ];

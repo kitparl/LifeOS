@@ -131,7 +131,7 @@ export class RegisterComponent {
     this.submitting.set(true);
     this.error.set(null);
     this.auth.register(this.form.getRawValue()).subscribe({
-      next: () => this.router.navigate(['/analytics/dashboard']),
+      next: () => this.router.navigateByUrl('/'),
       error: (err) => {
         const detail = err?.error?.detail;
         this.error.set(
