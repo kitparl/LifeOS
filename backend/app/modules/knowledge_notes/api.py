@@ -6,6 +6,7 @@ from app.core.deps import get_current_user
 from app.modules.auth.models import User
 from app.modules.knowledge_notes.schemas import (
     ChapterCreate,
+    ChapterDocumentsGroup,
     ChapterResponse,
     ChapterUpdate,
     SearchHit,
@@ -125,6 +126,18 @@ async def delete_chapter(
     db: AsyncSession = Depends(get_db),
 ):
     await KnowledgeNotesService(db).delete_chapter(user.id, chapter_id)
+
+
+@router.get("/subjects/{subject_id}/documents", response_model=list[ChapterDocumentsGroup])
+async def list_subject_documents(
+    subject_id: str,
+    chapter_id: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await KnowledgeNotesService(db).list_subject_documents(
+        user.id, subject_id, chapter_id
+    )
 
 
 # ---- Sections ----

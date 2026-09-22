@@ -71,6 +71,7 @@ describe('KnowledgeSubjectComponent', () => {
     deleteChapter: jasmine.Spy;
     deleteSubject: jasmine.Spy;
     search: jasmine.Spy;
+    listDocuments: jasmine.Spy;
   };
 
   beforeEach(async () => {
@@ -129,6 +130,36 @@ describe('KnowledgeSubjectComponent', () => {
       deleteChapter: jasmine.createSpy('deleteChapter').and.returnValue(of(void 0)),
       deleteSubject: jasmine.createSpy('deleteSubject').and.returnValue(of(void 0)),
       search: jasmine.createSpy('search').and.returnValue(of([])),
+      listDocuments: jasmine.createSpy('listDocuments').and.returnValue(
+        of([
+          {
+            chapter_id: 'c1',
+            chapter_title: 'First',
+            documents: [
+              {
+                id: 'pdf1',
+                filename: 'notes.pdf',
+                content_type: 'application/pdf',
+                size_bytes: 1200,
+                storage_backend: 'local',
+                url: '/api/v1/files/pdf1/content',
+                module: 'knowledge_notes',
+                entity_id: 's1',
+                created_at: now,
+                section_id: 's1',
+                section_title: 'Test',
+                chapter_id: 'c1',
+                chapter_title: 'First',
+              },
+            ],
+          },
+          {
+            chapter_id: 'c2',
+            chapter_title: 'Second',
+            documents: [],
+          },
+        ])
+      ),
     };
 
     await TestBed.configureTestingModule({
@@ -361,7 +392,7 @@ describe('KnowledgeSubjectComponent', () => {
     (fixture.nativeElement.querySelector('[aria-label="Subject actions"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     const items = Array.from(fixture.nativeElement.querySelectorAll('.menu-item')) as HTMLButtonElement[];
-    expect(items.map((el) => el.textContent?.trim())).toEqual(['Rename', 'Edit details', 'Delete']);
+    expect(items.map((el) => el.textContent?.trim())).toEqual(['Rename', 'Edit details', 'Documents', 'Delete']);
   });
 
   it('keeps chapter rename/delete behind the chapter overflow', () => {
@@ -371,6 +402,7 @@ describe('KnowledgeSubjectComponent', () => {
     expect(items.map((el) => el.textContent?.trim())).toEqual([
       'Rename',
       'Mark chapter completed',
+      'Documents',
       'Delete',
     ]);
   });
@@ -572,5 +604,70 @@ describe('KnowledgeSubjectComponent', () => {
     const id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
     const md = `Intro\n\n![shot.png](/api/v1/files/${id}/content)\n\n[notes.pdf](/api/v1/files/${id}/content)\n\nEnd`;
     expect(stripFileMarkdown(md, id)).toBe('Intro\n\nEnd');
+  });
+
+  it('opens chapter documents grouped by chapter', () => {
+    component.openDocuments();
+    fixture.detectChanges();
+    expect(notes.listDocuments).toHaveBeenCalledWith('sub1', null);
+    expect(component.documentsOpen()).toBeTrue();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Documents');
+    expect(text).toContain('notes.pdf');
+    expect(text).toContain('No PDF or Word documents in this chapter.');
+    expect(fixture.nativeElement.querySelector('[data-testid="kn-chapter-documents"]')).toBeTruthy();
+  });
+
+  it('filters documents to one chapter from the chapter menu', () => {
+    component.openDocuments('c2');
+    fixture.detectChanges();
+    expect(notes.listDocuments).toHaveBeenCalledWith('sub1', 'c2');
+    expect(component.documentsChapterId()).toBe('c2');
+  });
+
+  it('returns to the note from the documents view', () => {
+    component.openDocuments();
+    fixture.detectChanges();
+    component.closeDocuments();
+    fixture.detectChanges();
+    expect(component.documentsOpen()).toBeFalse();
+    expect(fixture.nativeElement.querySelector('[data-testid="kn-chapter-documents"]')).toBeFalsy();
+    expect(fixture.nativeElement.textContent).toContain('Document history');
+  });
+
+  it('strips markdown for an inline document deleted from another section', () => {
+    notes.updateSection.calls.reset();
+    notes.listDocuments.calls.reset();
+    component.openDocuments();
+    const extra: KnowledgeSection = {
+      id: 's9',
+      chapter_id: 'c1',
+      title: 'Other',
+      content: 'See [notes.pdf](/api/v1/files/pdf1/content)',
+      order_index: 1,
+      created_at: now,
+      updated_at: now,
+    };
+    component.subject()!.chapters[0].sections.push(extra);
+    component.onChapterDocumentRemoved({
+      id: 'pdf1',
+      filename: 'notes.pdf',
+      content_type: 'application/pdf',
+      size_bytes: 1200,
+      storage_backend: 'local',
+      url: '/api/v1/files/pdf1/content',
+      module: 'knowledge_notes',
+      entity_id: 's9',
+      created_at: now,
+      section_id: 's9',
+      section_title: 'Other',
+      chapter_id: 'c1',
+      chapter_title: 'First',
+    });
+    expect(notes.updateSection).toHaveBeenCalledWith('s9', {
+      title: 'Other',
+      content: 'See',
+    });
+    expect(notes.listDocuments).toHaveBeenCalled();
   });
 });

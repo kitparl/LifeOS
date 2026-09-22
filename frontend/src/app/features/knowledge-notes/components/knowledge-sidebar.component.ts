@@ -115,6 +115,7 @@ export type KnowledgeRenameTarget = { kind: 'chapter' | 'section' | 'subject'; i
                           } @else {
                             <button type="button" class="menu-item" role="menuitem" (click)="toggleChapterClosed.emit({ chapter: c, closed: true }); closeMenu.emit()">Mark chapter completed</button>
                           }
+                          <button type="button" class="menu-item" role="menuitem" (click)="openChapterDocuments.emit(c); closeMenu.emit()">Documents</button>
                           <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteChapter.emit(c); closeMenu.emit()">Delete</button>
                         </div>
                       }
@@ -243,6 +244,7 @@ export class KnowledgeSidebarComponent {
   @Output() readonly closeMenu = new EventEmitter<void>();
   @Output() readonly toggleChapterClosed = new EventEmitter<{ chapter: KnowledgeChapter; closed: boolean }>();
   @Output() readonly deleteChapter = new EventEmitter<KnowledgeChapter>();
+  @Output() readonly openChapterDocuments = new EventEmitter<KnowledgeChapter>();
   @Output() readonly selectSection = new EventEmitter<{ section: KnowledgeSection; chapter: KnowledgeChapter }>();
   @Output() readonly deleteSection = new EventEmitter<KnowledgeSection>();
   @Output() readonly restoreSection = new EventEmitter<KnowledgeSection>();

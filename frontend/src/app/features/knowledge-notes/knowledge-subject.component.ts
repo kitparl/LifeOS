@@ -16,9 +16,12 @@ import { FileRecord } from '../files/models/file.models';
 import { IntegrationsService, GitHubSectionSyncDisplay } from '../integrations/services/integrations.service';
 import { ModalComponent } from '../../shared/modal/modal.component';
 import { KnowledgeSectionEditorComponent } from './components/knowledge-section-editor.component';
+import { KnowledgeChapterDocumentsComponent } from './components/knowledge-chapter-documents.component';
 import { KnowledgeRenameTarget, KnowledgeSidebarComponent } from './components/knowledge-sidebar.component';
 import {
   KnowledgeChapter,
+  KnowledgeChapterDocument,
+  KnowledgeChapterDocumentsGroup,
   KnowledgeSearchHit,
   KnowledgeSection,
   KnowledgeSubjectDetail,
@@ -51,6 +54,7 @@ const ARCHIVE_TTL_DAYS = 7;
     ModalComponent,
     KnowledgeSidebarComponent,
     KnowledgeSectionEditorComponent,
+    KnowledgeChapterDocumentsComponent,
   ],
   template: `
     @if (subject(); as s) {
@@ -130,6 +134,7 @@ const ARCHIVE_TTL_DAYS = 7;
               <div class="menu kn-overflow__menu" role="menu" (click)="$event.stopPropagation()">
                 <button type="button" class="menu-item" role="menuitem" (click)="startRename('subject', s.id); closeMenu()">Rename</button>
                 <button type="button" class="menu-item" role="menuitem" (click)="openSubjectDetails(); closeMenu()">Edit details</button>
+                <button type="button" class="menu-item" role="menuitem" (click)="openDocuments(); closeMenu()">Documents</button>
                 <button type="button" class="menu-item menu-item--danger" role="menuitem" (click)="deleteSubject(); closeMenu()">Delete</button>
               </div>
             }
@@ -168,6 +173,7 @@ const ARCHIVE_TTL_DAYS = 7;
             (closeMenu)="closeMenu()"
             (toggleChapterClosed)="toggleChapterClosed($event.chapter, $event.closed)"
             (deleteChapter)="deleteChapter($event)"
+            (openChapterDocuments)="openDocuments($event.id)"
             (selectSection)="selectSection($event.section, $event.chapter)"
             (deleteSection)="deleteSection($event)"
             (restoreSection)="restoreSection($event)"
@@ -189,6 +195,18 @@ const ARCHIVE_TTL_DAYS = 7;
             (keydown)="onResizeKeydown($event)"
           ></div>
 
+          @if (documentsOpen()) {
+            <app-knowledge-chapter-documents
+              [groups]="documentGroups()"
+              [loading]="documentsLoading()"
+              [error]="documentsError()"
+              [chapterFilter]="documentsChapterId()"
+              (removed)="onChapterDocumentRemoved($event)"
+              (showAll)="openDocuments()"
+              (close)="closeDocuments()"
+              (openSection)="openDocumentSection($event.sectionId, $event.chapterId)"
+            />
+          } @else {
           <app-knowledge-section-editor
             [section]="selected()"
             [form]="form"
@@ -219,6 +237,7 @@ const ARCHIVE_TTL_DAYS = 7;
             (inlineFilesChanged)="onInlineFilesChanged()"
             (documentRemoved)="onDocumentRemoved($event)"
           />
+          }
         </div>
       </div>
 
@@ -302,6 +321,11 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     }
     return Array.from(groups.values());
   });
+  readonly documentsOpen = signal(false);
+  readonly documentsChapterId = signal<string | null>(null);
+  readonly documentGroups = signal<KnowledgeChapterDocumentsGroup[]>([]);
+  readonly documentsLoading = signal(false);
+  readonly documentsError = signal('');
   readonly noConnectedLists: string[] = [];
   private focusRename = false;
   expandedChapterIds = new Set<string>();
@@ -411,6 +435,13 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
         this.initExpandedDefaults(s);
         this.restoreSelection();
         this.reloadGitHubSyncStatuses(id);
+        if (this.documentsOpen()) {
+          const filter = this.documentsChapterId();
+          if (filter && !s.chapters.some((c) => c.id === filter)) {
+            this.documentsChapterId.set(null);
+          }
+          this.loadDocuments();
+        }
       },
       error: () => this.loading.set(false),
     });
@@ -434,13 +465,18 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     if (target) {
       const chapter = s.chapters.find((c) => c.sections.some((sec) => sec.id === target!.id));
       if (chapter) this.expandChapter(chapter.id);
-      this.selectSection(target, chapter);
+      this.applySectionSelection(target, chapter);
     } else {
       this.selected.set(null);
     }
   }
 
   selectSection(sec: KnowledgeSection, chapter?: KnowledgeChapter): void {
+    this.documentsOpen.set(false);
+    this.applySectionSelection(sec, chapter);
+  }
+
+  private applySectionSelection(sec: KnowledgeSection, chapter?: KnowledgeChapter): void {
     const s = this.subject();
     const parent =
       chapter ?? s?.chapters.find((c) => c.sections.some((item) => item.id === sec.id));
@@ -805,6 +841,72 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     this.sectionEditor?.setContent(next);
     this.refreshSync();
     this.saveIfDirty();
+  }
+
+  openDocuments(chapterId?: string): void {
+    this.closeMenu();
+    this.closeSearch();
+    this.documentsOpen.set(true);
+    this.documentsChapterId.set(chapterId ?? null);
+    this.loadDocuments();
+  }
+
+  closeDocuments(): void {
+    this.documentsOpen.set(false);
+    this.documentsError.set('');
+  }
+
+  openDocumentSection(sectionId: string, chapterId: string): void {
+    const s = this.subject();
+    const chapter = s?.chapters.find((c) => c.id === chapterId);
+    const section = chapter?.sections.find((sec) => sec.id === sectionId);
+    if (!chapter || !section) return;
+    this.selectSection(section, chapter);
+  }
+
+  onChapterDocumentRemoved(doc: KnowledgeChapterDocument): void {
+    if (doc.module === 'knowledge_notes') {
+      if (this.selected()?.id === doc.section_id) {
+        this.onDocumentRemoved(doc);
+      } else {
+        this.stripDocumentFromSection(doc);
+      }
+    }
+    if (this.selected()?.id === doc.section_id) {
+      this.sectionEditor?.reloadHistory();
+    }
+    this.loadDocuments();
+  }
+
+  private stripDocumentFromSection(doc: KnowledgeChapterDocument): void {
+    const s = this.subject();
+    const section = s?.chapters
+      .flatMap((c) => c.sections)
+      .find((sec) => sec.id === doc.section_id);
+    if (!section) return;
+    const next = stripFileMarkdown(section.content, doc.id);
+    if (next === section.content) return;
+    this.service.updateSection(section.id, { title: section.title, content: next }).subscribe({
+      next: (updated) => this.patchSection({ ...updated, content: next }),
+    });
+  }
+
+  private loadDocuments(): void {
+    const subjectId = this.subject()?.id;
+    if (!subjectId || !this.documentsOpen()) return;
+    this.documentsLoading.set(true);
+    this.documentsError.set('');
+    this.service.listDocuments(subjectId, this.documentsChapterId()).subscribe({
+      next: (groups) => {
+        this.documentGroups.set(groups);
+        this.documentsLoading.set(false);
+      },
+      error: () => {
+        this.documentGroups.set([]);
+        this.documentsLoading.set(false);
+        this.documentsError.set('Could not load documents.');
+      },
+    });
   }
 
   save(): void {

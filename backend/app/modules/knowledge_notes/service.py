@@ -8,6 +8,8 @@ from app.modules.knowledge_notes.repository import KnowledgeNotesRepository
 from app.core.exceptions import NotFoundError
 from app.modules.knowledge_notes.schemas import (
     ChapterCreate,
+    ChapterDocument,
+    ChapterDocumentsGroup,
     ChapterResponse,
     ChapterUpdate,
     SearchHit,
@@ -23,6 +25,17 @@ from app.modules.knowledge_notes.schemas import (
 ARCHIVE_TTL_DAYS = 7
 _INLINE_FILE_RE = re.compile(r"/files/([0-9a-f-]{36})/content", re.I)
 _SECTION_FILE_MODULES = ("knowledge_notes", "knowledge_notes_extra")
+_DOCUMENT_CONTENT_TYPES = (
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.oasis.opendocument.text",
+    "application/rtf",
+)
+
+
+def _file_content_url(file_id: str) -> str:
+    return f"/api/v1/files/{file_id}/content"
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +172,69 @@ class KnowledgeNotesService:
         if chapter is None:
             raise _not_found("Chapter")
         await self.repo.delete_chapter(chapter)
+
+    async def list_subject_documents(
+        self,
+        user_id: str,
+        subject_id: str,
+        chapter_id: str | None = None,
+    ) -> list[ChapterDocumentsGroup]:
+        subject = await self.repo.get_subject(user_id, subject_id)
+        if subject is None:
+            raise _not_found("Subject")
+        chapters = list(subject.chapters)
+        if chapter_id is not None:
+            chapters = [chapter for chapter in chapters if chapter.id == chapter_id]
+            if not chapters:
+                raise _not_found("Chapter")
+
+        section_lookup: dict[str, tuple] = {}
+        for chapter in chapters:
+            for section in chapter.sections:
+                if section.archived_at is None:
+                    section_lookup[section.id] = (section, chapter)
+
+        rows = await self.files.list_for_entities(
+            user_id,
+            list(section_lookup.keys()),
+            modules=list(_SECTION_FILE_MODULES),
+            content_types=list(_DOCUMENT_CONTENT_TYPES),
+        )
+        grouped: dict[str, list[ChapterDocument]] = {chapter.id: [] for chapter in chapters}
+        for row in rows:
+            pair = section_lookup.get(row.entity_id or "")
+            if pair is None:
+                continue
+            section, chapter = pair
+            grouped[chapter.id].append(
+                ChapterDocument(
+                    id=row.id,
+                    filename=row.filename,
+                    content_type=row.content_type,
+                    size_bytes=row.size_bytes,
+                    storage_backend=row.storage_backend,
+                    url=_file_content_url(row.id),
+                    module=row.module,
+                    entity_id=row.entity_id,
+                    created_at=row.created_at,
+                    checksum_sha256=row.checksum_sha256,
+                    extension=row.extension,
+                    visibility=row.visibility,
+                    section_id=section.id,
+                    section_title=section.title,
+                    chapter_id=chapter.id,
+                    chapter_title=chapter.title,
+                )
+            )
+
+        return [
+            ChapterDocumentsGroup(
+                chapter_id=chapter.id,
+                chapter_title=chapter.title,
+                documents=grouped[chapter.id],
+            )
+            for chapter in chapters
+        ]
 
     # ---- Sections ----
     async def get_section(self, user_id: str, section_id: str) -> SectionResponse:

@@ -103,3 +103,29 @@ class SearchHit(BaseModel):
     subject_id: str
     subject_title: str
     snippet: str
+
+
+# ---- Chapter documents ----
+class ChapterDocument(BaseModel):
+    id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    storage_backend: str
+    url: str
+    module: str | None
+    entity_id: str | None
+    created_at: datetime
+    checksum_sha256: str | None = None
+    extension: str | None = None
+    visibility: str = "private"
+    section_id: str
+    section_title: str
+    chapter_id: str
+    chapter_title: str
+
+
+class ChapterDocumentsGroup(BaseModel):
+    chapter_id: str
+    chapter_title: str
+    documents: list[ChapterDocument] = []

@@ -73,6 +73,34 @@ class FileRepository:
         )
         return list(result.scalars().all()), total
 
+    async def list_for_entities(
+        self,
+        user_id: str,
+        entity_ids: list[str],
+        *,
+        modules: list[str] | None = None,
+        content_types: list[str] | None = None,
+        limit: int = 500,
+    ) -> list[FileRecord]:
+        if not entity_ids:
+            return []
+        filters = [
+            FileRecord.user_id == user_id,
+            FileRecord.deleted_at.is_(None),
+            FileRecord.entity_id.in_(entity_ids),
+        ]
+        if modules:
+            filters.append(FileRecord.module.in_(modules))
+        if content_types:
+            filters.append(FileRecord.content_type.in_(content_types))
+        result = await self.db.execute(
+            select(FileRecord)
+            .where(*filters)
+            .order_by(FileRecord.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def usage_stats(self, user_id: str) -> tuple[int, int]:
         """Return (used_bytes, file_count) including soft-deleted rows (still count toward quota)."""
         result = await self.db.execute(

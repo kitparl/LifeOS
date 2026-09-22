@@ -110,3 +110,28 @@ export interface SectionUpdate {
   chapter_id?: string;
   closed?: boolean;
 }
+
+export interface KnowledgeChapterDocument {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_backend: string;
+  url: string;
+  module: string | null;
+  entity_id: string | null;
+  created_at: string;
+  checksum_sha256?: string | null;
+  extension?: string | null;
+  visibility?: string;
+  section_id: string;
+  section_title: string;
+  chapter_id: string;
+  chapter_title: string;
+}
+
+export interface KnowledgeChapterDocumentsGroup {
+  chapter_id: string;
+  chapter_title: string;
+  documents: KnowledgeChapterDocument[];
+}

@@ -10,6 +10,7 @@ import {
   ChapterCreate,
   CodeBlock,
   KnowledgeChapter,
+  KnowledgeChapterDocumentsGroup,
   KnowledgeSearchHit,
   KnowledgeSection,
   KnowledgeSubjectDetail,
@@ -68,6 +69,14 @@ export class KnowledgeNotesService {
 
   deleteChapter(id: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/chapters/${id}`);
+  }
+
+  listDocuments(subjectId: string, chapterId?: string | null): Observable<KnowledgeChapterDocumentsGroup[]> {
+    let params = new HttpParams();
+    if (chapterId) params = params.set('chapter_id', chapterId);
+    return this.http.get<KnowledgeChapterDocumentsGroup[]>(`${this.api}/subjects/${subjectId}/documents`, {
+      params,
+    });
   }
 
   // Sections

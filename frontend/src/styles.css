@@ -2118,6 +2118,14 @@ summary::-webkit-details-marker {
   flex-shrink: 0;
 }
 
+.kn-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  overflow: auto;
+}
+
 .kn-sync {
   font-size: 0.6875rem;
   color: var(--text-faint);

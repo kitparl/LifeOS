@@ -410,3 +410,115 @@ async def test_knowledge_section_archive_purges_after_ttl(client, monkeypatch):
     assert detail.json()["archived_sections"] == []
     gone = await client.get(f"/api/v1/knowledge-notes/sections/{section_id}", headers=headers)
     assert gone.status_code == 404
+
+
+_MIN_PNG = (
+    b"\x89PNG\r\n\x1a\n"
+    b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
+    b"\x00\x00\x00\nIDAT\x08d\x63\x60\x00\x00\x00\x02\x00\x01\xe2!\xbc3"
+    b"\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+@pytest.mark.asyncio
+async def test_knowledge_chapter_documents_grouped_and_filtered(client, tmp_path, monkeypatch):
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path / "uploads"))
+
+    token = await _auth_token(client, "kn-docs@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    subject = await client.post(
+        "/api/v1/knowledge-notes/subjects",
+        headers=headers,
+        json={"title": "Docs Subject"},
+    )
+    subject_id = subject.json()["id"]
+    chapter_a = await client.post(
+        f"/api/v1/knowledge-notes/subjects/{subject_id}/chapters",
+        headers=headers,
+        json={"title": "Chapter A"},
+    )
+    chapter_b = await client.post(
+        f"/api/v1/knowledge-notes/subjects/{subject_id}/chapters",
+        headers=headers,
+        json={"title": "Chapter B"},
+    )
+    chapter_a_id = chapter_a.json()["id"]
+    chapter_b_id = chapter_b.json()["id"]
+    section_a = await client.post(
+        f"/api/v1/knowledge-notes/chapters/{chapter_a_id}/sections",
+        headers=headers,
+        json={"title": "Notes A", "content": "see pdf"},
+    )
+    section_b = await client.post(
+        f"/api/v1/knowledge-notes/chapters/{chapter_b_id}/sections",
+        headers=headers,
+        json={"title": "Notes B", "content": "empty"},
+    )
+    section_a_id = section_a.json()["id"]
+    section_b_id = section_b.json()["id"]
+
+    pdf_a = await client.post(
+        "/api/v1/files/upload",
+        headers=headers,
+        files={"file": ("a.pdf", b"%PDF-1.4 notes-a", "application/pdf")},
+        data={"module": "knowledge_notes", "entity_id": section_a_id},
+    )
+    extra_b = await client.post(
+        "/api/v1/files/upload",
+        headers=headers,
+        files={"file": ("b.pdf", b"%PDF-1.4 notes-b", "application/pdf")},
+        data={"module": "knowledge_notes_extra", "entity_id": section_b_id},
+    )
+    image = await client.post(
+        "/api/v1/files/upload",
+        headers=headers,
+        files={"file": ("shot.png", _MIN_PNG, "image/png")},
+        data={"module": "knowledge_notes", "entity_id": section_a_id},
+    )
+    assert pdf_a.status_code == 201
+    assert extra_b.status_code == 201
+    assert image.status_code == 201
+
+    listed = await client.get(
+        f"/api/v1/knowledge-notes/subjects/{subject_id}/documents",
+        headers=headers,
+    )
+    assert listed.status_code == 200
+    groups = listed.json()
+    assert [g["chapter_title"] for g in groups] == ["Chapter A", "Chapter B"]
+    names_a = [d["filename"] for d in groups[0]["documents"]]
+    names_b = [d["filename"] for d in groups[1]["documents"]]
+    assert names_a == ["a.pdf"]
+    assert names_b == ["b.pdf"]
+    assert groups[0]["documents"][0]["section_title"] == "Notes A"
+    assert groups[0]["documents"][0]["section_id"] == section_a_id
+    assert "shot.png" not in names_a + names_b
+
+    filtered = await client.get(
+        f"/api/v1/knowledge-notes/subjects/{subject_id}/documents",
+        headers=headers,
+        params={"chapter_id": chapter_b_id},
+    )
+    assert filtered.status_code == 200
+    assert len(filtered.json()) == 1
+    assert filtered.json()[0]["chapter_id"] == chapter_b_id
+    assert [d["filename"] for d in filtered.json()[0]["documents"]] == ["b.pdf"]
+
+    missing = await client.get(
+        f"/api/v1/knowledge-notes/subjects/{subject_id}/documents",
+        headers=headers,
+        params={"chapter_id": "00000000-0000-0000-0000-000000000000"},
+    )
+    assert missing.status_code == 404
+
+    other = await _auth_token(client, "kn-docs-other@example.com")
+    other_headers = {"Authorization": f"Bearer {other}"}
+    denied = await client.get(
+        f"/api/v1/knowledge-notes/subjects/{subject_id}/documents",
+        headers=other_headers,
+    )
+    assert denied.status_code == 404
