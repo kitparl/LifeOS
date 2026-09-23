@@ -1,9 +1,9 @@
-import { Component, Input, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DevToolShellComponent } from './dev-tool-shell.component';
 import { CopyButtonComponent } from './copy-button.component';
 import { DevHistoryPanelComponent } from './dev-history-panel.component';
-import { DevHistoryService } from './dev-history.service';
+import { DevHistoryEntry, DevHistoryService } from './dev-history.service';
 
 export type TransformDirection = 'forward' | 'backward';
 
@@ -58,6 +58,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         <div class="space-y-1">
           <label class="form-label">{{ mode() === 'forward' ? 'Input' : backwardLabel + ' input' }}</label>
           <textarea
+            #mainInput
             class="input-field h-56 resize-y font-mono text-sm"
             [placeholder]="placeholder"
             [ngModel]="input()"
@@ -80,7 +81,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         </div>
       </div>
 
-      <app-dev-history-panel [toolId]="toolId" />
+      <app-dev-history-panel [toolId]="toolId" (reuse)="onReuse($event)" />
     </app-dev-tool-shell>
   `,
 })
@@ -96,6 +97,8 @@ export class TextTransformToolComponent implements OnInit, OnDestroy {
   @Input() placeholder = 'Type or paste text…';
   /** When true, offers a "Pretty-print JSON" toggle if the decoded output happens to be valid JSON (used by Base64). */
   @Input() detectJson = false;
+
+  @ViewChild('mainInput') private readonly mainInput?: ElementRef<HTMLTextAreaElement>;
 
   private readonly historyService = inject(DevHistoryService);
   private historyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -138,6 +141,12 @@ export class TextTransformToolComponent implements OnInit, OnDestroy {
   onInputChange(value: string): void {
     this.input.set(value);
     this.recompute();
+  }
+
+  onReuse(entry: DevHistoryEntry): void {
+    this.onInputChange(entry.input);
+    this.mainInput?.nativeElement.focus();
+    this.mainInput?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   setMode(mode: TransformDirection): void {

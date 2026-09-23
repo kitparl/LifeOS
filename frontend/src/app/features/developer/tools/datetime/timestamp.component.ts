@@ -1,10 +1,10 @@
-import { Component, OnDestroy, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DevToolShellComponent } from '../../shared/dev-tool-shell.component';
 import { CopyButtonComponent } from '../../shared/copy-button.component';
 import { DateTimeInputComponent } from '../../shared/date-time-input.component';
 import { DevHistoryPanelComponent } from '../../shared/dev-history-panel.component';
-import { DevHistoryService } from '../../shared/dev-history.service';
+import { DevHistoryEntry, DevHistoryService } from '../../shared/dev-history.service';
 
 const HISTORY_DEBOUNCE_MS = 900;
 
@@ -33,7 +33,12 @@ const HISTORY_DEBOUNCE_MS = 900;
         <div class="space-y-1">
           <label class="form-label">Unix timestamp ({{ unit() }})</label>
           <div class="flex gap-2">
-            <input class="input-field font-mono text-sm" [ngModel]="timestamp()" (ngModelChange)="onTimestampChange($event)" />
+            <input
+              #mainInput
+              class="input-field font-mono text-sm"
+              [ngModel]="timestamp()"
+              (ngModelChange)="onTimestampChange($event)"
+            />
             <app-copy-button [text]="timestamp()" />
           </div>
         </div>
@@ -46,11 +51,13 @@ const HISTORY_DEBOUNCE_MS = 900;
         </div>
       </div>
 
-      <app-dev-history-panel toolId="timestamp" />
+      <app-dev-history-panel toolId="timestamp" (reuse)="onReuse($event)" />
     </app-dev-tool-shell>
   `,
 })
 export class TimestampToolComponent implements OnDestroy {
+  @ViewChild('mainInput') private readonly mainInput?: ElementRef<HTMLInputElement>;
+
   private readonly historyService = inject(DevHistoryService);
   private historyTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -66,6 +73,12 @@ export class TimestampToolComponent implements OnDestroy {
   setUnit(u: 's' | 'ms'): void {
     this.unit.set(u);
     if (this.timestamp()) this.onTimestampChange(this.timestamp());
+  }
+
+  onReuse(entry: DevHistoryEntry): void {
+    this.onTimestampChange(entry.input);
+    this.mainInput?.nativeElement.focus();
+    this.mainInput?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   onTimestampChange(value: string): void {

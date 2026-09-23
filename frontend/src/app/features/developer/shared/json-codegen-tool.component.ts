@@ -1,9 +1,9 @@
-import { Component, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DevToolShellComponent } from './dev-tool-shell.component';
 import { CopyButtonComponent } from './copy-button.component';
 import { DevHistoryPanelComponent } from './dev-history-panel.component';
-import { DevHistoryService } from './dev-history.service';
+import { DevHistoryEntry, DevHistoryService } from './dev-history.service';
 import { parseJsonOrThrow } from '../tools/json/json.util';
 import { CodeGenOptions } from './json-codegen.util';
 
@@ -47,6 +47,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         <div class="space-y-1">
           <label class="form-label">JSON input</label>
           <textarea
+            #mainInput
             class="input-field h-64 resize-y font-mono text-sm"
             placeholder="Paste a JSON object or array…"
             [ngModel]="input()"
@@ -62,7 +63,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         </div>
       </div>
 
-      <app-dev-history-panel [toolId]="toolId" />
+      <app-dev-history-panel [toolId]="toolId" (reuse)="onReuse($event)" />
     </app-dev-tool-shell>
   `,
 })
@@ -75,6 +76,8 @@ export class JsonCodeGenToolComponent implements OnInit, OnDestroy {
   @Input() showUseType = false;
   @Input() defaultRootName = 'Root';
   @Input() defaultNullableFields = true;
+
+  @ViewChild('mainInput') private readonly mainInput?: ElementRef<HTMLTextAreaElement>;
 
   private readonly historyService = inject(DevHistoryService);
   private historyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -100,6 +103,12 @@ export class JsonCodeGenToolComponent implements OnInit, OnDestroy {
   onInputChange(value: string): void {
     this.input.set(value);
     this.run();
+  }
+
+  onReuse(entry: DevHistoryEntry): void {
+    this.onInputChange(entry.input);
+    this.mainInput?.nativeElement.focus();
+    this.mainInput?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   setRootName(value: string): void {

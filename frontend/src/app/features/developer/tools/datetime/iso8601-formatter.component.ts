@@ -4,7 +4,7 @@ import { DevToolShellComponent } from '../../shared/dev-tool-shell.component';
 import { CopyButtonComponent } from '../../shared/copy-button.component';
 import { DateTimeInputComponent } from '../../shared/date-time-input.component';
 import { DevHistoryPanelComponent } from '../../shared/dev-history-panel.component';
-import { DevHistoryService } from '../../shared/dev-history.service';
+import { DevHistoryEntry, DevHistoryService } from '../../shared/dev-history.service';
 import { extractWallClockParts } from '../../shared/datetime-parse.util';
 
 const OFFSETS: number[] = [];
@@ -51,7 +51,7 @@ function formatOffset(minutes: number): string {
         <input class="input-field font-mono text-sm" readonly [ngModel]="output()" />
       }
 
-      <app-dev-history-panel toolId="iso8601-formatter" />
+      <app-dev-history-panel toolId="iso8601-formatter" (reuse)="onReuse($event)" />
     </app-dev-tool-shell>
   `,
 })
@@ -96,6 +96,10 @@ export class Iso8601FormatterToolComponent implements OnInit, OnDestroy {
   setLocalValue(value: string): void {
     this.localValue.set(value);
     this.scheduleHistoryRecord();
+  }
+
+  onReuse(entry: DevHistoryEntry): void {
+    this.setLocalValue(entry.input);
   }
 
   setOffset(value: number): void {

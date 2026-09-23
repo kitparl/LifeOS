@@ -1,9 +1,9 @@
-import { Component, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DevToolShellComponent } from '../../shared/dev-tool-shell.component';
 import { CopyButtonComponent } from '../../shared/copy-button.component';
 import { DevHistoryPanelComponent } from '../../shared/dev-history-panel.component';
-import { DevHistoryService } from '../../shared/dev-history.service';
+import { DevHistoryEntry, DevHistoryService } from '../../shared/dev-history.service';
 import { parseJsonOrThrow } from './json.util';
 
 export type JsonAction = 'format' | 'validate' | 'minify';
@@ -40,6 +40,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         <div class="space-y-1">
           <label class="form-label">JSON input</label>
           <textarea
+            #mainInput
             class="input-field h-64 resize-y font-mono text-sm"
             placeholder="Paste JSON…"
             [ngModel]="input()"
@@ -62,7 +63,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         </div>
       </div>
 
-      <app-dev-history-panel [toolId]="toolId" />
+      <app-dev-history-panel [toolId]="toolId" (reuse)="onReuse($event)" />
     </app-dev-tool-shell>
   `,
 })
@@ -72,6 +73,8 @@ export class JsonActionToolComponent implements OnInit, OnDestroy {
   @Input() icon = 'braces';
   @Input({ required: true }) toolId = '';
   @Input({ required: true }) mode: JsonAction = 'format';
+
+  @ViewChild('mainInput') private readonly mainInput?: ElementRef<HTMLTextAreaElement>;
 
   private readonly historyService = inject(DevHistoryService);
   private historyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -93,6 +96,12 @@ export class JsonActionToolComponent implements OnInit, OnDestroy {
   onInputChange(value: string): void {
     this.input.set(value);
     this.run();
+  }
+
+  onReuse(entry: DevHistoryEntry): void {
+    this.onInputChange(entry.input);
+    this.mainInput?.nativeElement.focus();
+    this.mainInput?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   setIndent(value: number): void {

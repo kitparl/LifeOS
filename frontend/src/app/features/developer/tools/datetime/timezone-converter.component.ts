@@ -4,10 +4,12 @@ import { DevToolShellComponent } from '../../shared/dev-tool-shell.component';
 import { CopyButtonComponent } from '../../shared/copy-button.component';
 import { DateTimeInputComponent } from '../../shared/date-time-input.component';
 import { DevHistoryPanelComponent } from '../../shared/dev-history-panel.component';
-import { DevHistoryService } from '../../shared/dev-history.service';
+import { DevHistoryEntry, DevHistoryService } from '../../shared/dev-history.service';
 import { TIMEZONE_PRESETS, convertTimezone, listTimeZones } from './timezone.util';
 
 const HISTORY_DEBOUNCE_MS = 900;
+/** Matches the `input` shape recorded by scheduleHistoryRecord: "<dateTimeLocal> (<from> → <to>)". */
+const HISTORY_INPUT_PATTERN = /^(.*) \((.*) → (.*)\)$/;
 
 @Component({
   selector: 'app-timezone-converter-tool',
@@ -63,7 +65,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         </div>
       }
 
-      <app-dev-history-panel toolId="timezone-converter" />
+      <app-dev-history-panel toolId="timezone-converter" (reuse)="onReuse($event)" />
     </app-dev-tool-shell>
   `,
 })
@@ -134,6 +136,16 @@ export class TimezoneConverterToolComponent implements OnInit, OnDestroy {
     const from = this.fromZone();
     this.fromZone.set(this.toZone());
     this.toZone.set(from);
+    this.scheduleHistoryRecord();
+  }
+
+  onReuse(entry: DevHistoryEntry): void {
+    const match = entry.input.match(HISTORY_INPUT_PATTERN);
+    if (!match) return;
+    const [, dateTimeLocal, fromZone, toZone] = match;
+    this.dateTimeLocal.set(dateTimeLocal);
+    this.fromZone.set(fromZone);
+    this.toZone.set(toZone);
     this.scheduleHistoryRecord();
   }
 

@@ -3,9 +3,11 @@ import { DecimalPipe } from '@angular/common';
 import { DevToolShellComponent } from '../../shared/dev-tool-shell.component';
 import { DateTimeInputComponent } from '../../shared/date-time-input.component';
 import { DevHistoryPanelComponent } from '../../shared/dev-history-panel.component';
-import { DevHistoryService } from '../../shared/dev-history.service';
+import { DevHistoryEntry, DevHistoryService } from '../../shared/dev-history.service';
 
 const HISTORY_DEBOUNCE_MS = 900;
+/** Separates the two dates in a recorded entry's `input` — see scheduleHistoryRecord/onReuse. */
+const RANGE_SEPARATOR = ' → ';
 
 @Component({
   selector: 'app-date-difference-tool',
@@ -35,7 +37,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         <p class="text-sm text-[var(--text-muted)]">Choose both dates to see the difference.</p>
       }
 
-      <app-dev-history-panel toolId="date-difference" />
+      <app-dev-history-panel toolId="date-difference" (reuse)="onReuse($event)" />
     </app-dev-tool-shell>
   `,
 })
@@ -75,6 +77,14 @@ export class DateDifferenceToolComponent implements OnDestroy {
     this.scheduleHistoryRecord();
   }
 
+  onReuse(entry: DevHistoryEntry): void {
+    const separatorIndex = entry.input.indexOf(RANGE_SEPARATOR);
+    if (separatorIndex === -1) return;
+    this.from.set(entry.input.slice(0, separatorIndex));
+    this.to.set(entry.input.slice(separatorIndex + RANGE_SEPARATOR.length));
+    this.scheduleHistoryRecord();
+  }
+
   private scheduleHistoryRecord(): void {
     clearTimeout(this.historyTimer);
     this.historyTimer = setTimeout(() => {
@@ -82,7 +92,7 @@ export class DateDifferenceToolComponent implements OnDestroy {
       if (!r) return;
       void this.historyService.addEntry(
         'date-difference',
-        `${this.from()} → ${this.to()}`,
+        `${this.from()}${RANGE_SEPARATOR}${this.to()}`,
         `${r.days}d ${r.hours}h ${r.minutes}m ${r.seconds}s`,
       );
     }, HISTORY_DEBOUNCE_MS);

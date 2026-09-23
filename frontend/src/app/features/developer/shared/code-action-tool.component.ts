@@ -1,9 +1,9 @@
-import { Component, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DevToolShellComponent } from './dev-tool-shell.component';
 import { CopyButtonComponent } from './copy-button.component';
 import { DevHistoryPanelComponent } from './dev-history-panel.component';
-import { DevHistoryService } from './dev-history.service';
+import { DevHistoryEntry, DevHistoryService } from './dev-history.service';
 
 const HISTORY_DEBOUNCE_MS = 900;
 
@@ -45,6 +45,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         <div class="space-y-1">
           <label class="form-label">Input</label>
           <textarea
+            #mainInput
             class="input-field h-64 resize-y font-mono text-sm"
             [placeholder]="placeholder"
             [ngModel]="input()"
@@ -60,7 +61,7 @@ const HISTORY_DEBOUNCE_MS = 900;
         </div>
       </div>
 
-      <app-dev-history-panel [toolId]="toolId" />
+      <app-dev-history-panel [toolId]="toolId" (reuse)="onReuse($event)" />
     </app-dev-tool-shell>
   `,
 })
@@ -72,6 +73,8 @@ export class CodeActionToolComponent implements OnInit, OnDestroy {
   @Input({ required: true }) formatFn!: (input: string) => string;
   @Input({ required: true }) minifyFn!: (input: string) => string;
   @Input() placeholder = 'Paste code…';
+
+  @ViewChild('mainInput') private readonly mainInput?: ElementRef<HTMLTextAreaElement>;
 
   private readonly historyService = inject(DevHistoryService);
   private historyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -92,6 +95,12 @@ export class CodeActionToolComponent implements OnInit, OnDestroy {
   onInputChange(value: string): void {
     this.input.set(value);
     this.run();
+  }
+
+  onReuse(entry: DevHistoryEntry): void {
+    this.onInputChange(entry.input);
+    this.mainInput?.nativeElement.focus();
+    this.mainInput?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   setMode(mode: 'format' | 'minify'): void {
