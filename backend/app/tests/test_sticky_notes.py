@@ -319,3 +319,21 @@ async def test_title_content_search_unaffected_by_tags(client):
     assert results.status_code == 200
     assert len(results.json()) == 1
     assert results.json()[0]["title"] == "Groceries"
+
+
+@pytest.mark.parametrize(
+    ("stored", "expected"),
+    [(None, []), ([], []), ("[]", []), ('["work", "home"]', ["work", "home"]), ("not json", [])],
+)
+def test_response_accepts_tags_stored_as_json_text(stored, expected):
+    # Postgres returns the TEXT-backed JSON column as a raw string.
+    from app.modules.sticky_notes.schemas import StickyNoteResponse
+
+    now = datetime.now(timezone.utc)
+    resp = StickyNoteResponse.model_validate(
+        {
+            "id": "n1", "title": None, "content": "x", "color": "yellow", "is_pinned": False,
+            "order_index": 0, "note_month": "2026-09", "tags": stored, "created_at": now, "updated_at": now,
+        }
+    )
+    assert resp.tags == expected

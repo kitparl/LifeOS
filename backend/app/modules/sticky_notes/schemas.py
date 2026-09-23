@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import datetime
 from typing import Literal
@@ -77,8 +78,15 @@ class StickyNoteResponse(BaseModel):
 
     @field_validator("tags", mode="before")
     @classmethod
-    def _default_tags(cls, v: list[str] | None) -> list[str]:
-        return v or []
+    def _default_tags(cls, v: list[str] | str | None) -> list[str]:
+        # The column is TEXT (see migrations.py); on Postgres the JSON type comes
+        # back as the raw string, e.g. '[]' — same issue as running race photos.
+        if isinstance(v, str):
+            try:
+                v = json.loads(v)
+            except json.JSONDecodeError:
+                return []
+        return [str(t) for t in v] if isinstance(v, list) else []
 
 
 class StickyNoteMonth(BaseModel):
