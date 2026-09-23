@@ -67,8 +67,14 @@ const FIT_PADDING = 16;
       /* Selectable/searchable text overlay, positioned over the canvas by pdf.js's
          TextLayer. Rules trimmed from pdfjs-dist/web/pdf_viewer.css (just the
          .textLayer subset) rather than importing that whole viewer-chrome
-         stylesheet, to stay consistent with the app's own theme. */
-      .textLayer {
+         stylesheet, to stay consistent with the app's own theme.
+
+         ::ng-deep is required here, not stylistic: TextLayer inserts its spans
+         with plain DOM calls, outside Angular's template, so they never get the
+         _ngcontent scoping attribute emulated encapsulation relies on — an
+         ordinary scoped ".textLayer span {...}" rule silently never matches them,
+         leaving raw black, unpositioned, wrongly-sized text sitting on the canvas. */
+      :host ::ng-deep .textLayer {
         --min-font-size: 1;
         --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
         --min-font-size-inv: calc(1 / var(--min-font-size));
@@ -84,14 +90,14 @@ const FIT_PADDING = 16;
         caret-color: CanvasText;
         z-index: 0;
       }
-      .textLayer :is(span, br) {
+      :host ::ng-deep .textLayer :is(span, br) {
         color: transparent;
         position: absolute;
         white-space: pre;
         cursor: text;
         transform-origin: 0% 0%;
       }
-      .textLayer > :not(.markedContent) {
+      :host ::ng-deep .textLayer > :not(.markedContent) {
         z-index: 1;
         --font-height: 0;
         font-size: calc(var(--text-scale-factor) * var(--font-height));
@@ -99,17 +105,17 @@ const FIT_PADDING = 16;
         --rotate: 0deg;
         transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
       }
-      .textLayer .markedContent {
+      :host ::ng-deep .textLayer .markedContent {
         display: contents;
       }
-      .textLayer span[role='img'] {
+      :host ::ng-deep .textLayer span[role='img'] {
         user-select: none;
         cursor: default;
       }
-      .textLayer ::selection {
+      :host ::ng-deep .textLayer ::selection {
         background: color-mix(in srgb, AccentColor, transparent 75%);
       }
-      .textLayer .endOfContent {
+      :host ::ng-deep .textLayer .endOfContent {
         display: block;
         position: absolute;
         inset: 100% 0 0;
