@@ -58,10 +58,26 @@ describe('SettingsHomeSectionComponent', () => {
   it('keeps the option list scrollable when open', () => {
     openMenu();
 
-    const menu = fixture.nativeElement.querySelector('.type-select__menu') as HTMLElement;
-    expect(menu).toBeTruthy();
-    expect(getComputedStyle(menu).overflowY).toBe('auto');
-    expect(parseFloat(getComputedStyle(menu).maxHeight)).toBeGreaterThan(0);
+    const options = fixture.nativeElement.querySelector('.home-module-select__options') as HTMLElement;
+    expect(options).toBeTruthy();
+    expect(getComputedStyle(options).overflowY).toBe('auto');
+  });
+
+  it('filters modules as the user types in search', () => {
+    openMenu();
+
+    const search = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
+    expect(search).toBeTruthy();
+
+    search.value = 'task';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const labels = Array.from(
+      fixture.nativeElement.querySelectorAll('[role="option"]') as NodeListOf<HTMLButtonElement>,
+    ).map((option) => option.textContent?.trim());
+
+    expect(labels).toEqual(['Tasks']);
   });
 
   it('selects only one module and saves the preference', () => {

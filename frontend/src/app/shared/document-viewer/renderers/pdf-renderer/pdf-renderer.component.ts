@@ -9,6 +9,7 @@ import {
   Output,
   SimpleChanges,
   ViewChild,
+  signal,
 } from '@angular/core';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 
@@ -18,12 +19,12 @@ import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pdf-renderer">
-      @if (loading) {
+      @if (loading()) {
         <p class="state-text">Loading PDF…</p>
-      } @else if (error) {
-        <p class="state-text error">{{ error }}</p>
+      } @else if (error()) {
+        <p class="state-text error">{{ error() }}</p>
       }
-      <canvas #canvas [hidden]="loading || !!error"></canvas>
+      <canvas #canvas [hidden]="loading() || !!error()"></canvas>
     </div>
   `,
   styles: [
@@ -61,8 +62,8 @@ export class PdfRendererComponent implements OnChanges, OnDestroy {
 
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  loading = true;
-  error: string | null = null;
+  loading = signal(true);
+  error = signal<string | null>(null);
 
   private pdfDoc: PDFDocumentProxy | null = null;
   private renderTask: RenderTask | null = null;
@@ -83,8 +84,8 @@ export class PdfRendererComponent implements OnChanges, OnDestroy {
   }
 
   private async loadDocument(): Promise<void> {
-    this.loading = true;
-    this.error = null;
+    this.loading.set(true);
+    this.error.set(null);
     try {
       const pdfjs = await import('pdfjs-dist');
       // Served as a static asset (see angular.json "assets") — a `new URL(pkg-path,
@@ -102,14 +103,15 @@ export class PdfRendererComponent implements OnChanges, OnDestroy {
       }
       this.pdfDoc = doc;
       this.pageCountChange.emit(doc.numPages);
-      this.loading = false;
+      this.loading.set(false);
       await this.renderPage();
     } catch (err) {
       if (this.destroyed) return;
       console.error('[PdfRenderer] failed to load PDF', err);
-      this.error = 'Could not load this PDF.';
-      this.loading = false;
-      this.loadError.emit(this.error);
+      const message = 'Could not load this PDF.';
+      this.error.set(message);
+      this.loading.set(false);
+      this.loadError.emit(message);
     }
   }
 
