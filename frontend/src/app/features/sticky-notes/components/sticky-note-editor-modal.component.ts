@@ -94,7 +94,7 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
               <button
                 type="button"
                 class="leading-none text-[var(--text-faint)] hover:text-[var(--text)]"
-                aria-label="Remove tag {{ tag }}"
+                [attr.aria-label]="'Remove tag ' + tag"
                 title="Remove tag"
                 (click)="removeTag(tag)"
               >✕</button>
