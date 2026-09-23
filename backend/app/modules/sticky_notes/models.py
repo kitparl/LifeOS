@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -27,6 +27,7 @@ class StickyNote(Base):
     color: Mapped[str] = mapped_column(String(16), nullable=False, default="yellow")
     is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    tags: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     # Month the note was created in ("YYYY-MM"); fixed at creation, does not
     # move when the note is later edited.
     note_month: Mapped[str] = mapped_column(String(7), index=True, nullable=False)

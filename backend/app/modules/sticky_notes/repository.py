@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.sticky_notes.models import StickyNote
-from app.modules.sticky_notes.schemas import StickyNoteCreate, StickyNoteUpdate
+from app.modules.sticky_notes.schemas import StickyNoteCreate, StickyNoteUpdate, normalize_tag
 
 _ORDER = (StickyNote.is_pinned.desc(), StickyNote.order_index.asc())
 
@@ -60,13 +60,26 @@ class StickyNoteRepository:
         return list(result.scalars().all())
 
     async def search(self, user_id: str, query: str) -> list[StickyNote]:
+        # Text search matches title/content as before. Tag search: every
+        # whitespace-separated token (with or without a leading '#') is
+        # normalized the same way tags are stored, and a note must carry ALL
+        # of them (AND) to match by tag — precise for multi-tag queries.
+        # Notes are included if either the text match OR the tag match hits.
         like = f"%{query}%"
+        conditions = [StickyNote.title.ilike(like), StickyNote.content.ilike(like)]
+
+        tag_tokens = [normalize_tag(t) for t in query.split()]
+        tag_tokens = [t for t in tag_tokens if t]
+        if tag_tokens:
+            tags_as_text = cast(StickyNote.tags, String)
+            conditions.append(and_(*[tags_as_text.ilike(f'%"{t}"%') for t in tag_tokens]))
+
         result = await self.db.execute(
             select(StickyNote)
             .where(
                 StickyNote.user_id == user_id,
                 StickyNote.deleted_at.is_(None),
-                or_(StickyNote.title.ilike(like), StickyNote.content.ilike(like)),
+                or_(*conditions),
             )
             .order_by(StickyNote.updated_at.desc())
         )

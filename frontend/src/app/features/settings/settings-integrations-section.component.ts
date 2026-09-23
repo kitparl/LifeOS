@@ -14,14 +14,8 @@ import {
   standalone: true,
   imports: [RouterLink],
   template: `
-    <div class="panel !p-0 overflow-hidden">
-      <div class="title-bar rounded-none border-x-0 border-t-0">Integrations</div>
-      <div class="p-3 space-y-3 text-sm">
-        <p style="color: var(--text-muted)">
-          Turn integrations on or off here. Manage tokens, chat IDs, digests, and webhooks on the
-          <a routerLink="/integrations" class="link">Integrations</a> page.
-        </p>
-
+    <div class="panel max-w-2xl">
+      <div class="space-y-3 text-sm">
         @if (loading()) {
           <p class="text-xs" style="color: var(--text-muted)">Loading…</p>
         } @else if (!connections().length) {
@@ -42,14 +36,16 @@ import {
                     }
                   </p>
                 </div>
-                <label class="flex items-center gap-2 text-xs">
+                <label class="toggle-switch gap-2 text-xs" [title]="c.enabled ? 'Turn off' : 'Turn on'">
+                  <span style="color: var(--text-muted)">{{ c.enabled ? 'On' : 'Off' }}</span>
                   <input
                     type="checkbox"
                     [checked]="c.enabled"
                     [disabled]="busyId() === c.id"
+                    [attr.aria-label]="'Enable ' + (c.display_name || c.provider)"
                     (change)="toggle(c, $event)"
                   />
-                  {{ c.enabled ? 'On' : 'Off' }}
+                  <span class="toggle-switch__track" aria-hidden="true"></span>
                 </label>
               </li>
             }
@@ -60,9 +56,14 @@ import {
           <p class="text-xs" [style.color]="ok() ? 'var(--success)' : 'var(--danger)'">{{ message() }}</p>
         }
 
-        <a routerLink="/integrations" class="btn-secondary text-xs no-underline inline-block">
-          Open Integrations hub
-        </a>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--xp-border)] pt-3">
+          <a routerLink="/integrations" class="btn-secondary text-xs no-underline inline-block">
+            Open Integrations hub
+          </a>
+          <span class="text-xs" style="color: var(--text-muted)">
+            Your inbox stays at <a routerLink="/notifications" class="link">Notifications</a>.
+          </span>
+        </div>
       </div>
     </div>
   `,

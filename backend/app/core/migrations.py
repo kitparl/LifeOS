@@ -103,6 +103,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("finance_loans", "foreclosure_notes", "TEXT"),
     # Sticky notes: soft-delete (60-day retention before purge)
     ("sticky_notes", "deleted_at", "TIMESTAMP"),
+    # Sticky notes: tags (JSON array stored as TEXT; NULL on pre-existing rows)
+    ("sticky_notes", "tags", "TEXT"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [

@@ -8,6 +8,7 @@ export interface StickyNote {
   is_pinned: boolean;
   order_index: number;
   note_month: string;
+  tags: string[];
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -72,6 +73,15 @@ export function stickyNoteYearOptions(
     if (Number.isFinite(year)) years.add(year);
   }
   return [...years].sort((a, b) => b - a);
+}
+
+const TAG_MAX_LENGTH = 40;
+const TAG_INVALID_CHARS = /[^a-z0-9_-]/g;
+
+/** Strips a leading '#', lowercases, trims, and drops disallowed characters. Mirrors backend normalize_tag(). */
+export function normalizeTag(raw: string): string {
+  const withoutHash = raw.trim().replace(/^#+/, '');
+  return withoutHash.trim().toLowerCase().replace(TAG_INVALID_CHARS, '').slice(0, TAG_MAX_LENGTH);
 }
 
 /** Days left before a soft-deleted note is permanently purged (never negative). */

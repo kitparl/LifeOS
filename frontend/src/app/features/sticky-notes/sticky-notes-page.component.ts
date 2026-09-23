@@ -105,7 +105,7 @@ type NotesView = 'period' | 'all' | 'deleted';
             type="search"
             class="input-field w-full text-sm"
             style="padding-left: 2.25rem"
-            placeholder="Search notes…"
+            placeholder="Search notes or #tags…"
             [value]="searchQuery()"
             (input)="onSearchInput($event)"
           />

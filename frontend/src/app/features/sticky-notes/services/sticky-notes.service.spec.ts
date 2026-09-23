@@ -16,6 +16,7 @@ describe('StickyNotesService', () => {
     is_pinned: false,
     order_index: 0,
     note_month: '2026-09',
+    tags: [] as string[],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     deleted_at: null,
@@ -98,6 +99,24 @@ describe('StickyNotesService', () => {
     const req = http.expectOne(`${environment.apiUrl}/sticky-notes/all`);
     expect(req.request.method).toBe('GET');
     req.flush([sampleNote]);
+  });
+
+  it('creates a note with tags', () => {
+    service.create({ content: 'Standup notes', tags: ['scrum', 'meeting'] }).subscribe((n) => {
+      expect(n.tags).toEqual(['scrum', 'meeting']);
+    });
+    const req = http.expectOne(`${environment.apiUrl}/sticky-notes`);
+    expect(req.request.body.tags).toEqual(['scrum', 'meeting']);
+    req.flush({ ...sampleNote, tags: ['scrum', 'meeting'] });
+  });
+
+  it('updates tags on an existing note', () => {
+    service.update('1', { tags: ['scrum'] }).subscribe((n) => {
+      expect(n.tags).toEqual(['scrum']);
+    });
+    const req = http.expectOne(`${environment.apiUrl}/sticky-notes/1`);
+    expect(req.request.body.tags).toEqual(['scrum']);
+    req.flush({ ...sampleNote, tags: ['scrum'] });
   });
 
   it('lists soft-deleted notes', () => {

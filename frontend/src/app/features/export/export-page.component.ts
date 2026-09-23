@@ -7,38 +7,33 @@ import { ExportService } from './services/export.service';
   standalone: true,
   imports: [ReactiveFormsModule],
   template: `
-    <div class="max-w-lg space-y-3">
-      <p class="text-sm" style="color: var(--text-muted)">Download your LifeOS data as JSON or CSV (CSV opens in Excel).</p>
-
-      <div class="panel !p-0 overflow-hidden">
-        <div class="title-bar rounded-none border-x-0 border-t-0">Export</div>
-        <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="download()">
-          <div>
-            <label class="mb-1 block">Module</label>
-            <select class="input-field" formControlName="module">
-              @for (m of modules; track m) {
-                <option [value]="m">{{ m }}</option>
-              }
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block">Format</label>
-            <select class="input-field" formControlName="format">
-              <option value="json">JSON</option>
-              <option value="csv">CSV</option>
-            </select>
-          </div>
-          @if (message) {
-            <p class="text-xs text-green-700">{{ message }}</p>
-          }
-          @if (error) {
-            <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
-          }
-          <button type="submit" class="btn-primary" [disabled]="downloading">
-            {{ downloading ? 'Downloading…' : 'Download' }}
-          </button>
-        </form>
-      </div>
+    <div class="panel max-w-md">
+      <form class="space-y-3 text-sm" [formGroup]="form" (ngSubmit)="download()">
+        <div>
+          <label class="form-label" for="export-module">Module</label>
+          <select id="export-module" class="input-field" formControlName="module">
+            @for (m of modules; track m) {
+              <option [value]="m">{{ m }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="export-format">Format</label>
+          <select id="export-format" class="input-field" formControlName="format">
+            <option value="json">JSON</option>
+            <option value="csv">CSV</option>
+          </select>
+        </div>
+        @if (message) {
+          <p class="text-xs text-green-700">{{ message }}</p>
+        }
+        @if (error) {
+          <p class="text-xs" style="color: var(--danger)">{{ error }}</p>
+        }
+        <button type="submit" class="btn-primary" [disabled]="downloading">
+          {{ downloading ? 'Downloading…' : 'Download' }}
+        </button>
+      </form>
     </div>
   `,
 })

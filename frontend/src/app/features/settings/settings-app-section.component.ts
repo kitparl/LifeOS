@@ -5,10 +5,10 @@ import { PwaService } from '../../core/services/pwa.service';
   selector: 'app-settings-app-section',
   standalone: true,
   template: `
-    <div class="space-y-3">
-      <p class="text-sm text-[var(--text-muted)]">
-        LifeOS updates itself when you reopen the app. Use these controls if the installed app is
-        still showing an older version — on iPhone there is no browser reload button.
+    <div class="panel max-w-2xl space-y-3">
+      <p class="text-sm">
+        LifeOS updates itself when you reopen the app. Use these if the installed app still shows
+        an older version — on iPhone there is no browser reload button.
       </p>
 
       <div class="flex flex-wrap gap-2">
@@ -22,7 +22,7 @@ import { PwaService } from '../../core/services/pwa.service';
         <p class="text-sm" style="color: var(--text-muted)">{{ message }}</p>
       }
 
-      <p class="text-xs" style="color: var(--text-muted)">
+      <p class="border-t border-[var(--xp-border)] pt-3 text-xs" style="color: var(--text-muted)">
         Force refresh clears the offline cache and reloads from the server. Unsynced offline changes
         are kept, but the app will need the network to start.
       </p>

@@ -4,9 +4,9 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { StickyNote, StickyNoteMonth } from '../models/sticky-note.models';
 
-export type StickyNoteCreate = Partial<Pick<StickyNote, 'title' | 'content' | 'color' | 'is_pinned'>>;
+export type StickyNoteCreate = Partial<Pick<StickyNote, 'title' | 'content' | 'color' | 'is_pinned' | 'tags'>>;
 export type StickyNoteUpdate = Partial<
-  Pick<StickyNote, 'title' | 'content' | 'color' | 'is_pinned' | 'order_index'>
+  Pick<StickyNote, 'title' | 'content' | 'color' | 'is_pinned' | 'order_index' | 'tags'>
 >;
 
 @Injectable({ providedIn: 'root' })

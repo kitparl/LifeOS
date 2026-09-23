@@ -14,14 +14,13 @@ import {
   standalone: true,
   imports: [ReactiveFormsModule, ModalComponent],
   template: `
-    <div class="max-w-md space-y-6">
+    <div class="max-w-md space-y-4">
       <div>
-        <div class="title-bar">Profile</div>
         <div class="panel">
           <form [formGroup]="form" (ngSubmit)="onSubmit()" class="flex flex-col gap-3">
             <label class="text-sm font-medium">
               Email
-              <input class="input-field mt-1 bg-gray-100" type="email" [value]="email()" disabled />
+              <input class="input-field mt-1" type="email" [value]="email()" disabled />
             </label>
             <label class="text-sm font-medium">
               Display name
@@ -43,9 +42,9 @@ import {
       </div>
 
       <div>
-        <div class="title-bar">Username</div>
         <div class="panel">
           <form [formGroup]="usernameForm" (ngSubmit)="openConfirm()" class="flex flex-col gap-3">
+            <h4 class="text-sm font-semibold">Username</h4>
             <p class="text-sm text-[var(--text-muted)]">
               Current username:
               <strong>{{ '@' + (currentUsername() || '—') }}</strong>

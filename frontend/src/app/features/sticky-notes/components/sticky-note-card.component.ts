@@ -38,6 +38,14 @@ import { STICKY_NOTE_COLORS, StickyNote, daysUntilPurge, stickyNoteDisplayTitle 
         </button>
       }
 
+      @if (note.tags?.length) {
+        <div class="flex flex-wrap gap-1">
+          @for (tag of note.tags; track tag) {
+            <span class="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">#{{ tag }}</span>
+          }
+        </div>
+      }
+
       <div class="flex items-center justify-between gap-2 border-t border-[var(--border)] pt-2 text-[10px] text-[var(--text-faint)]">
         @if (deletedMode) {
           <span>Deleted — removed in {{ daysLeft() }} day{{ daysLeft() === 1 ? '' : 's' }}</span>

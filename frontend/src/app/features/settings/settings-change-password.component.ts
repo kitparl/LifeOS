@@ -8,59 +8,56 @@ import { SecretInputComponent } from '../../shared/secret-input/secret-input.com
   standalone: true,
   imports: [ReactiveFormsModule, SecretInputComponent],
   template: `
-    <div class="panel !p-0 overflow-hidden max-w-md">
-      <div class="title-bar">Change Password</div>
-      <div style="padding: 1rem;">
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="flex flex-col gap-3">
-          <div class="flex flex-col gap-1">
-            <label class="form-label" for="cp-current">Current password</label>
-            <app-secret-input
-              inputId="cp-current"
-              formControlName="current_password"
-              autocomplete="current-password"
-              placeholder="Enter current password"
-            />
-          </div>
+    <div class="panel max-w-md">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="flex flex-col gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="form-label" for="cp-current">Current password</label>
+          <app-secret-input
+            inputId="cp-current"
+            formControlName="current_password"
+            autocomplete="current-password"
+            placeholder="Enter current password"
+          />
+        </div>
 
-          <div class="flex flex-col gap-1">
-            <label class="form-label" for="cp-new">New password</label>
-            <app-secret-input
-              inputId="cp-new"
-              formControlName="new_password"
-              autocomplete="new-password"
-              placeholder="At least 8 characters"
-            />
-          </div>
+        <div class="flex flex-col gap-1">
+          <label class="form-label" for="cp-new">New password</label>
+          <app-secret-input
+            inputId="cp-new"
+            formControlName="new_password"
+            autocomplete="new-password"
+            placeholder="At least 8 characters"
+          />
+        </div>
 
-          <div class="flex flex-col gap-1">
-            <label class="form-label" for="cp-confirm">Confirm new password</label>
-            <app-secret-input
-              inputId="cp-confirm"
-              formControlName="confirm_password"
-              autocomplete="new-password"
-              placeholder="Repeat new password"
-            />
-            @if (form.errors?.['mismatch'] && form.get('confirm_password')?.touched) {
-              <p class="text-xs" style="color: var(--danger)">Passwords do not match.</p>
-            }
-          </div>
-
-          @if (success()) {
-            <p class="text-sm" style="color: var(--success)">Password changed successfully.</p>
+        <div class="flex flex-col gap-1">
+          <label class="form-label" for="cp-confirm">Confirm new password</label>
+          <app-secret-input
+            inputId="cp-confirm"
+            formControlName="confirm_password"
+            autocomplete="new-password"
+            placeholder="Repeat new password"
+          />
+          @if (form.errors?.['mismatch'] && form.get('confirm_password')?.touched) {
+            <p class="text-xs" style="color: var(--danger)">Passwords do not match.</p>
           }
-          @if (error()) {
-            <p class="text-sm" style="color: var(--danger)">{{ error() }}</p>
-          }
+        </div>
 
-          <button
-            class="btn-primary"
-            type="submit"
-            [disabled]="form.invalid || saving()"
-          >
-            {{ saving() ? 'Saving…' : 'Update password' }}
-          </button>
-        </form>
-      </div>
+        @if (success()) {
+          <p class="text-sm" style="color: var(--success)">Password changed successfully.</p>
+        }
+        @if (error()) {
+          <p class="text-sm" style="color: var(--danger)">{{ error() }}</p>
+        }
+
+        <button
+          class="btn-primary"
+          type="submit"
+          [disabled]="form.invalid || saving()"
+        >
+          {{ saving() ? 'Saving…' : 'Update password' }}
+        </button>
+      </form>
     </div>
   `,
 })

@@ -5,14 +5,10 @@ import { CurrencyPreferencesService } from '../../core/services/currency-prefere
   selector: 'app-settings-currency-section',
   standalone: true,
   template: `
-    <div class="space-y-3">
-      <p class="text-sm text-[var(--text-muted)]">
-        The currency amounts are shown in across Finance.
-      </p>
-
-      <div class="panel !p-0 overflow-hidden">
-        <div class="title-bar">Currency</div>
-        <div class="flex flex-wrap gap-2 p-3">
+    <div class="panel max-w-2xl space-y-3">
+      <div>
+        <p class="form-label">Display currency</p>
+        <div class="flex flex-wrap gap-2">
           @for (option of currencyPrefs.options; track option.code) {
             <button
               type="button"
@@ -26,12 +22,12 @@ import { CurrencyPreferencesService } from '../../core/services/currency-prefere
             </button>
           }
         </div>
-        <div class="border-t border-[var(--xp-border)] px-3 py-2 text-xs" style="color: var(--text-muted)">
-          Preview: {{ currencyPrefs.format(100000) }} · {{ currencyPrefs.format(850) }}
-        </div>
       </div>
-
-      <p class="text-xs" style="color: var(--text-muted)">
+      <p class="text-sm">
+        <span style="color: var(--text-muted)">Preview:</span>
+        {{ currencyPrefs.format(100000) }} · {{ currencyPrefs.format(850) }}
+      </p>
+      <p class="border-t border-[var(--xp-border)] pt-3 text-xs" style="color: var(--text-muted)">
         This changes how amounts are displayed, not what they are worth. Existing
         entries keep their recorded numbers — nothing is converted between currencies.
       </p>

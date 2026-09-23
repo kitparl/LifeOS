@@ -1,6 +1,6 @@
-import { Component, DestroyRef, OnInit, inject } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, ElementRef, computed, effect, inject, viewChild } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ExportPageComponent } from '../export/export-page.component';
 import { ProfileComponent } from '../profile/profile.component';
 import { SettingsAppSectionComponent } from './settings-app-section.component';
@@ -10,7 +10,9 @@ import { SettingsHomeSectionComponent } from './settings-home-section.component'
 import { SettingsEditorSectionComponent } from './settings-editor-section.component';
 import { SettingsCurrencySectionComponent } from './settings-currency-section.component';
 import { SettingsChangePasswordComponent } from './settings-change-password.component';
+import { groupSettingsSections, resolveSettingsSection } from './settings-sections';
 
+/** Settings shell: registry-driven nav (see settings-sections.ts) + one section at a time. */
 @Component({
   selector: 'app-settings-hub',
   standalone: true,
@@ -27,93 +29,139 @@ import { SettingsChangePasswordComponent } from './settings-change-password.comp
     SettingsAppSectionComponent,
   ],
   template: `
-    <div class="space-y-8">
-      <nav class="flex flex-wrap gap-2 text-sm">
-        @for (s of sections; track s.id) {
-          <a class="rounded-lg border border-[var(--xp-border)] px-3 py-1.5 no-underline hover:bg-[var(--surface-3)]"
-             routerLink="/settings" [fragment]="s.id">
-            {{ s.label }}
-          </a>
-        }
-      </nav>
+    <div class="mx-auto max-w-5xl space-y-4">
+      <header>
+        <h2 class="text-lg font-semibold">Settings</h2>
+        <p class="text-sm text-[var(--text-muted)]">Manage your account, connections, and how LifeOS behaves.</p>
+      </header>
 
-      <section id="profile" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Profile</h2>
-        <app-profile />
-      </section>
+      <!-- Mobile: sticky section picker -->
+      <div class="settings-picker md:hidden">
+        <label class="sr-only" for="settings-section-picker">Settings section</label>
+        <select
+          id="settings-section-picker"
+          class="input-field"
+          (change)="select($any($event.target).value)"
+        >
+          @for (group of groups; track group.category) {
+            <optgroup [label]="group.category">
+              @for (s of group.sections; track s.id) {
+                <option [value]="s.id" [selected]="s.id === active().id">{{ s.label }}</option>
+              }
+            </optgroup>
+          }
+        </select>
+      </div>
 
-      <section id="password" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Password</h2>
-        <app-settings-change-password />
-      </section>
+      <div class="md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+        <!-- Desktop: sticky grouped nav -->
+        <nav class="settings-nav hidden md:block" aria-label="Settings sections">
+          @for (group of groups; track group.category) {
+            <p class="section-heading">{{ group.category }}</p>
+            <ul class="mb-3">
+              @for (s of group.sections; track s.id) {
+                <li>
+                  <a
+                    class="settings-nav__item"
+                    [class.settings-nav__item--active]="s.id === active().id"
+                    [attr.aria-current]="s.id === active().id ? 'page' : null"
+                    routerLink="/settings"
+                    [fragment]="s.id"
+                  >
+                    {{ s.label }}
+                  </a>
+                </li>
+              }
+            </ul>
+          }
+        </nav>
 
-      <section id="integrations" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Integrations</h2>
-        <p class="text-sm text-[var(--text-muted)]">
-          Enable or disable delivery channels. Your notification inbox remains at
-          <a routerLink="/notifications" class="link">Notifications</a>.
-        </p>
-        <app-settings-integrations-section />
-      </section>
+        <section #sectionEl [id]="active().id" class="min-w-0 max-w-3xl scroll-mt-16 space-y-4 md:scroll-mt-4">
+          <div>
+            <p class="text-xs text-[var(--text-muted)]">{{ active().category }}</p>
+            <h3 class="text-base font-semibold">{{ active().label }}</h3>
+            @if (active().description) {
+              <p class="mt-0.5 text-sm text-[var(--text-muted)]">{{ active().description }}</p>
+            }
+          </div>
 
-      <section id="export" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Export</h2>
-        <app-export-page />
-      </section>
-
-      <section id="sidebar" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Sidebar</h2>
-        <app-settings-sidebar-section />
-      </section>
-
-      <section id="home" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Default Home Module</h2>
-        <app-settings-home-section />
-      </section>
-
-      <section id="editor" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Editor</h2>
-        <app-settings-editor-section />
-      </section>
-
-      <section id="currency" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">Currency</h2>
-        <app-settings-currency-section />
-      </section>
-
-      <section id="app" class="scroll-mt-24 space-y-3">
-        <h2 class="text-base font-semibold">App updates</h2>
-        <app-settings-app-section />
-      </section>
+          @switch (active().id) {
+            @case ('profile') { <app-profile /> }
+            @case ('password') { <app-settings-change-password /> }
+            @case ('integrations') { <app-settings-integrations-section /> }
+            @case ('export') { <app-export-page /> }
+            @case ('sidebar') { <app-settings-sidebar-section /> }
+            @case ('home') { <app-settings-home-section /> }
+            @case ('editor') { <app-settings-editor-section /> }
+            @case ('currency') { <app-settings-currency-section /> }
+            @case ('app') { <app-settings-app-section /> }
+          }
+        </section>
+      </div>
     </div>
+
+    <style>
+      .settings-picker {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        margin: 0 -0.25rem;
+        padding: 0.375rem 0.25rem;
+        background: var(--page-bg);
+        border-bottom: 1px solid var(--border);
+      }
+      .settings-nav {
+        position: sticky;
+        top: 0.75rem;
+        align-self: start;
+      }
+      .settings-nav__item {
+        display: block;
+        padding: 0.4rem 0.625rem;
+        border-radius: 4px;
+        font-size: 0.8125rem;
+        color: var(--text);
+        text-decoration: none;
+        border-left: 2px solid transparent;
+      }
+      .settings-nav__item:hover {
+        background: var(--surface-3);
+      }
+      .settings-nav__item--active,
+      .settings-nav__item--active:hover {
+        background: var(--sidebar-active-bg);
+        color: var(--sidebar-active-text);
+        border-left-color: var(--primary);
+        font-weight: 500;
+      }
+    </style>
   `,
 })
-export class SettingsHubComponent implements OnInit {
+export class SettingsHubComponent {
   private readonly route = inject(ActivatedRoute);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+  private readonly sectionEl = viewChild<ElementRef<HTMLElement>>('sectionEl');
 
-  readonly sections = [
-    { id: 'profile', label: 'Profile' },
-    { id: 'password', label: 'Password' },
-    { id: 'integrations', label: 'Integrations' },
-    { id: 'export', label: 'Export' },
-    { id: 'sidebar', label: 'Sidebar' },
-    { id: 'home', label: 'Default Home Module' },
-    { id: 'editor', label: 'Editor' },
-    { id: 'currency', label: 'Currency' },
-    { id: 'app', label: 'App updates' },
-  ];
+  readonly groups = groupSettingsSections();
 
-  ngOnInit(): void {
-    this.route.fragment.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((fragment) => {
-      if (!fragment) {
-        return;
-      }
-      // Map legacy #notifications → #integrations
-      const target = fragment === 'notifications' ? 'integrations' : fragment;
+  private readonly fragment = toSignal(this.route.fragment, { initialValue: this.route.snapshot.fragment });
+  readonly active = computed(() => resolveSettingsSection(this.fragment()));
+
+  constructor() {
+    // When switching sections after scrolling down, bring the new section's heading back into view.
+    effect(() => {
+      this.active();
+      const el = this.sectionEl()?.nativeElement;
+      if (!el) return;
       requestAnimationFrame(() => {
-        document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (el.getBoundingClientRect().top < 64) {
+          el.scrollIntoView({ block: 'start' });
+        }
       });
     });
+  }
+
+  select(id: string): void {
+    void this.router.navigate(['/settings'], { fragment: id });
   }
 }

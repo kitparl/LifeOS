@@ -2,6 +2,7 @@ import {
   STICKY_NOTES_PURGE_AFTER_DAYS,
   currentMonthKey,
   daysUntilPurge,
+  normalizeTag,
   stickyNoteDisplayTitle,
   stickyNoteMonthKey,
   stickyNoteMonthLabel,
@@ -52,6 +53,25 @@ describe('sticky-note.models', () => {
       expect(years).toContain(2026);
       expect(years).toContain(2016);
       expect(years).toContain(2014);
+    });
+  });
+
+  describe('normalizeTag', () => {
+    it('strips a leading # and lowercases', () => {
+      expect(normalizeTag('#Scrum')).toBe('scrum');
+    });
+
+    it('trims whitespace', () => {
+      expect(normalizeTag('  meeting  ')).toBe('meeting');
+    });
+
+    it('strips invalid characters, keeping letters/digits/underscore/hyphen', () => {
+      expect(normalizeTag('New Requirement!')).toBe('newrequirement');
+    });
+
+    it('returns an empty string for a blank or #-only tag', () => {
+      expect(normalizeTag('   ')).toBe('');
+      expect(normalizeTag('#')).toBe('');
     });
   });
 

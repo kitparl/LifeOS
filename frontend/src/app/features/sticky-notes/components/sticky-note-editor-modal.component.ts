@@ -22,6 +22,7 @@ import {
   STICKY_NOTE_COLORS,
   StickyNote,
   StickyNoteColor,
+  normalizeTag,
   stickyNoteDisplayTitle,
 } from '../models/sticky-note.models';
 import { StickyNoteUpdate, StickyNotesService } from '../services/sticky-notes.service';
@@ -46,6 +47,13 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
       [background]="'var(--note-' + color() + ')'"
       maxWidth="480px"
       [hasFooter]="true"
+      [closeOnBackdrop]="false"
+      [resizable]="true"
+      resizeStorageKey="sticky-note-editor-size"
+      [resizeMinWidth]="320"
+      [resizeMinHeight]="240"
+      [resizeMaxWidth]="900"
+      [resizeMaxHeight]="820"
       (closed)="onClose()"
     >
       <ng-container headerActions>
@@ -78,6 +86,31 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
           [value]="content()"
           (input)="onContentInput($event)"
         ></textarea>
+
+        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+          @for (tag of tags(); track tag) {
+            <span class="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/70 px-2 py-0.5 text-xs text-[var(--text)]">
+              #{{ tag }}
+              <button
+                type="button"
+                class="leading-none text-[var(--text-faint)] hover:text-[var(--text)]"
+                aria-label="Remove tag {{ tag }}"
+                title="Remove tag"
+                (click)="removeTag(tag)"
+              >✕</button>
+            </span>
+          }
+          <input
+            #tagInput
+            type="text"
+            class="min-w-[90px] flex-1 border-0 bg-transparent px-0 py-0.5 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
+            [placeholder]="tags().length ? '' : 'Add tag…'"
+            [value]="tagDraft"
+            (input)="onTagDraftInput($event)"
+            (keydown)="onTagKeydown($event)"
+            (blur)="onTagBlur()"
+          />
+        </div>
       </ng-container>
 
       <ng-container footer>
@@ -162,6 +195,7 @@ export class StickyNoteEditorModalComponent implements AfterViewInit, OnChanges 
 
   @ViewChild('titleInput') titleInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild('contentInput') contentInputRef?: ElementRef<HTMLTextAreaElement>;
+  @ViewChild('tagInput') tagInputRef?: ElementRef<HTMLInputElement>;
 
   private readonly service = inject(StickyNotesService);
   private readonly destroyRef = inject(DestroyRef);
@@ -176,7 +210,9 @@ export class StickyNoteEditorModalComponent implements AfterViewInit, OnChanges 
   readonly content = signal('');
   readonly color = signal<StickyNoteColor>('yellow');
   readonly isPinned = signal(false);
+  readonly tags = signal<string[]>([]);
   readonly saveStatus = signal<'idle' | 'saving' | 'saved'>('idle');
+  tagDraft = '';
 
   private readonly dirty$ = new Subject<void>();
   private focused = false;
@@ -215,6 +251,8 @@ export class StickyNoteEditorModalComponent implements AfterViewInit, OnChanges 
       this.content.set(this.note?.content ?? '');
       this.color.set((this.note?.color as StickyNoteColor) ?? 'yellow');
       this.isPinned.set(this.note?.is_pinned ?? false);
+      this.tags.set(this.note?.tags ?? []);
+      this.tagDraft = '';
       this.saveStatus.set('idle');
       this.syncedNoteId = incomingId;
     }
@@ -286,13 +324,24 @@ export class StickyNoteEditorModalComponent implements AfterViewInit, OnChanges 
   }
 
   onClose(): void {
+    this.commitTagDraft();
     if (this.isDirty()) this.save();
     this.closed.emit();
   }
 
   private isDirty(): boolean {
-    if (!this.note) return this.title().trim().length > 0 || this.content().trim().length > 0;
-    return this.title() !== (this.note.title ?? '') || this.content() !== (this.note.content ?? '');
+    if (!this.note) {
+      return this.title().trim().length > 0 || this.content().trim().length > 0 || this.tags().length > 0;
+    }
+    return (
+      this.title() !== (this.note.title ?? '') ||
+      this.content() !== (this.note.content ?? '') ||
+      !this.tagsEqual(this.tags(), this.note.tags ?? [])
+    );
+  }
+
+  private tagsEqual(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((t, i) => t === b[i]);
   }
 
   /** Debounced autosave while typing: creates the note on first non-blank input, updates it after. */
@@ -300,17 +349,65 @@ export class StickyNoteEditorModalComponent implements AfterViewInit, OnChanges 
     if (!this.isDirty()) return;
     const title = this.title().trim() || null;
     const content = this.content();
+    const tags = this.tags();
     if (this.note?.id) {
-      this.patchExisting({ title, content });
+      this.patchExisting({ title, content, tags });
       return;
     }
-    if (!title && !content.trim()) return;
+    // Tags alone are enough to create a note — tagging is an intentional act.
+    if (!title && !content.trim() && tags.length === 0) return;
     this.saveStatus.set('saving');
-    this.service.create({ title, content, color: this.color(), is_pinned: this.isPinned() }).subscribe((created) => {
-      this.note = created;
-      this.saveStatus.set('saved');
-      this.created.emit(created);
-    });
+    this.service
+      .create({ title, content, color: this.color(), is_pinned: this.isPinned(), tags })
+      .subscribe((created) => {
+        this.note = created;
+        this.tags.set(created.tags ?? []);
+        this.saveStatus.set('saved');
+        this.created.emit(created);
+      });
+  }
+
+  onTagDraftInput(event: Event): void {
+    this.tagDraft = (event.target as HTMLInputElement).value;
+  }
+
+  onTagKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      this.commitTagDraft();
+      this.persistTags();
+    } else if (event.key === 'Backspace' && !this.tagDraft && this.tags().length > 0) {
+      this.removeTag(this.tags()[this.tags().length - 1]);
+    }
+  }
+
+  onTagBlur(): void {
+    this.commitTagDraft();
+    this.persistTags();
+  }
+
+  /** Folds any in-progress tag text into tags() without persisting — callers persist afterwards. */
+  private commitTagDraft(): void {
+    const raw = this.tagDraft;
+    this.tagDraft = '';
+    if (this.tagInputRef) this.tagInputRef.nativeElement.value = '';
+    const tag = normalizeTag(raw);
+    if (!tag || this.tags().includes(tag)) return;
+    this.tags.set([...this.tags(), tag]);
+  }
+
+  removeTag(tag: string): void {
+    this.tags.set(this.tags().filter((t) => t !== tag));
+    this.persistTags();
+  }
+
+  /** Tag chips change is a discrete action — persist immediately rather than waiting on the debounce. */
+  private persistTags(): void {
+    if (this.note?.id) {
+      this.patchExisting({ tags: this.tags() });
+    } else {
+      this.save();
+    }
   }
 
   /** Immediate PATCH for a note that already exists. */

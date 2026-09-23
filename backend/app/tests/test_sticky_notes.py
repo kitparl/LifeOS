@@ -220,3 +220,102 @@ async def test_notes_are_scoped_per_user(client):
         f"/api/v1/sticky-notes/{note_id}", headers={"Authorization": f"Bearer {token_b}"}
     )
     assert cross_access.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_tags_are_normalized_on_create(client):
+    token = await _auth_token(client, "tagnorm@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    created = await client.post(
+        "/api/v1/sticky-notes",
+        headers=headers,
+        json={"content": "standup notes", "tags": ["#Scrum", "  meeting ", "#scrum", "New Requirement!", ""]},
+    )
+    assert created.status_code == 201
+    # "#Scrum" and "#scrum" collapse to one; case-folded, '#' stripped, invalid
+    # chars dropped, blank entries dropped, order of first occurrence kept.
+    assert created.json()["tags"] == ["scrum", "meeting", "newrequirement"]
+
+
+@pytest.mark.asyncio
+async def test_tags_persist_across_update_and_reload(client):
+    token = await _auth_token(client, "tagpersist@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    created = (
+        await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "sprint planning"})
+    ).json()
+    assert created["tags"] == []
+
+    updated = await client.patch(
+        f"/api/v1/sticky-notes/{created['id']}", headers=headers, json={"tags": ["scrum", "meeting"]}
+    )
+    assert updated.status_code == 200
+    assert updated.json()["tags"] == ["scrum", "meeting"]
+
+    reloaded = await client.get(f"/api/v1/sticky-notes/{created['id']}", headers=headers)
+    assert reloaded.json()["tags"] == ["scrum", "meeting"]
+
+    # Removing a chip: PATCH with the remaining tags only.
+    removed = await client.patch(
+        f"/api/v1/sticky-notes/{created['id']}", headers=headers, json={"tags": ["scrum"]}
+    )
+    assert removed.json()["tags"] == ["scrum"]
+
+
+@pytest.mark.asyncio
+async def test_search_matches_tag_with_or_without_hash(client):
+    token = await _auth_token(client, "tagsearch@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    tagged = (
+        await client.post(
+            "/api/v1/sticky-notes",
+            headers=headers,
+            json={"title": "Standup", "content": "unrelated body text", "tags": ["meeting"]},
+        )
+    ).json()
+    await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "no tags here"})
+
+    by_hash = await client.get("/api/v1/sticky-notes/search", headers=headers, params={"q": "#meeting"})
+    assert [n["id"] for n in by_hash.json()] == [tagged["id"]]
+
+    by_plain = await client.get("/api/v1/sticky-notes/search", headers=headers, params={"q": "meeting"})
+    assert [n["id"] for n in by_plain.json()] == [tagged["id"]]
+
+
+@pytest.mark.asyncio
+async def test_search_multi_tag_requires_all_tags(client):
+    token = await _auth_token(client, "multitag@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    both = (
+        await client.post(
+            "/api/v1/sticky-notes", headers=headers, json={"content": "a", "tags": ["scrum", "meeting"]}
+        )
+    ).json()
+    only_scrum = (
+        await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "b", "tags": ["scrum"]})
+    ).json()
+
+    results = await client.get(
+        "/api/v1/sticky-notes/search", headers=headers, params={"q": "#scrum #meeting"}
+    )
+    ids = [n["id"] for n in results.json()]
+    assert ids == [both["id"]]
+    assert only_scrum["id"] not in ids
+
+
+@pytest.mark.asyncio
+async def test_title_content_search_unaffected_by_tags(client):
+    token = await _auth_token(client, "textsearch@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/api/v1/sticky-notes", headers=headers, json={"title": "Groceries", "content": "eggs"})
+    await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "unrelated"})
+
+    results = await client.get("/api/v1/sticky-notes/search", headers=headers, params={"q": "grocer"})
+    assert results.status_code == 200
+    assert len(results.json()) == 1
+    assert results.json()[0]["title"] == "Groceries"
