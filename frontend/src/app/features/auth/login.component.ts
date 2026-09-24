@@ -1,8 +1,10 @@
-import { AfterViewInit, Component, ElementRef, NgZone, ViewChild, inject, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, NgZone, ViewChild, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-login',
@@ -109,10 +111,15 @@ import { AuthService } from '../../core/services/auth.service';
             </button>
           </form>
 
-          <div [hidden]="!googleEnabled()">
+          @if (googleState() !== 'off') {
             <div class="login-divider"><span>or</span></div>
-            <div #googleButton class="login-google"></div>
-          </div>
+            <div #googleSlot class="login-google">
+              @if (googleState() === 'loading') {
+                <div class="skeleton login-google__placeholder"></div>
+              }
+              <div #googleButton class="login-google__button"></div>
+            </div>
+          }
         </div>
 
         <!-- Footer -->
@@ -279,6 +286,23 @@ import { AuthService } from '../../core/services/auth.service';
         display: flex;
         justify-content: center;
         min-height: 40px;
+        /* Google's button is a light-scheme iframe; matching it avoids the browser
+           painting an opaque white backdrop behind it when the page is dark. */
+        color-scheme: light;
+        position: relative;
+      }
+
+      /* Holds the button's space while Google's iframe loads (no layout shift). */
+      .login-google__placeholder {
+        position: absolute;
+        inset: 0;
+      }
+
+      .login-google__button {
+        position: relative;
+        width: 100%;
+        display: flex;
+        justify-content: center;
       }
 
       /* Footer */
@@ -324,12 +348,31 @@ export class LoginComponent implements AfterViewInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly zone = inject(NgZone);
+  private readonly theme = inject(ThemeService);
+  private googleInitialized = false;
 
+  @ViewChild('googleSlot') private googleSlot?: ElementRef<HTMLElement>;
   @ViewChild('googleButton') private googleButton?: ElementRef<HTMLElement>;
 
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
-  readonly googleEnabled = signal(false);
+  /** loading = placeholder shown; ready = Google's button painted; off = hidden. */
+  readonly googleState = signal<'loading' | 'ready' | 'off'>('loading');
+
+  // Start the config fetch and the Google script download together, as soon as
+  // the page is created, instead of one after the other.
+  private readonly googleSetup = Promise.all([
+    firstValueFrom(this.auth.getGoogleClientId()),
+    loadGoogleScript(),
+  ]);
+
+  constructor() {
+    // Re-render Google's button so it follows light/dark theme switches.
+    effect(() => {
+      const mode = this.theme.resolved();
+      if (this.googleInitialized) this.drawGoogleButton(mode);
+    });
+  }
 
   readonly form = this.fb.nonNullable.group({
     identifier: ['', Validators.required],
@@ -337,35 +380,50 @@ export class LoginComponent implements AfterViewInit {
   });
 
   ngAfterViewInit(): void {
-    this.auth.getGoogleClientId().subscribe({
-      next: (clientId) => {
-        if (!clientId) return;
-        loadGoogleScript()
-          .then(() => this.renderGoogleButton(clientId))
-          .catch(() => {
-            // Script blocked/offline: keep password login usable, hide the Google option.
-            this.zone.run(() => this.googleEnabled.set(false));
-          });
-      },
-      error: () => this.googleEnabled.set(false),
-    });
+    this.googleSetup
+      .then(([clientId]) => {
+        if (!clientId) {
+          this.zone.run(() => this.googleState.set('off'));
+          return;
+        }
+        this.renderGoogleButton(clientId);
+      })
+      .catch(() => {
+        // Config/script failed (offline, blocked): keep password login, hide Google.
+        this.zone.run(() => this.googleState.set('off'));
+      });
   }
 
   private renderGoogleButton(clientId: string): void {
-    const el = this.googleButton?.nativeElement;
-    if (!el) return;
     google.accounts.id.initialize({
       client_id: clientId,
       callback: (res: { credential?: string }) =>
         this.zone.run(() => this.onGoogleCredential(res.credential)),
     });
+    this.googleInitialized = true;
+    this.drawGoogleButton(this.theme.resolved());
+  }
+
+  private drawGoogleButton(mode: 'light' | 'dark'): void {
+    const el = this.googleButton?.nativeElement;
+    if (!el) return;
+    el.replaceChildren();
+    const width = this.googleSlot?.nativeElement.clientWidth || 340;
     google.accounts.id.renderButton(el, {
-      theme: 'outline',
+      type: 'standard',
+      theme: mode === 'dark' ? 'filled_black' : 'outline',
       size: 'large',
       text: 'continue_with',
-      width: 340,
+      shape: 'rectangular',
+      logo_alignment: 'left',
+      // Match the form width (Google caps the button at 400px).
+      width: Math.min(400, width),
     });
-    this.zone.run(() => this.googleEnabled.set(true));
+    // Drop the placeholder once Google's iframe has painted the button.
+    const markReady = () => this.zone.run(() => this.googleState.set('ready'));
+    const iframe = el.querySelector('iframe');
+    if (iframe) iframe.addEventListener('load', markReady, { once: true });
+    else markReady();
   }
 
   private onGoogleCredential(credential: string | undefined): void {
