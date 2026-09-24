@@ -32,7 +32,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (!(err instanceof HttpErrorResponse) || err.status !== 401) {
         return throwError(() => err);
       }
-      if (shouldSkipRefresh(req.url) || req.headers.has('X-Retry')) {
+      // No in-memory token → guest page (e.g. /register-access). Refresh-on-401
+      // would call clearSession() and bounce to /login.
+      if (!token || shouldSkipRefresh(req.url) || req.headers.has('X-Retry')) {
         return throwError(() => err);
       }
 

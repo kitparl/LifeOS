@@ -176,7 +176,11 @@ export class AuthService {
     this.cancelRefreshTimer();
     this.accessToken.set(null);
     this.user.set(null);
-    this.router.navigate(['/login']);
+    const path = this.router.url.split('?')[0];
+    const publicPaths = ['/login', '/register', '/register-access', '/add-new-user', '/offline'];
+    if (!publicPaths.includes(path)) {
+      void this.router.navigate(['/login']);
+    }
   }
 
   private scheduleProactiveRefresh(): void {
