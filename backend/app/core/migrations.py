@@ -189,10 +189,41 @@ async def ensure_columns(conn: AsyncConnection) -> None:
             logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
 
     await drop_obsolete_columns(conn, dialect)
+    await widen_columns(conn, dialect)
     await backfill_telegram_timezone(conn)
     await backfill_usernames(conn)
     await backfill_finance_expense_kind(conn)
     await backfill_finance_loan_status(conn)
+
+
+# Columns whose VARCHAR length grew. SQLite ignores VARCHAR lengths, so only Postgres needs this.
+_COLUMNS_TO_WIDEN: list[tuple[str, str, str]] = [
+    # Calendar: Google Calendar event ids as source_id
+    ("calendar_events", "source_id", "VARCHAR(255)"),
+]
+
+
+async def widen_columns(conn: AsyncConnection, dialect: str) -> None:
+    """Idempotently widen VARCHAR columns; skips columns already at the target length."""
+    if dialect != "postgresql":
+        return
+    for table, column, col_type in _COLUMNS_TO_WIDEN:
+        target = int(col_type.split("(")[1].rstrip(")"))
+        try:
+            current = (
+                await conn.execute(
+                    text(
+                        "SELECT character_maximum_length FROM information_schema.columns "
+                        "WHERE table_name = :t AND column_name = :c"
+                    ),
+                    {"t": table, "c": column},
+                )
+            ).scalar()
+            if current is None or current >= target:
+                continue
+            await conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE {col_type}"))
+        except Exception as exc:
+            logger.warning("Could not widen column %s.%s: %s", table, column, exc)
 
 
 async def drop_obsolete_columns(conn: AsyncConnection, dialect: str) -> None:

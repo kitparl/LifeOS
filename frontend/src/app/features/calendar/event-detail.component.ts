@@ -17,14 +17,16 @@ import { CalendarService } from './services/calendar.service';
             <p class="text-xs capitalize" style="color: var(--text-muted)">
               {{ e.category }} · {{ e.recurrence }}
               @if (e.source_module) {
-                · <span class="qa-type-badge">{{ e.source_module }}</span>
+                · <span class="qa-type-badge">{{ e.source_module === 'google_calendar' ? 'Google' : e.source_module }}</span>
               }
             </p>
           </div>
-          <div class="flex gap-2">
-            <a [routerLink]="['/calendar', e.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
-            <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
-          </div>
+          @if (!e.read_only) {
+            <div class="flex gap-2">
+              <a [routerLink]="['/calendar', e.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
+              <button type="button" class="btn-danger text-xs" (click)="remove()">Delete</button>
+            </div>
+          }
         </div>
 
         <div class="panel text-sm space-y-2">

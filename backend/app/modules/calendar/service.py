@@ -11,6 +11,8 @@ from app.core.exceptions import get_or_404
 # Modules whose calendar events mirror an owning entity. Editing/deleting such an
 # event from the Calendar propagates back to the source (two-way sync).
 _RUNNING_SOURCE = "running"
+# Imported from Google Calendar; edits/deletes are gated (read-only unless two-way).
+_GOOGLE_SOURCE = "google_calendar"
 
 def _sort_key(dt: datetime) -> datetime:
     """Coerce naive datetimes (e.g. from SQLite) to UTC-aware so mixed lists sort safely."""
@@ -129,6 +131,10 @@ class CalendarService:
             items = [EventListItem.model_validate(e) for e in events]
 
         items.sort(key=lambda i: _sort_key(i.starts_at))
+        if any(i.source_module == _GOOGLE_SOURCE for i in items) and await self._google_read_only(user_id):
+            for i in items:
+                if i.source_module == _GOOGLE_SOURCE:
+                    i.read_only = True
         total = len(items)
         if limit is None:
             return items, total
@@ -136,7 +142,10 @@ class CalendarService:
 
     async def get_event(self, user_id: str, event_id: str) -> EventResponse:
         event = get_or_404(await self.repo.get_by_id(user_id, event_id), "Event not found")
-        return EventResponse.model_validate(event)
+        resp = EventResponse.model_validate(event)
+        if event.source_module == _GOOGLE_SOURCE:
+            resp.read_only = await self._google_read_only(user_id)
+        return resp
 
     async def create_event(self, user_id: str, data: EventCreate) -> EventResponse:
         event = await self.repo.create(user_id, data)
@@ -156,14 +165,31 @@ class CalendarService:
 
     async def update_event(self, user_id: str, event_id: str, data: EventUpdate) -> EventResponse:
         event = get_or_404(await self.repo.get_by_id(user_id, event_id), "Event not found")
+        if event.source_module == _GOOGLE_SOURCE:
+            # Rejects when read-only; otherwise writes to Google first so a Google
+            # failure aborts the request before the local row changes.
+            from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
+
+            await GoogleCalendarSyncService(self.db).push_update(
+                user_id, event, data.model_dump(exclude_unset=True)
+            )
         updated = await self.repo.update(event, data)
         await self._propagate_to_source(user_id, updated)
         return EventResponse.model_validate(updated)
 
     async def delete_event(self, user_id: str, event_id: str) -> None:
         event = get_or_404(await self.repo.get_by_id(user_id, event_id), "Event not found")
+        if event.source_module == _GOOGLE_SOURCE:
+            from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
+
+            await GoogleCalendarSyncService(self.db).push_delete(user_id, event)
         await self._delete_source(user_id, event)
         await self.repo.delete(event)
+
+    async def _google_read_only(self, user_id: str) -> bool:
+        from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
+
+        return await GoogleCalendarSyncService(self.db).is_read_only(user_id)
 
     async def _propagate_to_source(self, user_id: str, event: CalendarEvent) -> None:
         """Reverse sync: mirror a linked event's edits back to its owning entity.

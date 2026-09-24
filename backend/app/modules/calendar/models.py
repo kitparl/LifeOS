@@ -31,7 +31,8 @@ class CalendarEvent(Base):
     # events. Any future module (tasks, study planner, travel) can integrate via
     # the same (source_module, source_id) contract — see CalendarSyncService.
     source_module: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    source_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # 255 fits Google Calendar event ids (recurring instances exceed 36 chars).
+    source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)

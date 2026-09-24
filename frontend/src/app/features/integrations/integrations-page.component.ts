@@ -1,5 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { GithubConfigComponent } from './components/github-config.component';
+import { GoogleCalendarConfigComponent } from './components/google-calendar-config.component';
 import { SarvamConfigComponent } from './components/sarvam-config.component';
 import { TelegramConfigComponent } from './components/telegram-config.component';
 import {
@@ -11,7 +12,7 @@ import {
 @Component({
   selector: 'app-integrations-page',
   standalone: true,
-  imports: [TelegramConfigComponent, GithubConfigComponent, SarvamConfigComponent],
+  imports: [TelegramConfigComponent, GithubConfigComponent, SarvamConfigComponent, GoogleCalendarConfigComponent],
   template: `
     <div class="space-y-4">
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -24,6 +25,12 @@ import {
             />
           } @else if (p.provider === 'github') {
             <app-github-config
+              [displayName]="p.display_name"
+              [description]="p.description"
+              (connectionsChanged)="loadConnections()"
+            />
+          } @else if (p.provider === 'google_calendar') {
+            <app-google-calendar-config
               [displayName]="p.display_name"
               [description]="p.description"
               (connectionsChanged)="loadConnections()"

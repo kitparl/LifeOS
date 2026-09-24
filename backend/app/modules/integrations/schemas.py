@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -242,3 +243,33 @@ class SarvamTestResponse(BaseModel):
     ok: bool
     detail: str
     model: str | None = None
+
+
+class GoogleCalendarConfigUpdate(BaseModel):
+    enabled: bool | None = None
+    sync_direction: Literal["google_to_lifeos", "two_way"] | None = None
+
+
+class GoogleCalendarConfigStatus(BaseModel):
+    """Public status — never includes refresh/access tokens."""
+
+    connection_id: str
+    provider: str = "google_calendar"
+    enabled: bool
+    status: str
+    configured: bool
+    server_configured: bool
+    sync_direction: str = "google_to_lifeos"
+    can_write: bool = False
+    last_sync_at: datetime | None = None
+    last_sync_message: str | None = None
+    last_sync_ok: bool | None = None
+
+
+class GoogleCalendarOAuthStartResponse(BaseModel):
+    auth_url: str
+
+
+class GoogleCalendarOAuthCallback(BaseModel):
+    code: str = Field(min_length=1, max_length=2048)
+    state: str = Field(min_length=1, max_length=2048)

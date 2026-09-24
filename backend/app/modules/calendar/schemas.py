@@ -58,6 +58,8 @@ class EventListItem(BaseModel):
     location: str | None
     source_module: str | None = None
     source_id: str | None = None
+    # True for Google Calendar-sourced events unless two-way sync is active.
+    read_only: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -75,6 +77,8 @@ class EventResponse(BaseModel):
     location: str | None
     source_module: str | None = None
     source_id: str | None = None
+    # True for Google Calendar-sourced events unless two-way sync is active.
+    read_only: bool = False
     created_at: datetime
     updated_at: datetime
 

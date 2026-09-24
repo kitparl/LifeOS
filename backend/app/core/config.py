@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:4200"
     cookie_secure: bool | None = Field(default=None, validation_alias="COOKIE_SECURE")
     google_client_id: str = ""
+    # Google Calendar integration only (OAuth authorization-code flow). Login does not use these.
+    google_client_secret: str = Field(default="", validation_alias="GOOGLE_CLIENT_SECRET")
+    # Frontend URL Google redirects back to, e.g. https://lifeos.example.com/integrations
+    google_calendar_redirect_uri: str = Field(default="", validation_alias="GOOGLE_CALENDAR_REDIRECT_URI")
     github_client_id: str = ""
     s3_bucket: str = ""
     s3_region: str = "us-east-1"

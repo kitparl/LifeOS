@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +12,10 @@ from app.modules.integrations.schemas import (
     DetectChatIdResponse,
     DigestResponse,
     GitHubConfigStatus,
+    GoogleCalendarConfigStatus,
+    GoogleCalendarConfigUpdate,
+    GoogleCalendarOAuthCallback,
+    GoogleCalendarOAuthStartResponse,
     GitHubConfigUpdate,
     GitHubSyncResponse,
     GitHubTestResponse,
@@ -31,6 +37,7 @@ from app.modules.integrations.schemas import (
     TelegramWebhookStatus,
 )
 from app.modules.integrations.github.sync_service import GitHubSyncService
+from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
 from app.modules.integrations.service import IntegrationService, list_integration_providers
 from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 
@@ -90,6 +97,57 @@ async def test_github(
     db: AsyncSession = Depends(get_db),
 ):
     return await IntegrationService(db).test_github(user.id)
+
+
+@router.get("/google-calendar", response_model=GoogleCalendarConfigStatus)
+async def get_google_calendar_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GoogleCalendarSyncService(db).get_status(user.id)
+
+
+@router.put("/google-calendar/config", response_model=GoogleCalendarConfigStatus)
+async def save_google_calendar_config(
+    data: GoogleCalendarConfigUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GoogleCalendarSyncService(db).save_config(user.id, data)
+
+
+@router.get("/google-calendar/oauth/start", response_model=GoogleCalendarOAuthStartResponse)
+async def start_google_calendar_oauth(
+    mode: Literal["google_to_lifeos", "two_way"] = Query(default="google_to_lifeos"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return GoogleCalendarOAuthStartResponse(auth_url=GoogleCalendarSyncService(db).oauth_start(user.id, mode))
+
+
+@router.post("/google-calendar/oauth/callback", response_model=GoogleCalendarConfigStatus)
+async def complete_google_calendar_oauth(
+    data: GoogleCalendarOAuthCallback,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GoogleCalendarSyncService(db).oauth_callback(user.id, data.code, data.state)
+
+
+@router.post("/google-calendar/sync", response_model=IntegrationSyncResponse)
+async def sync_google_calendar(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GoogleCalendarSyncService(db).sync(user.id)
+
+
+@router.delete("/google-calendar", status_code=status.HTTP_204_NO_CONTENT)
+async def disconnect_google_calendar(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await GoogleCalendarSyncService(db).disconnect(user.id)
 
 
 @router.get("/sarvam", response_model=SarvamConfigStatus)

@@ -29,6 +29,7 @@ from app.modules.integrations.github.config import (
     parse_config as parse_github_config,
     serialize_config as serialize_github_config,
 )
+from app.modules.integrations.google_calendar.config import parse_config as parse_google_calendar_config
 from app.modules.integrations.sarvam_config import (
     mask_config as mask_sarvam_config,
     parse_config as parse_sarvam_config,
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
     IntegrationProviderInfo(provider="github", display_name="GitHub", description="Sync Knowledge Notes to a repository", oauth_required=False),
-    IntegrationProviderInfo(provider="google_calendar", display_name="Google Calendar", description="Two-way calendar sync", oauth_required=True),
+    IntegrationProviderInfo(provider="google_calendar", display_name="Google Calendar", description="Import Google Calendar events (optional two-way)", oauth_required=True),
     IntegrationProviderInfo(provider="google_fit", display_name="Google Fit", description="Activity and health metrics", oauth_required=True),
     IntegrationProviderInfo(provider="apple_health", display_name="Apple Health", description="Health data import", oauth_required=True),
     IntegrationProviderInfo(provider="garmin", display_name="Garmin", description="Runs and workouts", oauth_required=True),
@@ -58,6 +59,9 @@ PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
     IntegrationProviderInfo(provider="gemini", display_name="Gemini", description="Alternative AI provider", oauth_required=False),
     IntegrationProviderInfo(provider="sarvam", display_name="Sarvam AI", description="Writing feedback (sarvam-105b)", oauth_required=False),
 ]
+
+# Providers whose config_json holds encrypted secrets and is managed only by dedicated endpoints.
+_SECRET_CONFIG_PROVIDERS = frozenset({"telegram", "github", "sarvam", "google_calendar"})
 
 def list_integration_providers() -> list[IntegrationProviderInfo]:
     return PROVIDER_CATALOG
@@ -71,6 +75,8 @@ def _safe_response(conn) -> IntegrationResponse:
     if conn.provider == "github":
         resp.config_json = None
     if conn.provider == "sarvam":
+        resp.config_json = None
+    if conn.provider == "google_calendar":
         resp.config_json = None
     return resp
 
@@ -100,6 +106,10 @@ class IntegrationService:
             create_data = data.model_copy(update={"config_json": None})
         if data.provider == "sarvam" and data.config_json:
             create_data = data.model_copy(update={"config_json": None})
+        if data.provider == "google_calendar":
+            # Tokens only arrive via the OAuth callback; never accept raw config,
+            # and never enable before OAuth has produced a refresh token.
+            create_data = data.model_copy(update={"config_json": None, "enabled": False})
         conn = await self.repo.create(user_id, create_data, display_name)
         return _safe_response(conn)
 
@@ -108,13 +118,14 @@ class IntegrationService:
     ) -> IntegrationResponse:
         conn = get_or_404(await self.repo.get_by_id(user_id, conn_id), "Integration not found")
         update_data = data
-        if conn.provider == "telegram" and data.config_json is not None:
-            # Reject raw config_json on generic PATCH; use dedicated telegram config endpoint.
-            update_data = data.model_copy(update={"config_json": None})
-        if conn.provider == "github" and data.config_json is not None:
-            update_data = data.model_copy(update={"config_json": None})
-        if conn.provider == "sarvam" and data.config_json is not None:
-            update_data = data.model_copy(update={"config_json": None})
+        if conn.provider in _SECRET_CONFIG_PROVIDERS:
+            # Ignore raw config_json on generic PATCH; secrets go through the dedicated
+            # config endpoints. Drop the field entirely: model_copy(update={"config_json": None})
+            # would mark it as set, and repo.update would then wipe the stored config.
+            update_data = IntegrationUpdate(**data.model_dump(exclude_unset=True, exclude={"config_json"}))
+        if conn.provider == "google_calendar":
+            if data.enabled and not parse_google_calendar_config(conn.config_json).connected:
+                raise BadRequestError("Connect Google Calendar from Integrations before enabling it")
         updated = await self.repo.update(conn, update_data)
         return _safe_response(updated)
 
@@ -127,6 +138,11 @@ class IntegrationService:
                 remove_user_digest_job(user_id)
             except Exception:
                 logger.exception("Failed to remove scheduled jobs for user=%s", user_id)
+        if conn.provider == "google_calendar":
+            from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
+
+            await GoogleCalendarSyncService(self.repo.db).disconnect(user_id)
+            return
         await self.repo.delete(conn)
 
     async def sync_connection(self, user_id: str, conn_id: str) -> IntegrationSyncResponse:
@@ -135,6 +151,10 @@ class IntegrationService:
             raise BadRequestError("Integration is disabled")
         if conn.provider == "github":
             raise BadRequestError("Use POST /integrations/github/sync/section/{section_id} to sync notes",)
+        if conn.provider == "google_calendar":
+            from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
+
+            return await GoogleCalendarSyncService(self.repo.db).sync(user_id)
         now = datetime.now(timezone.utc)
         conn.last_sync_at = now
         conn.status = "synced"

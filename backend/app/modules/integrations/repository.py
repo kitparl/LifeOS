@@ -56,6 +56,15 @@ class IntegrationRepository:
         )
         return list(result.scalars().all())
 
+    async def list_enabled_by_provider(self, provider: str) -> list[IntegrationConnection]:
+        result = await self.db.execute(
+            select(IntegrationConnection).where(
+                IntegrationConnection.provider == provider,
+                IntegrationConnection.enabled.is_(True),
+            )
+        )
+        return list(result.scalars().all())
+
     async def create(self, user_id: str, data: IntegrationCreate, display_name: str) -> IntegrationConnection:
         conn = IntegrationConnection(
             user_id=user_id,

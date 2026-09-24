@@ -210,6 +210,34 @@ export interface SarvamTestResponse {
   model?: string | null;
 }
 
+export type GoogleCalendarSyncDirection = 'google_to_lifeos' | 'two_way';
+
+export interface GoogleCalendarConfigStatus {
+  connection_id: string;
+  provider: string;
+  enabled: boolean;
+  status: string;
+  configured: boolean;
+  server_configured: boolean;
+  sync_direction: GoogleCalendarSyncDirection;
+  can_write: boolean;
+  last_sync_at: string | null;
+  last_sync_message: string | null;
+  last_sync_ok: boolean | null;
+}
+
+export interface GoogleCalendarConfigUpdate {
+  enabled?: boolean | null;
+  sync_direction?: GoogleCalendarSyncDirection | null;
+}
+
+export interface IntegrationSyncResult {
+  provider: string;
+  status: string;
+  message: string;
+  synced_at: string;
+}
+
 export const TELEGRAM_EVENT_OPTIONS: { key: string; label: string }[] = [
   { key: 'task_created', label: 'New task' },
   { key: 'race_added', label: 'New race' },
@@ -323,5 +351,33 @@ export class IntegrationsService {
 
   testSarvam(): Observable<SarvamTestResponse> {
     return this.http.post<SarvamTestResponse>(`${this.api}/sarvam/test`, {});
+  }
+
+  getGoogleCalendar(): Observable<GoogleCalendarConfigStatus> {
+    return this.http.get<GoogleCalendarConfigStatus>(`${this.api}/google-calendar`);
+  }
+
+  saveGoogleCalendarConfig(body: GoogleCalendarConfigUpdate): Observable<GoogleCalendarConfigStatus> {
+    return this.http.put<GoogleCalendarConfigStatus>(`${this.api}/google-calendar/config`, body);
+  }
+
+  startGoogleCalendarOAuth(mode: GoogleCalendarSyncDirection): Observable<{ auth_url: string }> {
+    const params = new HttpParams().set('mode', mode);
+    return this.http.get<{ auth_url: string }>(`${this.api}/google-calendar/oauth/start`, { params });
+  }
+
+  completeGoogleCalendarOAuth(code: string, state: string): Observable<GoogleCalendarConfigStatus> {
+    return this.http.post<GoogleCalendarConfigStatus>(`${this.api}/google-calendar/oauth/callback`, {
+      code,
+      state,
+    });
+  }
+
+  syncGoogleCalendar(): Observable<IntegrationSyncResult> {
+    return this.http.post<IntegrationSyncResult>(`${this.api}/google-calendar/sync`, {});
+  }
+
+  disconnectGoogleCalendar(): Observable<void> {
+    return this.http.delete<void>(`${this.api}/google-calendar`);
   }
 }

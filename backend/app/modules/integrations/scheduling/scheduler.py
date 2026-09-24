@@ -165,6 +165,15 @@ async def _run_sticky_notes_purge() -> None:
             logger.exception("Sticky notes purge job failed")
 
 
+async def _run_google_calendar_sync() -> None:
+    from app.modules.integrations.google_calendar.sync_service import sync_all_enabled
+
+    try:
+        await sync_all_enabled()
+    except Exception:
+        logger.exception("Google Calendar sync job failed")
+
+
 async def _run_routines_expire() -> None:
     from datetime import date
 
@@ -346,11 +355,19 @@ def start_scheduler() -> AsyncIOScheduler:
         max_instances=1,
         misfire_grace_time=3600,
     )
+    _scheduler.add_job(
+        _run_google_calendar_sync,
+        trigger=IntervalTrigger(minutes=30),
+        id="google_calendar_sync",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=600,
+    )
     _scheduler.start()
     _install_after_commit_hook()
     logger.info(
         "APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST, "
-        "qa purge 00:05 IST, sticky notes purge 00:06 IST)"
+        "qa purge 00:05 IST, sticky notes purge 00:06 IST, google calendar 30m)"
     )
     return _scheduler
 

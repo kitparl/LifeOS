@@ -173,6 +173,9 @@ interface QuickCreateState {
                   🔁 {{ detailEvent()!.recurrence }}
                 </span>
               }
+              @if (detailEvent()!.source_module === 'google_calendar') {
+                <span class="qa-type-badge">Google</span>
+              }
             </div>
 
             <!-- Location -->
@@ -192,23 +195,29 @@ interface QuickCreateState {
             }
           </div>
           <div class="modal-footer">
-            <button
-              type="button"
-              class="btn-ghost text-xs"
-              style="color: var(--danger)"
-              (click)="deleteEvent(detailEvent()!.id)"
-              [disabled]="deleting()"
-            >
-              {{ deleting() ? 'Deleting…' : 'Delete' }}
-            </button>
+            @if (!detailEvent()!.read_only) {
+              <button
+                type="button"
+                class="btn-ghost text-xs"
+                style="color: var(--danger)"
+                (click)="deleteEvent(detailEvent()!.id)"
+                [disabled]="deleting()"
+              >
+                {{ deleting() ? 'Deleting…' : 'Delete' }}
+              </button>
+            } @else {
+              <span class="text-xs" style="color: var(--text-muted)">Synced from Google (read-only)</span>
+            }
             <div class="flex-1"></div>
-            <a
-              [routerLink]="['/calendar', detailEvent()!.id, 'edit']"
-              class="btn-secondary text-xs no-underline"
-              (click)="closeDetail()"
-            >
-              Edit
-            </a>
+            @if (!detailEvent()!.read_only) {
+              <a
+                [routerLink]="['/calendar', detailEvent()!.id, 'edit']"
+                class="btn-secondary text-xs no-underline"
+                (click)="closeDetail()"
+              >
+                Edit
+              </a>
+            }
             <button type="button" class="btn-primary text-xs" (click)="closeDetail()">Done</button>
           </div>
         </div>
@@ -323,6 +332,7 @@ export class CalendarListComponent {
   private toFCEvent(e: EventListItem): EventInput {
     const color = this.categoryColor(e.category);
     const isRoutine = e.source_module === 'routine' || e.id.startsWith('routine:');
+    const locked = isRoutine || !!e.read_only;
     return {
       id: e.id,
       title: e.title,
@@ -331,9 +341,9 @@ export class CalendarListComponent {
       allDay: e.all_day,
       backgroundColor: color,
       borderColor: color,
-      editable: !isRoutine,
-      startEditable: !isRoutine,
-      durationEditable: !isRoutine,
+      editable: !locked,
+      startEditable: !locked,
+      durationEditable: !locked,
       extendedProps: {
         category: e.category,
         source_module: e.source_module ?? null,
