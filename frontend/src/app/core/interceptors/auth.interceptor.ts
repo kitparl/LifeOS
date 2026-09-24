@@ -5,6 +5,7 @@ import { AuthService } from '../services/auth.service';
 
 const AUTH_SKIP_REFRESH = [
   '/auth/login',
+  '/auth/google',
   '/auth/register',
   '/auth/refresh',
   '/auth/logout',

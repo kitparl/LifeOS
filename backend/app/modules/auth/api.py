@@ -13,6 +13,8 @@ from app.core.security import create_access_token, create_refresh_token, decode_
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     ChangePasswordRequest,
+    GoogleConfigResponse,
+    GoogleLoginRequest,
     LoginRequest,
     RegisterRequest,
     RegistrationGateLoginRequest,
@@ -167,6 +169,20 @@ async def registration_gate_status(request: Request):
 async def login(data: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     user, access, refresh = await service.login(data.identifier, data.password)
+    _set_refresh_cookie(response, refresh)
+    return TokenResponse(access_token=access)
+
+
+@router.get("/google/config", response_model=GoogleConfigResponse)
+async def google_config():
+    """Public Google OAuth client ID for the Sign in with Google button (empty = disabled)."""
+    return GoogleConfigResponse(client_id=settings.google_client_id)
+
+
+@router.post("/google", response_model=TokenResponse)
+async def google_login(data: GoogleLoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
+    service = AuthService(db)
+    user, access, refresh = await service.google_login(data.credential)
     _set_refresh_cookie(response, refresh)
     return TokenResponse(access_token=access)
 

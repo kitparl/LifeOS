@@ -78,6 +78,29 @@ export class AuthService {
       );
   }
 
+  /** Public Google OAuth client ID from the backend; empty string = Google login disabled. */
+  getGoogleClientId(): Observable<string> {
+    return this.http
+      .get<{ client_id: string }>(`${environment.apiUrl}/auth/google/config`)
+      .pipe(map((res) => res.client_id));
+  }
+
+  /** Exchange a Google ID token for a LifeOS session (existing users only). */
+  googleLogin(credential: string): Observable<User> {
+    return this.http
+      .post<TokenResponse>(
+        `${environment.apiUrl}/auth/google`,
+        { credential },
+        { withCredentials: true },
+      )
+      .pipe(
+        tap((res) => this.setToken(res.access_token)),
+        switchMap(() => this.loadMe()),
+        map(() => this.user()!),
+        tap(() => this.scheduleProactiveRefresh()),
+      );
+  }
+
   register(data: RegisterRequest): Observable<User> {
     return this.http
       .post<TokenResponse>(`${environment.apiUrl}/auth/register`, data, {

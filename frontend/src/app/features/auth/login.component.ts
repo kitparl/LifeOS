@@ -1,4 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, NgZone, ViewChild, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -107,6 +108,11 @@ import { AuthService } from '../../core/services/auth.service';
               {{ submitting() ? 'Signing in…' : 'Sign in' }}
             </button>
           </form>
+
+          <div [hidden]="!googleEnabled()">
+            <div class="login-divider"><span>or</span></div>
+            <div #googleButton class="login-google"></div>
+          </div>
         </div>
 
         <!-- Footer -->
@@ -253,6 +259,28 @@ import { AuthService } from '../../core/services/auth.service';
         color: var(--text);
       }
 
+      .login-divider {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1.25rem 0;
+        font-size: 0.75rem;
+        color: var(--text-faint);
+      }
+
+      .login-divider::before,
+      .login-divider::after {
+        content: '';
+        flex: 1;
+        border-top: 1px solid var(--border);
+      }
+
+      .login-google {
+        display: flex;
+        justify-content: center;
+        min-height: 40px;
+      }
+
       /* Footer */
       .login-footer {
         margin-top: 3rem;
@@ -291,18 +319,74 @@ import { AuthService } from '../../core/services/auth.service';
     </style>
   `,
 })
-export class LoginComponent {
+export class LoginComponent implements AfterViewInit {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly zone = inject(NgZone);
+
+  @ViewChild('googleButton') private googleButton?: ElementRef<HTMLElement>;
 
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
+  readonly googleEnabled = signal(false);
 
   readonly form = this.fb.nonNullable.group({
     identifier: ['', Validators.required],
     password: ['', Validators.required],
   });
+
+  ngAfterViewInit(): void {
+    this.auth.getGoogleClientId().subscribe({
+      next: (clientId) => {
+        if (!clientId) return;
+        loadGoogleScript()
+          .then(() => this.renderGoogleButton(clientId))
+          .catch(() => {
+            // Script blocked/offline: keep password login usable, hide the Google option.
+            this.zone.run(() => this.googleEnabled.set(false));
+          });
+      },
+      error: () => this.googleEnabled.set(false),
+    });
+  }
+
+  private renderGoogleButton(clientId: string): void {
+    const el = this.googleButton?.nativeElement;
+    if (!el) return;
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: (res: { credential?: string }) =>
+        this.zone.run(() => this.onGoogleCredential(res.credential)),
+    });
+    google.accounts.id.renderButton(el, {
+      theme: 'outline',
+      size: 'large',
+      text: 'continue_with',
+      width: 340,
+    });
+    this.zone.run(() => this.googleEnabled.set(true));
+  }
+
+  private onGoogleCredential(credential: string | undefined): void {
+    if (!credential) {
+      this.error.set('Google sign-in was cancelled or failed. Please try again.');
+      return;
+    }
+    this.submitting.set(true);
+    this.error.set(null);
+    this.auth.googleLogin(credential).subscribe({
+      next: () => this.router.navigateByUrl('/'),
+      error: (err: unknown) => {
+        const detail = err instanceof HttpErrorResponse && err.status === 401 ? err.error?.detail : null;
+        this.error.set(
+          typeof detail === 'string' ? detail : 'Something went wrong signing in with Google. Please try again.',
+        );
+        this.submitting.set(false);
+      },
+      complete: () => this.submitting.set(false),
+    });
+  }
 
   onSubmit(): void {
     if (this.form.invalid) return;
@@ -317,4 +401,36 @@ export class LoginComponent {
       complete: () => this.submitting.set(false),
     });
   }
+}
+
+/** Minimal typing for the Google Identity Services global we use. */
+declare const google: {
+  accounts: {
+    id: {
+      initialize(config: { client_id: string; callback: (res: { credential?: string }) => void }): void;
+      renderButton(parent: HTMLElement, options: Record<string, unknown>): void;
+    };
+  };
+};
+
+const GOOGLE_GSI_SRC = 'https://accounts.google.com/gsi/client';
+let googleScriptPromise: Promise<void> | null = null;
+
+/** Load the Google Identity Services script once per page. */
+function loadGoogleScript(): Promise<void> {
+  if (!googleScriptPromise) {
+    googleScriptPromise = new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = GOOGLE_GSI_SRC;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => {
+        googleScriptPromise = null;
+        reject(new Error('Failed to load Google Identity Services'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return googleScriptPromise;
 }

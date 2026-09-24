@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, create_refresh_token, hash_password, verify_password
+from app.modules.auth.google_auth import verify_google_id_token
 from app.modules.auth.repository import UserRepository
 from app.modules.auth.schemas import RegisterRequest, UserUpdateRequest, UsernameChangeRequest
 from app.modules.auth.username_rules import normalize_username, validate_username
@@ -35,6 +36,14 @@ class AuthService:
         user = await self.repo.get_by_identifier(identifier)
         if user is None or not verify_password(password, user.hashed_password):
             raise UnauthorizedError("Invalid credentials")
+        return user, create_access_token(user.id), create_refresh_token(user.id)
+
+    async def google_login(self, credential: str):
+        """Log in an existing user via a verified Google ID token. Never creates users."""
+        email = await verify_google_id_token(credential)
+        user = await self.repo.get_by_email(email)
+        if user is None:
+            raise UnauthorizedError("User not found. Please contact your administrator to get access.")
         return user, create_access_token(user.id), create_refresh_token(user.id)
 
     async def update_profile(self, user_id: str, data: UserUpdateRequest):

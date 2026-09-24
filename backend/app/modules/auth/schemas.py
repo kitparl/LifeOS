@@ -40,6 +40,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=1, max_length=4096)
+
+
+class GoogleConfigResponse(BaseModel):
+    client_id: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
