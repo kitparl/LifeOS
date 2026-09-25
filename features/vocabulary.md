@@ -198,11 +198,11 @@ Nothing in this feature hard-codes "15,000". The available-word count, the progr
 Spec: `requirements/25sept-vocabulary-word-lab.md`. Setup: `setup/WORDNIK_SETUP.md`.
 
 - **Word Lab tab** (`components/vocabulary-word-lab.component.ts`):
-  - One search box plus tool chips: Dictionary, Synonyms, Explorer (reverse dictionary: describe an idea and get words), Rhymes, and Game (Guess the word / Guess the meaning / Scramble).
+  - One search box plus tool chips: Dictionary, Synonyms, Explorer (reverse dictionary: describe an idea and get words), Rhymes, Game (Guess the word / Guess the meaning / Scramble), and **Saved** (the words added through Save as vocabulary, newest first).
   - The tab is locked, with a "Connect in Integrations" link, until the user saves a Wordnik key on `/integrations`. Keys are per user (BYOK) and Fernet-encrypted, and all vendor calls are server-side.
   - **Usage remaining %** comes from the last Wordnik rate-limit headers stored on the user's integration. It shows "Unknown" when no reading exists for the current clock hour.
 - **Save as vocabulary** inserts a row into the same `vocabulary` table (`source="user_saved"`, id `x` + 15 hex chars). If the term already exists, case-insensitively, the existing id is returned instead. Saved rows open in the normal detail page and appear in Library search.
-- **Word of the Day** is a header chip (`shared/layout/word-of-the-day-chip.component.ts`) with a hover/tap popover. Clicking it opens `/communication/vocabulary/{id}`. It is hidden unless the current user has a connected key.
+- **Word of the Day** is a header chip showing only the term (`shared/layout/word-of-the-day-chip.component.ts`), with a hover/tap popover. The popover sits flush under the chip and closes 300 ms after the pointer leaves, so small cursor slips don't close it. Clicking it opens `/communication/vocabulary/{id}`. It is hidden unless the current user has a connected key.
   - Lookup order:
     1. browser `localStorage` (`lifeos.wotd.<userId>.<IST date>`)
     2. `vocabulary.wotd_for_date = today`
@@ -239,6 +239,7 @@ Spec: `requirements/25sept-vocabulary-word-lab.md`. Setup: `setup/WORDNIK_SETUP.
 | GET | `/word-lab/status` | `{connected, usage_remaining_pct}`. No vendor call. |
 | GET | `/word-lab/lookup` | `q`, `mode=dictionary\|synonyms\|explorer\|rhymes`. Proxied to Wordnik. |
 | GET | `/word-lab/game` | `type=guess_word\|guess_meaning\|scramble`. A stateless practice round. |
+| GET | `/word-lab/saved` | Word Lab saves (`source="user_saved"`), newest first, paginated |
 | POST | `/word-lab/save` | Save a looked-up word into `vocabulary` (returns the existing id if the term is already there) |
 | GET | `/word-of-the-day` | `{connected, date, vocabulary}`. DB first; Wordnik at most once per IST day. |
 

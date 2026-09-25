@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -77,4 +77,32 @@ describe('WordOfTheDayChipComponent', () => {
     chip()!.click();
     expect(router.navigate).toHaveBeenCalled();
   });
+
+  it('shows only the term in the header', () => {
+    word.set(WORD);
+    fixture.detectChanges();
+    expect(chip()!.textContent!.trim()).toBe('herald');
+    expect(chip()!.getAttribute('aria-label')).toBe('Word of the Day: herald');
+  });
+
+  it('keeps the popover open through a brief pointer slip and closes after the delay', fakeAsync(() => {
+    word.set(WORD);
+    fixture.detectChanges();
+    const host: HTMLElement = fixture.nativeElement;
+    host.dispatchEvent(new MouseEvent('mouseenter'));
+    host.dispatchEvent(new MouseEvent('mouseleave'));
+    tick(150);
+    host.dispatchEvent(new MouseEvent('mouseenter'));
+    tick(500);
+    fixture.detectChanges();
+    expect(host.querySelector('#wotd-popover')).not.toBeNull();
+
+    host.dispatchEvent(new MouseEvent('mouseleave'));
+    tick(299);
+    fixture.detectChanges();
+    expect(host.querySelector('#wotd-popover')).not.toBeNull();
+    tick(1);
+    fixture.detectChanges();
+    expect(host.querySelector('#wotd-popover')).toBeNull();
+  }));
 });

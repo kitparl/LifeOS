@@ -25,6 +25,7 @@ from app.core.exceptions import (
     ServiceUnavailableError,
     UnprocessableError,
 )
+from app.core.pagination import Pagination
 from app.core.timezone import ist_today
 from app.modules.auth.models import User
 from app.modules.communication.vocabulary.models import (
@@ -34,7 +35,9 @@ from app.modules.communication.vocabulary.models import (
 )
 from app.modules.communication.vocabulary.repository import VocabularyRepository
 from app.modules.communication.vocabulary.schemas import (
+    VocabularyCard,
     VocabularyDetail,
+    VocabularyPage,
     WordLabDefinition,
     WordLabGameResponse,
     WordLabGameType,
@@ -247,6 +250,12 @@ class WordLabService:
         except IntegrityError as exc:
             raise ConflictError("Saving collided with another save — please retry") from exc
         return WordLabSaveResponse(id=row.id, created=True)
+
+    async def list_saved(self, user: User, pagination: Pagination) -> VocabularyPage:
+        """Words added through Word Lab's Save (shared vocabulary rows, newest first)."""
+        await self._client(user)  # Word Lab tools are locked until Wordnik is connected.
+        rows, total = await self.repo.list_by_source(SOURCE_USER_SAVED, pagination)
+        return VocabularyPage(items=[VocabularyCard.model_validate(v) for v in rows], total=total)
 
     async def _insert(
         self, fields: dict[str, Any], *, row_id: str, source: str, wotd_for_date: date | None = None

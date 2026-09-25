@@ -89,4 +89,29 @@ describe('VocabularyWordLabComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="word-lab-locked"]')).not.toBeNull();
   });
+
+  it('lists Word Lab saves under the Saved tool, linking to detail', () => {
+    connect();
+    fixture.componentInstance.selectTool('saved');
+    http.expectOne(`${API}/saved?limit=20&offset=0`).flush({
+      total: 1,
+      items: [
+        {
+          id: 'xabc',
+          term: 'herald',
+          type: 'WORD',
+          level: 'B1',
+          part_of_speech: 'noun',
+          simple_meaning: 'A messenger.',
+          example: 'The herald spoke.',
+          pronunciation: null,
+        },
+      ],
+    });
+    fixture.detectChanges();
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('[data-testid="word-lab-saved"] a');
+    expect(link.textContent).toContain('herald');
+    expect(link.getAttribute('href')).toBe('/communication/vocabulary/xabc');
+    expect(fixture.nativeElement.querySelector('input')).toBeNull();
+  });
 });

@@ -411,3 +411,22 @@ async def test_wotd_race_serves_the_row_stored_by_the_other_request(client, word
         res = await client.get(f"{VOCAB}/word-of-the-day", headers=h)
     assert res.status_code == 200, res.text
     assert res.json()["vocabulary"]["term"] == "other"
+
+
+async def test_saved_list_shows_only_word_lab_saves_newest_first(client, wordnik):
+    await _seed(client, 3)
+    h = await _auth(client, "wlsavedlist@example.com")
+
+    locked = await client.get(f"{VOCAB}/word-lab/saved", headers=h)
+    assert locked.status_code == 400
+
+    await _connect(client, h)
+    for term in ("herald", "envoy"):
+        await client.post(f"{VOCAB}/word-lab/save", headers=h, json={"term": term, "definition": "x"})
+    # Already a dataset word: not a Word Lab save, so it stays out of the list.
+    await client.post(f"{VOCAB}/word-lab/save", headers=h, json={"term": "word-1", "definition": "x"})
+    await client.get(f"{VOCAB}/word-of-the-day", headers=h)
+
+    body = (await client.get(f"{VOCAB}/word-lab/saved", params={"limit": 10}, headers=h)).json()
+    assert body["total"] == 2
+    assert [item["term"] for item in body["items"]] == ["envoy", "herald"]

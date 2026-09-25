@@ -97,6 +97,15 @@ class VocabularyRepository:
         stmt = select(Vocabulary).where(Vocabulary.wotd_for_date == day)
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
+    async def list_by_source(self, source: str, pagination: Pagination) -> tuple[list[Vocabulary], int]:
+        """Rows from one source, newest first (Word Lab's saved-words list)."""
+        stmt = (
+            select(Vocabulary)
+            .where(Vocabulary.source == source)
+            .order_by(Vocabulary.created_at.desc(), Vocabulary.sequence_number.desc())
+        )
+        return await paginate(self.db, stmt, pagination)
+
     async def next_reserved_sequence_number(self) -> int:
         """Next sequence number in the reserved band above any dataset id (v000001–v999999),
         so future dataset imports can never collide with Word Lab / Word of the Day rows."""

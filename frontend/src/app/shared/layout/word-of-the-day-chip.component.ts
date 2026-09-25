@@ -1,4 +1,11 @@
-import { Component, ElementRef, HostListener, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  HostListener,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { WordOfTheDayService } from '../../features/communication/vocabulary/services/word-of-the-day.service';
@@ -8,6 +15,8 @@ import { WordOfTheDayService } from '../../features/communication/vocabulary/ser
  * (the service only yields a word then). Hover/focus/tap opens a mini detail popover;
  * clicking the term opens the full vocabulary detail page.
  */
+const CLOSE_DELAY_MS = 300;
+
 @Component({
   selector: 'app-word-of-the-day-chip',
   standalone: true,
@@ -16,6 +25,7 @@ import { WordOfTheDayService } from '../../features/communication/vocabulary/ser
     '(pointerdown)': 'lastPointer = $event.pointerType',
     '(mouseenter)': 'onHover()',
     '(mouseleave)': 'onLeave()',
+    '(focusout)': 'onFocusOut($event)',
   },
   template: `
     @if (word(); as w) {
@@ -23,41 +33,57 @@ import { WordOfTheDayService } from '../../features/communication/vocabulary/ser
         type="button"
         class="chip max-w-[10rem] sm:max-w-[16rem]"
         aria-controls="wotd-popover"
+        [attr.aria-label]="'Word of the Day: ' + w.term"
         [attr.aria-expanded]="open()"
         (focus)="onFocus()"
         (click)="onChipClick()"
       >
-        <span class="hidden lg:inline" style="color: var(--text-muted)">Word of the Day ·</span>
-        <span class="lg:hidden" style="color: var(--text-muted)">WotD ·</span>
         <span class="truncate">{{ w.term }}</span>
       </button>
       @if (open()) {
+        <!-- pt-2 (not mt-*) keeps the popover inside the hover area: no gap to fall through. -->
         <div
           id="wotd-popover"
           role="dialog"
           aria-label="Word of the Day"
-          class="menu absolute right-0 top-full mt-1 w-72 space-y-2 p-3 text-sm"
+          class="absolute right-0 top-full pt-2"
           style="z-index: 60"
         >
-          <p>
-            <span class="font-semibold">{{ w.term }}</span>
-            <span class="text-xs" style="color: var(--text-muted)"> · {{ w.part_of_speech }}</span>
-          </p>
-          <div>
-            <p class="text-xs font-medium" style="color: var(--text-muted)">Meaning</p>
-            <p>{{ w.simple_meaning }}</p>
-          </div>
-          <div>
-            <p class="text-xs font-medium" style="color: var(--text-muted)">Example</p>
-            <p>{{ w.example }}</p>
-          </div>
-          @if (w.synonyms.length) {
+          <div class="menu w-72 space-y-2 p-3 text-sm">
+            <p>
+              <span class="font-semibold">{{ w.term }}</span>
+              <span class="text-xs" style="color: var(--text-muted)">
+                · {{ w.part_of_speech }}</span
+              >
+            </p>
             <div>
-              <p class="text-xs font-medium" style="color: var(--text-muted)">Synonyms</p>
-              <p>{{ w.synonyms.join(', ') }}</p>
+              <p class="text-xs font-medium" style="color: var(--text-muted)">
+                Meaning
+              </p>
+              <p>{{ w.simple_meaning }}</p>
             </div>
-          }
-          <button type="button" class="btn-primary text-xs" (click)="openDetail()">View full details</button>
+            <div>
+              <p class="text-xs font-medium" style="color: var(--text-muted)">
+                Example
+              </p>
+              <p>{{ w.example }}</p>
+            </div>
+            @if (w.synonyms.length) {
+              <div>
+                <p class="text-xs font-medium" style="color: var(--text-muted)">
+                  Synonyms
+                </p>
+                <p>{{ w.synonyms.join(', ') }}</p>
+              </div>
+            }
+            <button
+              type="button"
+              class="btn-primary text-xs"
+              (click)="openDetail()"
+            >
+              View full details
+            </button>
+          </div>
         </div>
       }
     }
@@ -75,6 +101,8 @@ export class WordOfTheDayChipComponent {
   private suppressFocusOpen = false;
   // A tap also fires emulated mouseenter + focus; only the tap's click may toggle on touch.
   lastPointer = '';
+  // Leaving the chip/popover closes after a short grace period, so small cursor slips don't.
+  private closeTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
     effect(() => {
@@ -84,10 +112,12 @@ export class WordOfTheDayChipComponent {
   }
 
   show(): void {
+    clearTimeout(this.closeTimer);
     this.open.set(true);
   }
 
   hide(): void {
+    clearTimeout(this.closeTimer);
     this.open.set(false);
   }
 
@@ -96,7 +126,16 @@ export class WordOfTheDayChipComponent {
   }
 
   onLeave(): void {
-    if (this.lastPointer !== 'touch') this.hide();
+    if (this.lastPointer === 'touch') return;
+    clearTimeout(this.closeTimer);
+    this.closeTimer = setTimeout(() => this.open.set(false), CLOSE_DELAY_MS);
+  }
+
+  /** Keyboard users tabbing into the popover keep it open; tabbing out of the whole chip closes it. */
+  onFocusOut(event: FocusEvent): void {
+    const next = event.relatedTarget as Node | null;
+    if (next && this.elementRef.nativeElement.contains(next)) return;
+    if (this.lastPointer !== 'touch') this.onLeave();
   }
 
   onFocus(): void {
@@ -124,7 +163,11 @@ export class WordOfTheDayChipComponent {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    if (this.open() && !this.elementRef.nativeElement.contains(event.target as Node)) this.hide();
+    if (
+      this.open() &&
+      !this.elementRef.nativeElement.contains(event.target as Node)
+    )
+      this.hide();
   }
 
   @HostListener('document:keydown', ['$event'])
