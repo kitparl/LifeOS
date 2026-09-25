@@ -73,6 +73,13 @@ class BadGatewayError(AppError):
         super().__init__(detail)
 
 
+class TooManyRequestsError(AppError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+
+    def __init__(self, detail: str | dict = "Too many requests"):
+        super().__init__(detail)
+
+
 class UnprocessableError(AppError):
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
 

@@ -165,6 +165,20 @@ async def _run_sticky_notes_purge() -> None:
             logger.exception("Sticky notes purge job failed")
 
 
+async def _run_news_saved_purge() -> None:
+    from app.modules.news.service import NewsService
+
+    async with async_session_factory() as session:
+        try:
+            n = await NewsService(session).purge_expired()
+            await session.commit()
+            if n:
+                logger.info("Purged %s expired saved news articles", n)
+        except Exception:
+            await session.rollback()
+            logger.exception("Saved news purge job failed")
+
+
 async def _run_google_calendar_sync() -> None:
     from app.modules.integrations.google_calendar.sync_service import sync_all_enabled
 
@@ -356,6 +370,14 @@ def start_scheduler() -> AsyncIOScheduler:
         misfire_grace_time=3600,
     )
     _scheduler.add_job(
+        _run_news_saved_purge,
+        trigger=CronTrigger(hour=0, minute=7, timezone=_safe_zone("Asia/Kolkata")),
+        id="news_saved_purge",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=3600,
+    )
+    _scheduler.add_job(
         _run_google_calendar_sync,
         trigger=IntervalTrigger(minutes=30),
         id="google_calendar_sync",
@@ -367,7 +389,7 @@ def start_scheduler() -> AsyncIOScheduler:
     _install_after_commit_hook()
     logger.info(
         "APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST, "
-        "qa purge 00:05 IST, sticky notes purge 00:06 IST, google calendar 30m)"
+        "qa purge 00:05 IST, sticky notes purge 00:06 IST, news saved purge 00:07 IST, google calendar 30m)"
     )
     return _scheduler
 

@@ -10,8 +10,6 @@ vendor failures uniformly.
 
 from __future__ import annotations
 
-import html
-import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any
@@ -19,13 +17,12 @@ from urllib.parse import quote
 
 import httpx
 
+from app.core.text import clean_text
 from app.modules.integrations.wordnik.config import WordnikUsage
 
 BASE_URL = "https://api.wordnik.com/v4"
 TIMEOUT_SECONDS = 10.0
 _LABEL = "Wordnik"
-_TAG_RE = re.compile(r"<[^>]+>")
-_WS_RE = re.compile(r"\s+")
 
 
 class WordnikError(Exception):
@@ -76,14 +73,6 @@ class WordOfTheDayEntry:
     definitions: list[Definition]
     examples: list[str]
     note: str | None
-
-
-def clean_text(value: Any) -> str:
-    """Plain text from vendor/user markup: tags removed, entities decoded, whitespace collapsed."""
-    if value is None:
-        return ""
-    text = html.unescape(_TAG_RE.sub("", str(value)))
-    return _WS_RE.sub(" ", text).strip()
 
 
 def _http_client(timeout: float) -> httpx.AsyncClient:

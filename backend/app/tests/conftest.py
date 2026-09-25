@@ -22,6 +22,8 @@ from app.main import app
 from app.modules.ai.adapters import base as ai_adapter_base
 from app.modules.auth.registration_gate import require_registration_unlock
 from app.modules.integrations.wordnik import client as wordnik_client
+from app.modules.news import client as news_client
+from app.modules.news import service as news_service
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -42,7 +44,7 @@ def _offline_vendor(request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture(autouse=True)
 def _no_real_llm_vendor_calls():
-    """AI adapters and the Wordnik client never reach the internet in tests; individual tests mock vendors on top of this."""
+    """AI adapters and the Wordnik/news clients never reach the internet in tests; individual tests mock vendors on top of this."""
     real_client = httpx.AsyncClient
 
     def offline_client(timeout: float) -> httpx.AsyncClient:
@@ -51,6 +53,7 @@ def _no_real_llm_vendor_calls():
     with (
         patch.object(ai_adapter_base, "_http_client", side_effect=offline_client),
         patch.object(wordnik_client, "_http_client", side_effect=offline_client),
+        patch.object(news_client, "_http_client", side_effect=offline_client),
     ):
         yield
 
@@ -113,6 +116,63 @@ def wordnik():
 
     with patch.object(wordnik_client, "_http_client", side_effect=factory):
         yield fake
+
+
+NEWS_RESULT = {
+    "id": "a1",
+    "url": "https://www.thehindu.com/news/article1.ece",
+    "title": "AI centre &quot;proposal&quot; submitted",
+    "description": None,
+    "published_at": "2026-09-25T10:00:00Z",
+    "crawled_at": "2026-09-25T10:05:00Z",
+    "host": "www.thehindu.com",
+    "sitename": "The Hindu",
+    "country": "IN",
+    "country_source": "publisher",
+    "lang": "en",
+    "tld": "com",
+    "author": None,
+    "categories": ["technology"],
+    "image": None,
+}
+
+
+class FakeNews:
+    """Routes FreeNewsAPI requests by path and records them. Tests edit `search`/`article`/`status`."""
+
+    def __init__(self) -> None:
+        self.requests: list[httpx.Request] = []
+        self.status: int | None = None  # force every response to this status
+        self.search: object = {"took_ms": 5, "total": 1, "total_is_lower_bound": False, "results": [dict(NEWS_RESULT)]}
+        self.article: object | None = {**NEWS_RESULT, "text": "First paragraph.\n\nSecond paragraph."}
+
+    def params(self, index: int = -1) -> dict[str, str]:
+        return dict(self.requests[index].url.params)
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        if self.status is not None:
+            return httpx.Response(self.status, json={"detail": "forced"})
+        if request.url.path == "/v1/search":
+            return httpx.Response(200, json=self.search)
+        if request.url.path == "/v1/article" and self.article is not None:
+            return httpx.Response(200, json=self.article)
+        return httpx.Response(404, json={"detail": "not found"})
+
+
+@pytest.fixture
+def fake_news():
+    """Mock FreeNewsAPI for a test (overrides the autouse offline transport); starts with an empty cache."""
+    fake = FakeNews()
+    real_client = httpx.AsyncClient
+
+    def factory(timeout: float) -> httpx.AsyncClient:
+        return real_client(timeout=timeout, transport=httpx.MockTransport(fake))
+
+    news_service.reset_vendor_state()
+    with patch.object(news_client, "_http_client", side_effect=factory):
+        yield fake
+    news_service.reset_vendor_state()
 
 
 @pytest_asyncio.fixture

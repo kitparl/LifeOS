@@ -50,6 +50,7 @@ def _import_models() -> None:
     import app.modules.integrations.github.sync_models  # noqa: F401
     import app.modules.integrations.notifications.outbox_models  # noqa: F401
     import app.modules.integrations.reports.models  # noqa: F401
+    import app.modules.news.models  # noqa: F401
     import app.modules.preferences.models  # noqa: F401
     import app.modules.routines.models  # noqa: F401
     import app.modules.tasks.models  # noqa: F401

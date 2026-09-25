@@ -12,7 +12,8 @@ import secrets
 from datetime import date
 from typing import Any
 
-from app.modules.integrations.wordnik.client import WordOfTheDayEntry, clean_text
+from app.core.text import clean_text
+from app.modules.integrations.wordnik.client import WordOfTheDayEntry
 
 DEFAULT_TYPE = "WORD"
 DEFAULT_LEVEL = "B1"
