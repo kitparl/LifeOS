@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.ai.adapters.base import ModelInfo
 from app.modules.ai.models import (
+    MODEL_SOURCE_FETCHED,
+    MODEL_SOURCE_MANUAL,
     AIProviderModel,
     AIUseCaseModelSelection,
     AIUseCaseModelSelectionHistory,
@@ -121,6 +123,26 @@ class AiRepository:
         await self.db.refresh(existing)
         return existing
 
+    async def clear_selection(self, user_id: str, use_case: str) -> None:
+        """Return a use case to automatic resolution; closes the open history period."""
+        open_history = await self.db.execute(
+            select(AIUseCaseModelSelectionHistory).where(
+                AIUseCaseModelSelectionHistory.user_id == user_id,
+                AIUseCaseModelSelectionHistory.use_case == use_case,
+                AIUseCaseModelSelectionHistory.effective_to.is_(None),
+            )
+        )
+        current_open = open_history.scalar_one_or_none()
+        if current_open is not None:
+            current_open.effective_to = datetime.now(timezone.utc)
+        await self.db.execute(
+            delete(AIUseCaseModelSelection).where(
+                AIUseCaseModelSelection.user_id == user_id,
+                AIUseCaseModelSelection.use_case == use_case,
+            )
+        )
+        await self.db.flush()
+
     async def list_history(
         self, user_id: str, use_case: str
     ) -> list[AIUseCaseModelSelectionHistory]:
@@ -142,14 +164,18 @@ class AiRepository:
         result = await self.db.execute(q.order_by(AIProviderModel.provider, AIProviderModel.model_id))
         return list(result.scalars().all())
 
-    async def replace_models(self, user_id: str, provider: str, models: list[ModelInfo]) -> None:
+    async def replace_fetched_models(self, user_id: str, provider: str, models: list[ModelInfo]) -> None:
+        """Replace the provider's fetched catalog; user-added (manual) ids are kept."""
         await self.db.execute(
             delete(AIProviderModel).where(
-                AIProviderModel.user_id == user_id, AIProviderModel.provider == provider
+                AIProviderModel.user_id == user_id,
+                AIProviderModel.provider == provider,
+                AIProviderModel.source == MODEL_SOURCE_FETCHED,
             )
         )
+        manual_ids = {m.model_id for m in await self.list_models(user_id, provider)}
         now = datetime.now(timezone.utc)
-        unique = {m.model_id: m for m in models}
+        unique = {m.model_id: m for m in models if m.model_id not in manual_ids}
         self.db.add_all(
             AIProviderModel(
                 user_id=user_id,
@@ -157,11 +183,50 @@ class AiRepository:
                 model_id=m.model_id,
                 display_name=m.display_name,
                 capabilities=",".join(sorted(m.capabilities)),
+                source=MODEL_SOURCE_FETCHED,
                 refreshed_at=now,
             )
             for m in unique.values()
         )
         await self.db.flush()
+
+    async def add_manual_model(self, user_id: str, provider: str, model_id: str, capability: str) -> bool:
+        """Add a user-entered model id. Returns False when the id is already in the list."""
+        existing = await self.db.execute(
+            select(AIProviderModel.id).where(
+                AIProviderModel.user_id == user_id,
+                AIProviderModel.provider == provider,
+                AIProviderModel.model_id == model_id,
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            return False
+        self.db.add(
+            AIProviderModel(
+                user_id=user_id,
+                provider=provider,
+                model_id=model_id,
+                display_name=model_id,
+                capabilities=capability,
+                source=MODEL_SOURCE_MANUAL,
+                refreshed_at=datetime.now(timezone.utc),
+            )
+        )
+        await self.db.flush()
+        return True
+
+    async def remove_manual_model(self, user_id: str, provider: str, model_id: str) -> bool:
+        """Delete a user-added model id. Fetched ids are never removed here."""
+        result = await self.db.execute(
+            delete(AIProviderModel).where(
+                AIProviderModel.user_id == user_id,
+                AIProviderModel.provider == provider,
+                AIProviderModel.model_id == model_id,
+                AIProviderModel.source == MODEL_SOURCE_MANUAL,
+            )
+        )
+        await self.db.flush()
+        return bool(result.rowcount)
 
     async def get_ai_settings(self, user_id: str) -> AiSettings:
         prefs = PreferenceRepository(self.db)

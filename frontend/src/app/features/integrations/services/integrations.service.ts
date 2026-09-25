@@ -201,6 +201,7 @@ export interface AiProviderConfigStatus {
   default_model: string | null;
   base_url: string | null;
   supports_base_url: boolean;
+  supports_model_listing: boolean;
   last_tested_at: string | null;
   last_test_ok: boolean | null;
   models_refreshed_at: string | null;
@@ -222,10 +223,19 @@ export interface AiProviderTestResponse {
   model?: string | null;
 }
 
+export type AiModelSource = 'fetched' | 'manual';
+
 export interface AiModelItem {
   model_id: string;
   display_name: string;
   capabilities: string[];
+  source: AiModelSource;
+}
+
+export interface AiModelTestResponse {
+  ok: boolean;
+  detail: string;
+  model_id: string;
 }
 
 export interface AiModelsResponse {
@@ -395,6 +405,18 @@ export class IntegrationsService {
 
   refreshAiModels(provider: string): Observable<AiModelsResponse> {
     return this.http.post<AiModelsResponse>(`${this.api}/ai/${provider}/models/refresh`, {});
+  }
+
+  addAiModel(provider: string, modelId: string, capability: 'chat' | 'embedding' = 'chat'): Observable<AiModelsResponse> {
+    return this.http.post<AiModelsResponse>(`${this.api}/ai/${provider}/models`, { model_id: modelId, capability });
+  }
+
+  removeAiModel(provider: string, modelId: string): Observable<AiModelsResponse> {
+    return this.http.post<AiModelsResponse>(`${this.api}/ai/${provider}/models/remove`, { model_id: modelId });
+  }
+
+  testAiModel(provider: string, modelId: string): Observable<AiModelTestResponse> {
+    return this.http.post<AiModelTestResponse>(`${this.api}/ai/${provider}/models/test`, { model_id: modelId });
   }
 
   getGoogleCalendar(): Observable<GoogleCalendarConfigStatus> {

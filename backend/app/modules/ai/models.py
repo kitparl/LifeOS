@@ -58,6 +58,10 @@ class AIUseCaseModelSelectionHistory(Base):
     effective_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+MODEL_SOURCE_FETCHED = "fetched"
+MODEL_SOURCE_MANUAL = "manual"
+
+
 class AIProviderModel(Base):
     """Cached model catalog per user + provider, replaced on each refresh."""
 
@@ -73,6 +77,8 @@ class AIProviderModel(Base):
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     # Comma-separated capability flags, e.g. "chat,vision".
     capabilities: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    # "fetched" rows are replaced on each refresh; "manual" rows (user-added ids) persist.
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default=MODEL_SOURCE_FETCHED)
     refreshed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )

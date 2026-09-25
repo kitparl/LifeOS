@@ -105,6 +105,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("sticky_notes", "deleted_at", "TIMESTAMP"),
     # Sticky notes: tags (JSON array stored as TEXT; NULL on pre-existing rows)
     ("sticky_notes", "tags", "TEXT"),
+    # AI Integration: fetched vs user-added model ids in the cached catalog.
+    ("ai_provider_models", "source", "VARCHAR(16)"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
@@ -119,6 +121,7 @@ _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
     ("wishlist_items", "status", "in_progress"),
     ("wishlist_items", "priority", "medium"),
     ("file_records", "visibility", "private"),
+    ("ai_provider_models", "source", "fetched"),
 ]
 
 _INTEGER_DEFAULTS_TO_BACKFILL: list[tuple[str, str, int]] = [

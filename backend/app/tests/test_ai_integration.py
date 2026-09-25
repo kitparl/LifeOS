@@ -135,9 +135,41 @@ class FakeVendors:
                         "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 3},
                     },
                 )
-        if host == "api.sarvam.ai":
+        if path.endswith("/chat/completions") and host in COMPATIBLE_HOSTS | {"api.sarvam.ai"}:
             return httpx.Response(200, json={"choices": [{"message": {"content": self.chat_text}}]})
+        if host in VENDOR_MODEL_LISTS and path == VENDOR_MODEL_LISTS[host][0]:
+            return httpx.Response(200, json=VENDOR_MODEL_LISTS[host][1])
         return httpx.Response(404, json={"error": {"message": f"unrouted {host}{path}"}})
+
+
+# host -> (model-list path, raw vendor response). Covers each vendor's classification rules.
+VENDOR_MODEL_LISTS: dict[str, tuple[str, object]] = {
+    "api.groq.com": (
+        "/openai/v1/models",
+        {"data": [{"id": "llama-3.3-70b-versatile", "active": True}, {"id": "whisper-large-v3"},
+                  {"id": "old-model", "active": False}, {"id": "llama-guard-4-12b"}]},
+    ),
+    "api.x.ai": ("/v1/models", {"data": [{"id": "grok-4"}, {"id": "grok-2-image"}]}),
+    "api.deepseek.com": ("/models", {"object": "list", "data": [{"id": "deepseek-chat"}, {"id": "deepseek-reasoner"}]}),
+    "api.mistral.ai": (
+        "/v1/models",
+        {"data": [{"id": "mistral-large-latest", "capabilities": {"completion_chat": True, "vision": True}},
+                  {"id": "mistral-embed", "capabilities": {"completion_chat": False}},
+                  {"id": "codestral-fim", "capabilities": {"completion_chat": False}}]},
+    ),
+    "api.together.xyz": (
+        "/v1/models",
+        [{"id": "meta-llama/Llama-3.3-70B-Instruct-Turbo", "type": "chat", "display_name": "Llama 3.3 70B"},
+         {"id": "BAAI/bge-large-en-v1.5", "type": "embedding"}, {"id": "black-forest-labs/FLUX.1", "type": "image"}],
+    ),
+    "openrouter.ai": (
+        "/api/v1/models/user",
+        {"data": [{"id": "anthropic/claude-opus-5", "name": "Claude Opus 5",
+                   "architecture": {"input_modalities": ["text", "image"], "output_modalities": ["text"]}},
+                  {"id": "openai/gpt-image-1", "architecture": {"output_modalities": ["image"]}}]},
+    ),
+}
+COMPATIBLE_HOSTS = frozenset(VENDOR_MODEL_LISTS) | {"api.perplexity.ai"}
 
 
 @contextmanager
@@ -310,7 +342,9 @@ async def test_openai_retries_without_temperature_for_reasoning_models():
 
 
 def test_registry_covers_all_providers():
-    assert AI_PROVIDERS == ("openai", "anthropic", "gemini", "sarvam")
+    # The original four keep their resolution order; new vendors are appended.
+    assert AI_PROVIDERS[:4] == ("openai", "anthropic", "gemini", "sarvam")
+    assert set(AI_PROVIDERS[4:]) == {"mistral", "groq", "xai", "deepseek", "together", "openrouter", "perplexity"}
     for provider in AI_PROVIDERS:
         assert get_adapter(provider, ProviderCredentials("k")).label
     with pytest.raises(ValueError):
@@ -454,6 +488,22 @@ async def test_use_case_options_come_from_cached_catalogs(client, vendors):
         f"{API}/ai/use-cases/nope.case/model", headers=headers, json={"provider": "openai", "model": "gpt-4o-mini"}
     )
     assert unknown.status_code == 404
+
+
+async def test_clearing_a_use_case_returns_to_automatic(client, vendors):
+    headers = await _auth(client, "aiclear@example.com")
+    await _connect(client, headers, "openai", "sk-clr-1", default_model="gpt-4o-mini")
+    url = f"{API}/ai/use-cases/coaches.chat/model"
+    await client.put(url, headers=headers, json={"provider": "openai", "model": "o3-mini"})
+
+    cleared = await client.delete(url, headers=headers)
+    assert cleared.status_code == 200
+    current = cleared.json()["current"]
+    assert current["model"] == "gpt-4o-mini" and current["updated_at"] is None  # automatic
+
+    history = (await client.get(f"{API}/ai/use-cases/coaches.chat/history", headers=headers)).json()
+    assert history[0]["model"] == "o3-mini" and history[0]["effective_to"] is not None
+    assert (await client.delete(f"{API}/ai/use-cases/nope.case/model", headers=headers)).status_code == 404
 
 
 async def test_ai_settings_defaults_and_bounds(client):
@@ -630,3 +680,137 @@ async def test_analytics_insights_placeholder_then_llm(client, vendors):
     assert ready["daily"] == {**ready["daily"], "status": "ready", "items": ["Finish one task"]}
     assert ready["monthly"]["items"] == [] and ready["monthly"]["message"]
     analytics_cache.clear()
+
+
+# ---------------------------------------------------------------------------
+# More providers, manual model ids, per-model test
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "provider,expected",
+    [
+        ("groq", {"llama-3.3-70b-versatile": {CAPABILITY_CHAT}}),
+        ("xai", {"grok-4": {CAPABILITY_CHAT}}),
+        ("deepseek", {"deepseek-chat": {CAPABILITY_CHAT}, "deepseek-reasoner": {CAPABILITY_CHAT}}),
+        ("mistral", {"mistral-large-latest": {CAPABILITY_CHAT, "vision"}, "mistral-embed": {CAPABILITY_EMBEDDING}}),
+        (
+            "together",
+            {
+                "meta-llama/Llama-3.3-70B-Instruct-Turbo": {CAPABILITY_CHAT},
+                "BAAI/bge-large-en-v1.5": {CAPABILITY_EMBEDDING},
+            },
+        ),
+        ("openrouter", {"anthropic/claude-opus-5": {CAPABILITY_CHAT, "vision"}}),
+    ],
+)
+async def test_compatible_vendor_model_lists(vendors, provider, expected):
+    adapter = get_adapter(provider, ProviderCredentials("k"))
+    models = {m.model_id: m.capabilities for m in await adapter.list_models()}
+    assert models == expected
+    assert vendors.requests[-1].headers["Authorization"] == "Bearer k"
+
+
+async def test_compatible_vendor_chat_uses_its_base_url(vendors):
+    result = await get_adapter("groq", ProviderCredentials("k")).chat(
+        "s", "u", model="llama-3.3-70b-versatile", temperature=0.2, max_tokens=10, timeout=5
+    )
+    assert result.text == "Mocked reply"
+    req = vendors.requests[-1]
+    assert str(req.url) == "https://api.groq.com/openai/v1/chat/completions"
+    assert json.loads(req.content)["max_tokens"] == 10
+
+
+async def test_manual_model_ids_survive_refresh(client, vendors):
+    headers = await _auth(client, "aimanual@example.com")
+    await _connect(client, headers, "openrouter", "or-key-1")
+    url = f"{API}/integrations/ai/openrouter/models"
+
+    added = await client.post(url, headers=headers, json={"model_id": "meta-llama/llama-4-maverick:free"})
+    assert added.status_code == 200
+    duplicate = await client.post(url, headers=headers, json={"model_id": "meta-llama/llama-4-maverick:free"})
+    assert duplicate.status_code == 409
+
+    refreshed = await client.post(f"{url}/refresh", headers=headers)
+    sources = {m["model_id"]: m["source"] for m in refreshed.json()["models"]}
+    assert sources == {"anthropic/claude-opus-5": "fetched", "meta-llama/llama-4-maverick:free": "manual"}
+
+    # Added ids appear in use-case options and can be a default model without the custom flag.
+    cases = {c["use_case"]: c for c in (await client.get(f"{API}/ai/use-cases", headers=headers)).json()}
+    assert ("openrouter", "meta-llama/llama-4-maverick:free") in {
+        (o["provider"], o["model"]) for o in cases["coaches.chat"]["options"]
+    }
+    default = await client.put(
+        f"{API}/integrations/ai/openrouter/config",
+        headers=headers,
+        json={"default_model": "meta-llama/llama-4-maverick:free"},
+    )
+    assert default.status_code == 200
+
+    fetched = await client.post(f"{url}/remove", headers=headers, json={"model_id": "anthropic/claude-opus-5"})
+    assert fetched.status_code == 400
+    missing = await client.post(f"{url}/remove", headers=headers, json={"model_id": "nope/model"})
+    assert missing.status_code == 404
+    removed = await client.post(f"{url}/remove", headers=headers, json={"model_id": "meta-llama/llama-4-maverick:free"})
+    assert [m["model_id"] for m in removed.json()["models"]] == ["anthropic/claude-opus-5"]
+
+
+async def test_per_model_test(client, vendors):
+    headers = await _auth(client, "aimodeltest@example.com")
+    await _connect(client, headers, "deepseek", "ds-key-1")
+    url = f"{API}/integrations/ai/deepseek/models/test"
+
+    ok = await client.post(url, headers=headers, json={"model_id": "deepseek-chat"})
+    assert ok.json() == {"ok": True, "detail": "Model responded", "model_id": "deepseek-chat"}
+    assert json.loads(vendors.requests[-1].content)["model"] == "deepseek-chat"
+
+    vendors.chat_text = "   "  # reasoning model used its tiny budget: reachable, not a failure
+    empty = await client.post(url, headers=headers, json={"model_id": "deepseek-reasoner"})
+    assert empty.json()["ok"] is True and "Reachable" in empty.json()["detail"]
+
+    vendors.status["api.deepseek.com"] = 404
+    failed = await client.post(url, headers=headers, json={"model_id": "deepseek-v9"})
+    assert failed.json()["ok"] is False and "HTTP 404" in failed.json()["detail"]
+    assert "ds-key-1" not in failed.text
+
+
+async def test_providers_without_listing_seed_suggestions_without_network(client, vendors):
+    headers = await _auth(client, "ainolisting@example.com")
+    body = await _connect(client, headers, "perplexity", "pplx-key-1")
+    assert body["supports_model_listing"] is False and body["status"] == "connected"
+    assert not vendors.requests  # saving a key makes no vendor call for no-listing providers
+
+    models = (await client.get(f"{API}/integrations/ai/perplexity/models", headers=headers)).json()["models"]
+    assert [m["model_id"] for m in models] == ["sonar", "sonar-deep-research", "sonar-pro", "sonar-reasoning-pro"]
+    assert {m["source"] for m in models} == {"manual"}
+
+    refresh = await client.post(f"{API}/integrations/ai/perplexity/models/refresh", headers=headers)
+    assert refresh.status_code == 400
+
+    sarvam = await _connect(client, headers, "sarvam", "sarvam-key-2")
+    assert sarvam["model_count"] == 2
+
+    test = await client.post(f"{API}/integrations/ai/perplexity/test", headers=headers)
+    assert test.json()["ok"] is True and test.json()["model"] == "sonar"
+    assert str(vendors.requests[-1].url) == "https://api.perplexity.ai/chat/completions"
+
+
+async def test_source_column_migration_backfills_existing_rows():
+    from app.core.migrations import ensure_columns
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "CREATE TABLE ai_provider_models (id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(36), "
+                "provider VARCHAR(32), model_id VARCHAR(80), display_name VARCHAR(120), "
+                "capabilities VARCHAR(64), refreshed_at DATETIME)"
+            )
+        )
+        await conn.execute(text("INSERT INTO ai_provider_models (id, model_id) VALUES ('1', 'gpt-4o-mini')"))
+        await ensure_columns(conn)
+        row = (await conn.execute(text("SELECT source FROM ai_provider_models"))).one()
+    await engine.dispose()
+    assert row.source == "fetched"

@@ -263,6 +263,8 @@ class AiProviderConfigStatus(BaseModel):
     default_model: str | None = None
     base_url: str | None = None
     supports_base_url: bool = False
+    # False for vendors without a model-listing API (models are added manually).
+    supports_model_listing: bool = True
     last_tested_at: datetime | None = None
     last_test_ok: bool | None = None
     models_refreshed_at: datetime | None = None
@@ -280,6 +282,22 @@ class AiModelItem(BaseModel):
     model_id: str
     display_name: str
     capabilities: list[str]
+    # "fetched" from the vendor's model-list API, or "manual" (added by the user).
+    source: str
+
+
+class AiModelRef(BaseModel):
+    model_id: str = Field(min_length=1, max_length=80, pattern=MODEL_ID_PATTERN)
+
+
+class AiModelAdd(AiModelRef):
+    capability: Literal["chat", "embedding"] = "chat"
+
+
+class AiModelTestResponse(BaseModel):
+    ok: bool
+    detail: str
+    model_id: str
 
 
 class AiModelsResponse(BaseModel):

@@ -19,6 +19,13 @@ INTEGRATION_PROVIDERS = (
     "anthropic",
     "gemini",
     "sarvam",
+    "mistral",
+    "groq",
+    "xai",
+    "deepseek",
+    "together",
+    "openrouter",
+    "perplexity",
 )
 
 

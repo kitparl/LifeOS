@@ -37,6 +37,11 @@ export class AiService {
     return this.http.put<AiUseCase>(`${this.api}/use-cases/${encodeURIComponent(useCase)}/model`, body);
   }
 
+  /** Return a use case to automatic model resolution. */
+  clearUseCaseModel(useCase: string): Observable<AiUseCase> {
+    return this.http.delete<AiUseCase>(`${this.api}/use-cases/${encodeURIComponent(useCase)}/model`);
+  }
+
   useCaseHistory(useCase: string): Observable<AiUseCaseHistoryItem[]> {
     return this.http.get<AiUseCaseHistoryItem[]>(`${this.api}/use-cases/${encodeURIComponent(useCase)}/history`);
   }

@@ -108,6 +108,14 @@ class AiService:
         await self.repo.set_selection(user_id, use_case, provider, model)
         return await self._use_case_response(user_id, uc, connected, models)
 
+    async def clear_use_case_model(self, user_id: str, use_case: str) -> UseCaseResponse:
+        uc = get_use_case(use_case)
+        if uc is None:
+            raise NotFoundError(f"Unknown use case: {use_case}")
+        await self.repo.clear_selection(user_id, use_case)
+        connected = await self._connected_providers(user_id)
+        return await self._use_case_response(user_id, uc, connected, await self.repo.list_models(user_id))
+
     async def get_use_case_history(
         self, user_id: str, use_case: str
     ) -> list[UseCaseHistoryItem]:

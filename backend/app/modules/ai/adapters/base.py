@@ -112,6 +112,8 @@ class ProviderAdapter(ChatCompletionProvider, Protocol):
     """What every registered vendor adapter supports: chat, model listing, and a connection test."""
 
     label: str
+    # False when the vendor has no model-listing API; users add model ids manually instead.
+    supports_model_listing: bool
 
     async def list_models(self) -> list[ModelInfo]: ...
 
@@ -129,7 +131,7 @@ def _vendor_message(res: httpx.Response) -> str:
     return str(message or "")[:_VENDOR_MESSAGE_MAX_CHARS]
 
 
-async def request_json(
+async def request_json_value(
     method: str,
     url: str,
     *,
@@ -138,8 +140,11 @@ async def request_json(
     timeout: float,
     json_body: dict[str, Any] | None = None,
     params: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Perform one vendor HTTP call and map transport/status failures to AiProviderError."""
+) -> Any:
+    """Perform one vendor HTTP call and map transport/status failures to AiProviderError.
+
+    Returns the decoded JSON value (object or array).
+    """
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             res = await client.request(method, url, headers=headers, json=json_body, params=params)
@@ -164,9 +169,25 @@ async def request_json(
         )
 
     try:
-        data = res.json()
+        return res.json()
     except ValueError as exc:
         raise MalformedResponseError(f"{label} returned a non-JSON response.") from exc
+
+
+async def request_json(
+    method: str,
+    url: str,
+    *,
+    label: str,
+    headers: dict[str, str],
+    timeout: float,
+    json_body: dict[str, Any] | None = None,
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Like request_json_value, but the response must be a JSON object."""
+    data = await request_json_value(
+        method, url, label=label, headers=headers, timeout=timeout, json_body=json_body, params=params
+    )
     if not isinstance(data, dict):
         raise MalformedResponseError(f"{label} returned an unexpected response shape.")
     return data

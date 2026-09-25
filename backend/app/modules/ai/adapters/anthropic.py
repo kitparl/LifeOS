@@ -22,6 +22,7 @@ _MODELS_PAGE_LIMIT = 1000
 
 class AnthropicAdapter:
     label = "Anthropic"
+    supports_model_listing = True
 
     def __init__(self, credentials: ProviderCredentials):
         self._api_key = credentials.api_key

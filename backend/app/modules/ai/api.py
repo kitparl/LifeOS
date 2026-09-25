@@ -64,6 +64,15 @@ async def set_use_case_model(
     )
 
 
+@router.delete("/use-cases/{use_case}/model", response_model=UseCaseResponse)
+async def clear_use_case_model(
+    use_case: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiService(db).clear_use_case_model(user.id, use_case)
+
+
 @router.get("/use-cases/{use_case}/history", response_model=list[UseCaseHistoryItem])
 async def get_use_case_history(
     use_case: str,

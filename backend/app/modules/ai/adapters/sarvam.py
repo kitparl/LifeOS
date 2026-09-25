@@ -1,13 +1,12 @@
 """Sarvam adapter (Chat Completions).
 
-Sarvam does not publish a model-listing endpoint, so `list_models` returns a seeded
-list; users can still enter any newer model id as a custom model.
+Sarvam does not publish a model-listing endpoint: suggested model ids are seeded on first key
+save (see registry.suggested_models) and users add any other id manually.
 """
 
 from __future__ import annotations
 
 from app.modules.ai.adapters.base import (
-    CAPABILITY_CHAT,
     METADATA_TIMEOUT_SECONDS,
     ChatResult,
     MalformedResponseError,
@@ -19,13 +18,13 @@ from app.modules.ai.adapters.base import (
 
 CHAT_URL = "https://api.sarvam.ai/v1/chat/completions"
 DEFAULT_MODEL = "sarvam-105b"
-SEEDED_MODELS: tuple[ModelInfo, ...] = (
-    ModelInfo(model_id=DEFAULT_MODEL, display_name=DEFAULT_MODEL, capabilities=frozenset({CAPABILITY_CHAT})),
-)
+# sarvam-m and sarvam-30b are deprecated by Sarvam; 105b-conversations targets real-time dialogue.
+SUGGESTED_MODELS: tuple[str, ...] = (DEFAULT_MODEL, "sarvam-105b-conversations")
 
 
 class SarvamAdapter:
     label = "Sarvam"
+    supports_model_listing = False
 
     def __init__(self, credentials: ProviderCredentials):
         self._api_key = credentials.api_key
@@ -70,7 +69,7 @@ class SarvamAdapter:
         )
 
     async def list_models(self) -> list[ModelInfo]:
-        return list(SEEDED_MODELS)
+        return []
 
     async def test(self, model: str | None) -> None:
         # No listing endpoint: a minimal chat call is the only way to validate the key.

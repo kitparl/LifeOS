@@ -9,7 +9,10 @@ from app.modules.auth.models import User
 from app.modules.integrations.scheduling.digest_service import DigestService
 from app.modules.integrations.ai.service import AiProviderIntegrationService
 from app.modules.integrations.schemas import (
+    AiModelAdd,
+    AiModelRef,
     AiModelsResponse,
+    AiModelTestResponse,
     AiProviderConfigStatus,
     AiProviderConfigUpdate,
     AiProviderTestResponse,
@@ -196,6 +199,36 @@ async def refresh_ai_provider_models(
     db: AsyncSession = Depends(get_db),
 ):
     return await AiProviderIntegrationService(db).refresh_models(user.id, provider)
+
+
+@router.post("/ai/{provider}/models", response_model=AiModelsResponse)
+async def add_ai_provider_model(
+    provider: str,
+    data: AiModelAdd,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiProviderIntegrationService(db).add_model(user.id, provider, data)
+
+
+@router.post("/ai/{provider}/models/remove", response_model=AiModelsResponse)
+async def remove_ai_provider_model(
+    provider: str,
+    data: AiModelRef,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiProviderIntegrationService(db).remove_model(user.id, provider, data.model_id)
+
+
+@router.post("/ai/{provider}/models/test", response_model=AiModelTestResponse)
+async def test_ai_provider_model(
+    provider: str,
+    data: AiModelRef,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiProviderIntegrationService(db).test_model(user.id, provider, data.model_id)
 
 
 @router.post("/github/sync/section/{section_id}", response_model=GitHubSyncResponse)

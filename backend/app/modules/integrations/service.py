@@ -52,6 +52,13 @@ PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
     IntegrationProviderInfo(provider="anthropic", display_name="Anthropic", description="Claude models for chat and writing", oauth_required=False, group="ai"),
     IntegrationProviderInfo(provider="gemini", display_name="Google Gemini", description="Gemini models for chat and writing", oauth_required=False, group="ai"),
     IntegrationProviderInfo(provider="sarvam", display_name="Sarvam AI", description="Sarvam models for chat and writing", oauth_required=False, group="ai"),
+    IntegrationProviderInfo(provider="mistral", display_name="Mistral AI", description="Mistral models for chat and writing", oauth_required=False, group="ai"),
+    IntegrationProviderInfo(provider="groq", display_name="Groq", description="Fast open models (Llama, Qwen, and more)", oauth_required=False, group="ai"),
+    IntegrationProviderInfo(provider="xai", display_name="xAI", description="Grok models for chat and writing", oauth_required=False, group="ai"),
+    IntegrationProviderInfo(provider="deepseek", display_name="DeepSeek", description="DeepSeek chat and reasoning models", oauth_required=False, group="ai"),
+    IntegrationProviderInfo(provider="together", display_name="Together AI", description="Open-source models (Llama, Qwen, and more)", oauth_required=False, group="ai"),
+    IntegrationProviderInfo(provider="openrouter", display_name="OpenRouter", description="Many vendors' models through one key", oauth_required=False, group="ai"),
+    IntegrationProviderInfo(provider="perplexity", display_name="Perplexity", description="Sonar models with web search", oauth_required=False, group="ai"),
 ]
 
 # Providers whose config_json holds encrypted secrets and is managed only by dedicated endpoints.

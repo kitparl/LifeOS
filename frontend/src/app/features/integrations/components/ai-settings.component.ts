@@ -1,23 +1,18 @@
 import { DatePipe } from '@angular/common';
 import { Component, Input, OnChanges, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  AiModelOption,
-  AiSettings,
-  AiUseCase,
-  AiUseCaseHistoryItem,
-  AiUseCaseModelUpdate,
-} from '../../ai/models/ai.models';
+import { Observable } from 'rxjs';
+import { AiSettings, AiUseCase, AiUseCaseHistoryItem } from '../../ai/models/ai.models';
 import { AiService } from '../../ai/services/ai.service';
 import { IntegrationProvider, apiErrorMessage } from '../services/integrations.service';
 
-interface UseCaseRow {
-  useCase: AiUseCase;
+/** Select values: '' = automatic, `model|<provider>|<id>` = a model from the provider's list. */
+const AUTOMATIC = '';
+const MODEL_PREFIX = 'model|';
+
+interface ProviderGroup {
   provider: string;
-  model: string;
-  custom: boolean;
-  customModel: string;
-  history: AiUseCaseHistoryItem[] | null;
+  models: string[];
 }
 
 @Component({
@@ -26,15 +21,57 @@ interface UseCaseRow {
   imports: [FormsModule, DatePipe],
   template: `
     <div class="panel text-sm" data-testid="ai-settings">
-      <p class="font-medium">AI defaults &amp; use cases</p>
+      <p class="font-medium">AI use cases</p>
       <p class="text-gray-600 text-xs mt-1">
-        Choose which model each LifeOS feature uses. Options come from the model lists of your connected providers.
+        Pick the model each feature uses. Changes save immediately. To use a model that isn't listed, add its ID on the
+        provider card above.
       </p>
 
+      <ul class="mt-3 divide-y divide-[var(--xp-border)]">
+        <!-- Track by object: a fresh server copy re-renders the row, resetting the select after an error. -->
+        @for (uc of useCases(); track uc) {
+          <li class="py-2" [attr.data-testid]="'ai-use-case-' + uc.use_case">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <label class="font-medium" [for]="'ai-uc-' + uc.use_case">{{ uc.display_name }}</label>
+              <select
+                [id]="'ai-uc-' + uc.use_case"
+                class="input-field w-full sm:w-80"
+                [ngModel]="valueFor(uc)"
+                (ngModelChange)="onSelect(uc, $event)"
+                [disabled]="busy() || !groupsFor(uc).length"
+                [attr.data-testid]="'ai-use-case-' + uc.use_case + '-select'"
+              >
+                <option value="">{{ automaticLabel(uc) }}</option>
+                @for (g of groupsFor(uc); track g.provider) {
+                  <optgroup [label]="providerName(g.provider)">
+                    @for (m of g.models; track m) {
+                      <option [value]="modelValue(g.provider, m)">{{ m }}</option>
+                    }
+                  </optgroup>
+                }
+              </select>
+            </div>
+
+            @if (uc.current && !uc.current.available) {
+              <p class="text-xs mt-1" style="color: var(--danger)">
+                {{ providerName(uc.current.provider) }} is not connected. Choose another model or reconnect it above.
+              </p>
+            }
+
+          </li>
+        }
+      </ul>
+
+      @if (!hasConnectedProvider()) {
+        <p class="text-xs mt-2" style="color: var(--text-muted)">Connect a provider above to choose models.</p>
+      }
+
       <details class="mt-3 text-xs">
-        <summary class="cursor-pointer font-medium">Defaults</summary>
+        <summary class="cursor-pointer font-medium">Advanced</summary>
+
         @if (settings(); as s) {
-          <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 max-w-3xl">
+          <p class="form-label mt-3">Defaults</p>
+          <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 max-w-3xl">
             <div class="flex flex-col gap-1">
               <label class="form-label" for="ai-default-provider">Default provider</label>
               <select
@@ -72,76 +109,32 @@ interface UseCaseRow {
             Save defaults
           </button>
         }
-      </details>
 
-      <details class="mt-3 text-xs" open>
-        <summary class="cursor-pointer font-medium">Use cases</summary>
-        <ul class="mt-2 divide-y divide-[var(--xp-border)]">
-          @for (row of rows(); track row.useCase.use_case) {
-            <li class="py-2 flex flex-col gap-2" [attr.data-testid]="'ai-use-case-' + row.useCase.use_case">
-              <div class="flex flex-wrap items-baseline justify-between gap-2">
-                <p class="font-medium">{{ row.useCase.display_name }}</p>
-                <p style="color: var(--text-muted)">
-                  @if (row.useCase.current; as cur) {
-                    Using {{ providerName(cur.provider) }} · {{ cur.model }}
-                    {{ cur.updated_at ? '' : '(automatic)' }}
-                    @if (!cur.available) {
-                      <span style="color: var(--danger)">— provider not connected</span>
-                    }
-                  } @else {
-                    No provider connected
-                  }
-                </p>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <select class="input-field" [(ngModel)]="row.provider" (ngModelChange)="row.model = ''" [attr.aria-label]="row.useCase.display_name + ' provider'">
-                  <option value="">Provider…</option>
-                  @for (p of rowProviders(row); track p) {
-                    <option [value]="p">{{ providerName(p) }}</option>
-                  }
-                </select>
-                @if (!row.custom) {
-                  <select class="input-field" [(ngModel)]="row.model" [disabled]="!row.provider" [attr.aria-label]="row.useCase.display_name + ' model'">
-                    <option value="">Model…</option>
-                    @for (o of rowModels(row); track o.model) {
-                      <option [value]="o.model">{{ o.model }}</option>
-                    }
-                  </select>
-                } @else {
-                  <input class="input-field" [(ngModel)]="row.customModel" maxlength="80" placeholder="Custom model id" [attr.aria-label]="row.useCase.display_name + ' custom model id'" />
-                }
-                <label class="flex items-center gap-1">
-                  <input type="checkbox" [(ngModel)]="row.custom" />
-                  Custom id
-                </label>
-                <button
-                  type="button"
-                  class="btn-primary text-xs"
-                  [disabled]="busy() || !row.provider || !(row.custom ? row.customModel.trim() : row.model)"
-                  (click)="assign(row)"
-                  [attr.data-testid]="'ai-use-case-' + row.useCase.use_case + '-save-button'"
-                >
-                  Assign
-                </button>
-                <button type="button" class="text-xs link" (click)="toggleHistory(row)">
-                  {{ row.history ? 'Hide history' : 'History' }}
-                </button>
-              </div>
-              @if (row.history) {
-                <ul class="pl-4 list-disc" style="color: var(--text-muted)">
-                  @for (h of row.history; track h.effective_from) {
-                    <li>
-                      {{ providerName(h.provider) }} · {{ h.model }} — from {{ h.effective_from | date: 'medium' }}
-                      {{ h.effective_to ? 'to ' + (h.effective_to | date: 'medium') : '(current)' }}
-                    </li>
-                  } @empty {
-                    <li>No changes yet.</li>
-                  }
-                </ul>
-              }
-            </li>
+        <p class="form-label mt-4">Change history</p>
+        <select
+          class="input-field w-full sm:w-80"
+          [ngModel]="historyUseCase()"
+          (ngModelChange)="loadHistory($event)"
+          aria-label="Use case history"
+          data-testid="ai-settings-history-select"
+        >
+          <option value="">Select a use case…</option>
+          @for (uc of useCases(); track uc.use_case) {
+            <option [value]="uc.use_case">{{ uc.display_name }}</option>
           }
-        </ul>
+        </select>
+        @if (history(); as rows) {
+          <ul class="mt-2 pl-4 list-disc" style="color: var(--text-muted)">
+            @for (h of rows; track h.effective_from) {
+              <li>
+                {{ providerName(h.provider) }} · {{ h.model }} — {{ h.effective_from | date: 'medium' }}
+                {{ h.effective_to ? 'to ' + (h.effective_to | date: 'medium') : '(current)' }}
+              </li>
+            } @empty {
+              <li>No changes yet (using automatic).</li>
+            }
+          </ul>
+        }
       </details>
 
       @if (message()) {
@@ -159,37 +152,71 @@ export class AiSettingsComponent implements OnChanges {
   @Input() reloadKey = 0;
 
   readonly settings = signal<AiSettings | null>(null);
-  readonly rows = signal<UseCaseRow[]>([]);
+  readonly useCases = signal<AiUseCase[]>([]);
+  readonly historyUseCase = signal('');
+  readonly history = signal<AiUseCaseHistoryItem[] | null>(null);
   readonly busy = signal(false);
   readonly message = signal<string | null>(null);
   readonly ok = signal(false);
 
   ngOnChanges(): void {
-    this.load();
-  }
-
-  load(): void {
     this.ai.getSettings().subscribe({
       next: (s) => this.settings.set({ ...s }),
       error: (err) => this.fail(err, 'Failed to load AI defaults'),
     });
-    this.ai.listUseCases().subscribe({
-      next: (cases) => this.rows.set(cases.map((uc) => this.toRow(uc))),
-      error: (err) => this.fail(err, 'Failed to load AI use cases'),
-    });
+    this.reloadUseCases();
   }
 
   providerName(provider: string): string {
     return this.providers.find((p) => p.provider === provider)?.display_name ?? provider;
   }
 
-  rowProviders(row: UseCaseRow): string[] {
-    const fromOptions = row.useCase.options.map((o) => o.provider);
-    return [...new Set(row.provider ? [...fromOptions, row.provider] : fromOptions)];
+  hasConnectedProvider(): boolean {
+    return this.useCases().some((uc) => uc.options.length > 0);
   }
 
-  rowModels(row: UseCaseRow): AiModelOption[] {
-    return row.useCase.options.filter((o) => o.provider === row.provider);
+  modelValue(provider: string, model: string): string {
+    return `${MODEL_PREFIX}${provider}|${model}`;
+  }
+
+  /** Explicit selections map to their option; no selection maps to "Automatic". */
+  valueFor(uc: AiUseCase): string {
+    const cur = uc.current;
+    return cur?.updated_at ? this.modelValue(cur.provider, cur.model) : AUTOMATIC;
+  }
+
+  automaticLabel(uc: AiUseCase): string {
+    const cur = uc.current;
+    if (cur && !cur.updated_at) return `Automatic (${this.providerName(cur.provider)} · ${cur.model})`;
+    return 'Automatic';
+  }
+
+  /** Listed models grouped by provider, plus a saved model that is no longer listed. */
+  groupsFor(uc: AiUseCase): ProviderGroup[] {
+    const groups = new Map<string, string[]>();
+    for (const o of uc.options) {
+      groups.set(o.provider, [...(groups.get(o.provider) ?? []), o.model]);
+    }
+    const cur = uc.current;
+    if (cur?.updated_at && !groups.get(cur.provider)?.includes(cur.model)) {
+      groups.set(cur.provider, [...(groups.get(cur.provider) ?? []), cur.model]);
+    }
+    return [...groups.entries()].map(([provider, models]) => ({ provider, models }));
+  }
+
+  onSelect(uc: AiUseCase, value: string): void {
+    if (value === AUTOMATIC) {
+      if (uc.current?.updated_at) {
+        this.apply(this.ai.clearUseCaseModel(uc.use_case), `${uc.display_name} now uses the automatic model`);
+      }
+      return;
+    }
+    const [provider, ...rest] = value.slice(MODEL_PREFIX.length).split('|');
+    const model = rest.join('|');
+    this.apply(
+      this.ai.setUseCaseModel(uc.use_case, { provider, model }),
+      `${uc.display_name} now uses ${this.providerName(provider)} · ${model}`,
+    );
   }
 
   saveSettings(): void {
@@ -210,59 +237,40 @@ export class AiSettingsComponent implements OnChanges {
     });
   }
 
-  assign(row: UseCaseRow): void {
-    const body: AiUseCaseModelUpdate = {
-      provider: row.provider,
-      model: row.custom ? row.customModel.trim() : row.model,
-      custom: row.custom,
-    };
-    this.busy.set(true);
-    this.ai.setUseCaseModel(row.useCase.use_case, body).subscribe({
-      next: (updated) => {
-        this.rows.update((rows) =>
-          rows.map((r) => (r.useCase.use_case === updated.use_case ? this.toRow(updated) : r)),
-        );
-        this.busy.set(false);
-        this.succeed(`${updated.display_name} now uses ${this.providerName(body.provider)} · ${body.model}`);
-      },
-      error: (err) => {
-        this.busy.set(false);
-        this.fail(err, 'Failed to assign model');
-      },
-    });
-  }
-
-  toggleHistory(row: UseCaseRow): void {
-    if (row.history) {
-      this.patchRow(row.useCase.use_case, { history: null });
-      return;
-    }
-    this.ai.useCaseHistory(row.useCase.use_case).subscribe({
-      next: (history) => this.patchRow(row.useCase.use_case, { history }),
+  loadHistory(useCase: string): void {
+    this.historyUseCase.set(useCase);
+    this.history.set(null);
+    if (!useCase) return;
+    this.ai.useCaseHistory(useCase).subscribe({
+      next: (rows) => this.history.set(rows),
       error: (err) => this.fail(err, 'Failed to load history'),
     });
   }
 
+  private apply(request: Observable<AiUseCase>, successText: string): void {
+    this.busy.set(true);
+    this.message.set(null);
+    request.subscribe({
+      next: (updated) => {
+        this.busy.set(false);
+        this.useCases.update((list) => list.map((uc) => (uc.use_case === updated.use_case ? updated : uc)));
+        this.succeed(successText);
+        if (this.historyUseCase() === updated.use_case) this.loadHistory(updated.use_case);
+      },
+      error: (err) => {
+        this.busy.set(false);
+        this.fail(err, 'Failed to update model');
+        // Server state is the source of truth; restore the select to it.
+        this.reloadUseCases();
+      },
+    });
+  }
+
   private reloadUseCases(): void {
-    this.ai.listUseCases().subscribe({ next: (cases) => this.rows.set(cases.map((uc) => this.toRow(uc))) });
-  }
-
-  private patchRow(useCase: string, patch: Partial<UseCaseRow>): void {
-    this.rows.update((rows) => rows.map((r) => (r.useCase.use_case === useCase ? { ...r, ...patch } : r)));
-  }
-
-  private toRow(useCase: AiUseCase): UseCaseRow {
-    const cur = useCase.current;
-    const inOptions = !!cur && useCase.options.some((o) => o.provider === cur.provider && o.model === cur.model);
-    const isCustom = !!cur?.updated_at && !inOptions;
-    return {
-      useCase,
-      provider: cur?.provider ?? '',
-      model: inOptions ? cur!.model : '',
-      custom: isCustom,
-      customModel: isCustom ? cur!.model : '',
-      history: null,
-    };
+    this.ai.listUseCases().subscribe({
+      next: (cases) => this.useCases.set(cases),
+      error: (err) => this.fail(err, 'Failed to load AI use cases'),
+    });
   }
 
   private succeed(text: string): void {

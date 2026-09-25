@@ -94,6 +94,39 @@ describe('IntegrationsService (AI providers)', () => {
   });
 });
 
+describe('IntegrationsService (AI model list)', () => {
+  let service: IntegrationsService;
+  let http: HttpTestingController;
+  const api = `${environment.apiUrl}/integrations/ai/openrouter/models`;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    service = TestBed.inject(IntegrationsService);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('adds, removes and tests model ids in the request body (ids may contain "/")', () => {
+    service.addAiModel('openrouter', 'meta-llama/llama-4:free').subscribe();
+    const add = http.expectOne(api);
+    expect(add.request.body).toEqual({ model_id: 'meta-llama/llama-4:free', capability: 'chat' });
+    add.flush({ provider: 'openrouter', models: [], refreshed_at: null });
+
+    service.removeAiModel('openrouter', 'meta-llama/llama-4:free').subscribe();
+    const remove = http.expectOne(`${api}/remove`);
+    expect(remove.request.body).toEqual({ model_id: 'meta-llama/llama-4:free' });
+    remove.flush({ provider: 'openrouter', models: [], refreshed_at: null });
+
+    service.testAiModel('openrouter', 'anthropic/claude-opus-5').subscribe((r) => expect(r.ok).toBeTrue());
+    const test = http.expectOne(`${api}/test`);
+    expect(test.request.method).toBe('POST');
+    test.flush({ ok: true, detail: 'Model responded', model_id: 'anthropic/claude-opus-5' });
+  });
+});
+
 describe('apiErrorMessage', () => {
   it('reads string, coded, and validation details', () => {
     expect(apiErrorMessage({ error: { detail: 'plain' } }, 'fb')).toBe('plain');
