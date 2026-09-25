@@ -201,7 +201,8 @@ export class AuthService {
     this.user.set(null);
     const path = this.router.url.split('?')[0];
     const publicPaths = ['/login', '/register', '/register-access', '/add-new-user', '/offline'];
-    if (!publicPaths.includes(path)) {
+    const isExplorePath = path === '/explore' || path.startsWith('/explore/');
+    if (!publicPaths.includes(path) && !isExplorePath) {
       void this.router.navigate(['/login']);
     }
   }

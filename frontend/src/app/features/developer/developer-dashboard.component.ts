@@ -93,7 +93,7 @@ import { DevFavoritesService } from './shared/dev-favorites.service';
           </button>
         </div>
         <p class="flex-1 text-xs text-[var(--text-muted)]">{{ tool.description }}</p>
-        <a class="btn-primary self-start" [routerLink]="['/developer', tool.route]">Open</a>
+        <a class="btn-primary self-start" [routerLink]="[tool.route]">Open</a>
       </div>
     </ng-template>
   `,

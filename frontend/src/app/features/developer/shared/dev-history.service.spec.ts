@@ -1,5 +1,7 @@
+import { EnvironmentInjector, createEnvironmentInjector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DevHistoryService } from './dev-history.service';
+import { DEV_TOOLS_STORAGE_SCOPE } from './dev-storage-scope';
 
 describe('DevHistoryService', () => {
   let service: DevHistoryService;
@@ -43,5 +45,24 @@ describe('DevHistoryService', () => {
 
     await service.clearHistory(clearId);
     expect(history().length).toBe(0);
+  });
+
+  it('keeps guest-scope history separate from the user history', async () => {
+    const guestInjector = createEnvironmentInjector(
+      [{ provide: DEV_TOOLS_STORAGE_SCOPE, useValue: 'guest' }, DevHistoryService],
+      TestBed.inject(EnvironmentInjector),
+    );
+    const guest = guestInjector.get(DevHistoryService);
+    const scopedId = `${toolId}-scoped`;
+    const userHistory = service.getHistory(scopedId);
+    const guestHistory = guest.getHistory(scopedId);
+
+    await guest.addEntry(scopedId, 'guest-in', 'guest-out');
+    await service.clearHistory(scopedId);
+
+    expect(guestHistory().length).toBe(1);
+    expect(userHistory().length).toBe(0);
+    await guest.clearHistory(scopedId);
+    guestInjector.destroy();
   });
 });

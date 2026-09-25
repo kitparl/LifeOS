@@ -20,25 +20,54 @@ import { TaskListItem } from './models/task.models';
         <div class="task-card__row">
           <div class="task-card__main min-w-0 flex-1">
             <a [routerLink]="['/tasks', task.id]" class="link font-medium leading-snug">{{ task.title }}</a>
-            <div class="mt-1 flex flex-wrap items-center gap-1 text-xs" style="color: var(--text-muted)">
+            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style="color: var(--text-muted)">
               @if (isOverdue) {
-                <span class="chip" style="color: var(--warning, #b45309)">Overdue</span>
+                <span class="font-medium" style="color: var(--warning)">
+                  Overdue{{ task.due_date ? ' · ' + (task.due_date | date: 'MMM d') : '' }}
+                </span>
               } @else if (task.due_date) {
                 <span>{{ task.due_date | date: 'mediumDate' }}</span>
               } @else {
                 <span>No date</span>
               }
+              @if (task.priority === 'high' || task.priority === 'urgent') {
+                <span class="capitalize">· {{ task.priority }}</span>
+              }
+              @if (task.subtask_count > 0) {
+                <span>· {{ task.completed_subtasks }}/{{ task.subtask_count }} subtasks</span>
+              }
             </div>
           </div>
           @if (task.status !== 'completed') {
-            <div class="task-card__actions shrink-0 flex flex-wrap justify-end gap-1">
+            <div class="task-card__actions shrink-0 flex justify-end gap-1">
               @if (showTodayAction) {
-                <button type="button" class="btn-ghost px-2 text-xs" (click)="scheduleToday.emit(task.id)">Today</button>
+                <button
+                  type="button"
+                  class="task-card__today btn-ghost px-2 text-xs"
+                  [attr.aria-label]="'Schedule ' + task.title + ' for today'"
+                  (click)="scheduleToday.emit(task.id)"
+                >
+                  Today
+                </button>
               }
               @if (showDateAction) {
-                <button type="button" class="btn-ghost px-2 text-xs" (click)="scheduleDate.emit(task.id)">Date</button>
+                <button
+                  type="button"
+                  class="btn-ghost px-2 text-xs"
+                  [attr.aria-label]="'Set date for ' + task.title"
+                  (click)="scheduleDate.emit(task.id)"
+                >
+                  Date
+                </button>
               }
-              <button type="button" class="btn-primary px-2 text-xs" (click)="complete.emit(task.id)">Done</button>
+              <button
+                type="button"
+                class="btn-secondary px-2 text-xs"
+                [attr.aria-label]="'Mark ' + task.title + ' done'"
+                (click)="complete.emit(task.id)"
+              >
+                Done
+              </button>
             </div>
           }
         </div>
@@ -84,11 +113,9 @@ import { TaskListItem } from './models/task.models';
         gap: 0.5rem;
         padding: 0.625rem 0.75rem;
       }
-      .task-card__actions {
-        max-width: 9rem;
-      }
+      /* Mobile: "Today" lives in the date panel; swipe right or Done completes. */
       @media (max-width: 767px) {
-        .task-card__actions .btn-ghost {
+        .task-card__today {
           display: none;
         }
       }

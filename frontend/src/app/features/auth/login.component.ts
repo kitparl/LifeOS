@@ -2,14 +2,14 @@ import { AfterViewInit, Component, ElementRef, NgZone, ViewChild, effect, inject
 import { firstValueFrom } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink],
   template: `
     <div class="login-root">
 
@@ -120,6 +120,13 @@ import { ThemeService } from '../../core/services/theme.service';
               <div #googleButton class="login-google__button"></div>
             </div>
           }
+
+          <div class="login-explore">
+            <a routerLink="/explore" class="btn-secondary w-full" style="min-height: 40px" data-testid="login-explore-tools-link">
+              Explore free tools
+            </a>
+            <p class="login-explore__hint">No sign-in needed</p>
+          </div>
         </div>
 
         <!-- Footer -->
@@ -280,6 +287,19 @@ import { ThemeService } from '../../core/services/theme.service';
         content: '';
         flex: 1;
         border-top: 1px solid var(--border);
+      }
+
+      .login-explore {
+        margin-top: 1.25rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--border);
+        text-align: center;
+      }
+
+      .login-explore__hint {
+        margin: 0.375rem 0 0;
+        font-size: 0.75rem;
+        color: var(--text-faint);
       }
 
       .login-google {

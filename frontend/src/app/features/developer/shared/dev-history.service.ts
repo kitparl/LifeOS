@@ -1,5 +1,6 @@
-import { Injectable, Signal, WritableSignal, signal } from '@angular/core';
+import { Injectable, Signal, WritableSignal, inject, signal } from '@angular/core';
 import Dexie, { Table } from 'dexie';
+import { DEV_TOOLS_STORAGE_SCOPE, scopedStorageName } from './dev-storage-scope';
 
 export interface DevHistoryEntry {
   id?: number;
@@ -29,8 +30,8 @@ const MAX_ENTRIES_PER_TOOL = 200;
 class DevHistoryDatabase extends Dexie {
   entries!: Table<DevHistoryEntry, number>;
 
-  constructor() {
-    super('DevToolsHistoryDB');
+  constructor(name: string) {
+    super(name);
     this.version(1).stores({ entries: '++id, toolId, createdAt' });
   }
 }
@@ -43,7 +44,7 @@ class DevHistoryDatabase extends Dexie {
  */
 @Injectable({ providedIn: 'root' })
 export class DevHistoryService {
-  private readonly db = new DevHistoryDatabase();
+  private readonly db = new DevHistoryDatabase(scopedStorageName('DevToolsHistoryDB', inject(DEV_TOOLS_STORAGE_SCOPE)));
   private readonly cache = new Map<string, WritableSignal<DevHistoryEntry[]>>();
 
   getHistory(toolId: string): Signal<DevHistoryEntry[]> {

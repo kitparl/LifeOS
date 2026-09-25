@@ -1,5 +1,4 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { TaskListItem } from './models/task.models';
 import { TaskSwipeCardComponent } from './task-swipe-card.component';
@@ -7,34 +6,34 @@ import { TaskSwipeCardComponent } from './task-swipe-card.component';
 @Component({
   selector: 'app-task-list-section',
   standalone: true,
-  imports: [RouterLink, ListPaginatorComponent, TaskSwipeCardComponent],
+  imports: [ListPaginatorComponent, TaskSwipeCardComponent],
   template: `
     <section
       class="task-board-section"
       [class.task-board-section--today]="variant === 'today'"
       [class.task-board-section--overdue]="variant === 'overdue'"
     >
-      <div class="task-board-section__head">
-        <div>
+      @if (showHead) {
+        <div class="task-board-section__head">
           <h2 class="task-board-section__title">{{ title }}</h2>
           @if (hint) {
             <p class="task-board-section__hint">{{ hint }}</p>
           }
         </div>
-        @if (total > 0) {
-          <span class="chip text-xs">{{ total }}</span>
-        }
-      </div>
+      }
 
       <div class="task-board-section__body panel !p-2">
         @if (loading) {
-          <p class="px-2 py-3 text-sm" style="color: var(--text-muted)">Loading…</p>
+          <p class="px-2 py-3 text-sm" style="color: var(--text-muted)" role="status">Loading…</p>
+        } @else if (error) {
+          <div class="px-2 py-4 text-center" role="alert">
+            <p class="text-sm" style="color: var(--danger)">Couldn't load tasks.</p>
+            <button type="button" class="btn-secondary mt-2 text-xs" (click)="retry.emit()">Try again</button>
+          </div>
         } @else if (tasks.length === 0) {
           <div class="px-2 py-4 text-center">
             <p class="text-sm" style="color: var(--text-muted)">{{ emptyMessage }}</p>
-            @if (showCreateLink) {
-              <a routerLink="/tasks/new" class="btn-primary mt-2 inline-block text-xs no-underline">Create task</a>
-            }
+            <ng-content select="[emptyAction]" />
           </div>
         } @else {
           <ul class="space-y-1.5">
@@ -69,9 +68,9 @@ import { TaskSwipeCardComponent } from './task-swipe-card.component';
     `
       .task-board-section__head {
         display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 0.5rem;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0 0.5rem;
         margin-bottom: 0.5rem;
       }
       .task-board-section__title {
@@ -79,7 +78,6 @@ import { TaskSwipeCardComponent } from './task-swipe-card.component';
         font-weight: 600;
       }
       .task-board-section__hint {
-        margin-top: 0.125rem;
         font-size: 0.75rem;
         color: var(--text-muted);
       }
@@ -87,8 +85,11 @@ import { TaskSwipeCardComponent } from './task-swipe-card.component';
         border: 1px solid var(--xp-border);
         background: var(--primary-soft);
       }
+      .task-board-section--overdue .task-board-section__title {
+        color: var(--warning);
+      }
       .task-board-section--overdue .task-board-section__body {
-        border-color: color-mix(in srgb, var(--warning, #b45309) 35%, var(--xp-border));
+        border-color: color-mix(in srgb, var(--warning) 35%, var(--xp-border));
       }
     `,
   ],
@@ -104,11 +105,14 @@ export class TaskListSectionComponent {
   @Input() pageSize = 25;
   @Input() currentPage = 1;
   @Input() loading = false;
+  @Input() error = false;
   @Input() emptyMessage = 'No tasks.';
-  @Input() showCreateLink = false;
+  /** Hide the heading when the surrounding view already names the list. */
+  @Input() showHead = true;
 
   @Output() pageChange = new EventEmitter<number>();
   @Output() complete = new EventEmitter<string>();
   @Output() scheduleToday = new EventEmitter<string>();
   @Output() scheduleDate = new EventEmitter<string>();
+  @Output() retry = new EventEmitter<void>();
 }

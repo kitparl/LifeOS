@@ -1,12 +1,14 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { readJsonLocalStorage, writeJsonLocalStorage } from '../../../core/services/preferences-sync';
+import { DEV_TOOLS_STORAGE_SCOPE, scopedStorageName } from './dev-storage-scope';
 
 const STORAGE_KEY = 'lifeos-dev-tools-favorites';
 
 /** Pure-localStorage favorites for the Developer module. Stores tool IDs only — never tool content. */
 @Injectable({ providedIn: 'root' })
 export class DevFavoritesService {
-  private readonly favorites = signal<string[]>(readJsonLocalStorage<string[]>(STORAGE_KEY, []));
+  private readonly storageKey = scopedStorageName(STORAGE_KEY, inject(DEV_TOOLS_STORAGE_SCOPE));
+  private readonly favorites = signal<string[]>(readJsonLocalStorage<string[]>(this.storageKey, []));
 
   readonly favoriteIds = computed(() => this.favorites());
 
@@ -18,6 +20,6 @@ export class DevFavoritesService {
     const current = this.favorites();
     const next = current.includes(toolId) ? current.filter((id) => id !== toolId) : [...current, toolId];
     this.favorites.set(next);
-    writeJsonLocalStorage(STORAGE_KEY, next);
+    writeJsonLocalStorage(this.storageKey, next);
   }
 }

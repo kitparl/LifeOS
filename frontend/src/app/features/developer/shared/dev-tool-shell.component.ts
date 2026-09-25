@@ -11,7 +11,7 @@ import { DevFavoritesService } from './dev-favorites.service';
     <div class="space-y-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <a routerLink="/developer" class="text-xs text-[var(--text-muted)] hover:text-[var(--text)] no-underline">
+          <a routerLink=".." class="text-xs text-[var(--text-muted)] hover:text-[var(--text)] no-underline">
             &larr; Developer
           </a>
           <h1 class="mt-1 flex items-center gap-2 text-lg font-semibold">
