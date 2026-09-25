@@ -19,6 +19,14 @@ import {
   VocabularyPage,
   VocabularyProgress,
   VocabularySet,
+  WordLabGameRound,
+  WordLabGameType,
+  WordLabLookupResponse,
+  WordLabMode,
+  WordLabSaveRequest,
+  WordLabSaveResponse,
+  WordLabStatus,
+  WordOfTheDayResponse,
 } from '../models/vocabulary.models';
 
 /**
@@ -152,5 +160,29 @@ export class VocabularyService {
   getGameHistory(limit = 20, offset = 0): Observable<GameHistoryPage> {
     const params = new HttpParams().set('limit', limit).set('offset', offset);
     return this.http.get<GameHistoryPage>(`${this.api}/games/history`, { params });
+  }
+
+  // ---- Word Lab + Word of the Day ------------------------------------------
+
+  wordLabStatus(): Observable<WordLabStatus> {
+    return this.http.get<WordLabStatus>(`${this.api}/word-lab/status`);
+  }
+
+  wordLabLookup(q: string, mode: WordLabMode): Observable<WordLabLookupResponse> {
+    const params = new HttpParams().set('q', q).set('mode', mode);
+    return this.http.get<WordLabLookupResponse>(`${this.api}/word-lab/lookup`, { params });
+  }
+
+  wordLabGame(type: WordLabGameType): Observable<WordLabGameRound> {
+    const params = new HttpParams().set('type', type);
+    return this.http.get<WordLabGameRound>(`${this.api}/word-lab/game`, { params });
+  }
+
+  wordLabSave(body: WordLabSaveRequest): Observable<WordLabSaveResponse> {
+    return this.http.post<WordLabSaveResponse>(`${this.api}/word-lab/save`, body);
+  }
+
+  wordOfTheDay(): Observable<WordOfTheDayResponse> {
+    return this.http.get<WordOfTheDayResponse>(`${this.api}/word-of-the-day`);
   }
 }

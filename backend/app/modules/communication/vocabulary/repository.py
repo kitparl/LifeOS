@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Pagination, paginate
 from app.modules.communication.vocabulary.models import (
+    RESERVED_SEQUENCE_START,
     GameQuestion,
     GameSession,
     UserVocabulary,
@@ -16,6 +17,9 @@ from app.modules.communication.vocabulary.models import (
     VocabularySet,
     VocabularySetItem,
 )
+
+# Rows the daily allocator may hand out. IS NOT TRUE also admits NULL on legacy rows.
+_DAILY_ELIGIBLE = Vocabulary.exclude_from_daily.is_not(True)
 
 
 class VocabularyRepository:
@@ -59,7 +63,7 @@ class VocabularyRepository:
     async def get_next_unused(self, from_sequence: int, count: int) -> list[Vocabulary]:
         stmt = (
             select(Vocabulary)
-            .where(Vocabulary.sequence_number >= from_sequence)
+            .where(Vocabulary.sequence_number >= from_sequence, _DAILY_ELIGIBLE)
             .order_by(Vocabulary.sequence_number)
             .limit(count)
         )
@@ -70,7 +74,34 @@ class VocabularyRepository:
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
     async def count_vocabulary(self) -> int:
-        return (await self.db.execute(select(func.count()).select_from(Vocabulary))).scalar_one()
+        """Daily-eligible rows only: Word Lab saves and Word of the Day rows never inflate the
+        "learned / total" denominator, because they can never be allocated."""
+        stmt = select(func.count()).select_from(Vocabulary).where(_DAILY_ELIGIBLE)
+        return (await self.db.execute(stmt)).scalar_one()
+
+    # ------------------------------------------------------------------
+    # Word Lab / Word of the Day rows (never daily-allocated)
+    # ------------------------------------------------------------------
+
+    async def find_by_normalized_term(self, normalized_term: str) -> Vocabulary | None:
+        """Oldest row whose term matches case-insensitively (dataset rows win over later saves)."""
+        stmt = (
+            select(Vocabulary)
+            .where(func.lower(func.trim(Vocabulary.term)) == normalized_term)
+            .order_by(Vocabulary.sequence_number)
+            .limit(1)
+        )
+        return (await self.db.execute(stmt)).scalar_one_or_none()
+
+    async def get_word_of_the_day(self, day: date) -> Vocabulary | None:
+        stmt = select(Vocabulary).where(Vocabulary.wotd_for_date == day)
+        return (await self.db.execute(stmt)).scalar_one_or_none()
+
+    async def next_reserved_sequence_number(self) -> int:
+        """Next sequence number in the reserved band above any dataset id (v000001–v999999),
+        so future dataset imports can never collide with Word Lab / Word of the Day rows."""
+        current = (await self.db.execute(select(func.max(Vocabulary.sequence_number)))).scalar_one()
+        return max(current or 0, RESERVED_SEQUENCE_START - 1) + 1
 
     # ------------------------------------------------------------------
     # Sets

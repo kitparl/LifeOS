@@ -37,8 +37,17 @@ from app.modules.communication.vocabulary.schemas import (
     VocabularyDetailResponse,
     VocabularyPage,
     VocabularySetResponse,
+    WordLabGameResponse,
+    WordLabGameType,
+    WordLabLookupResponse,
+    WordLabMode,
+    WordLabSaveRequest,
+    WordLabSaveResponse,
+    WordLabStatus,
+    WordOfTheDayResponse,
 )
 from app.modules.communication.vocabulary.service import VocabularyService
+from app.modules.communication.vocabulary.word_lab import WordLabService
 
 router = APIRouter(prefix="/communication", tags=["communication"])
 
@@ -265,6 +274,54 @@ async def complete_game_session(
     db: AsyncSession = Depends(get_db),
 ):
     return await VocabularyService(db).complete_game_session(user, session_id)
+
+
+# --------------------------------------------------------------------------
+# Vocabulary — Word Lab (Wordnik lookups) + Word of the Day
+# --------------------------------------------------------------------------
+
+@router.get("/vocabulary/word-lab/status", response_model=WordLabStatus)
+async def word_lab_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WordLabService(db).status(user)
+
+
+@router.get("/vocabulary/word-lab/lookup", response_model=WordLabLookupResponse)
+async def word_lab_lookup(
+    q: str = Query(min_length=1, max_length=200),
+    mode: WordLabMode = Query(default="dictionary"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WordLabService(db).lookup(user, q, mode)
+
+
+@router.get("/vocabulary/word-lab/game", response_model=WordLabGameResponse)
+async def word_lab_game(
+    type: WordLabGameType = Query(default="guess_word"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WordLabService(db).game(user, type)
+
+
+@router.post("/vocabulary/word-lab/save", response_model=WordLabSaveResponse)
+async def word_lab_save(
+    data: WordLabSaveRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WordLabService(db).save(user, data)
+
+
+@router.get("/vocabulary/word-of-the-day", response_model=WordOfTheDayResponse)
+async def word_of_the_day(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WordLabService(db).word_of_the_day(user)
 
 
 # --------------------------------------------------------------------------

@@ -114,10 +114,17 @@ class ProviderAdapter(ChatCompletionProvider, Protocol):
     label: str
     # False when the vendor has no model-listing API; users add model ids manually instead.
     supports_model_listing: bool
+    # False when the model list is public, so a successful listing does not prove the key works.
+    model_list_validates_key: bool
 
     async def list_models(self) -> list[ModelInfo]: ...
 
     async def test(self, model: str | None) -> None: ...
+
+
+def _http_client(timeout: float) -> httpx.AsyncClient:
+    """Single construction point for vendor HTTP clients (tests patch this seam)."""
+    return httpx.AsyncClient(timeout=timeout)
 
 
 def _vendor_message(res: httpx.Response) -> str:
@@ -146,7 +153,7 @@ async def request_json_value(
     Returns the decoded JSON value (object or array).
     """
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with _http_client(timeout) as client:
             res = await client.request(method, url, headers=headers, json=json_body, params=params)
     except httpx.TimeoutException as exc:
         raise ProviderTimeoutError(f"{label} request timed out.") from exc

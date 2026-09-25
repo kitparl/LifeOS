@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -253,3 +253,70 @@ class GameAnswerResponse(BaseModel):
 class GameHistoryPage(BaseModel):
     items: list[GameSessionResponse]
     total: int
+
+
+# --------------------------------------------------------------------------
+# Word Lab (Wordnik-backed lookups) + Word of the Day
+# --------------------------------------------------------------------------
+
+WordLabMode = Literal["dictionary", "synonyms", "explorer", "rhymes"]
+WordLabGameType = Literal["guess_word", "guess_meaning", "scramble"]
+
+
+class WordLabStatus(BaseModel):
+    connected: bool
+    # None when unknown (no reading yet this clock hour) — never an invented number.
+    usage_remaining_pct: int | None = None
+
+
+class WordLabDefinition(BaseModel):
+    part_of_speech: str | None = None
+    text: str
+
+
+class WordLabWord(BaseModel):
+    word: str
+    hint: str | None = None
+
+
+class WordLabLookupResponse(BaseModel):
+    """One shape for every mode: dictionary fills definitions/example, the others fill words."""
+
+    mode: WordLabMode
+    query: str
+    definitions: list[WordLabDefinition] = []
+    example: str | None = None
+    words: list[WordLabWord] = []
+    usage_remaining_pct: int | None = None
+
+
+class WordLabGameResponse(BaseModel):
+    """Stateless practice round. guess_word / guess_meaning: pick options[answer_index].
+    scramble: unscramble `prompt` into `answer`, with the definition as `hint`."""
+
+    type: WordLabGameType
+    prompt: str
+    options: list[str] = []
+    answer_index: int | None = None
+    answer: str | None = None
+    hint: str | None = None
+    usage_remaining_pct: int | None = None
+
+
+class WordLabSaveRequest(BaseModel):
+    term: str = Field(min_length=1, max_length=200)
+    definition: str = Field(min_length=1, max_length=2000)
+    part_of_speech: str | None = Field(default=None, max_length=32)
+    example: str | None = Field(default=None, max_length=1000)
+    synonyms: list[Annotated[str, Field(max_length=100)]] = Field(default_factory=list, max_length=20)
+
+
+class WordLabSaveResponse(BaseModel):
+    id: str
+    created: bool
+
+
+class WordOfTheDayResponse(BaseModel):
+    connected: bool
+    date: date
+    vocabulary: VocabularyDetail | None = None

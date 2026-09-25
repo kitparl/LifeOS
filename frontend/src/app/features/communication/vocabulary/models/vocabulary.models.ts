@@ -175,3 +175,63 @@ export interface GameHistoryPage {
   items: GameSessionResponse[];
   total: number;
 }
+
+// ---- Word Lab (Wordnik-backed) + Word of the Day ----------------------------
+
+export type WordLabMode = 'dictionary' | 'synonyms' | 'explorer' | 'rhymes';
+export type WordLabGameType = 'guess_word' | 'guess_meaning' | 'scramble';
+
+export interface WordLabStatus {
+  connected: boolean;
+  /** null when unknown — the UI shows "Unknown", never an invented number. */
+  usage_remaining_pct: number | null;
+}
+
+export interface WordLabDefinition {
+  part_of_speech: string | null;
+  text: string;
+}
+
+export interface WordLabWord {
+  word: string;
+  hint: string | null;
+}
+
+export interface WordLabLookupResponse {
+  mode: WordLabMode;
+  query: string;
+  definitions: WordLabDefinition[];
+  example: string | null;
+  words: WordLabWord[];
+  usage_remaining_pct: number | null;
+}
+
+export interface WordLabGameRound {
+  type: WordLabGameType;
+  prompt: string;
+  options: string[];
+  answer_index: number | null;
+  answer: string | null;
+  hint: string | null;
+  usage_remaining_pct: number | null;
+}
+
+export interface WordLabSaveRequest {
+  term: string;
+  definition: string;
+  part_of_speech?: string | null;
+  example?: string | null;
+  synonyms?: string[];
+}
+
+export interface WordLabSaveResponse {
+  id: string;
+  created: boolean;
+}
+
+export interface WordOfTheDayResponse {
+  connected: boolean;
+  /** IST date (YYYY-MM-DD). */
+  date: string;
+  vocabulary: VocabularyDetail | null;
+}

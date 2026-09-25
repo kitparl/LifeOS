@@ -22,6 +22,7 @@ import { ConfirmHostComponent } from '../confirm/confirm-host.component';
 import { DocumentViewerHostComponent } from '../document-viewer/document-viewer-host.component';
 import { MarkdownImportChoiceHostComponent } from '../markdown/markdown-import-choice-host.component';
 import { NotificationDropdownComponent } from './notification-dropdown.component';
+import { WordOfTheDayChipComponent } from './word-of-the-day-chip.component';
 import { resolvePageTitle } from './nav-registry';
 
 const STORAGE_AI_OPEN    = 'lifeos-ai-panel-open';
@@ -42,6 +43,7 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
     MarkdownImportChoiceHostComponent,
     DocumentViewerHostComponent,
     NotificationDropdownComponent,
+    WordOfTheDayChipComponent,
   ],
   template: `
     <app-command-palette />
@@ -206,6 +208,7 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
                 {{ label }}
               </span>
             }
+            <app-word-of-the-day-chip />
             <app-notification-dropdown />
             <button type="button" class="btn-ghost !px-2 text-xs !hidden sm:!inline-flex" (click)="openSearch()">
               Search <kbd style="font-size: 10px; opacity: 0.7; margin-left: 4px">⌘K</kbd>

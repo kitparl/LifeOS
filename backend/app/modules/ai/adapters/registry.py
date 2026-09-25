@@ -45,7 +45,6 @@ _FALLBACK_MODELS: dict[str, str] = {"sarvam": sarvam.DEFAULT_MODEL}
 
 # Seeded as manual model ids on first key save for vendors without a model-listing API.
 _SUGGESTED_MODELS: dict[str, tuple[str, ...]] = {
-    "sarvam": sarvam.SUGGESTED_MODELS,
     "perplexity": ("sonar", "sonar-pro", "sonar-reasoning-pro", "sonar-deep-research"),
 }
 
@@ -69,6 +68,11 @@ def provider_label(provider: str) -> str:
 
 def supports_model_listing(provider: str) -> bool:
     return bool(getattr(_ADAPTERS.get(provider), "supports_model_listing", False))
+
+
+def model_list_validates_key(provider: str) -> bool:
+    """False when the vendor's model list is public, so fetching it doesn't prove the key works."""
+    return bool(getattr(_ADAPTERS.get(provider), "model_list_validates_key", False))
 
 
 def fallback_model(provider: str) -> str | None:

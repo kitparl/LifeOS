@@ -189,7 +189,29 @@ Pick a **source** the same way as Revision (Today / All Learned / Bookmarked / N
 
 ## Dynamic dataset size
 
-Nothing in this feature hard-codes "15,000". The available-word count, the progress denominator, and the "end of dataset" check are all computed as `COUNT(*)` on the `vocabulary` table at request time. You can grow the dataset to 20,000, 50,000, or 100,000+ items by re-running the importer with an updated/extended JSON file — no code changes needed.
+Nothing in this feature hard-codes "15,000". The available-word count, the progress denominator, and the "end of dataset" check are all computed at request time over the **daily-eligible** rows of `vocabulary` (`exclude_from_daily IS NOT TRUE`). Word Lab saves and Word of the Day rows are excluded; see [Word Lab and Word of the Day](#word-lab-and-word-of-the-day). You can grow the dataset to 20,000, 50,000, or 100,000+ items by re-running the importer with an updated/extended JSON file — no code changes needed.
+
+---
+
+## Word Lab and Word of the Day
+
+Spec: `requirements/25sept-vocabulary-word-lab.md`. Setup: `setup/WORDNIK_SETUP.md`.
+
+- **Word Lab tab** (`components/vocabulary-word-lab.component.ts`):
+  - One search box plus tool chips: Dictionary, Synonyms, Explorer (reverse dictionary: describe an idea and get words), Rhymes, and Game (Guess the word / Guess the meaning / Scramble).
+  - The tab is locked, with a "Connect in Integrations" link, until the user saves a Wordnik key on `/integrations`. Keys are per user (BYOK) and Fernet-encrypted, and all vendor calls are server-side.
+  - **Usage remaining %** comes from the last Wordnik rate-limit headers stored on the user's integration. It shows "Unknown" when no reading exists for the current clock hour.
+- **Save as vocabulary** inserts a row into the same `vocabulary` table (`source="user_saved"`, id `x` + 15 hex chars). If the term already exists, case-insensitively, the existing id is returned instead. Saved rows open in the normal detail page and appear in Library search.
+- **Word of the Day** is a header chip (`shared/layout/word-of-the-day-chip.component.ts`) with a hover/tap popover. Clicking it opens `/communication/vocabulary/{id}`. It is hidden unless the current user has a connected key.
+  - Lookup order:
+    1. browser `localStorage` (`lifeos.wotd.<userId>.<IST date>`)
+    2. `vocabulary.wotd_for_date = today`
+    3. one Wordnik fetch, stored app-wide
+  - If the term already exists, that row is reused (only `wotd_for_date` is set). Otherwise a `w<YYYYMMDD>` row with `source="api"` is inserted.
+- **Columns** (additive): `source` (`dataset` | `api` | `user_saved`), `exclude_from_daily`, and `wotd_for_date` (unique index `ix_vocabulary_wotd_for_date`).
+- **Sequencing rule:**
+  - `get_next_unused` and `count_vocabulary` only consider rows with `exclude_from_daily IS NOT TRUE`, so saved and Word of the Day rows are never allocated as daily words and never inflate the progress denominator.
+  - Non-dataset rows also take `sequence_number` from a reserved band starting at 1,000,000,000 (`RESERVED_SEQUENCE_START`), so future dataset imports (`v000001`–`v999999`) can never collide with them.
 
 ---
 
@@ -214,6 +236,11 @@ Nothing in this feature hard-codes "15,000". The available-word count, the progr
 | POST | `/games/sessions/{id}/answers` | Submit one answer (updates mastery) |
 | POST | `/games/sessions/{id}/complete` | Finalize a session's score |
 | GET | `/games/history` | Paginated list of completed sessions |
+| GET | `/word-lab/status` | `{connected, usage_remaining_pct}`. No vendor call. |
+| GET | `/word-lab/lookup` | `q`, `mode=dictionary\|synonyms\|explorer\|rhymes`. Proxied to Wordnik. |
+| GET | `/word-lab/game` | `type=guess_word\|guess_meaning\|scramble`. A stateless practice round. |
+| POST | `/word-lab/save` | Save a looked-up word into `vocabulary` (returns the existing id if the term is already there) |
+| GET | `/word-of-the-day` | `{connected, date, vocabulary}`. DB first; Wordnik at most once per IST day. |
 
 Every endpoint derives the user from the JWT (`Depends(get_current_user)`) and scopes every query by `user_id` at the repository layer — a client can never read or modify another user's progress, bookmarks, examples, or game history.
 

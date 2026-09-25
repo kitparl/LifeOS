@@ -8,7 +8,7 @@ export interface IntegrationProvider {
   display_name: string;
   description: string;
   oauth_required: boolean;
-  group: 'general' | 'ai';
+  group: 'general' | 'ai' | 'language';
 }
 
 export interface IntegrationConnection {
@@ -167,6 +167,27 @@ export interface GitHubTestResponse {
   repo_full_name: string | null;
   branch?: string | null;
   can_push?: boolean | null;
+}
+
+export interface WordnikConfigStatus {
+  connection_id: string;
+  enabled: boolean;
+  status: string;
+  configured: boolean;
+  api_key_masked: string | null;
+  last_tested_at: string | null;
+  last_test_ok: boolean | null;
+  usage_remaining_pct: number | null;
+}
+
+export interface WordnikConfigUpdate {
+  api_key?: string | null;
+  enabled?: boolean | null;
+}
+
+export interface WordnikTestResponse {
+  ok: boolean;
+  detail: string;
 }
 
 export interface GitHubSyncResponse {
@@ -375,6 +396,18 @@ export class IntegrationsService {
 
   testGitHub(): Observable<GitHubTestResponse> {
     return this.http.post<GitHubTestResponse>(`${this.api}/github/test`, {});
+  }
+
+  getWordnik(): Observable<WordnikConfigStatus> {
+    return this.http.get<WordnikConfigStatus>(`${this.api}/wordnik`);
+  }
+
+  saveWordnikConfig(body: WordnikConfigUpdate): Observable<WordnikConfigStatus> {
+    return this.http.put<WordnikConfigStatus>(`${this.api}/wordnik/config`, body);
+  }
+
+  testWordnik(): Observable<WordnikTestResponse> {
+    return this.http.post<WordnikTestResponse>(`${this.api}/wordnik/test`, {});
   }
 
   syncSectionToGitHub(sectionId: string): Observable<GitHubSyncResponse> {

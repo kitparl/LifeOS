@@ -107,6 +107,10 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("sticky_notes", "tags", "TEXT"),
     # AI Integration: fetched vs user-added model ids in the cached catalog.
     ("ai_provider_models", "source", "VARCHAR(16)"),
+    # Vocabulary Word Lab: row origin, daily-allocation opt-out, Word of the Day date.
+    ("vocabulary", "source", "VARCHAR(16)"),
+    ("vocabulary", "exclude_from_daily", "BOOLEAN DEFAULT FALSE"),
+    ("vocabulary", "wotd_for_date", "DATE"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
@@ -115,6 +119,7 @@ _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
     ("race_events", "attended"),
     ("race_events", "skipped"),
     ("users", "is_admin"),
+    ("vocabulary", "exclude_from_daily"),
 ]
 
 _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
@@ -122,6 +127,7 @@ _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
     ("wishlist_items", "priority", "medium"),
     ("file_records", "visibility", "private"),
     ("ai_provider_models", "source", "fetched"),
+    ("vocabulary", "source", "dataset"),
 ]
 
 _INTEGER_DEFAULTS_TO_BACKFILL: list[tuple[str, str, int]] = [
@@ -197,6 +203,7 @@ async def ensure_columns(conn: AsyncConnection) -> None:
     await backfill_usernames(conn)
     await backfill_finance_expense_kind(conn)
     await backfill_finance_loan_status(conn)
+    await ensure_vocabulary_wotd_index(conn)
 
 
 # Columns whose VARCHAR length grew. SQLite ignores VARCHAR lengths, so only Postgres needs this.
@@ -425,3 +432,14 @@ async def backfill_finance_loan_status(conn: AsyncConnection) -> None:
         )
     except Exception as exc:
         logger.warning("Could not backfill finance_loans.status: %s", exc)
+
+
+async def ensure_vocabulary_wotd_index(conn: AsyncConnection) -> None:
+    """At most one Word of the Day row per date. SQLite cannot ADD a UNIQUE column, so the
+    constraint is a separate unique index (NULLs are allowed repeatedly on both engines)."""
+    try:
+        await conn.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS ix_vocabulary_wotd_for_date ON vocabulary (wotd_for_date)")
+        )
+    except Exception as exc:
+        logger.warning("Could not create unique index on vocabulary.wotd_for_date: %s", exc)

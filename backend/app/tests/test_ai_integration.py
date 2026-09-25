@@ -135,6 +135,8 @@ class FakeVendors:
                         "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 3},
                     },
                 )
+        if host == "api.sarvam.ai" and path in SARVAM_MODEL_LISTS:
+            return httpx.Response(200, json=SARVAM_MODEL_LISTS[path])
         if path.endswith("/chat/completions") and host in COMPATIBLE_HOSTS | {"api.sarvam.ai"}:
             return httpx.Response(200, json={"choices": [{"message": {"content": self.chat_text}}]})
         if host in VENDOR_MODEL_LISTS and path == VENDOR_MODEL_LISTS[host][0]:
@@ -170,17 +172,23 @@ VENDOR_MODEL_LISTS: dict[str, tuple[str, object]] = {
     ),
 }
 COMPATIBLE_HOSTS = frozenset(VENDOR_MODEL_LISTS) | {"api.perplexity.ai"}
+SARVAM_MODEL_LISTS: dict[str, object] = {
+    "/v1/models": {"object": "list", "data": [{"id": "sarvam-105b"}, {"id": "sarvam-105b-conversations"}]},
+    "/v2/models": {
+        "object": "list",
+        "data": [{"id": "glm5.3"}, {"id": "gemma4"}, {"id": "sarvam-105b"}, {"id": "deepseekv4-flash"}],
+    },
+}
 
 
 @contextmanager
 def mock_vendor_http(handler: Callable[[httpx.Request], httpx.Response]) -> Iterator[None]:
     real_client = httpx.AsyncClient
 
-    def factory(*args, **kwargs):
-        kwargs["transport"] = httpx.MockTransport(handler)
-        return real_client(*args, **kwargs)
+    def factory(timeout: float) -> httpx.AsyncClient:
+        return real_client(timeout=timeout, transport=httpx.MockTransport(handler))
 
-    with patch.object(adapter_base.httpx, "AsyncClient", side_effect=factory):
+    with patch.object(adapter_base, "_http_client", side_effect=factory):
         yield
 
 
@@ -774,7 +782,7 @@ async def test_per_model_test(client, vendors):
     assert "ds-key-1" not in failed.text
 
 
-async def test_providers_without_listing_seed_suggestions_without_network(client, vendors):
+async def test_perplexity_without_listing_seeds_suggestions_without_network(client, vendors):
     headers = await _auth(client, "ainolisting@example.com")
     body = await _connect(client, headers, "perplexity", "pplx-key-1")
     assert body["supports_model_listing"] is False and body["status"] == "connected"
@@ -786,9 +794,6 @@ async def test_providers_without_listing_seed_suggestions_without_network(client
 
     refresh = await client.post(f"{API}/integrations/ai/perplexity/models/refresh", headers=headers)
     assert refresh.status_code == 400
-
-    sarvam = await _connect(client, headers, "sarvam", "sarvam-key-2")
-    assert sarvam["model_count"] == 2
 
     test = await client.post(f"{API}/integrations/ai/perplexity/test", headers=headers)
     assert test.json()["ok"] is True and test.json()["model"] == "sonar"
@@ -814,3 +819,30 @@ async def test_source_column_migration_backfills_existing_rows():
         row = (await conn.execute(text("SELECT source FROM ai_provider_models"))).one()
     await engine.dispose()
     assert row.source == "fetched"
+
+
+async def test_sarvam_merges_v1_and_v2_lists_and_routes_chat_by_version(client, vendors):
+    headers = await _auth(client, "aisarvamv2@example.com")
+    body = await _connect(client, headers, "sarvam", "sarvam-key-3")
+    # Public lists: fetched on save, but that is not treated as a key check.
+    assert body["supports_model_listing"] is True and body["model_count"] == 5
+    assert body["last_tested_at"] is None
+
+    models = (await client.get(f"{API}/integrations/ai/sarvam/models", headers=headers)).json()["models"]
+    assert [m["model_id"] for m in models] == [
+        "deepseekv4-flash", "gemma4", "glm5.3", "sarvam-105b", "sarvam-105b-conversations",
+    ]
+    assert {m["source"] for m in models} == {"fetched"}
+
+    adapter = get_adapter("sarvam", ProviderCredentials("sk"))
+    await adapter.chat("s", "u", model="sarvam-105b", temperature=0.2, max_tokens=8, timeout=5)
+    assert str(vendors.requests[-1].url) == "https://api.sarvam.ai/v1/chat/completions"
+    await adapter.chat("s", "u", model="gemma4", temperature=0.2, max_tokens=8, timeout=5)
+    assert str(vendors.requests[-1].url) == "https://api.sarvam.ai/v2/chat/completions"
+    assert vendors.requests[-1].headers["api-subscription-key"] == "sk"
+
+    # Existing Writing Feedback users keep resolving to sarvam-105b.
+    user_id = await _user_id(client, headers)
+    async with client.session_factory() as session:
+        resolved = await AiGateway(session).resolve(user_id, USE_CASE_WRITING_FEEDBACK)
+    assert (resolved.provider, resolved.model) == ("sarvam", "sarvam-105b")

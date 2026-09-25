@@ -40,11 +40,15 @@ from app.modules.integrations.schemas import (
     TelegramTestResponse,
     TelegramWebhookRegisterResponse,
     TelegramWebhookStatus,
+    WordnikConfigStatus,
+    WordnikConfigUpdate,
+    WordnikTestResponse,
 )
 from app.modules.integrations.github.sync_service import GitHubSyncService
 from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
 from app.modules.integrations.service import IntegrationService, list_integration_providers
 from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
+from app.modules.integrations.wordnik.service import WordnikIntegrationService
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -229,6 +233,31 @@ async def test_ai_provider_model(
     db: AsyncSession = Depends(get_db),
 ):
     return await AiProviderIntegrationService(db).test_model(user.id, provider, data.model_id)
+
+
+@router.get("/wordnik", response_model=WordnikConfigStatus)
+async def get_wordnik_config(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WordnikIntegrationService(db).status(user.id)
+
+
+@router.put("/wordnik/config", response_model=WordnikConfigStatus)
+async def save_wordnik_config(
+    data: WordnikConfigUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WordnikIntegrationService(db).save(user.id, data)
+
+
+@router.post("/wordnik/test", response_model=WordnikTestResponse)
+async def test_wordnik(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await WordnikIntegrationService(db).test(user.id)
 
 
 @router.post("/github/sync/section/{section_id}", response_model=GitHubSyncResponse)

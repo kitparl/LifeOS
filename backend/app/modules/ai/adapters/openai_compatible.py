@@ -31,6 +31,7 @@ class OpenAiCompatibleAdapter:
     default_base_url = ""
     models_path = "/models"
     supports_model_listing = True
+    model_list_validates_key = True
     # OpenAI itself uses max_completion_tokens; most compatible vendors still use max_tokens.
     max_tokens_field = "max_tokens"
 

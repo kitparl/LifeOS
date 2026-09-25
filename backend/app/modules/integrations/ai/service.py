@@ -24,6 +24,7 @@ from app.modules.ai.adapters.registry import (
     fallback_model,
     get_adapter,
     is_ai_provider,
+    model_list_validates_key,
     provider_label,
     suggested_models,
     supports_model_listing,
@@ -150,8 +151,8 @@ class AiProviderIntegrationService:
 
         if new_key:
             updated.status = "error" if refresh_error else "connected"
-            if refresh_error is None and supports_model_listing(provider):
-                # Listing models is a live key check, so it counts as a successful test.
+            if refresh_error is None and supports_model_listing(provider) and model_list_validates_key(provider):
+                # An authenticated model listing is a live key check, so it counts as a successful test.
                 updated.last_sync_at = datetime.now(timezone.utc)
             await self.repo.db.flush()
         return await self.status(user_id, provider, models_refresh_error=refresh_error)

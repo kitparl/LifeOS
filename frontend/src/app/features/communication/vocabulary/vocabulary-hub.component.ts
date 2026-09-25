@@ -5,9 +5,10 @@ import { VocabularyGamesComponent } from './components/vocabulary-games.componen
 import { VocabularyHistoryComponent } from './components/vocabulary-history.component';
 import { VocabularyLibraryComponent } from './components/vocabulary-library.component';
 import { VocabularyProgressComponent } from './components/vocabulary-progress.component';
+import { VocabularyWordLabComponent } from './components/vocabulary-word-lab.component';
 import { VocabularyDailyComponent } from './vocabulary-daily.component';
 
-type VocabTab = 'today' | 'bookmarks' | 'library' | 'history' | 'progress' | 'games';
+type VocabTab = 'today' | 'bookmarks' | 'library' | 'history' | 'progress' | 'games' | 'word-lab';
 
 @Component({
   selector: 'app-vocabulary-hub',
@@ -20,6 +21,7 @@ type VocabTab = 'today' | 'bookmarks' | 'library' | 'history' | 'progress' | 'ga
     VocabularyHistoryComponent,
     VocabularyProgressComponent,
     VocabularyGamesComponent,
+    VocabularyWordLabComponent,
   ],
   template: `
     <div class="space-y-3">
@@ -44,6 +46,9 @@ type VocabTab = 'today' | 'bookmarks' | 'library' | 'history' | 'progress' | 'ga
         @case ('games') {
           <app-vocabulary-games />
         }
+        @case ('word-lab') {
+          <app-vocabulary-word-lab />
+        }
       }
     </div>
   `,
@@ -56,6 +61,7 @@ export class VocabularyHubComponent {
     { id: 'history', label: 'History' },
     { id: 'progress', label: 'Progress' },
     { id: 'games', label: 'Games' },
+    { id: 'word-lab', label: 'Word Lab' },
   ];
 
   readonly activeTab = signal<VocabTab>('today');

@@ -40,6 +40,13 @@ GAME_TYPES = (
     "word_matching",
     "meaning_matching",
 )
+# Where a vocabulary row came from. Only "dataset" rows feed daily allocation by default.
+SOURCE_DATASET = "dataset"
+SOURCE_API = "api"
+SOURCE_USER_SAVED = "user_saved"
+SOURCES = (SOURCE_DATASET, SOURCE_API, SOURCE_USER_SAVED)
+# Dataset ids are v000001–v999999 (sequence 1–999999). Non-dataset rows are numbered from here up.
+RESERVED_SEQUENCE_START = 1_000_000_000
 GAME_SOURCES = ("today", "specific_day", "all_learned", "bookmarked", "needs_revision", "level")
 
 
@@ -97,6 +104,11 @@ class Vocabulary(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
     dataset_version: Mapped[str] = mapped_column(String(16), nullable=False, default="1.0")
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default=SOURCE_DATASET)
+    # True for Word Lab saves and Word of the Day rows: allocate_next must never hand them out.
+    exclude_from_daily: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Set on the row that is the Word of the Day for this IST date (unique index; see migrations).
+    wotd_for_date: Mapped[date | None] = mapped_column(Date, nullable=True, unique=True, index=True)
 
 
 class UserVocabularyProgress(Base):

@@ -26,6 +26,7 @@ INTEGRATION_PROVIDERS = (
     "together",
     "openrouter",
     "perplexity",
+    "wordnik",
 )
 
 

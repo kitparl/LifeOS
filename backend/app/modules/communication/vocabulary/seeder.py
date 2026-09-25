@@ -32,6 +32,7 @@ from app.modules.communication.vocabulary.models import (
     FORMALITY,
     LEARNING_PRIORITY,
     LEVELS,
+    SOURCE_DATASET,
     VOCAB_TYPES,
     Vocabulary,
     VocabularyCollection,
@@ -229,6 +230,8 @@ def _row_from_record(record: dict[str, Any], collection_id: str, dataset_version
         "created_at": now,
         "updated_at": now,
         "dataset_version": record.get("dataset_version", dataset_version),
+        "source": SOURCE_DATASET,
+        "exclude_from_daily": False,
     }
 
 
