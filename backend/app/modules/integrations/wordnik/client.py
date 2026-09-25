@@ -13,7 +13,7 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 from urllib.parse import quote
 
@@ -104,7 +104,7 @@ def _usage_from_headers(headers: httpx.Headers) -> WordnikUsage | None:
     limit = _header_int(headers, "x-ratelimit-limit-hour")
     if remaining is None or limit is None:
         return None
-    return WordnikUsage(remaining=remaining, limit=limit, observed_at=datetime.now(UTC))
+    return WordnikUsage(remaining=remaining, limit=limit, observed_at=datetime.now(timezone.utc))
 
 
 def _definitions(raw: Any) -> list[Definition]:
