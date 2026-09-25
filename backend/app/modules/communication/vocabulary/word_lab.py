@@ -25,7 +25,6 @@ from app.core.exceptions import (
     ServiceUnavailableError,
     UnprocessableError,
 )
-from app.core.pagination import Pagination
 from app.core.timezone import ist_today
 from app.modules.auth.models import User
 from app.modules.communication.vocabulary.models import (
@@ -35,9 +34,7 @@ from app.modules.communication.vocabulary.models import (
 )
 from app.modules.communication.vocabulary.repository import VocabularyRepository
 from app.modules.communication.vocabulary.schemas import (
-    VocabularyCard,
     VocabularyDetail,
-    VocabularyPage,
     WordLabDefinition,
     WordLabGameResponse,
     WordLabGameType,
@@ -241,21 +238,20 @@ class WordLabService:
         )
         if not fields["term"] or not fields["simple_meaning"]:
             raise UnprocessableError("A word and its meaning are required")
-        existing = await self.repo.find_by_normalized_term(normalize_term(fields["term"]))
-        if existing is not None:
-            return WordLabSaveResponse(id=existing.id, created=False)
-        try:
-            async with self.db.begin_nested():
-                row = await self._insert(fields, row_id=new_saved_id(), source=SOURCE_USER_SAVED)
-        except IntegrityError as exc:
-            raise ConflictError("Saving collided with another save — please retry") from exc
-        return WordLabSaveResponse(id=row.id, created=True)
-
-    async def list_saved(self, user: User, pagination: Pagination) -> VocabularyPage:
-        """Words added through Word Lab's Save (shared vocabulary rows, newest first)."""
-        await self._client(user)  # Word Lab tools are locked until Wordnik is connected.
-        rows, total = await self.repo.list_by_source(SOURCE_USER_SAVED, pagination)
-        return VocabularyPage(items=[VocabularyCard.model_validate(v) for v in rows], total=total)
+        row = await self.repo.find_by_normalized_term(normalize_term(fields["term"]))
+        created = row is None
+        if row is None:
+            try:
+                async with self.db.begin_nested():
+                    row = await self._insert(fields, row_id=new_saved_id(), source=SOURCE_USER_SAVED)
+            except IntegrityError as exc:
+                raise ConflictError("Saving collided with another save — please retry") from exc
+        # Vocabulary rows are shared, so the per-user record of "I saved this" is a bookmark.
+        # It also covers words that already existed (e.g. seeded ones), which get no new row.
+        if await self.repo.get_bookmark(user.id, row.id) is None:
+            self.repo.new_bookmark(user.id, row.id)
+            await self.db.flush()
+        return WordLabSaveResponse(id=row.id, created=created)
 
     async def _insert(
         self, fields: dict[str, Any], *, row_id: str, source: str, wotd_for_date: date | None = None

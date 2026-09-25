@@ -182,11 +182,6 @@ export class VocabularyService {
     return this.http.post<WordLabSaveResponse>(`${this.api}/word-lab/save`, body);
   }
 
-  wordLabSaved(limit = 20, offset = 0): Observable<VocabularyPage> {
-    const params = new HttpParams().set('limit', limit).set('offset', offset);
-    return this.http.get<VocabularyPage>(`${this.api}/word-lab/saved`, { params });
-  }
-
   wordOfTheDay(): Observable<WordOfTheDayResponse> {
     return this.http.get<WordOfTheDayResponse>(`${this.api}/word-of-the-day`);
   }

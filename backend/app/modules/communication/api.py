@@ -316,15 +316,6 @@ async def word_lab_save(
     return await WordLabService(db).save(user, data)
 
 
-@router.get("/vocabulary/word-lab/saved", response_model=VocabularyPage)
-async def word_lab_saved(
-    pagination: Pagination = Depends(pagination_params),
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    return await WordLabService(db).list_saved(user, pagination)
-
-
 @router.get("/vocabulary/word-of-the-day", response_model=WordOfTheDayResponse)
 async def word_of_the_day(
     user: User = Depends(get_current_user),

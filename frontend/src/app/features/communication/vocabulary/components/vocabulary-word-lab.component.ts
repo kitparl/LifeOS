@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../../../shared/pagination/list-paginator.component';
 import {
-  VocabularyCard,
+  BookmarkResponse,
   WordLabGameRound,
   WordLabGameType,
   WordLabLookupResponse,
@@ -13,7 +13,7 @@ import {
 } from '../models/vocabulary.models';
 import { VocabularyService } from '../services/vocabulary.service';
 
-type WordLabTool = WordLabMode | 'game' | 'saved';
+type WordLabTool = WordLabMode | 'game';
 
 const TOOLS: { id: WordLabTool; label: string; placeholder: string }[] = [
   { id: 'dictionary', label: 'Dictionary', placeholder: 'Look up a word' },
@@ -25,7 +25,6 @@ const TOOLS: { id: WordLabTool; label: string; placeholder: string }[] = [
   },
   { id: 'rhymes', label: 'Rhymes', placeholder: 'Find rhymes for…' },
   { id: 'game', label: 'Game', placeholder: '' },
-  { id: 'saved', label: 'Saved', placeholder: '' },
 ];
 
 const GAMES: { id: WordLabGameType; label: string }[] = [
@@ -34,7 +33,7 @@ const GAMES: { id: WordLabGameType; label: string }[] = [
   { id: 'scramble', label: 'Scramble' },
 ];
 
-const SAVED_PAGE_SIZE = 20;
+const SAVED_PAGE_SIZE = 12;
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credential: 'Wordnik rejected the API key. Check it in Integrations.',
@@ -228,36 +227,6 @@ const ERROR_MESSAGES: Record<string, string> = {
               </div>
             }
           </div>
-        } @else if (tool() === 'saved') {
-          <div class="space-y-2" data-testid="word-lab-saved">
-            @if (savedWords().length) {
-              <div class="grid gap-2 sm:grid-cols-2">
-                @for (item of savedWords(); track item.id) {
-                  <a
-                    class="panel block text-sm"
-                    [routerLink]="['/communication/vocabulary', item.id]"
-                  >
-                    <p class="font-semibold">{{ item.term }}</p>
-                    <p class="text-xs" style="color: var(--text-muted)">
-                      {{ item.part_of_speech }}
-                    </p>
-                    <p>{{ item.simple_meaning }}</p>
-                  </a>
-                }
-              </div>
-              <app-list-paginator
-                [total]="savedTotal()"
-                [pageSize]="savedPageSize"
-                [currentPage]="savedPage()"
-                (pageChange)="loadSaved($event)"
-              />
-            } @else if (!busy()) {
-              <p style="color: var(--text-muted)">
-                No saved words yet. Look a word up in Dictionary and choose Save
-                as vocabulary.
-              </p>
-            }
-          </div>
         } @else {
           @if (result(); as res) {
             @if (res.mode === 'dictionary') {
@@ -346,6 +315,38 @@ const ERROR_MESSAGES: Record<string, string> = {
             }
           }
         }
+
+        <section
+          class="space-y-2 border-t pt-3"
+          style="border-color: var(--border)"
+          data-testid="word-lab-saved"
+        >
+          <p class="font-semibold">Your saved words</p>
+          @if (savedWords().length) {
+            <div class="flex flex-wrap gap-2">
+              @for (b of savedWords(); track b.id) {
+                <a
+                  class="chip"
+                  [routerLink]="['/communication/vocabulary', b.vocabulary.id]"
+                  [title]="b.vocabulary.simple_meaning"
+                >
+                  {{ b.vocabulary.term }}
+                </a>
+              }
+            </div>
+            <app-list-paginator
+              [total]="savedTotal()"
+              [pageSize]="savedPageSize"
+              [currentPage]="savedPage()"
+              (pageChange)="loadSaved($event)"
+            />
+          } @else {
+            <p class="text-xs" style="color: var(--text-muted)">
+              Nothing saved yet. Look a word up in Dictionary and choose Save as
+              vocabulary.
+            </p>
+          }
+        </section>
       }
     </div>
   `,
@@ -361,7 +362,7 @@ export class VocabularyWordLabComponent implements OnInit {
   readonly query = signal('');
   readonly result = signal<WordLabLookupResponse | null>(null);
   readonly saved = signal<WordLabSaveResponse | null>(null);
-  readonly savedWords = signal<VocabularyCard[]>([]);
+  readonly savedWords = signal<BookmarkResponse[]>([]);
   readonly savedTotal = signal(0);
   readonly savedPage = signal(1);
   readonly savedPageSize = SAVED_PAGE_SIZE;
@@ -376,9 +377,7 @@ export class VocabularyWordLabComponent implements OnInit {
   readonly correct = signal(false);
   readonly feedback = signal<string | null>(null);
 
-  readonly hasSearch = computed(
-    () => this.tool() !== 'game' && this.tool() !== 'saved',
-  );
+  readonly hasSearch = computed(() => this.tool() !== 'game');
   readonly placeholder = computed(
     () => TOOLS.find((t) => t.id === this.tool())?.placeholder ?? '',
   );
@@ -389,7 +388,10 @@ export class VocabularyWordLabComponent implements OnInit {
 
   ngOnInit(): void {
     this.vocabulary.wordLabStatus().subscribe({
-      next: (s) => this.status.set(s),
+      next: (s) => {
+        this.status.set(s);
+        if (s.connected) this.loadSaved(1);
+      },
       error: () =>
         this.status.set({ connected: false, usage_remaining_pct: null }),
     });
@@ -401,8 +403,6 @@ export class VocabularyWordLabComponent implements OnInit {
     this.error.set(null);
     if (tool === 'game') {
       this.loadRound();
-    } else if (tool === 'saved') {
-      this.loadSaved(1);
     } else if (this.query().trim()) {
       this.search();
     } else {
@@ -419,7 +419,7 @@ export class VocabularyWordLabComponent implements OnInit {
   search(): void {
     const q = this.query().trim();
     const mode = this.tool();
-    if (!q || mode === 'game' || mode === 'saved') return;
+    if (!q || mode === 'game') return;
     this.begin();
     this.saved.set(null);
     this.vocabulary.wordLabLookup(q, mode).subscribe({
@@ -447,24 +447,24 @@ export class VocabularyWordLabComponent implements OnInit {
       .subscribe({
         next: (saved) => {
           this.saved.set(saved);
+          this.loadSaved(1);
           this.busy.set(false);
         },
         error: (err) => this.fail(err),
       });
   }
 
+  /** Bookmarks are the per-user record of saved words (Save bookmarks the word). */
   loadSaved(page: number): void {
-    this.begin();
     this.savedPage.set(page);
     this.vocabulary
-      .wordLabSaved(SAVED_PAGE_SIZE, (page - 1) * SAVED_PAGE_SIZE)
+      .getBookmarks(SAVED_PAGE_SIZE, (page - 1) * SAVED_PAGE_SIZE)
       .subscribe({
         next: (res) => {
           this.savedWords.set(res.items);
           this.savedTotal.set(res.total);
-          this.busy.set(false);
         },
-        error: (err) => this.fail(err),
+        error: () => this.savedWords.set([]),
       });
   }
 
