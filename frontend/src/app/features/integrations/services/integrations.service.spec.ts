@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { environment } from '../../../../environments/environment';
-import { IntegrationsService } from './integrations.service';
+import { IntegrationsService, apiErrorMessage } from './integrations.service';
 
 describe('IntegrationsService (Google Calendar)', () => {
   let service: IntegrationsService;
@@ -49,5 +49,56 @@ describe('IntegrationsService (Google Calendar)', () => {
     const del = http.expectOne(api);
     expect(del.request.method).toBe('DELETE');
     del.flush(null);
+  });
+});
+
+describe('IntegrationsService (AI providers)', () => {
+  let service: IntegrationsService;
+  let http: HttpTestingController;
+  const api = `${environment.apiUrl}/integrations/ai`;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    service = TestBed.inject(IntegrationsService);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('reads and saves provider config', () => {
+    service.getAiProvider('anthropic').subscribe((s) => expect(s.api_key_masked).toBe('****1234'));
+    http.expectOne(`${api}/anthropic/config`).flush({ api_key_masked: '****1234' });
+
+    service.saveAiProvider('anthropic', { api_key: 'k', default_model: 'm', custom_model: true }).subscribe();
+    const put = http.expectOne(`${api}/anthropic/config`);
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({ api_key: 'k', default_model: 'm', custom_model: true });
+    put.flush({});
+  });
+
+  it('tests, lists and refreshes models', () => {
+    service.testAiProvider('gemini').subscribe((r) => expect(r.ok).toBeTrue());
+    const test = http.expectOne(`${api}/gemini/test`);
+    expect(test.request.method).toBe('POST');
+    test.flush({ ok: true, detail: 'ok' });
+
+    service.listAiModels('gemini').subscribe((r) => expect(r.models.length).toBe(1));
+    http.expectOne(`${api}/gemini/models`).flush({ provider: 'gemini', models: [{ model_id: 'x' }], refreshed_at: null });
+
+    service.refreshAiModels('gemini').subscribe();
+    const refresh = http.expectOne(`${api}/gemini/models/refresh`);
+    expect(refresh.request.method).toBe('POST');
+    refresh.flush({ provider: 'gemini', models: [], refreshed_at: null });
+  });
+});
+
+describe('apiErrorMessage', () => {
+  it('reads string, coded, and validation details', () => {
+    expect(apiErrorMessage({ error: { detail: 'plain' } }, 'fb')).toBe('plain');
+    expect(apiErrorMessage({ error: { detail: { code: 'x', message: 'coded' } } }, 'fb')).toBe('coded');
+    expect(apiErrorMessage({ error: { detail: [{ msg: 'bad url' }] } }, 'fb')).toBe('bad url');
+    expect(apiErrorMessage(null, 'fb')).toBe('fb');
   });
 });

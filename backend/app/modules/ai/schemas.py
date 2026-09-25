@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.modules.ai.adapters.base import MODEL_ID_PATTERN
 from pydantic import BaseModel, Field
 
 
@@ -44,18 +45,23 @@ class CurrentSelectionResponse(BaseModel):
     provider: str
     model: str
     updated_at: datetime | None = None
+    # False when the selected provider is no longer connected/enabled.
+    available: bool = True
 
 
 class UseCaseResponse(BaseModel):
     use_case: str
     display_name: str
+    capability: str
     options: list[ModelOptionResponse]
     current: CurrentSelectionResponse | None = None
 
 
 class UseCaseModelUpdate(BaseModel):
     provider: str = Field(min_length=1, max_length=32)
-    model: str = Field(min_length=1, max_length=80)
+    model: str = Field(min_length=1, max_length=80, pattern=MODEL_ID_PATTERN)
+    # Accept a model id that is not (yet) in the provider's cached catalog.
+    custom: bool = False
 
 
 class UseCaseHistoryItem(BaseModel):
@@ -63,3 +69,12 @@ class UseCaseHistoryItem(BaseModel):
     model: str
     effective_from: datetime
     effective_to: datetime | None = None
+
+
+class AiSettings(BaseModel):
+    """Per-user AI defaults (stored in user_preferences under "ai_settings")."""
+
+    default_provider: str | None = Field(default=None, max_length=32)
+    timeout_seconds: int = Field(default=120, ge=10, le=300)
+    max_tokens: int = Field(default=1200, ge=256, le=8192)
+    temperature: float = Field(default=0.3, ge=0.0, le=1.0)

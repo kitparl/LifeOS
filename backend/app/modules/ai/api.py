@@ -7,6 +7,7 @@ from app.modules.ai.schemas import (
     AiChatRequest,
     AiChatResponse,
     AiIndexResponse,
+    AiSettings,
     AiStatusResponse,
     UseCaseHistoryItem,
     UseCaseModelUpdate,
@@ -58,7 +59,9 @@ async def set_use_case_model(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await AiService(db).set_use_case_model(user.id, use_case, data.provider, data.model)
+    return await AiService(db).set_use_case_model(
+        user.id, use_case, data.provider, data.model, custom=data.custom
+    )
 
 
 @router.get("/use-cases/{use_case}/history", response_model=list[UseCaseHistoryItem])
@@ -68,3 +71,20 @@ async def get_use_case_history(
     db: AsyncSession = Depends(get_db),
 ):
     return await AiService(db).get_use_case_history(user.id, use_case)
+
+
+@router.get("/settings", response_model=AiSettings)
+async def get_ai_settings(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiService(db).get_ai_settings(user.id)
+
+
+@router.put("/settings", response_model=AiSettings)
+async def save_ai_settings(
+    data: AiSettings,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiService(db).save_ai_settings(user.id, data)

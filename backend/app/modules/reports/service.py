@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.ai.service import AiService
+from app.modules.ai.use_cases import USE_CASE_REPORTS
 from app.modules.analytics.service import AnalyticsService
 
 
@@ -58,7 +59,7 @@ class ReportsService:
         ai_summary = None
         prompt = f"Write a brief {period} life progress summary based on: {sections[0].body}"
         try:
-            chat = await self.ai.chat(user_id, prompt)
+            chat = await self.ai.chat(user_id, prompt, use_case=USE_CASE_REPORTS)
             ai_summary = chat.reply
         except Exception:
             ai_summary = None
@@ -76,7 +77,7 @@ class ReportsService:
             "monthly": "Give me a monthly review: progress across goals, habits, running, learning, and finance.",
         }
         prompt = prompts.get(review_type, prompts["weekly"])
-        chat = await self.ai.chat(user_id, prompt)
+        chat = await self.ai.chat(user_id, prompt, use_case=USE_CASE_REPORTS)
         return ReviewResponse(
             review_type=review_type,
             generated_at=datetime.now(timezone.utc),

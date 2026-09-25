@@ -8,6 +8,7 @@ export interface IntegrationProvider {
   display_name: string;
   description: string;
   oauth_required: boolean;
+  group: 'general' | 'ai';
 }
 
 export interface IntegrationConnection {
@@ -189,25 +190,60 @@ export interface SubjectSectionSyncStatusResponse {
   sections: SectionSyncStatus[];
 }
 
-export interface SarvamConfigStatus {
+export interface AiProviderConfigStatus {
   connection_id: string;
   provider: string;
+  display_name: string;
   enabled: boolean;
   status: string;
   configured: boolean;
   api_key_masked: string | null;
-  last_sync_at: string | null;
+  default_model: string | null;
+  base_url: string | null;
+  supports_base_url: boolean;
+  last_tested_at: string | null;
+  last_test_ok: boolean | null;
+  models_refreshed_at: string | null;
+  model_count: number;
+  models_refresh_error: string | null;
 }
 
-export interface SarvamConfigUpdate {
+export interface AiProviderConfigUpdate {
   api_key?: string | null;
   enabled?: boolean | null;
+  default_model?: string | null;
+  custom_model?: boolean;
+  base_url?: string | null;
 }
 
-export interface SarvamTestResponse {
+export interface AiProviderTestResponse {
   ok: boolean;
   detail: string;
   model?: string | null;
+}
+
+export interface AiModelItem {
+  model_id: string;
+  display_name: string;
+  capabilities: string[];
+}
+
+export interface AiModelsResponse {
+  provider: string;
+  models: AiModelItem[];
+  refreshed_at: string | null;
+}
+
+/** API errors carry `detail` as a string, `{code, message}`, or a 422 validation list. */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const detail = (err as { error?: { detail?: unknown } } | null)?.error?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const first = detail[0] as { msg?: string } | undefined;
+    return first?.msg ?? fallback;
+  }
+  const message = (detail as { message?: string } | undefined)?.message;
+  return message ?? fallback;
 }
 
 export type GoogleCalendarSyncDirection = 'google_to_lifeos' | 'two_way';
@@ -341,16 +377,24 @@ export class IntegrationsService {
     );
   }
 
-  getSarvam(): Observable<SarvamConfigStatus> {
-    return this.http.get<SarvamConfigStatus>(`${this.api}/sarvam`);
+  getAiProvider(provider: string): Observable<AiProviderConfigStatus> {
+    return this.http.get<AiProviderConfigStatus>(`${this.api}/ai/${provider}/config`);
   }
 
-  saveSarvamConfig(body: SarvamConfigUpdate): Observable<SarvamConfigStatus> {
-    return this.http.put<SarvamConfigStatus>(`${this.api}/sarvam/config`, body);
+  saveAiProvider(provider: string, body: AiProviderConfigUpdate): Observable<AiProviderConfigStatus> {
+    return this.http.put<AiProviderConfigStatus>(`${this.api}/ai/${provider}/config`, body);
   }
 
-  testSarvam(): Observable<SarvamTestResponse> {
-    return this.http.post<SarvamTestResponse>(`${this.api}/sarvam/test`, {});
+  testAiProvider(provider: string): Observable<AiProviderTestResponse> {
+    return this.http.post<AiProviderTestResponse>(`${this.api}/ai/${provider}/test`, {});
+  }
+
+  listAiModels(provider: string): Observable<AiModelsResponse> {
+    return this.http.get<AiModelsResponse>(`${this.api}/ai/${provider}/models`);
+  }
+
+  refreshAiModels(provider: string): Observable<AiModelsResponse> {
+    return this.http.post<AiModelsResponse>(`${this.api}/ai/${provider}/models/refresh`, {});
   }
 
   getGoogleCalendar(): Observable<GoogleCalendarConfigStatus> {

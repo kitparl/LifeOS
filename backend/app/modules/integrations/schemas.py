@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.modules.ai.adapters.base import MODEL_ID_PATTERN
 
 
 class IntegrationProviderInfo(BaseModel):
@@ -9,6 +12,8 @@ class IntegrationProviderInfo(BaseModel):
     display_name: str
     description: str
     oauth_required: bool
+    # "ai" providers render in the Integrations page's AI Integration section.
+    group: Literal["general", "ai"] = "general"
 
 
 class IntegrationCreate(BaseModel):
@@ -224,25 +229,63 @@ class SubjectSectionSyncStatusResponse(BaseModel):
     sections: list[SectionSyncStatus]
 
 
-class SarvamConfigUpdate(BaseModel):
-    api_key: str | None = Field(default=None, max_length=200)
+class AiProviderConfigUpdate(BaseModel):
+    """Blank/omitted api_key keeps the stored key. Omitted fields are left unchanged."""
+
+    api_key: str | None = Field(default=None, max_length=512)
     enabled: bool | None = None
+    default_model: str | None = Field(default=None, max_length=80, pattern=MODEL_ID_PATTERN)
+    # Accept a default_model that is not in the cached catalog (e.g. a just-released model).
+    custom_model: bool = False
+    base_url: str | None = Field(default=None, max_length=300)
+
+    @field_validator("base_url")
+    @classmethod
+    def _https_base_url(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        parsed = urlparse(value.strip())
+        if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment:
+            raise ValueError("base_url must be an https:// URL without query or fragment")
+        return value.strip().rstrip("/")
 
 
-class SarvamConfigStatus(BaseModel):
+class AiProviderConfigStatus(BaseModel):
+    """Public status: the API key is only ever returned masked."""
+
     connection_id: str
-    provider: str = "sarvam"
+    provider: str
+    display_name: str
     enabled: bool
     status: str
     configured: bool
     api_key_masked: str | None = None
-    last_sync_at: datetime | None = None
+    default_model: str | None = None
+    base_url: str | None = None
+    supports_base_url: bool = False
+    last_tested_at: datetime | None = None
+    last_test_ok: bool | None = None
+    models_refreshed_at: datetime | None = None
+    model_count: int = 0
+    models_refresh_error: str | None = None
 
 
-class SarvamTestResponse(BaseModel):
+class AiProviderTestResponse(BaseModel):
     ok: bool
     detail: str
     model: str | None = None
+
+
+class AiModelItem(BaseModel):
+    model_id: str
+    display_name: str
+    capabilities: list[str]
+
+
+class AiModelsResponse(BaseModel):
+    provider: str
+    models: list[AiModelItem]
+    refreshed_at: datetime | None = None
 
 
 class GoogleCalendarConfigUpdate(BaseModel):

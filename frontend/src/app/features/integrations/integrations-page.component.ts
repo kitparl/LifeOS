@@ -1,7 +1,8 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { AiProviderConfigComponent } from './components/ai-provider-config.component';
+import { AiSettingsComponent } from './components/ai-settings.component';
 import { GithubConfigComponent } from './components/github-config.component';
 import { GoogleCalendarConfigComponent } from './components/google-calendar-config.component';
-import { SarvamConfigComponent } from './components/sarvam-config.component';
 import { TelegramConfigComponent } from './components/telegram-config.component';
 import {
   IntegrationConnection,
@@ -12,11 +13,17 @@ import {
 @Component({
   selector: 'app-integrations-page',
   standalone: true,
-  imports: [TelegramConfigComponent, GithubConfigComponent, SarvamConfigComponent, GoogleCalendarConfigComponent],
+  imports: [
+    TelegramConfigComponent,
+    GithubConfigComponent,
+    GoogleCalendarConfigComponent,
+    AiProviderConfigComponent,
+    AiSettingsComponent,
+  ],
   template: `
     <div class="space-y-4">
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        @for (p of providers; track p.provider) {
+        @for (p of generalProviders; track p.provider) {
           @if (p.provider === 'telegram') {
             <app-telegram-config
               [displayName]="p.display_name"
@@ -31,12 +38,6 @@ import {
             />
           } @else if (p.provider === 'google_calendar') {
             <app-google-calendar-config
-              [displayName]="p.display_name"
-              [description]="p.description"
-              (connectionsChanged)="loadConnections()"
-            />
-          } @else if (p.provider === 'sarvam') {
-            <app-sarvam-config
               [displayName]="p.display_name"
               [description]="p.description"
               (connectionsChanged)="loadConnections()"
@@ -61,17 +62,51 @@ import {
       @if (lastSyncMsg) {
         <p class="text-sm" style="color: var(--text-muted)">{{ lastSyncMsg }}</p>
       }
+
+      @if (aiProviders.length) {
+        <section class="space-y-3 pt-2" aria-labelledby="ai-integration-heading" data-testid="ai-integration-section">
+          <div>
+            <h2 id="ai-integration-heading" class="font-medium">AI Integration</h2>
+            <p class="text-xs" style="color: var(--text-muted)">
+              Bring your own API keys for LLM providers, then choose which model each LifeOS feature uses.
+            </p>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            @for (p of aiProviders; track p.provider) {
+              <app-ai-provider-config
+                [provider]="p.provider"
+                [displayName]="p.display_name"
+                [description]="p.description"
+                (connectionsChanged)="onAiProviderChanged()"
+              />
+            }
+          </div>
+          <app-ai-settings [providers]="aiProviders" [reloadKey]="aiReloadKey" />
+        </section>
+      }
     </div>
   `,
 })
 export class IntegrationsPageComponent implements OnInit {
   private readonly integrations = inject(IntegrationsService);
-  providers: IntegrationProvider[] = [];
+  generalProviders: IntegrationProvider[] = [];
+  aiProviders: IntegrationProvider[] = [];
   connections: IntegrationConnection[] = [];
   lastSyncMsg: string | null = null;
+  aiReloadKey = 0;
 
   ngOnInit(): void {
-    this.integrations.providers().subscribe({ next: (p) => (this.providers = p) });
+    this.integrations.providers().subscribe({
+      next: (providers) => {
+        this.generalProviders = providers.filter((p) => p.group !== 'ai');
+        this.aiProviders = providers.filter((p) => p.group === 'ai');
+      },
+    });
+    this.loadConnections();
+  }
+
+  onAiProviderChanged(): void {
+    this.aiReloadKey++;
     this.loadConnections();
   }
 

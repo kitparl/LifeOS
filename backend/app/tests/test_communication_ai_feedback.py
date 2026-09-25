@@ -1,4 +1,4 @@
-"""Tests for AI writing feedback, Sarvam BYOK, and use-case model selection."""
+"""Tests for AI writing feedback, Sarvam BYOK (via Integrations → AI), and use-case model selection."""
 
 from unittest.mock import AsyncMock, patch
 
@@ -6,13 +6,10 @@ import pytest
 
 from app.core.crypto import decrypt, encrypt
 from app.modules.communication.ai.metrics import compute_deterministic_metrics
-from app.modules.communication.ai.provider import (
-    InvalidCredentialError,
-    MalformedResponseError,
-    _validate_canonical,
-)
+from app.modules.ai.adapters.base import InvalidCredentialError, MalformedResponseError, parse_json_object
+from app.modules.communication.ai.provider import _validate_canonical
 from app.modules.communication.ai.rubric import compute_overall_score, normalize_dimensions
-from app.modules.integrations.sarvam_config import mask_config, parse_config, serialize_config
+from app.modules.integrations.ai.config import mask_config, parse_config, serialize_config
 
 
 async def _auth(client, email="aiwrite@example.com"):
@@ -31,7 +28,7 @@ async def _auth(client, email="aiwrite@example.com"):
 
 def test_sarvam_encrypt_decrypt_roundtrip():
     raw = "test-sarvam-key-abcdef"
-    serialized = serialize_config(api_key=raw)
+    serialized = serialize_config(existing_json=None, api_key=raw, default_model=None, base_url=None)
     parsed = parse_config(serialized)
     assert parsed is not None
     assert parsed.api_key == raw
@@ -85,12 +82,12 @@ async def test_sarvam_status_and_save(client):
     token = await _auth(client, "sarvamcfg@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
-    status = await client.get("/api/v1/integrations/sarvam", headers=headers)
+    status = await client.get("/api/v1/integrations/ai/sarvam/config", headers=headers)
     assert status.status_code == 200
     assert status.json()["configured"] is False
 
     saved = await client.put(
-        "/api/v1/integrations/sarvam/config",
+        "/api/v1/integrations/ai/sarvam/config",
         headers=headers,
         json={"api_key": "sk-test-sarvam-key-9999", "enabled": True},
     )
@@ -109,7 +106,7 @@ async def test_use_case_model_selection_history(client):
 
     # Connect Sarvam so the model becomes selectable
     await client.put(
-        "/api/v1/integrations/sarvam/config",
+        "/api/v1/integrations/ai/sarvam/config",
         headers=headers,
         json={"api_key": "sk-model-select-1111", "enabled": True},
     )
@@ -161,7 +158,7 @@ async def test_writing_feedback_idempotency_and_missing_key(client):
     assert detail["code"] == "missing_credential"
 
     await client.put(
-        "/api/v1/integrations/sarvam/config",
+        "/api/v1/integrations/ai/sarvam/config",
         headers=headers,
         json={"api_key": "sk-feedback-2222", "enabled": True},
     )
@@ -195,7 +192,7 @@ async def test_writing_feedback_idempotency_and_missing_key(client):
     }
 
     with patch(
-        "app.modules.communication.service.SarvamWritingProvider.evaluate_writing",
+        "app.modules.communication.service.ChatWritingProvider.evaluate_writing",
         new_callable=AsyncMock,
         return_value=dict(fake_result),
     ) as mock_eval:
@@ -231,13 +228,13 @@ async def test_invalid_credential_mapping(client):
     )
     writing_id = created.json()["id"]
     await client.put(
-        "/api/v1/integrations/sarvam/config",
+        "/api/v1/integrations/ai/sarvam/config",
         headers=headers,
         json={"api_key": "sk-bad", "enabled": True},
     )
 
     with patch(
-        "app.modules.communication.service.SarvamWritingProvider.evaluate_writing",
+        "app.modules.communication.service.ChatWritingProvider.evaluate_writing",
         new_callable=AsyncMock,
         side_effect=InvalidCredentialError("Invalid or revoked Sarvam API key."),
     ):
@@ -251,9 +248,7 @@ async def test_invalid_credential_mapping(client):
 
 def test_malformed_response_helper():
     with pytest.raises(MalformedResponseError):
-        from app.modules.communication.ai.provider import _parse_json_object
-
-        _parse_json_object("not json at all")
+        parse_json_object("not json at all")
 
 
 @pytest.mark.asyncio
@@ -269,7 +264,7 @@ async def test_writing_rewrite_idempotency(client):
     writing_id = created.json()["id"]
 
     await client.put(
-        "/api/v1/integrations/sarvam/config",
+        "/api/v1/integrations/ai/sarvam/config",
         headers=headers,
         json={"api_key": "sk-rewrite-3333", "enabled": True},
     )
@@ -285,7 +280,7 @@ async def test_writing_rewrite_idempotency(client):
     }
 
     with patch(
-        "app.modules.communication.service.SarvamWritingProvider.suggest_rewrite",
+        "app.modules.communication.service.ChatWritingProvider.suggest_rewrite",
         new_callable=AsyncMock,
         return_value=dict(fake_rewrite),
     ) as mock_rewrite:

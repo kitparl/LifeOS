@@ -2,7 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { AiChatResponse, AiIndexResponse, AiStatus } from '../models/ai.models';
+import {
+  AiChatResponse,
+  AiIndexResponse,
+  AiSettings,
+  AiStatus,
+  AiUseCase,
+  AiUseCaseHistoryItem,
+  AiUseCaseModelUpdate,
+} from '../models/ai.models';
 
 @Injectable({ providedIn: 'root' })
 export class AiService {
@@ -19,5 +27,25 @@ export class AiService {
 
   chat(message: string): Observable<AiChatResponse> {
     return this.http.post<AiChatResponse>(`${this.api}/chat`, { message });
+  }
+
+  listUseCases(): Observable<AiUseCase[]> {
+    return this.http.get<AiUseCase[]>(`${this.api}/use-cases`);
+  }
+
+  setUseCaseModel(useCase: string, body: AiUseCaseModelUpdate): Observable<AiUseCase> {
+    return this.http.put<AiUseCase>(`${this.api}/use-cases/${encodeURIComponent(useCase)}/model`, body);
+  }
+
+  useCaseHistory(useCase: string): Observable<AiUseCaseHistoryItem[]> {
+    return this.http.get<AiUseCaseHistoryItem[]>(`${this.api}/use-cases/${encodeURIComponent(useCase)}/history`);
+  }
+
+  getSettings(): Observable<AiSettings> {
+    return this.http.get<AiSettings>(`${this.api}/settings`);
+  }
+
+  saveSettings(body: AiSettings): Observable<AiSettings> {
+    return this.http.put<AiSettings>(`${this.api}/settings`, body);
   }
 }

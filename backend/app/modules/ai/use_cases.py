@@ -1,46 +1,39 @@
-"""Code-constant catalog of AI use cases and allowed provider/model options."""
+"""Code-constant registry of AI use cases.
+
+A use case declares what the product supports (id, name, required capability). Which
+models are allowed comes from the cached catalogs of the user's connected providers.
+Adding a use case: add a constant + entry here, then call AiGateway from the domain service.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.modules.ai.adapters.base import CAPABILITY_CHAT
+
 
 @dataclass(frozen=True)
-class ModelOption:
-    provider: str
-    model: str
+class UseCase:
+    id: str
     display_name: str
+    capability: str
 
 
 USE_CASE_WRITING_FEEDBACK = "communication.writing_feedback"
+USE_CASE_RAG_CHAT = "ai.rag_chat"
+USE_CASE_COACHES = "coaches.chat"
+USE_CASE_REPORTS = "reports.ai_briefing"
+USE_CASE_ANALYTICS_INSIGHTS = "analytics.insights"
 
-USE_CASE_CATALOG: dict[str, list[ModelOption]] = {
-    USE_CASE_WRITING_FEEDBACK: [
-        ModelOption(
-            provider="sarvam",
-            model="sarvam-105b",
-            display_name="Sarvam · sarvam-105b",
-        ),
-    ],
-}
-
-USE_CASE_DISPLAY_NAMES: dict[str, str] = {
-    USE_CASE_WRITING_FEEDBACK: "Writing Feedback",
-}
-
-
-def known_use_cases() -> list[str]:
-    return list(USE_CASE_CATALOG.keys())
+_USE_CASES: tuple[UseCase, ...] = (
+    UseCase(USE_CASE_WRITING_FEEDBACK, "Writing Feedback", CAPABILITY_CHAT),
+    UseCase(USE_CASE_RAG_CHAT, "Dashboard AI Chat", CAPABILITY_CHAT),
+    UseCase(USE_CASE_COACHES, "Coaches", CAPABILITY_CHAT),
+    UseCase(USE_CASE_REPORTS, "Reports & Briefings", CAPABILITY_CHAT),
+    UseCase(USE_CASE_ANALYTICS_INSIGHTS, "Analytics Insights", CAPABILITY_CHAT),
+)
+USE_CASES: dict[str, UseCase] = {uc.id: uc for uc in _USE_CASES}
 
 
-def options_for(use_case: str) -> list[ModelOption]:
-    return list(USE_CASE_CATALOG.get(use_case, []))
-
-
-def is_valid_option(use_case: str, provider: str, model: str) -> bool:
-    return any(o.provider == provider and o.model == model for o in options_for(use_case))
-
-
-def default_option(use_case: str) -> ModelOption | None:
-    opts = options_for(use_case)
-    return opts[0] if opts else None
+def get_use_case(use_case: str) -> UseCase | None:
+    return USE_CASES.get(use_case)

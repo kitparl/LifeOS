@@ -1,16 +1,19 @@
-
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.exceptions import BadRequestError, NotFoundError
+from app.modules.ai.adapters.base import AiProviderError, MissingCredentialError
+from app.modules.ai.adapters.registry import AI_PROVIDERS, is_ai_provider, provider_label
+from app.modules.ai.gateway import AiGateway
 from app.modules.ai.indexer import AiIndexer
-from app.modules.ai.models import ContentEmbedding
-from app.modules.ai.provider import OpenAiProvider
+from app.modules.ai.models import AIProviderModel, ContentEmbedding
 from app.modules.ai.repository import AiRepository, cosine_similarity, parse_embedding, serialize_embedding
 from app.modules.ai.schemas import (
     AiChatResponse,
     AiIndexResponse,
+    AiSettings,
     AiSourceItem,
     AiStatusResponse,
     CurrentSelectionResponse,
@@ -18,16 +21,20 @@ from app.modules.ai.schemas import (
     UseCaseHistoryItem,
     UseCaseResponse,
 )
-from app.core.exceptions import BadRequestError, NotFoundError
-from app.modules.ai.use_cases import (
-    USE_CASE_DISPLAY_NAMES,
-    default_option,
-    is_valid_option,
-    known_use_cases,
-    options_for,
-)
+from app.modules.ai.use_cases import USE_CASE_RAG_CHAT, USE_CASES, UseCase, get_use_case
 
 logger = logging.getLogger(__name__)
+
+EMBED_INPUT_MAX_CHARS = 8000
+OFFLINE_HINT = "Connect an AI provider in Integrations → AI (or set OPENAI_API_KEY in backend/.env)."
+
+
+def _option(row: AIProviderModel) -> ModelOptionResponse:
+    return ModelOptionResponse(
+        provider=row.provider,
+        model=row.model_id,
+        display_name=f"{provider_label(row.provider)} · {row.display_name}",
+    )
 
 
 class AiService:
@@ -35,79 +42,76 @@ class AiService:
         self.db = db
         self.settings = settings or get_settings()
         self.repo = AiRepository(db)
-        self.provider = OpenAiProvider(self.settings)
+        self.gateway = AiGateway(db, self.settings)
         self.indexer = AiIndexer(db)
 
     async def _connected_providers(self, user_id: str) -> set[str]:
-        """Providers the user has a configured credential for (Integrations)."""
-        from app.modules.integrations.repository import IntegrationRepository
-        from app.modules.integrations.sarvam_config import parse_config as parse_sarvam_config
+        """Providers with usable credentials (enabled BYOK, or env for OpenAI)."""
+        return {p for p in AI_PROVIDERS if await self.gateway.credentials(user_id, p) is not None}
 
-        connected: set[str] = set()
-        repo = IntegrationRepository(self.db)
-        sarvam = await repo.get_by_provider(user_id, "sarvam")
-        if sarvam is not None and parse_sarvam_config(sarvam.config_json) is not None:
-            connected.add("sarvam")
-        return connected
+    async def _use_case_response(
+        self, user_id: str, uc: UseCase, connected: set[str], models: list[AIProviderModel]
+    ) -> UseCaseResponse:
+        options = [
+            _option(m) for m in models if m.provider in connected and uc.capability in m.capability_set
+        ]
+        current = None
+        sel = await self.repo.get_selection(user_id, uc.id)
+        if sel is not None:
+            current = CurrentSelectionResponse(
+                provider=sel.provider,
+                model=sel.model,
+                updated_at=sel.updated_at,
+                available=sel.provider in connected,
+            )
+        else:
+            try:
+                resolved = await self.gateway.resolve(user_id, uc.id)
+                current = CurrentSelectionResponse(provider=resolved.provider, model=resolved.model)
+            except MissingCredentialError:
+                current = None
+        return UseCaseResponse(
+            use_case=uc.id,
+            display_name=uc.display_name,
+            capability=uc.capability,
+            options=options,
+            current=current,
+        )
 
     async def list_use_cases(self, user_id: str) -> list[UseCaseResponse]:
         connected = await self._connected_providers(user_id)
-        selections = {s.use_case: s for s in await self.repo.list_selections(user_id)}
-        result: list[UseCaseResponse] = []
-        for use_case in known_use_cases():
-            opts = [
-                ModelOptionResponse(
-                    provider=o.provider,
-                    model=o.model,
-                    display_name=o.display_name,
-                    available=o.provider in connected,
-                )
-                for o in options_for(use_case)
-            ]
-            current = None
-            sel = selections.get(use_case)
-            if sel is not None:
-                current = CurrentSelectionResponse(
-                    provider=sel.provider,
-                    model=sel.model,
-                    updated_at=sel.updated_at,
-                )
-            else:
-                default = default_option(use_case)
-                if default is not None and default.provider in connected:
-                    current = CurrentSelectionResponse(
-                        provider=default.provider,
-                        model=default.model,
-                        updated_at=None,
-                    )
-            result.append(
-                UseCaseResponse(
-                    use_case=use_case,
-                    display_name=USE_CASE_DISPLAY_NAMES.get(use_case, use_case),
-                    options=opts,
-                    current=current,
-                )
-            )
-        return result
+        models = await self.repo.list_models(user_id)
+        return [await self._use_case_response(user_id, uc, connected, models) for uc in USE_CASES.values()]
 
     async def set_use_case_model(
-        self, user_id: str, use_case: str, provider: str, model: str
+        self, user_id: str, use_case: str, provider: str, model: str, *, custom: bool = False
     ) -> UseCaseResponse:
-        if use_case not in known_use_cases():
+        uc = get_use_case(use_case)
+        if uc is None:
             raise NotFoundError(f"Unknown use case: {use_case}")
-        if not is_valid_option(use_case, provider, model):
-            raise BadRequestError(f"Model {provider}:{model} is not allowed for {use_case}",)
+        if not is_ai_provider(provider):
+            raise BadRequestError(f"Unknown AI provider: {provider}")
         connected = await self._connected_providers(user_id)
         if provider not in connected:
-            raise BadRequestError(f"Connect your {provider} API key in Integrations before selecting this model",)
+            raise BadRequestError(
+                f"Connect your {provider_label(provider)} API key in Integrations before selecting this model"
+            )
+        models = await self.repo.list_models(user_id)
+        if not custom and not any(
+            m.provider == provider and m.model_id == model and uc.capability in m.capability_set
+            for m in models
+        ):
+            raise BadRequestError(
+                f"Model {provider}:{model} is not in the cached model list for {uc.display_name}. "
+                "Refresh models or use a custom model id."
+            )
         await self.repo.set_selection(user_id, use_case, provider, model)
-        items = await self.list_use_cases(user_id)
-        return next(i for i in items if i.use_case == use_case)
+        return await self._use_case_response(user_id, uc, connected, models)
 
     async def get_use_case_history(
         self, user_id: str, use_case: str
     ) -> list[UseCaseHistoryItem]:
-        if use_case not in known_use_cases():
+        if get_use_case(use_case) is None:
             raise NotFoundError(f"Unknown use case: {use_case}")
         rows = await self.repo.list_history(user_id, use_case)
         return [
@@ -120,23 +124,23 @@ class AiService:
             for r in rows
         ]
 
-    async def resolve_model_for_use_case(
-        self, user_id: str, use_case: str
-    ) -> tuple[str, str]:
-        """Return (provider, model) for the next AI call on this use case."""
-        sel = await self.repo.get_selection(user_id, use_case)
-        if sel is not None:
-            return sel.provider, sel.model
-        default = default_option(use_case)
-        if default is None:
-            raise BadRequestError(f"No model configured for use case {use_case}",)
-        return default.provider, default.model
+    async def get_ai_settings(self, user_id: str) -> AiSettings:
+        return await self.repo.get_ai_settings(user_id)
+
+    async def save_ai_settings(self, user_id: str, data: AiSettings) -> AiSettings:
+        if data.default_provider is not None and not is_ai_provider(data.default_provider):
+            raise BadRequestError(f"Unknown AI provider: {data.default_provider}")
+        return await self.repo.put_ai_settings(user_id, data)
 
     async def status(self, user_id: str) -> AiStatusResponse:
         total, embedded = await self.repo.count_for_user(user_id)
+        try:
+            provider = (await self.gateway.resolve(user_id, USE_CASE_RAG_CHAT)).provider
+        except MissingCredentialError:
+            provider = None
         return AiStatusResponse(
-            enabled=self.provider.enabled,
-            provider="openai" if self.provider.enabled else "none",
+            enabled=provider is not None,
+            provider=provider or "none",
             indexed_chunks=total,
             embedding_chunks=embedded,
         )
@@ -144,15 +148,17 @@ class AiService:
     async def index(self, user_id: str) -> AiIndexResponse:
         await self.repo.clear_user_index(user_id)
         docs = await self.indexer.collect_documents(user_id)
+        embedder = await self.gateway.embedding_adapter(user_id)
         embedded = 0
         for doc in docs:
             embedding_json = None
-            if self.provider.enabled and doc.content.strip():
+            if embedder is not None and doc.content.strip():
+                adapter, model = embedder
                 try:
-                    vec = await self.provider.embed(doc.content[:8000])
+                    vec = await adapter.embed(doc.content[:EMBED_INPUT_MAX_CHARS], model=model)
                     embedding_json = serialize_embedding(vec)
                     embedded += 1
-                except Exception:
+                except AiProviderError:
                     embedding_json = None
             await self.repo.upsert_chunk(
                 ContentEmbedding(
@@ -167,7 +173,9 @@ class AiService:
             )
         return AiIndexResponse(indexed=len(docs), embedded=embedded)
 
-    async def chat(self, user_id: str, message: str) -> AiChatResponse:
+    async def chat(
+        self, user_id: str, message: str, *, use_case: str = USE_CASE_RAG_CHAT
+    ) -> AiChatResponse:
         rows = await self.repo.list_for_user(user_id)
         if not rows:
             await self.index(user_id)
@@ -178,24 +186,23 @@ class AiService:
             f"[{s.source_type}] {s.title}: {s.snippet}" for s in sources[:8]
         ) or "No personal records matched this question yet."
 
-        if self.provider.enabled:
-            system = (
-                "You are LifeOS, a personal AI assistant. Answer using ONLY the personal context below. "
-                "If context is insufficient, say what is missing. Be concise and actionable.\n\n"
-                f"Personal context:\n{context}"
-            )
-            try:
-                reply = await self.provider.chat(system, message)
-            except Exception:
-                logger.exception("AI chat provider failed")
-                reply = (
-                    "I found relevant records but could not reach the AI provider. "
-                    "Please try again shortly."
-                )
-        else:
+        system = (
+            "You are LifeOS, a personal AI assistant. Answer using ONLY the personal context below. "
+            "If context is insufficient, say what is missing. Be concise and actionable.\n\n"
+            f"Personal context:\n{context}"
+        )
+        try:
+            reply = await self.gateway.chat(user_id, use_case, system, message)
+        except MissingCredentialError:
             reply = (
-                "AI provider is not configured (set OPENAI_API_KEY in backend/.env). "
+                f"AI provider is not configured. {OFFLINE_HINT} "
                 "Here is what I found in your LifeOS data:\n\n" + context
+            )
+        except AiProviderError:
+            logger.exception("AI chat provider failed use_case=%s", use_case)
+            reply = (
+                "I found relevant records but could not reach the AI provider. "
+                "Please try again shortly."
             )
 
         return AiChatResponse(reply=reply, sources=sources[:8])
@@ -207,10 +214,12 @@ class AiService:
         scored: list[AiSourceItem] = []
 
         query_vec: list[float] | None = None
-        if self.provider.enabled:
+        embedder = await self.gateway.embedding_adapter(user_id)
+        if embedder is not None:
+            adapter, model = embedder
             try:
-                query_vec = await self.provider.embed(query)
-            except Exception:
+                query_vec = await adapter.embed(query, model=model)
+            except AiProviderError:
                 query_vec = None
 
         for row in rows:
@@ -272,14 +281,22 @@ class AiService:
             date.today(), time(12, 0), tzinfo=timezone.utc
         )
 
-        if self.provider.enabled:
-            system = (
-                "Extract a task from the user message. Reply with ONLY JSON: "
-                '{"title": "...", "due": "YYYY-MM-DD|today|tomorrow|null"}. '
-                "No markdown."
-            )
+        system = (
+            "Extract a task from the user message. Reply with ONLY JSON: "
+            '{"title": "...", "due": "YYYY-MM-DD|today|tomorrow|null"}. '
+            "No markdown."
+        )
+        raw: str | None
+        try:
+            raw = await self.gateway.chat(user_id, USE_CASE_RAG_CHAT, system, natural_language)
+        except MissingCredentialError:
+            raw = None
+        except AiProviderError:
+            # Provider failed: keep the raw text as the title rather than guessing.
+            raw = ""
+
+        if raw is not None:
             try:
-                raw = await self.provider.chat(system, natural_language)
                 m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
                 if m:
                     data = json.loads(m.group(0))
@@ -308,7 +325,8 @@ class AiService:
                             )
                         except ValueError:
                             pass
-            except Exception:
+            except ValueError:
+                # Unparseable JSON from the model: keep the raw title.
                 pass
         else:
             # Lightweight fallback: strip leading verbs / "remind me to"

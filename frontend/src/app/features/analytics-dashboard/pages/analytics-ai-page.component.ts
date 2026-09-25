@@ -14,14 +14,17 @@ import { WidgetFrameComponent } from '../widgets/widget-frame.component';
       <p class="text-sm text-[var(--danger)]">{{ error() }}</p>
     } @else if (data()) {
       <div class="space-y-3">
-        <p class="text-sm text-[var(--text-muted)]">
-          AI-powered insights are architected but not implemented yet. The provider interface is ready for a
-          future swap.
-        </p>
+        @if (!anyReady) {
+          <p class="text-sm text-[var(--text-muted)]">
+            Connect an AI provider in Integrations → AI Integration to generate insights from your analytics.
+          </p>
+        }
         <div class="grid gap-3 sm:grid-cols-2">
           @for (block of blocks; track block.period) {
-            <app-widget-frame [title]="block.title" hint="Coming Soon">
-              <p class="text-sm text-[var(--text-muted)]">{{ block.message }}</p>
+            <app-widget-frame [title]="block.title" [hint]="block.status === 'ready' ? '' : 'Coming Soon'">
+              @if (block.message) {
+                <p class="text-sm text-[var(--text-muted)]">{{ block.message }}</p>
+              }
               @if (block.items.length) {
                 <ul class="mt-2 list-disc pl-4 text-sm">
                   @for (item of block.items; track item) {
@@ -41,6 +44,10 @@ export class AnalyticsAiPageComponent implements OnInit {
   readonly data = signal<AiInsightsResponse | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+
+  get anyReady(): boolean {
+    return this.blocks.some((b) => b.status === 'ready');
+  }
 
   get blocks() {
     const d = this.data();

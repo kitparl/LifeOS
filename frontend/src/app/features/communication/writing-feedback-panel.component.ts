@@ -30,7 +30,7 @@ type FeedbackTab = 'overview' | 'issues' | 'coach';
       @if (errorCode() === 'missing_credential' || errorCode() === 'invalid_credential') {
         <div class="text-xs space-y-1 mb-2" style="color: var(--danger)">
           <p>{{ errorMessage() }}</p>
-          <a routerLink="/integrations" class="link">Open Integrations → Sarvam</a>
+          <a routerLink="/integrations" class="link">Open Integrations → AI Integration</a>
         </div>
       } @else if (errorMessage()) {
         <p class="text-xs mb-2" style="color: var(--danger)">{{ errorMessage() }}</p>
@@ -234,7 +234,7 @@ type FeedbackTab = 'overview' | 'issues' | 'coach';
         }
       } @else if (!busy() && !errorMessage()) {
         <p class="text-xs" style="color: var(--text-muted)">
-          Evaluate this writing with your connected Sarvam model. Feedback is stored and not re-billed for unchanged content.
+          Evaluate this writing with the AI model assigned to Writing Feedback. Feedback is stored and not re-billed for unchanged content.
         </p>
       }
     </div>
@@ -580,9 +580,6 @@ export class WritingFeedbackPanelComponent implements OnInit {
       this.errorMessage.set(d.message || 'AI feedback failed');
     } else if (typeof detail === 'string') {
       this.errorMessage.set(detail);
-      if (detail.toLowerCase().includes('sarvam') || detail.toLowerCase().includes('api key')) {
-        this.errorCode.set('missing_credential');
-      }
     } else {
       this.errorMessage.set('AI feedback is temporarily unavailable. Your writing has not been changed.');
     }

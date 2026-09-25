@@ -4,26 +4,15 @@ import time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
-    AppError,
-    BadGatewayError,
     BadRequestError,
     ServiceUnavailableError,
-    UnauthorizedError,
     get_or_404,
 )
-from app.modules.ai.service import AiService
+from app.modules.ai.adapters.base import AiProviderError, MissingCredentialError
+from app.modules.ai.gateway import AiGateway, to_app_error
 from app.modules.ai.use_cases import USE_CASE_WRITING_FEEDBACK
 from app.modules.communication.ai.metrics import compute_deterministic_metrics
-from app.modules.communication.ai.provider import (
-    InvalidCredentialError,
-    MalformedResponseError,
-    MissingCredentialError,
-    ProviderUnavailableError,
-    RateLimitError,
-    SarvamWritingProvider,
-    TimeoutError_,
-    WritingAiError,
-)
+from app.modules.communication.ai.provider import ChatWritingProvider
 from app.modules.communication.ai.rubric import (
     EVALUATION_VERSION,
     PROMPT_VERSION,
@@ -50,21 +39,20 @@ from app.modules.communication.schemas import (
     WritingRewriteResponse,
     WritingUpdate,
 )
-from app.modules.integrations.repository import IntegrationRepository
-from app.modules.integrations.sarvam_config import parse_config as parse_sarvam_config
 
 
-def _writing_ai_error(exc: WritingAiError) -> AppError:
-    detail = {"code": exc.code, "message": str(exc)}
-    if isinstance(exc, (TimeoutError_, ProviderUnavailableError, RateLimitError)):
-        return ServiceUnavailableError(detail)
-    if isinstance(exc, InvalidCredentialError):
-        return UnauthorizedError(detail)
-    if isinstance(exc, MissingCredentialError):
-        return BadRequestError(detail)
-    if isinstance(exc, MalformedResponseError):
-        return BadGatewayError(detail)
-    return BadRequestError(detail)
+async def _resolve_writing_provider(db: AsyncSession, user_id: str) -> ChatWritingProvider:
+    """Writing feedback on whichever provider/model the user resolved for the use case."""
+    try:
+        resolved = await AiGateway(db).resolve(user_id, USE_CASE_WRITING_FEEDBACK)
+    except MissingCredentialError as exc:
+        raise to_app_error(exc) from exc
+    return ChatWritingProvider(
+        resolved.adapter,
+        provider=resolved.provider,
+        model=resolved.model,
+        timeout=float(resolved.settings.timeout_seconds),
+    )
 
 def _evaluation_key(
     *,
@@ -231,11 +219,8 @@ class CommunicationService:
         if not (item.content or "").strip():
             raise BadRequestError("Write some content before requesting AI Feedback.",)
 
-        provider_name, model = await AiService(self.db).resolve_model_for_use_case(
-            user_id, USE_CASE_WRITING_FEEDBACK
-        )
-        if provider_name != "sarvam":
-            raise BadRequestError(f"Provider '{provider_name}' is not implemented for writing feedback yet.",)
+        adapter = await _resolve_writing_provider(self.db, user_id)
+        provider_name, model = adapter.provider, adapter.model
 
         key = _evaluation_key(
             content=item.content or "",
@@ -249,14 +234,6 @@ class CommunicationService:
         if existing is not None:
             return _to_evaluation_response(existing, cached=True)
 
-        conn = await IntegrationRepository(self.db).get_by_provider(user_id, "sarvam")
-        cfg = parse_sarvam_config(conn.config_json) if conn is not None else None
-        if cfg is None:
-            raise BadRequestError({
-                    "code": "missing_credential",
-                    "message": "Connect your Sarvam API key in Integrations before requesting AI Feedback.",
-                },)
-
         run = WritingAIRun(
             user_id=user_id,
             writing_id=writing_id,
@@ -269,7 +246,6 @@ class CommunicationService:
         )
         await self.repo.create_ai_run(run)
 
-        adapter = SarvamWritingProvider(api_key=cfg.api_key, model=model)
         started = time.perf_counter()
         try:
             result = await adapter.evaluate_writing(
@@ -277,13 +253,13 @@ class CommunicationService:
                 content=item.content or "",
                 category=item.category,
             )
-        except WritingAiError as exc:
+        except AiProviderError as exc:
             run.status = "error"
             run.error_code = exc.code
             run.error_message = str(exc)
             run.latency_ms = int((time.perf_counter() - started) * 1000)
             await self.repo.update_ai_run(run)
-            raise _writing_ai_error(exc) from exc
+            raise to_app_error(exc) from exc
         except Exception as exc:
             run.status = "error"
             run.error_code = "unknown"
@@ -349,11 +325,8 @@ class CommunicationService:
         if not (item.content or "").strip():
             raise BadRequestError("Write some content before requesting a coach rewrite.",)
 
-        provider_name, model = await AiService(self.db).resolve_model_for_use_case(
-            user_id, USE_CASE_WRITING_FEEDBACK
-        )
-        if provider_name != "sarvam":
-            raise BadRequestError(f"Provider '{provider_name}' is not implemented for writing rewrite yet.",)
+        adapter = await _resolve_writing_provider(self.db, user_id)
+        provider_name, model = adapter.provider, adapter.model
 
         key = _rewrite_key(
             content=item.content or "",
@@ -364,14 +337,6 @@ class CommunicationService:
         existing = await self.repo.get_rewrite_by_key(writing_id, key)
         if existing is not None:
             return _to_rewrite_response(existing, cached=True)
-
-        conn = await IntegrationRepository(self.db).get_by_provider(user_id, "sarvam")
-        cfg = parse_sarvam_config(conn.config_json) if conn is not None else None
-        if cfg is None:
-            raise BadRequestError({
-                    "code": "missing_credential",
-                    "message": "Connect your Sarvam API key in Integrations before requesting a coach rewrite.",
-                },)
 
         run = WritingAIRun(
             user_id=user_id,
@@ -385,7 +350,6 @@ class CommunicationService:
         )
         await self.repo.create_ai_run(run)
 
-        adapter = SarvamWritingProvider(api_key=cfg.api_key, model=model)
         started = time.perf_counter()
         try:
             result = await adapter.suggest_rewrite(
@@ -393,13 +357,13 @@ class CommunicationService:
                 content=item.content or "",
                 category=item.category,
             )
-        except WritingAiError as exc:
+        except AiProviderError as exc:
             run.status = "error"
             run.error_code = exc.code
             run.error_message = str(exc)
             run.latency_ms = int((time.perf_counter() - started) * 1000)
             await self.repo.update_ai_run(run)
-            raise _writing_ai_error(exc) from exc
+            raise to_app_error(exc) from exc
         except Exception as exc:
             run.status = "error"
             run.error_code = "unknown"

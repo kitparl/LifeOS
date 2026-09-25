@@ -16,6 +16,7 @@ INTEGRATION_PROVIDERS = (
     "telegram",
     "email",
     "openai",
+    "anthropic",
     "gemini",
     "sarvam",
 )

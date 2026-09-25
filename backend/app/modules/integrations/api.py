@@ -7,7 +7,12 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
 from app.modules.integrations.scheduling.digest_service import DigestService
+from app.modules.integrations.ai.service import AiProviderIntegrationService
 from app.modules.integrations.schemas import (
+    AiModelsResponse,
+    AiProviderConfigStatus,
+    AiProviderConfigUpdate,
+    AiProviderTestResponse,
     DetectChatIdRequest,
     DetectChatIdResponse,
     DigestResponse,
@@ -25,9 +30,6 @@ from app.modules.integrations.schemas import (
     IntegrationSyncResponse,
     IntegrationUpdate,
     ReportRunResponse,
-    SarvamConfigStatus,
-    SarvamConfigUpdate,
-    SarvamTestResponse,
     SectionSyncStatus,
     SubjectSectionSyncStatusResponse,
     TelegramConfigStatus,
@@ -150,29 +152,50 @@ async def disconnect_google_calendar(
     await GoogleCalendarSyncService(db).disconnect(user.id)
 
 
-@router.get("/sarvam", response_model=SarvamConfigStatus)
-async def get_sarvam_status(
+@router.get("/ai/{provider}/config", response_model=AiProviderConfigStatus)
+async def get_ai_provider_config(
+    provider: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).get_sarvam_status(user.id)
+    return await AiProviderIntegrationService(db).status(user.id, provider)
 
 
-@router.put("/sarvam/config", response_model=SarvamConfigStatus)
-async def save_sarvam_config(
-    data: SarvamConfigUpdate,
+@router.put("/ai/{provider}/config", response_model=AiProviderConfigStatus)
+async def save_ai_provider_config(
+    provider: str,
+    data: AiProviderConfigUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).save_sarvam_config(user.id, data)
+    return await AiProviderIntegrationService(db).save(user.id, provider, data)
 
 
-@router.post("/sarvam/test", response_model=SarvamTestResponse)
-async def test_sarvam(
+@router.post("/ai/{provider}/test", response_model=AiProviderTestResponse)
+async def test_ai_provider(
+    provider: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).test_sarvam(user.id)
+    return await AiProviderIntegrationService(db).test(user.id, provider)
+
+
+@router.get("/ai/{provider}/models", response_model=AiModelsResponse)
+async def list_ai_provider_models(
+    provider: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiProviderIntegrationService(db).list_models(user.id, provider)
+
+
+@router.post("/ai/{provider}/models/refresh", response_model=AiModelsResponse)
+async def refresh_ai_provider_models(
+    provider: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AiProviderIntegrationService(db).refresh_models(user.id, provider)
 
 
 @router.post("/github/sync/section/{section_id}", response_model=GitHubSyncResponse)

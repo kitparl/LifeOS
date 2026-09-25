@@ -404,17 +404,17 @@ async def test_disconnect_revokes_and_removes_only_google_events(client, fake_go
 
 
 @pytest.mark.parametrize(
-    "provider,body",
+    "name,config_path,status_path,body",
     [
-        ("github", {"token": "ghp_secret1234", "repo": "owner/repo"}),
-        ("sarvam", {"api_key": "sk_secret1234"}),
-        ("telegram", {"bot_token": "123:ABC", "chat_id": "42"}),
+        ("github", "github/config", "github", {"token": "ghp_secret1234", "repo": "owner/repo"}),
+        ("sarvam", "ai/sarvam/config", "ai/sarvam/config", {"api_key": "sk_secret1234"}),
+        ("telegram", "telegram/config", "telegram", {"bot_token": "123:ABC", "chat_id": "42"}),
     ],
 )
-async def test_generic_patch_config_json_does_not_wipe_secret_config(client, provider, body):
+async def test_generic_patch_config_json_does_not_wipe_secret_config(client, name, config_path, status_path, body):
     """Regression: model_copy(update={"config_json": None}) marked the field set and wiped config."""
-    headers, _uid = await _login(client, f"{provider}wipe@example.com")
-    saved = await client.put(f"{API}/integrations/{provider}/config", headers=headers, json=body)
+    headers, _uid = await _login(client, f"{name}wipe@example.com")
+    saved = await client.put(f"{API}/integrations/{config_path}", headers=headers, json=body)
     assert saved.status_code == 200 and saved.json()["configured"] is True
     conn_id = saved.json()["connection_id"]
 
@@ -422,4 +422,4 @@ async def test_generic_patch_config_json_does_not_wipe_secret_config(client, pro
         f"{API}/integrations/{conn_id}", headers=headers, json={"config_json": "{}", "display_name": "Renamed"}
     )
     assert res.status_code == 200 and res.json()["display_name"] == "Renamed"
-    assert (await client.get(f"{API}/integrations/{provider}", headers=headers)).json()["configured"] is True
+    assert (await client.get(f"{API}/integrations/{status_path}", headers=headers)).json()["configured"] is True

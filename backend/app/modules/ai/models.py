@@ -56,3 +56,27 @@ class AIUseCaseModelSelectionHistory(Base):
     model: Mapped[str] = mapped_column(String(80), nullable=False)
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     effective_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AIProviderModel(Base):
+    """Cached model catalog per user + provider, replaced on each refresh."""
+
+    __tablename__ = "ai_provider_models"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", "model_id", name="uq_ai_provider_model"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    model_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Comma-separated capability flags, e.g. "chat,vision".
+    capabilities: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    refreshed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    @property
+    def capability_set(self) -> frozenset[str]:
+        return frozenset(c for c in self.capabilities.split(",") if c)

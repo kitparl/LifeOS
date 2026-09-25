@@ -16,7 +16,7 @@ from app.modules.analytics_dashboard.aggregators.tasks_aggregator import (
     overdue_count,
     task_completion_breakdown,
 )
-from app.modules.analytics_dashboard.ai.provider import PlaceholderInsightProvider
+from app.modules.analytics_dashboard.ai.provider import AnalyticsInsightProvider, LlmInsightProvider
 from app.modules.analytics_dashboard.cache import analytics_cache
 from app.modules.analytics_dashboard.schemas import (
     AiInsightsResponse,
@@ -34,10 +34,10 @@ class AnalyticsDashboardService:
     def __init__(
         self,
         db: AsyncSession,
-        insight_provider: PlaceholderInsightProvider | None = None,
+        insight_provider: AnalyticsInsightProvider | None = None,
     ) -> None:
         self.db = db
-        self.insights = insight_provider or PlaceholderInsightProvider()
+        self.insights = insight_provider or LlmInsightProvider(db)
 
     def _cache_key(self, user_id: str, endpoint: str, range_days: int) -> str:
         return f"{user_id}:{endpoint}:{range_days}"

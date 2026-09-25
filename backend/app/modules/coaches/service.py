@@ -3,7 +3,9 @@ from datetime import date, timedelta
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import BadRequestError
-from app.modules.ai.provider import OpenAiProvider
+from app.modules.ai.adapters.base import AiProviderError, MissingCredentialError
+from app.modules.ai.gateway import AiGateway
+from app.modules.ai.use_cases import USE_CASE_COACHES
 from app.modules.career.models import CareerProject, JobApplication
 from app.modules.coaches.schemas import COACH_TYPES, CoachChatResponse
 from app.modules.communication.vocabulary.models import UserVocabulary
@@ -22,7 +24,7 @@ class CoachesService:
     def __init__(self, db: AsyncSession, settings: Settings | None = None):
         self.db = db
         self.settings = settings or get_settings()
-        self.provider = OpenAiProvider(self.settings)
+        self.gateway = AiGateway(db, self.settings)
         self.memory_repo = MemoryRepository(db)
 
     async def chat(self, user_id: str, coach_type: str, message: str) -> CoachChatResponse:
@@ -36,21 +38,20 @@ class CoachesService:
             context = f"User memories:\n{memory_text}\n\n{context}"
 
         system = self._system_prompt(coach_type, context)
-        if self.provider.enabled:
-            try:
-                reply = await self.provider.chat(system, message)
-            except Exception:
-                logger.exception("Coach AI provider failed type=%s", coach_type)
-                reply = (
-                    f"Coach context ready but the AI provider is temporarily unavailable.\n\n"
-                    f"Context:\n{summary}"
-                )
-        else:
+        try:
+            reply = await self.gateway.chat(user_id, USE_CASE_COACHES, system, message)
+        except MissingCredentialError:
             reply = (
                 f"[{coach_type.title()} Coach — offline mode]\n"
-                f"Set OPENAI_API_KEY for personalized coaching.\n\n"
+                f"Connect an AI provider in Integrations → AI for personalized coaching.\n\n"
                 f"Based on your data:\n{summary}\n\n"
                 f"You asked: {message}"
+            )
+        except AiProviderError:
+            logger.exception("Coach AI provider failed type=%s", coach_type)
+            reply = (
+                f"Coach context ready but the AI provider is temporarily unavailable.\n\n"
+                f"Context:\n{summary}"
             )
 
         return CoachChatResponse(coach_type=coach_type, reply=reply, context_summary=summary)

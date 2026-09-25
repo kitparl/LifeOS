@@ -2,14 +2,21 @@ import json
 import math
 from datetime import datetime, timezone
 
+from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.ai.adapters.base import ModelInfo
 from app.modules.ai.models import (
+    AIProviderModel,
     AIUseCaseModelSelection,
     AIUseCaseModelSelectionHistory,
     ContentEmbedding,
 )
+from app.modules.ai.schemas import AiSettings
+from app.modules.preferences.repository import PreferenceRepository
+
+AI_SETTINGS_PREFERENCE_KEY = "ai_settings"
 
 
 class AiRepository:
@@ -126,6 +133,51 @@ class AiRepository:
             .order_by(AIUseCaseModelSelectionHistory.effective_from.desc())
         )
         return list(result.scalars().all())
+
+
+    async def list_models(self, user_id: str, provider: str | None = None) -> list[AIProviderModel]:
+        q = select(AIProviderModel).where(AIProviderModel.user_id == user_id)
+        if provider is not None:
+            q = q.where(AIProviderModel.provider == provider)
+        result = await self.db.execute(q.order_by(AIProviderModel.provider, AIProviderModel.model_id))
+        return list(result.scalars().all())
+
+    async def replace_models(self, user_id: str, provider: str, models: list[ModelInfo]) -> None:
+        await self.db.execute(
+            delete(AIProviderModel).where(
+                AIProviderModel.user_id == user_id, AIProviderModel.provider == provider
+            )
+        )
+        now = datetime.now(timezone.utc)
+        unique = {m.model_id: m for m in models}
+        self.db.add_all(
+            AIProviderModel(
+                user_id=user_id,
+                provider=provider,
+                model_id=m.model_id,
+                display_name=m.display_name,
+                capabilities=",".join(sorted(m.capabilities)),
+                refreshed_at=now,
+            )
+            for m in unique.values()
+        )
+        await self.db.flush()
+
+    async def get_ai_settings(self, user_id: str) -> AiSettings:
+        prefs = PreferenceRepository(self.db)
+        raw = prefs.parse_value(await prefs.get(user_id, AI_SETTINGS_PREFERENCE_KEY))
+        if not isinstance(raw, dict):
+            return AiSettings()
+        try:
+            return AiSettings.model_validate(raw)
+        except ValidationError:
+            return AiSettings()
+
+    async def put_ai_settings(self, user_id: str, settings: AiSettings) -> AiSettings:
+        await PreferenceRepository(self.db).upsert(
+            user_id, AI_SETTINGS_PREFERENCE_KEY, settings.model_dump()
+        )
+        return settings
 
 
 def parse_embedding(raw: str | None) -> list[float] | None:

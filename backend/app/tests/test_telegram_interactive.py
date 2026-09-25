@@ -364,6 +364,7 @@ async def test_route_update_callback_nav_home():
 
 @pytest.mark.asyncio
 async def test_ai_parse_and_create_task_fallback():
+    from app.modules.ai.adapters.base import MissingCredentialError
     from app.modules.ai.service import AiService
 
     db = MagicMock()
@@ -374,8 +375,7 @@ async def test_ai_parse_and_create_task_fallback():
     with patch("app.modules.tasks.service.TaskService") as Svc:
         Svc.return_value.create_task = AsyncMock(return_value=created)
         svc = AiService(db)
-        svc.provider = MagicMock()
-        svc.provider.enabled = False
+        svc.gateway.chat = AsyncMock(side_effect=MissingCredentialError("no provider"))
         task = await svc.parse_and_create_task("u1", "remind me to Call the dentist")
     assert task.title == "Call the dentist"
 
