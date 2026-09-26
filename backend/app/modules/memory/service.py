@@ -1,9 +1,10 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import get_or_404
 from app.modules.memory.repository import MemoryRepository
 from app.modules.memory.schemas import MemoryCreate, MemoryResponse, MemorySummary, MemoryUpdate
-from app.core.exceptions import get_or_404
+
 
 class MemoryService:
     def __init__(self, db: AsyncSession):

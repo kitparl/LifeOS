@@ -1,10 +1,9 @@
-import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import {
-  PreferencesApi,
   readJsonLocalStorage,
   writeJsonLocalStorage,
 } from './preferences-sync';
+import { PreferencesApiService } from './preferences-api.service';
 
 export type EditorKeymap = 'default' | 'vim';
 
@@ -29,7 +28,7 @@ function normalizePrefs(raw: unknown): EditorPrefsValue {
 
 @Injectable({ providedIn: 'root' })
 export class EditorPreferencesService {
-  private readonly prefsApi = new PreferencesApi(inject(HttpClient));
+  private readonly prefsApi = inject(PreferencesApiService);
 
   private readonly prefs = signal<EditorPrefsValue>({ ...DEFAULT_PREFS });
 

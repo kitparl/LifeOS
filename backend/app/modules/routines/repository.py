@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core import taxonomy
 from app.core.pagination import Pagination, paginate
 from app.modules.habits.models import Habit
 from app.modules.routines.models import (
@@ -140,43 +141,15 @@ class RoutineRepository:
         return list(result.scalars().all())
 
     async def list_area_names(self, user_id: str) -> list[str]:
-        result = await self.db.execute(
-            select(RoutineAreaOption.name)
-            .where(RoutineAreaOption.user_id == user_id)
-            .order_by(RoutineAreaOption.name.asc())
-        )
-        return list(result.scalars().all())
+        return await taxonomy.list_names(self.db, RoutineAreaOption, user_id)
 
     async def ensure_area(self, user_id: str, name: str) -> None:
-        clean = (name or "").strip()
-        if not clean:
-            return
-        existing = await self.db.execute(
-            select(RoutineAreaOption).where(RoutineAreaOption.user_id == user_id)
-        )
-        for row in existing.scalars().all():
-            if row.name.lower() == clean.lower():
-                return
-        self.db.add(RoutineAreaOption(user_id=user_id, name=clean))
-        await self.db.flush()
+        """Register a name for reuse (idempotent, case-insensitive)."""
+        await taxonomy.ensure_name(self.db, RoutineAreaOption, user_id, name)
 
     async def list_category_names(self, user_id: str) -> list[str]:
-        result = await self.db.execute(
-            select(RoutineCategoryOption.name)
-            .where(RoutineCategoryOption.user_id == user_id)
-            .order_by(RoutineCategoryOption.name.asc())
-        )
-        return list(result.scalars().all())
+        return await taxonomy.list_names(self.db, RoutineCategoryOption, user_id)
 
     async def ensure_category(self, user_id: str, name: str) -> None:
-        clean = (name or "").strip()
-        if not clean:
-            return
-        existing = await self.db.execute(
-            select(RoutineCategoryOption).where(RoutineCategoryOption.user_id == user_id)
-        )
-        for row in existing.scalars().all():
-            if row.name.lower() == clean.lower():
-                return
-        self.db.add(RoutineCategoryOption(user_id=user_id, name=clean))
-        await self.db.flush()
+        """Register a name for reuse (idempotent, case-insensitive)."""
+        await taxonomy.ensure_name(self.db, RoutineCategoryOption, user_id, name)

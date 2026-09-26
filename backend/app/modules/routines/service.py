@@ -3,11 +3,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import BadRequestError, get_or_404
+from app.core.taxonomy import merge_names
 from app.modules.calendar.schemas import EventListItem
 from app.modules.routines.expiry import period_is_outside_today
 from app.modules.routines.models import ROUTINE_AREAS, ROUTINE_CATEGORIES
 from app.modules.routines.repository import RoutineRepository
-from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.routines.schemas import (
     LinkedHabitBrief,
     RoutineBlockResponse,
@@ -120,17 +121,9 @@ class RoutineService:
         routine = get_or_404(await self.repo.get_by_id(user_id, routine_id), "Routine not found")
         await self.repo.delete(routine)
 
-    def _merge_taxonomy(self, suggested: tuple[str, ...], stored: list[str]) -> list[str]:
-        seen: dict[str, str] = {}
-        for name in [*suggested, *stored]:
-            key = name.strip().lower()
-            if key and key not in seen:
-                seen[key] = name.strip()
-        return sorted(seen.values(), key=str.lower)
-
     async def list_areas(self, user_id: str) -> list[str]:
         stored = await self.repo.list_area_names(user_id)
-        return self._merge_taxonomy(ROUTINE_AREAS, stored)
+        return merge_names(ROUTINE_AREAS, stored)
 
     async def create_area(self, user_id: str, name: str) -> str:
         clean = name.strip()
@@ -141,7 +134,7 @@ class RoutineService:
 
     async def list_categories(self, user_id: str) -> list[str]:
         stored = await self.repo.list_category_names(user_id)
-        return self._merge_taxonomy(ROUTINE_CATEGORIES, stored)
+        return merge_names(ROUTINE_CATEGORIES, stored)
 
     async def create_category(self, user_id: str, name: str) -> str:
         clean = name.strip()

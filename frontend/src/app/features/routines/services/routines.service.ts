@@ -1,13 +1,11 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Routine, RoutineCreate, RoutineListItem, RoutineUpdate } from '../models/routine.models';
+import { Page, toPage } from '../../../core/utils/http';
 
-export interface RoutineListResult {
-  items: RoutineListItem[];
-  total: number;
-}
+export type RoutineListResult = Page<RoutineListItem>;
 
 @Injectable({ providedIn: 'root' })
 export class RoutinesService {
@@ -23,10 +21,7 @@ export class RoutinesService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<RoutineListItem[]>(this.api, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<RoutineListItem[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

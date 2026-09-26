@@ -9,6 +9,7 @@ import { MarkdownExportButtonComponent } from '../../shared/markdown/markdown-ex
 import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { WRITING_CATEGORIES } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-writing-form',
@@ -173,7 +174,7 @@ export class WritingFormComponent implements OnInit {
     req.subscribe({
       next: (w) => this.router.navigate(['/communication/writing', w.id]),
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save';
+        this.error = apiErrorMessage(err, 'Failed to save');
         this.saving = false;
       },
     });

@@ -59,12 +59,3 @@ async def dispatch(ctx: CallbackContext) -> Any:
 
         return Screen(text="Unknown action. Try /dashboard.", keyboard=None)
     return await handler(ctx)
-
-
-def clear_handlers_for_tests() -> None:
-    """Not used in production — reserved if tests need isolation."""
-    pass
-
-
-def list_handlers() -> list[str]:
-    return sorted(_HANDLERS.keys())

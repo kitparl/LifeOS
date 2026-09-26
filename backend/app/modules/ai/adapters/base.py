@@ -160,13 +160,13 @@ async def request_json_value(
     except httpx.HTTPError as exc:
         raise ProviderUnavailableError(f"{label} is temporarily unavailable.") from exc
 
-    if res.status_code in (401, 403):
+    if res.status_code in (httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN):
         raise InvalidCredentialError(f"Invalid or revoked {label} API key. Check Integrations → AI.")
-    if res.status_code == 429:
+    if res.status_code == httpx.codes.TOO_MANY_REQUESTS:
         raise RateLimitError(f"{label} rate limit reached. Try again in a moment.")
-    if res.status_code >= 500:
+    if res.status_code >= httpx.codes.INTERNAL_SERVER_ERROR:
         raise ProviderUnavailableError(f"{label} is temporarily unavailable.")
-    if res.status_code >= 400:
+    if res.status_code >= httpx.codes.BAD_REQUEST:
         vendor_message = _vendor_message(res)
         suffix = f": {vendor_message}" if vendor_message else "."
         raise ProviderRequestError(

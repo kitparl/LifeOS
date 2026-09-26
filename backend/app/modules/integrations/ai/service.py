@@ -6,11 +6,10 @@ with ids the user added manually (kept across refreshes).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
+from app.core.timezone import utc_now
 from app.modules.ai.adapters.base import (
     CAPABILITY_CHAT,
     METADATA_TIMEOUT_SECONDS,
@@ -33,6 +32,7 @@ from app.modules.ai.gateway import to_app_error
 from app.modules.ai.models import AIProviderModel
 from app.modules.ai.repository import AiRepository
 from app.modules.integrations.ai.config import load_config, mask_config, parse_config, serialize_config
+from app.modules.integrations.common import last_test_ok
 from app.modules.integrations.models import IntegrationConnection
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import (
@@ -43,7 +43,6 @@ from app.modules.integrations.schemas import (
     AiProviderConfigStatus,
     AiProviderConfigUpdate,
     AiProviderTestResponse,
-    IntegrationCreate,
     IntegrationUpdate,
 )
 
@@ -79,14 +78,11 @@ class AiProviderIntegrationService:
 
     async def _get_or_create(self, user_id: str, provider: str) -> IntegrationConnection:
         _require_ai_provider(provider)
-        conn = await self.repo.get_by_provider(user_id, provider)
-        if conn is not None:
-            return conn
         from app.modules.integrations.service import PROVIDER_CATALOG
 
         catalog = next((p for p in PROVIDER_CATALOG if p.provider == provider), None)
         display_name = catalog.display_name if catalog else provider_label(provider)
-        return await self.repo.create(user_id, IntegrationCreate(provider=provider, enabled=False), display_name)
+        return await self.repo.get_or_create(user_id, provider, display_name)
 
     async def status(
         self, user_id: str, provider: str, *, models_refresh_error: str | None = None
@@ -107,7 +103,7 @@ class AiProviderIntegrationService:
             supports_base_url=provider in BASE_URL_PROVIDERS,
             supports_model_listing=supports_model_listing(provider),
             last_tested_at=conn.last_sync_at,
-            last_test_ok={"connected": True, "error": False}.get(conn.status),
+            last_test_ok=last_test_ok(conn.status),
             models_refreshed_at=max((m.refreshed_at for m in models), default=None),
             model_count=len(models),
             models_refresh_error=models_refresh_error,
@@ -153,7 +149,7 @@ class AiProviderIntegrationService:
             updated.status = "error" if refresh_error else "connected"
             if refresh_error is None and supports_model_listing(provider) and model_list_validates_key(provider):
                 # An authenticated model listing is a live key check, so it counts as a successful test.
-                updated.last_sync_at = datetime.now(timezone.utc)
+                updated.last_sync_at = utc_now()
             await self.repo.db.flush()
         return await self.status(user_id, provider, models_refresh_error=refresh_error)
 
@@ -170,7 +166,7 @@ class AiProviderIntegrationService:
             await self.repo.db.flush()
             return AiProviderTestResponse(ok=False, detail=str(exc), model=model)
         conn.status = "connected"
-        conn.last_sync_at = datetime.now(timezone.utc)
+        conn.last_sync_at = utc_now()
         await self.repo.db.flush()
         return AiProviderTestResponse(ok=True, detail=f"{provider_label(provider)} API key verified", model=model)
 

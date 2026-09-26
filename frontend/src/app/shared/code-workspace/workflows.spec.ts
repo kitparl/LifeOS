@@ -5,8 +5,6 @@ import { of } from 'rxjs';
 import { CodeWorkspaceComponent } from './components/code-workspace/code-workspace.component';
 import { EditorService } from './services/editor.service';
 import { ThemeIntegrationService } from './services/theme/theme-integration.service';
-import { EditorPersistenceService } from './services/editor-persistence.service';
-import { Subject } from 'rxjs';
 
 describe('Code workspace workflows', () => {
   let fixture: ComponentFixture<CodeWorkspaceComponent>;
@@ -63,17 +61,6 @@ describe('Code workspace workflows', () => {
     component.onTabChange('edit');
     expect(component.currentView).toBe('edit');
   });
-
-  it('autosaves drafts after 2.5s of inactivity', fakeAsync(() => {
-    const persistence = TestBed.inject(EditorPersistenceService);
-    spyOn(persistence, 'saveDraft').and.resolveTo();
-    const content$ = new Subject<string>();
-    persistence.enableAutosave('wf', content$);
-    content$.next('note');
-    tick(2500);
-    expect(persistence.saveDraft).toHaveBeenCalledWith('wf', 'note');
-    persistence.disableAutosave('wf');
-  }));
 
   it('updates the resolved theme without requiring a new editor', () => {
     const theme = TestBed.inject(ThemeIntegrationService);

@@ -3,7 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ModalComponent } from '../../../shared/modal/modal.component';
 import { TypeSelectComponent } from '../../../shared/type-select/type-select.component';
 import { Income, IncomePayload } from '../models/finance.models';
-import { todayIso } from '../utils/period';
+import { localIsoDate } from '../../../core/utils/date';
 
 /** Add/edit an income record. Income is context only — nothing is derived from it. */
 @Component({
@@ -78,7 +78,7 @@ export class IncomeFormComponent implements OnChanges {
   readonly form = this.fb.nonNullable.group({
     title: ['', Validators.required],
     amount: [0, [Validators.required, Validators.min(0.01)]],
-    txn_date: [todayIso(), Validators.required],
+    txn_date: [localIsoDate(), Validators.required],
     category: ['Salary'],
     is_recurring: [false],
     notes: [''],
@@ -101,7 +101,7 @@ export class IncomeFormComponent implements OnChanges {
       this.form.reset({
         title: '',
         amount: 0,
-        txn_date: todayIso(),
+        txn_date: localIsoDate(),
         category: 'Salary',
         is_recurring: false,
         notes: '',

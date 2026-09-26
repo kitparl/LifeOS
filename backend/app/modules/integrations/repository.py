@@ -65,6 +65,13 @@ class IntegrationRepository:
         )
         return list(result.scalars().all())
 
+    async def get_or_create(self, user_id: str, provider: str, display_name: str) -> IntegrationConnection:
+        """The user's connection for ``provider``, created disabled on first use."""
+        conn = await self.get_by_provider(user_id, provider)
+        if conn is not None:
+            return conn
+        return await self.create(user_id, IntegrationCreate(provider=provider, enabled=False), display_name)
+
     async def create(self, user_id: str, data: IntegrationCreate, display_name: str) -> IntegrationConnection:
         conn = IntegrationConnection(
             user_id=user_id,

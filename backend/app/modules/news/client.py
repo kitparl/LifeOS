@@ -123,11 +123,11 @@ class FreeNewsClient:
         except httpx.HTTPError as exc:
             raise NewsApiUnavailableError(f"{_LABEL} is temporarily unavailable.") from exc
 
-        if res.status_code == 429:
+        if res.status_code == httpx.codes.TOO_MANY_REQUESTS:
             raise NewsApiRateLimitError(f"{_LABEL} rate limit reached. Try again shortly.")
-        if res.status_code == 404:
+        if res.status_code == httpx.codes.NOT_FOUND:
             return None
-        if res.status_code >= 400:
+        if res.status_code >= httpx.codes.BAD_REQUEST:
             raise NewsApiUnavailableError(f"{_LABEL} could not complete the request (HTTP {res.status_code}).")
         try:
             return res.json()

@@ -19,13 +19,13 @@ import logging
 import re
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import utc_now
 from app.modules.communication.vocabulary.models import (
     COMMONNESS,
     FORMALITY,
@@ -203,7 +203,7 @@ def _dialect_name(db: AsyncSession) -> str:
 
 def _row_from_record(record: dict[str, Any], collection_id: str, dataset_version: str) -> dict[str, Any]:
     rid = record["id"]
-    now = datetime.now(timezone.utc)
+    now = utc_now()
     return {
         "id": rid,
         "collection_id": collection_id,

@@ -1,4 +1,4 @@
-import { extractWallClockParts, toDatetimeLocalValue } from './datetime-parse.util';
+import { extractWallClockParts } from './datetime-parse.util';
 
 describe('datetime-parse.util', () => {
   describe('extractWallClockParts', () => {
@@ -21,13 +21,6 @@ describe('datetime-parse.util', () => {
 
     it('throws a clear error for unparseable input', () => {
       expect(() => extractWallClockParts('not a date')).toThrowError(/Could not parse/);
-    });
-  });
-
-  describe('toDatetimeLocalValue', () => {
-    it('formats a Date as YYYY-MM-DDTHH:mm', () => {
-      const d = new Date(2026, 0, 15, 9, 5);
-      expect(toDatetimeLocalValue(d)).toBe('2026-01-15T09:05');
     });
   });
 });

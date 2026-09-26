@@ -1,7 +1,5 @@
-import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
-from app.core.database import Base
 from sqlalchemy import (
     Boolean,
     Date,
@@ -15,27 +13,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-TRANSACTION_TYPES = ("income", "expense")
-
-# Soft = variable/lifestyle spend. Hard = fixed/committed obligation.
-# The distinction exists to show expense burden and composition — it is not an
-# accounting classification.
-EXPENSE_KINDS = ("soft", "hard")
-
-LOAN_STATUSES = ("ACTIVE", "COMPLETED", "FORECLOSED")
-EMI_STATUSES = ("PENDING", "PAID", "CANCELLED")
-PART_PAYMENT_IMPACTS = ("REDUCE_TENURE", "REDUCE_EMI")
-RECURRING_FREQUENCIES = ("monthly",)
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 # Category reserved for loan EMI expenses. EMI expenses are always Hard.
 LOAN_EMI_CATEGORY = "Loan EMI"
-
-# Legacy tuple kept for the pre-existing transactions API and the modules that
-# import it (coaches, predictions, automations).
-FINANCE_CATEGORIES = (
-    "salary", "freelance", "food", "rent", "transport", "utilities",
-    "entertainment", "health", "education", "investment", "savings", "loan", "other",
-)
 
 DEFAULT_EXPENSE_CATEGORIES = (
     "Food", "Groceries", "Shopping", "Transport", "Rent", "Utilities",
@@ -56,12 +38,6 @@ HARD_CATEGORY_HINTS = (
 )
 
 
-def _uuid() -> str:
-    return str(uuid.uuid4())
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class FinanceTransaction(Base):
@@ -74,7 +50,7 @@ class FinanceTransaction(Base):
 
     __tablename__ = "finance_transactions"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     txn_type: Mapped[str] = mapped_column(String(16), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -91,26 +67,26 @@ class FinanceTransaction(Base):
     loan_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     loan_emi_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
 class FinanceBudget(Base):
     """Per-category monthly limit.
 
-    Out of scope for the Finance UI (this is not a budgeting app), but retained
-    because Coaches, Predictions and Automations read it.
+    Out of scope for the Finance UI (this is not a budgeting app); served only by the
+    legacy ``/finance/budgets`` endpoints.
     """
 
     __tablename__ = "finance_budgets"
     __table_args__ = (UniqueConstraint("user_id", "category", name="uq_finance_budget_category"),)
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     category: Mapped[str] = mapped_column(String(32), nullable=False)
     monthly_limit: Mapped[float] = mapped_column(Float, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
 class FinanceCategory(Base):
@@ -124,11 +100,11 @@ class FinanceCategory(Base):
         UniqueConstraint("user_id", "txn_type", "name", name="uq_finance_category_user_type_name"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     txn_type: Mapped[str] = mapped_column(String(16), nullable=False, default="expense")
     name: Mapped[str] = mapped_column(String(32), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class FinanceRecurring(Base):
@@ -140,7 +116,7 @@ class FinanceRecurring(Base):
 
     __tablename__ = "finance_recurring"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     txn_type: Mapped[str] = mapped_column(String(16), nullable=False, default="expense")
     title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -153,8 +129,8 @@ class FinanceRecurring(Base):
     day_of_month: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
 class FinanceRecurringRun(Base):
@@ -170,13 +146,13 @@ class FinanceRecurringRun(Base):
         UniqueConstraint("recurring_id", "period", name="uq_finance_recurring_run_period"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     recurring_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("finance_recurring.id", ondelete="CASCADE"), index=True, nullable=False
     )
     period: Mapped[str] = mapped_column(String(7), nullable=False)  # "YYYY-MM"
     expense_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class Loan(Base):
@@ -191,7 +167,7 @@ class Loan(Base):
 
     __tablename__ = "finance_loans"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     lender: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -208,8 +184,8 @@ class Loan(Base):
     foreclosed_at: Mapped[date | None] = mapped_column("closed_at", Date, nullable=True)
     foreclosure_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     foreclosure_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
 class LoanEMI(Base):
@@ -225,7 +201,7 @@ class LoanEMI(Base):
         UniqueConstraint("loan_id", "emi_number", name="uq_finance_loan_emi_number"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     loan_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("finance_loans.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -236,8 +212,8 @@ class LoanEMI(Base):
     paid_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     expense_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     expense_generated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
 class LoanPartPayment(Base):
@@ -249,7 +225,7 @@ class LoanPartPayment(Base):
 
     __tablename__ = "finance_loan_part_payments"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     loan_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("finance_loans.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -259,4 +235,4 @@ class LoanPartPayment(Base):
     impact: Mapped[str] = mapped_column(String(16), nullable=False)
     resulting_emi_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     resulting_tenure_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

@@ -5,8 +5,9 @@ Business data comes from domain services; this module only formats.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -15,9 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.calendar.service import CalendarService
 from app.modules.habits.service import HabitService
 from app.modules.integrations.telegram import templates as tpl
+from app.modules.routines.expiry import runs_on
 from app.modules.routines.service import RoutineService
 from app.modules.tasks.models import Task
 from app.modules.tasks.repository import TaskRepository
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -31,7 +35,7 @@ def _aware(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -115,22 +119,14 @@ async def _routine_lines(db: AsyncSession, user_id: str, *, limit: int = 12) -> 
 async def _linked_habit_lines_for_today(db: AsyncSession, user_id: str) -> list[str]:
     """Habits attached to today's routine blocks (best-effort; empty if no links)."""
     try:
-
         routines = await RoutineService(db).repo.list_routines(user_id, active_only=True, limit=None)
         if not routines:
             return []
         tz = ZoneInfo(routines[0].timezone or "Asia/Kolkata")
         today = datetime.now(tz).date()
-        weekday = today.weekday()
         lines: list[str] = []
         for r in routines:
-            if weekday not in r.days_of_week:
-                continue
-            if today.isoformat() in r.skip_dates:
-                continue
-            if r.start_date and today < r.start_date:
-                continue
-            if r.end_date and today > r.end_date:
+            if not runs_on(r, today):
                 continue
             for block in r.blocks:
                 habits = getattr(block, "habits", None) or []
@@ -138,6 +134,8 @@ async def _linked_habit_lines_for_today(db: AsyncSession, user_id: str) -> list[
                     lines.append(f"{block.title}: {h.name}")
         return lines
     except Exception:
+        # Optional section: the report still goes out without it.
+        logger.warning("Linked-habit lines failed for user=%s", user_id, exc_info=True)
         return []
 
 
@@ -198,8 +196,8 @@ async def build_night(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportBui
             Task.deleted_at.is_(None),
             Task.status == "completed",
             Task.completed_at.is_not(None),
-            Task.completed_at >= day_start.astimezone(timezone.utc),
-            Task.completed_at < day_end.astimezone(timezone.utc),
+            Task.completed_at >= day_start.astimezone(UTC),
+            Task.completed_at < day_end.astimezone(UTC),
         )
     )
     completed = list(result.scalars().all())

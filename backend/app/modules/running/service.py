@@ -1,15 +1,14 @@
 import json
-from datetime import datetime, time, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import RACE_ADDED, EntityCreated, event_bus
+from app.core.exceptions import BadRequestError, get_or_404
+from app.core.taxonomy import merge_names
+from app.core.timezone import start_of_day_utc
 from app.modules.calendar.sync_service import CalendarSyncService
-from app.modules.running.models import RaceEvent, SUGGESTED_SHOES
+from app.modules.running.models import SUGGESTED_SHOES, RaceEvent
 from app.modules.running.repository import RunningRepository
-
-# Source-module key used for the reusable Calendar scheduling linkage.
-RUNNING_SOURCE_MODULE = "running"
 from app.modules.running.schemas import (
     ChartPoint,
     PersonalBest,
@@ -18,14 +17,13 @@ from app.modules.running.schemas import (
     RaceUpdate,
     RunCreate,
     RunListItem,
-    RunResponse,
-    RunUpdate,
     RunningSettingsResponse,
     RunningSettingsUpdate,
     RunningStatsResponse,
+    RunResponse,
+    RunUpdate,
     ShoeTotal,
 )
-from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.running.stats import (
     _race_distance_km,
     compute_distance_over_time,
@@ -37,6 +35,10 @@ from app.modules.running.stats import (
     weekly_km,
 )
 
+# Source-module key used for the reusable Calendar scheduling linkage.
+RUNNING_SOURCE_MODULE = "running"
+
+
 class RunningService:
     def __init__(self, db: AsyncSession):
         self.repo = RunningRepository(db)
@@ -44,7 +46,7 @@ class RunningService:
 
     async def _sync_race_to_calendar(self, user_id: str, race: RaceEvent) -> None:
         """Mirror a race/competition into the shared Calendar (all-day event)."""
-        starts_at = datetime.combine(race.race_date, time.min, tzinfo=timezone.utc)
+        starts_at = start_of_day_utc(race.race_date)
         await self.calendar_sync.upsert_from_source(
             user_id=user_id,
             source_module=RUNNING_SOURCE_MODULE,
@@ -174,12 +176,7 @@ class RunningService:
 
     async def list_shoes(self, user_id: str) -> list[str]:
         stored = await self.repo.list_shoe_names(user_id)
-        seen: dict[str, str] = {}
-        for name in [*SUGGESTED_SHOES, *stored]:
-            key = name.strip().lower()
-            if key and key not in seen:
-                seen[key] = name.strip()
-        return sorted(seen.values(), key=str.lower)
+        return merge_names(SUGGESTED_SHOES, stored)
 
     async def create_shoe(self, user_id: str, name: str) -> str:
         clean = name.strip()
@@ -276,15 +273,3 @@ class RunningService:
             weekly_totals=[ChartPoint(**p) for p in compute_weekly_totals(runs, races)],
             **event_stats,
         )
-
-    async def get_dashboard_progress(self, user_id: str) -> dict | None:
-        runs = await self.repo.list_runs(user_id)
-        if not runs:
-            return None
-        settings = await self.repo.get_settings(user_id)
-        last = runs[0]
-        return {
-            "weekly_km": weekly_km(runs),
-            "goal_km": settings.weekly_goal_km,
-            "last_run": last.run_date.isoformat(),
-        }

@@ -1,3 +1,4 @@
+import { Page } from '../../../core/utils/http';
 export type ExpenseKind = 'soft' | 'hard';
 export type LoanStatus = 'ACTIVE' | 'COMPLETED' | 'FORECLOSED';
 export type EMIStatus = 'PENDING' | 'PAID' | 'CANCELLED';
@@ -206,7 +207,4 @@ export interface CategoryOptions {
   income: string[];
 }
 
-export interface FinanceListResult<T> {
-  items: T[];
-  total: number;
-}
+export type FinanceListResult<T> = Page<T>;

@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, injec
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ModalComponent } from '../../../shared/modal/modal.component';
 import { Loan, LoanPayload } from '../models/finance.models';
-import { todayIso } from '../utils/period';
+import { localIsoDate } from '../../../core/utils/date';
 
 /**
  * Loan details are entered once. The EMI schedule is generated from them, so
@@ -136,11 +136,11 @@ export class LoanFormComponent implements OnChanges {
     principal_amount: [0, [Validators.required, Validators.min(0.01)]],
     emi_amount: [0, [Validators.required, Validators.min(0.01)]],
     interest_rate: [0],
-    start_date: [todayIso(), Validators.required],
-    emi_start_date: [todayIso(), Validators.required],
+    start_date: [localIsoDate(), Validators.required],
+    emi_start_date: [localIsoDate(), Validators.required],
     scheduleMode: ['tenure' as 'tenure' | 'last_emi_date', Validators.required],
     tenure_months: [12, [Validators.min(1)]],
-    last_emi_date: [todayIso()],
+    last_emi_date: [localIsoDate()],
     emi_day: [1, [Validators.required, Validators.min(1), Validators.max(31)]],
     notes: [''],
   });
@@ -160,12 +160,12 @@ export class LoanFormComponent implements OnChanges {
         emi_start_date: this.loan.emi_start_date,
         scheduleMode: 'tenure',
         tenure_months: this.loan.tenure_months,
-        last_emi_date: this.loan.next_due_date ?? todayIso(),
+        last_emi_date: this.loan.next_due_date ?? localIsoDate(),
         emi_day: this.loan.emi_day,
         notes: this.loan.notes ?? '',
       });
     } else {
-      const today = todayIso();
+      const today = localIsoDate();
       this.form.reset({
         name: '',
         lender: '',

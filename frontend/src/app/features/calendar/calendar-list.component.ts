@@ -7,13 +7,13 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
 import { FullCalendarModule, FullCalendarComponent } from '@fullcalendar/angular';
 import { CalendarOptions, EventInput, EventApi, DateSelectArg, EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
+import { CalendarEventModalComponent } from './calendar-event-modal.component';
 import { CalendarService } from './services/calendar.service';
 import {
   CalendarEvent,
@@ -21,16 +21,9 @@ import {
   EventCreate,
   EventListItem,
   EVENT_CATEGORIES,
+  categoryColor,
 } from './models/calendar.models';
-
-/** Category → display color */
-export const CATEGORY_COLORS: Record<EventCategory, string> = {
-  personal: '#3b82f6',
-  task: '#8b5cf6',
-  running: '#22c55e',
-  bill: '#ef4444',
-  learning: '#f59e0b',
-};
+import { toDatetimeLocalValue } from '../../core/utils/date';
 
 interface QuickCreateState {
   startStr: string;   // datetime-local format
@@ -41,7 +34,7 @@ interface QuickCreateState {
 @Component({
   selector: 'app-calendar-list',
   standalone: true,
-  imports: [FullCalendarModule, FormsModule, RouterLink, DatePipe],
+  imports: [FullCalendarModule, FormsModule, RouterLink, CalendarEventModalComponent],
   template: `
     <!-- ====== Quick-Create Modal ====== -->
     @if (quickCreate()) {
@@ -130,98 +123,13 @@ interface QuickCreateState {
     }
 
     <!-- ====== Event Detail Modal ====== -->
-    @if (detailEvent()) {
-      <div class="modal-backdrop" (click)="closeDetail()">
-        <div class="modal" (click)="$event.stopPropagation()" style="max-width: 440px">
-          <div class="modal-header" style="gap: 0.5rem">
-            <span
-              class="inline-block w-3 h-3 rounded-full shrink-0"
-              [style.background]="categoryColor(detailEvent()!.category)"
-            ></span>
-            <span class="flex-1 truncate">{{ detailEvent()!.title }}</span>
-            <button type="button" class="btn-ghost !px-2 text-xs" (click)="closeDetail()">✕</button>
-          </div>
-          <div class="modal-body space-y-3 text-sm">
-            <!-- Date / time -->
-            <div class="flex items-start gap-2" style="color: var(--text-muted)">
-              <span>📅</span>
-              <span>
-                @if (detailEvent()!.all_day) {
-                  {{ detailEvent()!.starts_at | date: 'EEEE, MMMM d, y' }}
-                  @if (detailEvent()!.ends_at) {
-                    &nbsp;– {{ detailEvent()!.ends_at! | date: 'EEEE, MMMM d, y' }}
-                  }
-                } @else {
-                  {{ detailEvent()!.starts_at | date: 'EEE, MMM d · h:mm a' }}
-                  @if (detailEvent()!.ends_at) {
-                    &nbsp;– {{ detailEvent()!.ends_at! | date: 'h:mm a' }}
-                  }
-                }
-              </span>
-            </div>
-
-            <!-- Category -->
-            <div class="flex items-center gap-2">
-              <span
-                class="inline-block px-2 py-0.5 rounded-full text-xs font-medium text-white capitalize"
-                [style.background]="categoryColor(detailEvent()!.category)"
-              >
-                {{ detailEvent()!.category }}
-              </span>
-              @if (detailEvent()!.recurrence !== 'none') {
-                <span class="text-xs" style="color: var(--text-muted)">
-                  🔁 {{ detailEvent()!.recurrence }}
-                </span>
-              }
-              @if (detailEvent()!.source_module === 'google_calendar') {
-                <span class="qa-type-badge">Google</span>
-              }
-            </div>
-
-            <!-- Location -->
-            @if (detailEvent()!.location) {
-              <div class="flex items-start gap-2" style="color: var(--text-muted)">
-                <span>📍</span>
-                <span>{{ detailEvent()!.location }}</span>
-              </div>
-            }
-
-            <!-- Description -->
-            @if (detailEvent()!.description) {
-              <div class="flex items-start gap-2" style="color: var(--text)">
-                <span style="color: var(--text-muted)">📝</span>
-                <p class="whitespace-pre-wrap">{{ detailEvent()!.description }}</p>
-              </div>
-            }
-          </div>
-          <div class="modal-footer">
-            @if (!detailEvent()!.read_only) {
-              <button
-                type="button"
-                class="btn-ghost text-xs"
-                style="color: var(--danger)"
-                (click)="deleteEvent(detailEvent()!.id)"
-                [disabled]="deleting()"
-              >
-                {{ deleting() ? 'Deleting…' : 'Delete' }}
-              </button>
-            } @else {
-              <span class="text-xs" style="color: var(--text-muted)">Synced from Google (read-only)</span>
-            }
-            <div class="flex-1"></div>
-            @if (!detailEvent()!.read_only) {
-              <a
-                [routerLink]="['/calendar', detailEvent()!.id, 'edit']"
-                class="btn-secondary text-xs no-underline"
-                (click)="closeDetail()"
-              >
-                Edit
-              </a>
-            }
-            <button type="button" class="btn-primary text-xs" (click)="closeDetail()">Done</button>
-          </div>
-        </div>
-      </div>
+    @if (detailEvent(); as ev) {
+      <app-calendar-event-modal
+        [event]="ev"
+        [deleting]="deleting()"
+        (closed)="closeDetail()"
+        (deleteRequested)="deleteEvent($event)"
+      />
     }
 
     <!-- ====== Calendar ====== -->
@@ -312,9 +220,7 @@ export class CalendarListComponent {
     eventDidMount: this.applyEventColor.bind(this),
   };
 
-  categoryColor(cat: EventCategory): string {
-    return CATEGORY_COLORS[cat] ?? '#6b7280';
-  }
+  readonly categoryColor = categoryColor;
 
   // ── FullCalendar callbacks ──────────────────────────────────────────────────
 
@@ -364,11 +270,11 @@ export class CalendarListComponent {
   handleDateSelect(selectInfo: DateSelectArg): void {
     const start = selectInfo.allDay
       ? selectInfo.startStr
-      : this.toLocalDatetimeInput(new Date(selectInfo.start));
+      : toDatetimeLocalValue(new Date(selectInfo.start));
     const end = selectInfo.allDay
       ? selectInfo.endStr
       : selectInfo.end
-      ? this.toLocalDatetimeInput(new Date(selectInfo.end))
+      ? toDatetimeLocalValue(new Date(selectInfo.end))
       : '';
 
     this.qcTitle = '';
@@ -509,8 +415,8 @@ export class CalendarListComponent {
   openNewEventForm(): void {
     // Navigate to full form — handled by routerLink, but we can also open quick-create
     const now = new Date();
-    const start = this.toLocalDatetimeInput(now);
-    const end = this.toLocalDatetimeInput(new Date(now.getTime() + 60 * 60 * 1000));
+    const start = toDatetimeLocalValue(now);
+    const end = toDatetimeLocalValue(new Date(now.getTime() + 60 * 60 * 1000));
     this.qcTitle = '';
     this.qcAllDay = false;
     this.qcStart = start;
@@ -565,13 +471,5 @@ export class CalendarListComponent {
   private getInitialView(): string {
     if (typeof window === 'undefined') return 'dayGridMonth';
     return window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth';
-  }
-
-  private toLocalDatetimeInput(date: Date): string {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return (
-      `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-      `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-    );
   }
 }

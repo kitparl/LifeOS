@@ -1,15 +1,16 @@
 """Registration gate enforcement tests (no dependency override)."""
 
+from datetime import UTC
+
 import bcrypt
 import pytest
-from jose import jwt
-
 from app.core.config import get_settings
 from app.main import app
 from app.modules.auth.registration_gate import (
     REG_UNLOCK_COOKIE,
     require_registration_unlock,
 )
+from jose import jwt
 
 GATE_EMAIL = "pranshu.java@gmail.com"
 GATE_PASSWORD = "Parley@75220"
@@ -157,12 +158,12 @@ async def test_tampered_unlock_token_rejected(gated_client, gate_settings):
 @pytest.mark.asyncio
 async def test_unlock_token_bound_to_wrong_email_rejected(gated_client, gate_settings):
     """Unlock JWT whose sub does not match ADMIN_GATE_EMAIL must be rejected."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     wrong = jwt.encode(
         {
             "sub": "other@example.com",
-            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+            "exp": datetime.now(UTC) + timedelta(hours=1),
             "type": "reg_unlock",
         },
         gate_settings.secret_key,
@@ -184,12 +185,12 @@ async def test_unlock_token_bound_to_wrong_email_rejected(gated_client, gate_set
 @pytest.mark.asyncio
 async def test_access_token_cannot_masquerade_as_unlock(gated_client, gate_settings):
     """A normal access JWT must not satisfy the registration unlock cookie."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     fake = jwt.encode(
         {
             "sub": "some-user-id",
-            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+            "exp": datetime.now(UTC) + timedelta(hours=1),
             "type": "access",
         },
         gate_settings.secret_key,

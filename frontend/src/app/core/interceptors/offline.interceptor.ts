@@ -1,9 +1,4 @@
-import {
-  HttpErrorResponse,
-  HttpEvent,
-  HttpInterceptorFn,
-  HttpResponse,
-} from '@angular/common/http';
+import { HttpErrorResponse, HttpEvent, HttpInterceptorFn, HttpResponse, HttpStatusCode } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Observable, from, of, throwError } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs';
@@ -57,7 +52,7 @@ export const offlineInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((err: unknown) => {
-      if (err instanceof HttpErrorResponse && (err.status === 0 || err.status >= 500)) {
+      if (err instanceof HttpErrorResponse && (err.status === 0 || err.status >= HttpStatusCode.InternalServerError)) {
         return queueIfOffline();
       }
       return throwError(() => err);

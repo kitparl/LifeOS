@@ -103,10 +103,7 @@ export class EditorService {
       theme = 'light',
       keymap: keymapMode = 'default',
       readOnly = false,
-      lineNumbers = true,
-      lineWrapping = true,
       tabSize = 2,
-      placeholder = ''
     } = config;
 
     const state = EditorState.create({
@@ -228,7 +225,7 @@ export class EditorService {
     };
   }
 
-  insertText(view: EditorView, text: string, at: 'cursor' | 'selection' = 'cursor'): void {
+  insertText(view: EditorView, text: string, _at: 'cursor' | 'selection' = 'cursor'): void {
     const selection = view.state.selection.main;
     view.dispatch({
       changes: {

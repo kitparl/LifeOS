@@ -4,6 +4,7 @@ import {
   IntegrationConnection,
   IntegrationsService,
 } from '../integrations/services/integrations.service';
+import { apiErrorMessage } from '../../core/utils/http';
 
 /**
  * Central enable/disable entry point for integrations.
@@ -108,7 +109,7 @@ export class SettingsIntegrationsSectionComponent implements OnInit {
       error: (err) => {
         this.busyId.set(null);
         this.ok.set(false);
-        this.message.set(err?.error?.detail || 'Failed to update integration');
+        this.message.set(apiErrorMessage(err, 'Failed to update integration'));
         // Revert checkbox by reloading
         this.load();
       },

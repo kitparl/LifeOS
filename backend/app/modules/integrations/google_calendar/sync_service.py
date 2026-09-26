@@ -18,12 +18,18 @@ from __future__ import annotations
 
 import logging
 import time as _time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AppError, BadGatewayError, BadRequestError, ServiceUnavailableError
+from app.core.exceptions import (
+    BadGatewayError,
+    BadRequestError,
+    ServiceUnavailableError,
+    TooManyRequestsError,
+)
+from app.core.timezone import as_utc, utc_now
 from app.modules.calendar.models import CalendarEvent
 from app.modules.calendar.sync_service import CalendarSyncService
 from app.modules.integrations.google_calendar import oauth
@@ -38,7 +44,6 @@ from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import (
     GoogleCalendarConfigStatus,
     GoogleCalendarConfigUpdate,
-    IntegrationCreate,
     IntegrationSyncResponse,
     IntegrationUpdate,
 )
@@ -55,12 +60,8 @@ MANUAL_SYNC_COOLDOWN_SECONDS = 15.0
 _last_manual_sync: dict[str, float] = {}
 
 
-class SyncThrottledError(AppError):
-    status_code = 429
-
-
-def _utc(dt: datetime) -> datetime:
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+class SyncThrottledError(TooManyRequestsError):
+    pass
 
 
 class GoogleCalendarSyncService:
@@ -71,12 +72,7 @@ class GoogleCalendarSyncService:
     # ── connection / status ────────────────────────────────────────────────
 
     async def get_or_create(self, user_id: str):
-        conn = await self.repo.get_by_provider(user_id, PROVIDER)
-        if conn is not None:
-            return conn
-        return await self.repo.create(
-            user_id, IntegrationCreate(provider=PROVIDER, enabled=False), "Google Calendar"
-        )
+        return await self.repo.get_or_create(user_id, PROVIDER, "Google Calendar")
 
     async def get_status(self, user_id: str) -> GoogleCalendarConfigStatus:
         conn = await self.get_or_create(user_id)
@@ -189,7 +185,7 @@ class GoogleCalendarSyncService:
                 raise SyncThrottledError("Sync just ran. Try again in a few seconds.")
             _last_manual_sync[user_id] = now_mono
 
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         time_min, time_max = now - WINDOW_PAST, now + WINDOW_FUTURE
 
         # Phase 1 — fetch everything. No local writes until the listing is complete,
@@ -334,8 +330,8 @@ class GoogleCalendarSyncService:
             title=pick("title"),
             description=pick("description"),
             location=pick("location"),
-            starts_at=_utc(pick("starts_at")),
-            ends_at=_utc(pick("ends_at")) if pick("ends_at") else None,
+            starts_at=as_utc(pick("starts_at")),
+            ends_at=as_utc(pick("ends_at")) if pick("ends_at") else None,
             all_day=bool(pick("all_day")),
             calendar_tz=cfg.time_zone,
         )

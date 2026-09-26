@@ -1,14 +1,13 @@
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.tasks.models import Task, TaskAssignment
+from app.core.timezone import start_of_day_utc, utc_now
+from app.modules.tasks.models import ACTIVE_ASSIGNMENT_STATUSES, OPEN_TASK_STATUSES, Task, TaskAssignment
 from app.modules.tasks.schemas import TaskCreate, TaskUpdate
 from app.modules.tasks.status_utils import normalize_task_status
-
-_INCOMPLETE_STATUSES = ("pending", "in_progress", "hold", "delayed")
 
 
 class TaskRepository:
@@ -50,7 +49,7 @@ class TaskRepository:
         elif scope == "assigned_to_me":
             q = q.join(TaskAssignment, TaskAssignment.task_id == Task.id).where(
                 TaskAssignment.assignee_user_id == user_id,
-                TaskAssignment.status.in_(("pending", "accepted")),
+                TaskAssignment.status.in_(ACTIVE_ASSIGNMENT_STATUSES),
                 Task.user_id != user_id,
             )
         elif scope == "all":
@@ -58,7 +57,7 @@ class TaskRepository:
                 or_(
                     Task.user_id == user_id,
                     (TaskAssignment.assignee_user_id == user_id)
-                    & (TaskAssignment.status.in_(("pending", "accepted"))),
+                    & (TaskAssignment.status.in_(ACTIVE_ASSIGNMENT_STATUSES)),
                 )
             )
         else:
@@ -86,7 +85,7 @@ class TaskRepository:
             q = q.where(
                 Task.due_date.is_not(None),
                 Task.due_date < today_start,
-                Task.status.in_(_INCOMPLETE_STATUSES),
+                Task.status.in_(OPEN_TASK_STATUSES),
             )
         if due_later:
             _, today_end = self._today_bounds()
@@ -101,7 +100,7 @@ class TaskRepository:
                 )
             )
         if incomplete_only:
-            q = q.where(Task.status.in_(_INCOMPLETE_STATUSES))
+            q = q.where(Task.status.in_(OPEN_TASK_STATUSES))
         if search:
             term = f"%{search.lower()}%"
             q = q.where(or_(Task.title.ilike(term), Task.description.ilike(term)))
@@ -116,25 +115,6 @@ class TaskRepository:
             q = q.limit(limit)
         result = await self.db.execute(q)
         return list(result.scalars().unique().all()), int(total)
-
-    async def get_today_for_dashboard(self, user_id: str, limit: int = 10) -> list[Task]:
-        today_start, today_end = self._today_bounds()
-        result = await self.db.execute(
-            select(Task)
-            .where(
-                Task.user_id == user_id,
-                Task.parent_id.is_(None),
-                Task.deleted_at.is_(None),
-                Task.archived_at.is_(None),
-                Task.status.in_(("pending", "in_progress", "hold", "delayed")),
-                Task.due_date.is_not(None),
-                Task.due_date >= today_start,
-                Task.due_date <= today_end,
-            )
-            .order_by(Task.priority.desc(), Task.due_date.asc())
-            .limit(limit)
-        )
-        return list(result.scalars().all())
 
     async def get_by_id(self, user_id: str, task_id: str) -> Task | None:
         """Owner-scoped get (backward compatible)."""
@@ -185,7 +165,7 @@ class TaskRepository:
         if status_val is not None:
             task.status = status_val
             if status_val == "completed":
-                task.completed_at = datetime.now(timezone.utc)
+                task.completed_at = utc_now()
             elif status_val in ("pending", "in_progress", "hold", "delayed") and task.completed_at:
                 task.completed_at = None
         task.version = (task.version or 1) + 1
@@ -195,14 +175,14 @@ class TaskRepository:
 
     async def complete(self, task: Task) -> Task:
         task.status = "completed"
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = utc_now()
         task.version = (task.version or 1) + 1
         await self.db.flush()
         await self.db.refresh(task, ["subtasks"])
         return task
 
     async def soft_delete(self, task: Task) -> None:
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         task.deleted_at = now
         task.version = (task.version or 1) + 1
         # Cascade soft-delete subtasks
@@ -214,7 +194,7 @@ class TaskRepository:
         await self.db.flush()
 
     async def archive(self, task: Task) -> Task:
-        task.archived_at = datetime.now(timezone.utc)
+        task.archived_at = utc_now()
         task.version = (task.version or 1) + 1
         await self.db.flush()
         await self.db.refresh(task, ["subtasks"])
@@ -228,9 +208,9 @@ class TaskRepository:
         return task
 
     def _today_bounds(self) -> tuple[datetime, datetime]:
-        now = datetime.now(timezone.utc)
-        start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
-        end = datetime.combine(now.date(), time.max, tzinfo=timezone.utc)
+        now = utc_now()
+        start = start_of_day_utc(now.date())
+        end = datetime.combine(now.date(), time.max, tzinfo=UTC)
         return start, end
 
     async def get_stats(self, user_id: str) -> tuple[int, int]:

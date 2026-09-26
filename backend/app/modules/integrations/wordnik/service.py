@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError
+from app.core.timezone import utc_now, utc_today
+from app.modules.integrations.common import last_test_ok
 from app.modules.integrations.models import IntegrationConnection
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import (
-    IntegrationCreate,
     IntegrationUpdate,
     WordnikConfigStatus,
     WordnikConfigUpdate,
@@ -36,10 +35,7 @@ class WordnikIntegrationService:
         self.repo = IntegrationRepository(db)
 
     async def _get_or_create(self, user_id: str) -> IntegrationConnection:
-        conn = await self.repo.get_by_provider(user_id, PROVIDER)
-        if conn is not None:
-            return conn
-        return await self.repo.create(user_id, IntegrationCreate(provider=PROVIDER, enabled=False), DISPLAY_NAME)
+        return await self.repo.get_or_create(user_id, PROVIDER, DISPLAY_NAME)
 
     async def client_for(self, user_id: str) -> WordnikClient | None:
         """A client for the user's enabled Wordnik key, or None when not connected."""
@@ -53,7 +49,7 @@ class WordnikIntegrationService:
         conn = await self.repo.get_by_provider(user_id, PROVIDER)
         if conn is None:
             return None
-        return usage_remaining_pct(load_config(conn.config_json).usage, datetime.now(timezone.utc))
+        return usage_remaining_pct(load_config(conn.config_json).usage, utc_now())
 
     async def record_usage(self, user_id: str, usage: WordnikUsage | None) -> int | None:
         """Persist the latest rate-limit reading; returns the resulting percent (None when unknown)."""
@@ -63,7 +59,7 @@ class WordnikIntegrationService:
         if conn is not None:
             conn.config_json = with_usage(conn.config_json, usage)
             await self.repo.db.flush()
-        return usage_remaining_pct(usage, datetime.now(timezone.utc))
+        return usage_remaining_pct(usage, utc_now())
 
     async def status(self, user_id: str) -> WordnikConfigStatus:
         conn = await self._get_or_create(user_id)
@@ -75,8 +71,8 @@ class WordnikIntegrationService:
             configured=bool(cfg.api_key),
             api_key_masked=mask_key(cfg.api_key),
             last_tested_at=conn.last_sync_at,
-            last_test_ok={"connected": True, "error": False}.get(conn.status),
-            usage_remaining_pct=usage_remaining_pct(cfg.usage, datetime.now(timezone.utc)),
+            last_test_ok=last_test_ok(conn.status),
+            usage_remaining_pct=usage_remaining_pct(cfg.usage, utc_now()),
         )
 
     async def save(self, user_id: str, data: WordnikConfigUpdate) -> WordnikConfigStatus:
@@ -106,14 +102,14 @@ class WordnikIntegrationService:
             return WordnikTestResponse(ok=False, detail="Wordnik API key not configured")
         client = WordnikClient(cfg.api_key)
         try:
-            await client.word_of_the_day(datetime.now(timezone.utc).date())
+            await client.word_of_the_day(utc_today())
         except WordnikError as exc:
             conn.status = "error"
             await self.repo.db.flush()
             await self.record_usage(user_id, client.last_usage)
             return WordnikTestResponse(ok=False, detail=str(exc))
         conn.status = "connected"
-        conn.last_sync_at = datetime.now(timezone.utc)
+        conn.last_sync_at = utc_now()
         await self.repo.db.flush()
         await self.record_usage(user_id, client.last_usage)
         return WordnikTestResponse(ok=True, detail="Wordnik API key verified")

@@ -20,6 +20,7 @@ import {
   SubjectCreate,
   SubjectUpdate,
 } from '../models/knowledge-notes.models';
+import { toPage } from '../../../core/utils/http';
 
 @Injectable({ providedIn: 'root' })
 export class KnowledgeNotesService {
@@ -35,10 +36,7 @@ export class KnowledgeNotesService {
     return this.http
       .get<KnowledgeSubjectListItem[]>(`${this.api}/subjects`, { params, observe: 'response' })
       .pipe(
-        map((response) => ({
-          items: response.body ?? [],
-          total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-        })),
+        map(toPage),
       );
   }
 

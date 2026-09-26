@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { environment } from '../../../../environments/environment';
-import { IntegrationsService, apiErrorMessage } from './integrations.service';
+import { IntegrationsService } from './integrations.service';
 
 describe('IntegrationsService (Google Calendar)', () => {
   let service: IntegrationsService;
@@ -124,14 +124,5 @@ describe('IntegrationsService (AI model list)', () => {
     const test = http.expectOne(`${api}/test`);
     expect(test.request.method).toBe('POST');
     test.flush({ ok: true, detail: 'Model responded', model_id: 'anthropic/claude-opus-5' });
-  });
-});
-
-describe('apiErrorMessage', () => {
-  it('reads string, coded, and validation details', () => {
-    expect(apiErrorMessage({ error: { detail: 'plain' } }, 'fb')).toBe('plain');
-    expect(apiErrorMessage({ error: { detail: { code: 'x', message: 'coded' } } }, 'fb')).toBe('coded');
-    expect(apiErrorMessage({ error: { detail: [{ msg: 'bad url' }] } }, 'fb')).toBe('bad url');
-    expect(apiErrorMessage(null, 'fb')).toBe('fb');
   });
 });

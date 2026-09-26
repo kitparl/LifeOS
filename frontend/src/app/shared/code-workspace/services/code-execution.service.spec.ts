@@ -25,9 +25,9 @@ describe('CodeExecutionService', () => {
     js = jasmine.createSpyObj('JavaScriptExecutor', ['execute', 'stop', 'isReady', 'destroy']);
     py = jasmine.createSpyObj('PythonExecutor', ['execute', 'stop', 'isReady', 'isLoading']);
     sql = jasmine.createSpyObj('SqlExecutor', ['execute', 'stop', 'isReady', 'isLoading', 'resetDatabase', 'destroy']);
-    (js as any).executionType = 'browser';
-    (py as any).executionType = 'wasm';
-    (sql as any).executionType = 'wasm';
+    Object.assign(js, { executionType: 'browser' });
+    Object.assign(py, { executionType: 'wasm' });
+    Object.assign(sql, { executionType: 'wasm' });
     js.execute.and.returnValue(of(ok({ stdout: 'js' })));
     py.execute.and.returnValue(of(ok({ stdout: 'py' })));
     sql.execute.and.returnValue(of(ok({ stdout: 'sql' })));

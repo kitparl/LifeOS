@@ -20,6 +20,7 @@ import { CodeBlock, KnowledgeSection } from './models/knowledge-notes.models';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
 import { KnowledgeCodeRunnerService } from './services/knowledge-code-runner.service';
 import { KnowledgeRunBarComponent } from './components/knowledge-run-bar.component';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-knowledge-notes-editor',
@@ -134,8 +135,7 @@ export class KnowledgeNotesEditorComponent implements OnChanges {
         );
         this.workspace?.insertAtCursor(this.markdownForRecord(record, file));
       } catch (err: unknown) {
-        const detail = (err as { error?: { detail?: string } })?.error?.detail;
-        this.uploadError = detail || 'Upload failed';
+        this.uploadError = apiErrorMessage(err, 'Upload failed');
         this.uploadStatus = '';
         return;
       }

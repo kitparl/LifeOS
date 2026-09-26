@@ -1,11 +1,11 @@
 import json
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 # Suggested starter types surfaced to every user. These are NOT hardcoded as the
 # only allowed values — users can create custom types which persist in qa_types
@@ -26,7 +26,7 @@ SUGGESTED_QA_TYPES: tuple[str, ...] = (
 class QAEntry(Base):
     __tablename__ = "qa_entries"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     current_answer: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -36,9 +36,9 @@ class QAEntry(Base):
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_deep_personal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
     versions: Mapped[list["QAVersion"]] = relationship(
@@ -60,11 +60,11 @@ class QAEntry(Base):
 class QAVersion(Base):
     __tablename__ = "qa_versions"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     entry_id: Mapped[str] = mapped_column(String(36), ForeignKey("qa_entries.id", ondelete="CASCADE"), index=True)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     entry: Mapped["QAEntry"] = relationship("QAEntry", back_populates="versions")
 
@@ -74,9 +74,9 @@ class QAType(Base):
 
     __tablename__ = "qa_types"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_qa_types_user_name"),)

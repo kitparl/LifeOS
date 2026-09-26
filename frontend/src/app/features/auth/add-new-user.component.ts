@@ -9,6 +9,7 @@ import {
   usernameErrorMessage,
   usernameFormatValidator,
 } from '../../core/validators/username.validator';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-add-new-user',
@@ -138,12 +139,7 @@ export class AddNewUserComponent {
         this.submitting.set(false);
       },
       error: (err) => {
-        const detail = err?.error?.detail;
-        this.error.set(
-          typeof detail === 'string'
-            ? detail
-            : 'Could not create user. Email or username may already be in use.',
-        );
+        this.error.set(apiErrorMessage(err, 'Could not create user. Email or username may already be in use.'));
         this.submitting.set(false);
       },
     });

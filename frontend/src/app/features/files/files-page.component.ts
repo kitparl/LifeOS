@@ -4,6 +4,7 @@ import { DocumentViewerService } from '../../shared/document-viewer/document-vie
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import { FileRecord } from './models/file.models';
 import { FilesService } from './services/files.service';
+import { formatBytes } from '../../core/utils/format';
 
 @Component({
   selector: 'app-files-page',
@@ -95,11 +96,7 @@ export class FilesPageComponent implements OnInit {
     this.filesService.saveAsDownload(f);
   }
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
+  readonly formatSize = formatBytes;
 
   remove(id: string): void {
     this.filesService.delete(id).subscribe({ next: () => this.load() });

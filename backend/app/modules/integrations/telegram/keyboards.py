@@ -12,10 +12,6 @@ def button(text: str, callback_data: str) -> dict[str, str]:
     return {"text": text, "callback_data": callback_data}
 
 
-def url_button(text: str, url: str) -> dict[str, str]:
-    return {"text": text, "url": url}
-
-
 def inline_keyboard(rows: list[list[dict[str, str]]]) -> dict[str, Any]:
     return {"inline_keyboard": rows}
 
@@ -52,7 +48,3 @@ def pagination_row(
     if page < total_pages - 1:
         buttons.append(button("▶", f"{namespace}:page:{page + 1}{suffix}"))
     return buttons
-
-
-def confirm_row(*, yes_data: str, no_data: str, yes_label: str = "✅ Confirm", no_label: str = "❌ Cancel") -> list[dict[str, str]]:
-    return [button(yes_label, yes_data), button(no_label, no_data)]

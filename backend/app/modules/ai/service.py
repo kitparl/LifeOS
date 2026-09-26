@@ -1,4 +1,7 @@
+import json
 import logging
+import re
+from datetime import date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +25,9 @@ from app.modules.ai.schemas import (
     UseCaseResponse,
 )
 from app.modules.ai.use_cases import USE_CASE_RAG_CHAT, USE_CASES, UseCase, get_use_case
+from app.modules.tasks.due_dates import noon_utc, resolve_due_token
+from app.modules.tasks.schemas import TaskCreate
+from app.modules.tasks.service import TaskService
 
 logger = logging.getLogger(__name__)
 
@@ -277,17 +283,9 @@ class AiService:
         Uses the AI provider when available; falls back to regex title + due today.
         Returns TaskResponse or None.
         """
-        import json
-        import re
-        from datetime import date, datetime, time, timedelta, timezone
-
-        from app.modules.tasks.schemas import TaskCreate
-        from app.modules.tasks.service import TaskService
-
         title = natural_language.strip()[:200]
-        due: datetime | None = datetime.combine(
-            date.today(), time(12, 0), tzinfo=timezone.utc
-        )
+        today = date.today()
+        due: datetime | None = noon_utc(today)
 
         system = (
             "Extract a task from the user message. Reply with ONLY JSON: "
@@ -310,29 +308,10 @@ class AiService:
                     data = json.loads(m.group(0))
                     title = str(data.get("title") or title).strip()[:200]
                     due_token = data.get("due")
-                    if due_token in (None, "null", ""):
-                        due = datetime.combine(
-                            date.today(), time(12, 0), tzinfo=timezone.utc
-                        )
-                    elif str(due_token).lower() == "today":
-                        due = datetime.combine(
-                            date.today(), time(12, 0), tzinfo=timezone.utc
-                        )
-                    elif str(due_token).lower() == "tomorrow":
-                        due = datetime.combine(
-                            date.today() + timedelta(days=1),
-                            time(12, 0),
-                            tzinfo=timezone.utc,
-                        )
-                    else:
-                        try:
-                            due = datetime.combine(
-                                date.fromisoformat(str(due_token)[:10]),
-                                time(12, 0),
-                                tzinfo=timezone.utc,
-                            )
-                        except ValueError:
-                            pass
+                    token = "today" if due_token in (None, "null", "") else str(due_token).lower()[:10]
+                    due_day = resolve_due_token(token, today)
+                    if due_day is not None:
+                        due = noon_utc(due_day)
             except ValueError:
                 # Unparseable JSON from the model: keep the raw title.
                 pass

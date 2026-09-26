@@ -17,6 +17,7 @@ import asyncio
 import hashlib
 import logging
 import sys
+from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -25,6 +26,12 @@ from app.modules.files.backends import resolve_backend
 from app.modules.files.repository import FileRepository
 
 logger = logging.getLogger(__name__)
+
+
+async def _hashing_stream(stream: AsyncIterator[bytes], hasher: hashlib._Hash) -> AsyncIterator[bytes]:
+    async for chunk in stream:
+        hasher.update(chunk)
+        yield chunk
 
 
 async def backfill_to(
@@ -71,12 +78,7 @@ async def backfill_to(
             stream2 = await source.open(key)
             hasher = hashlib.sha256()
 
-            async def copy_stream():
-                async for chunk in stream2:
-                    hasher.update(chunk)
-                    yield chunk
-
-            await target.save(key, copy_stream(), record.content_type)
+            await target.save(key, _hashing_stream(stream2, hasher), record.content_type)
             new_sum = hasher.hexdigest()
             if record.checksum_sha256 and new_sum != record.checksum_sha256:
                 await target.delete(key)

@@ -4,7 +4,12 @@ import { map, catchError, timeout } from 'rxjs/operators';
 import { BaseExecutor, ExecutionType } from './base.executor';
 import { CodeExecutionRequest, CodeExecutionResult } from '../models/code-execution.model';
 
-declare const loadPyodide: any;
+/** The part of the Pyodide runtime this executor uses (loaded from the CDN at runtime). */
+interface PyodideRuntime {
+  runPython(code: string): string;
+}
+
+declare const loadPyodide: (options: { indexURL: string }) => Promise<PyodideRuntime>;
 
 /**
  * Python executor using Pyodide WebAssembly runtime.
@@ -22,7 +27,7 @@ export class PythonExecutor implements BaseExecutor {
   readonly language = 'python';
   readonly executionType: ExecutionType = 'wasm';
 
-  private pyodide: any | null = null;
+  private pyodide: PyodideRuntime | null = null;
   private loading: boolean = false;
   private loadingPromise: Promise<void> | null = null;
   private readonly DEFAULT_TIMEOUT_MS = 30000; // 30 seconds (Pyodide can be slow)
@@ -78,11 +83,11 @@ sys.stderr = StringIO()
             executionTimeMs: Math.round(endTime - startTime),
             executionId,
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Try to get stderr if available
           try {
             stderr = this.pyodide.runPython('sys.stderr.getvalue()');
-          } catch (e) {
+          } catch {
             // Ignore
           }
 
@@ -91,8 +96,8 @@ sys.stderr = StringIO()
           return {
             success: false,
             stdout: stdout || '',
-            stderr: stderr || error.message || '',
-            error: error.message,
+            stderr: stderr || (error as Error).message || '',
+            error: (error as Error).message,
             exitCode: 1,
             executionTimeMs: Math.round(endTime - startTime),
             executionId,
@@ -129,7 +134,7 @@ sys.stderr = StringIO()
   /**
    * Stop execution (Pyodide doesn't support this directly)
    */
-  stop(executionId: string): void {
+  stop(_executionId: string): void {
     // Pyodide doesn't provide a way to interrupt execution
     // This would require running Pyodide in a Web Worker
     console.warn('Python execution cannot be stopped once started');
@@ -185,7 +190,6 @@ sys.stderr = StringIO()
         indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/',
       });
 
-      console.log('Pyodide loaded successfully');
     } catch (error) {
       console.error('Failed to load Pyodide:', error);
       throw error;

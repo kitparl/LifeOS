@@ -5,24 +5,21 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from cryptography.fernet import Fernet
-
 from app.core import crypto
 from app.core.events import (
     TASK_CREATED,
     EntityCreated,
     event_bus,
 )
-from app.modules.integrations.telegram.command_handler import handle_command
 from app.modules.integrations.notifications.outbox_models import FAILED, PENDING, PendingNotification
 from app.modules.integrations.notifications.outbox_repository import OutboxRepository
-from app.modules.integrations.scheduling.scheduler import _cron_for_prefs
 from app.modules.integrations.notifications.subscriber import format_entity_message
+from app.modules.integrations.telegram.command_handler import handle_command
 from app.modules.integrations.telegram.config import (
-    TelegramPreferences,
     parse_preferences,
     serialize_config,
 )
+from cryptography.fernet import Fernet
 
 
 @pytest.fixture(autouse=True)
@@ -81,26 +78,6 @@ def test_format_entity_messages():
     assert "due 2026-07-25" in format_entity_message(
         EntityCreated(TASK_CREATED, "u1", "id1", "Buy milk", when="2026-07-25", module="tasks")
     )
-
-
-def test_cron_for_prefs_daily_and_weekly():
-    daily = _cron_for_prefs(
-        TelegramPreferences(digest_time="08:00", digest_frequency="daily", timezone="UTC")
-    )
-    assert daily is not None
-    weekly = _cron_for_prefs(
-        TelegramPreferences(
-            digest_time="07:15",
-            digest_frequency="weekly",
-            digest_weekday=0,
-            timezone="Asia/Kolkata",
-        )
-    )
-    assert weekly is not None
-    weekdays = _cron_for_prefs(
-        TelegramPreferences(digest_time="06:00", digest_frequency="weekdays", timezone="UTC")
-    )
-    assert weekdays is not None
 
 
 @pytest.mark.asyncio

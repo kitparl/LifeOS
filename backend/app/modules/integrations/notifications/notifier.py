@@ -65,35 +65,3 @@ class TelegramNotifier(Notifier):
             return NotifierResult(ok=True, detail="Message sent")
         except TelegramClientError:
             return NotifierResult(ok=False, detail="Telegram send failed")
-
-    async def edit_message(
-        self,
-        message_id: int,
-        message: NotifierMessage,
-    ) -> NotifierResult:
-        try:
-            await self._client.edit_message_text(
-                self._chat_id,
-                message_id,
-                message.text,
-                parse_mode=message.parse_mode,
-                reply_markup=message.reply_markup,
-            )
-            return NotifierResult(ok=True, detail="Message edited")
-        except TelegramClientError:
-            return NotifierResult(ok=False, detail="Telegram edit failed")
-
-    async def answer_callback(
-        self,
-        callback_query_id: str,
-        *,
-        text: str = "",
-        show_alert: bool = False,
-    ) -> NotifierResult:
-        try:
-            await self._client.answer_callback_query(
-                callback_query_id, text=text, show_alert=show_alert
-            )
-            return NotifierResult(ok=True, detail="Callback answered")
-        except TelegramClientError:
-            return NotifierResult(ok=False, detail="Telegram callback failed")

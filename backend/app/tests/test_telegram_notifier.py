@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from cryptography.fernet import Fernet
-
 from app.core import crypto
 from app.core.crypto import decrypt, encrypt
-from app.modules.integrations.scheduling.digest_service import DigestContent, format_digest
 from app.modules.integrations.notifications.notifier import NotifierMessage, TelegramNotifier
 from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
 from app.modules.integrations.telegram.config import mask_config, parse_config, serialize_config
+from cryptography.fernet import Fernet
 
 
 @pytest.fixture(autouse=True)
@@ -69,22 +66,6 @@ def test_telegram_config_preserve_existing_on_partial_update():
     assert parsed is not None
     assert parsed.bot_token == "token-one-AAAA"
     assert parsed.chat_id == "222"
-
-
-def test_format_digest_empty_and_sections():
-    empty = format_digest(DigestContent())
-    assert "caught up" in empty.text.lower()
-    assert empty.parse_mode == "HTML"
-
-    content = DigestContent(
-        pending_tasks=["Buy milk [pending, no due date]"],
-        habits_due=["Meditate (daily)"],
-    )
-    msg = format_digest(content, now=datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc))
-    assert "Pending tasks" in msg.text
-    assert "Buy milk" in msg.text
-    assert "Habits due" in msg.text
-    assert "<" in msg.text  # HTML tags
 
 
 @pytest.mark.asyncio

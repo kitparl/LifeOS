@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, NotFoundError
-from app.modules.tasks.models import Task, TaskAssignment, TaskWatcher
+from app.modules.tasks.models import ACTIVE_ASSIGNMENT_STATUSES, Task, TaskAssignment, TaskWatcher
+
 
 class TaskRole(str, Enum):
     OWNER = "owner"
@@ -47,7 +48,7 @@ class TaskPermissions:
             select(TaskAssignment.id).where(
                 TaskAssignment.task_id == task.id,
                 TaskAssignment.assignee_user_id == user_id,
-                TaskAssignment.status.in_(("pending", "accepted")),
+                TaskAssignment.status.in_(ACTIVE_ASSIGNMENT_STATUSES),
             ).limit(1)
         )
         if active.scalar_one_or_none():

@@ -13,7 +13,16 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_TRANSIENT_STATUS = frozenset({408, 429, 500, 502, 503, 504})
+_TRANSIENT_STATUS = frozenset(
+    {
+        httpx.codes.REQUEST_TIMEOUT,
+        httpx.codes.TOO_MANY_REQUESTS,
+        httpx.codes.INTERNAL_SERVER_ERROR,
+        httpx.codes.BAD_GATEWAY,
+        httpx.codes.SERVICE_UNAVAILABLE,
+        httpx.codes.GATEWAY_TIMEOUT,
+    }
+)
 _MAX_RETRIES = 3
 DEFAULT_BASE_URL = "https://api.github.com"
 DEFAULT_TIMEOUT_SECONDS = 30.0
@@ -35,19 +44,19 @@ class GitHubClientError(Exception):
 
 
 def _classify_code(status_code: int | None, message: str) -> str:
-    if status_code == 401:
+    if status_code == httpx.codes.UNAUTHORIZED:
         return "auth"
-    if status_code == 403:
+    if status_code == httpx.codes.FORBIDDEN:
         return "permission"
-    if status_code == 404:
+    if status_code == httpx.codes.NOT_FOUND:
         return "not_found"
-    if status_code == 409:
+    if status_code == httpx.codes.CONFLICT:
         return "conflict"
-    if status_code == 422:
+    if status_code == httpx.codes.UNPROCESSABLE_ENTITY:
         return "validation"
     if status_code in _TRANSIENT_STATUS or "timed out" in (message or "").lower():
         return "transient"
-    if status_code and status_code >= 500:
+    if status_code and status_code >= httpx.codes.INTERNAL_SERVER_ERROR:
         return "transient"
     return "unknown"
 
@@ -160,21 +169,21 @@ class GitHubClient:
             except httpx.HTTPError as exc:
                 raise GitHubClientError("GitHub request failed", code="unknown") from exc
 
-            if response.status_code == 404 and allow_404:
+            if response.status_code == httpx.codes.NOT_FOUND and allow_404:
                 return None
 
             if response.status_code in _TRANSIENT_STATUS and attempt + 1 < _MAX_RETRIES:
                 await asyncio.sleep(0.4 * (2**attempt))
                 continue
 
-            if response.status_code >= 400:
+            if response.status_code >= httpx.codes.BAD_REQUEST:
                 detail = response.text[:300] if response.text else response.reason_phrase
                 raise GitHubClientError(
                     f"GitHub API error ({response.status_code}): {detail}",
                     status_code=response.status_code,
                 )
 
-            if response.status_code == 204 or not response.content:
+            if response.status_code == httpx.codes.NO_CONTENT or not response.content:
                 return {}
             data = response.json()
             return data if isinstance(data, dict) else {}
@@ -186,7 +195,7 @@ class GitHubClient:
     async def get_repo(self) -> dict[str, Any]:
         result = await self._request("GET", self._repo_url(), allow_404=True)
         if result is None:
-            raise GitHubClientError("Repository not found", status_code=404)
+            raise GitHubClientError("Repository not found", status_code=httpx.codes.NOT_FOUND)
         return result
 
     async def get_branch_ref(self) -> dict[str, Any]:
@@ -195,7 +204,7 @@ class GitHubClient:
         if result is None:
             raise GitHubClientError(
                 f"Branch '{self._branch}' not found",
-                status_code=404,
+                status_code=httpx.codes.NOT_FOUND,
             )
         return result
 
@@ -212,31 +221,6 @@ class GitHubClient:
         if not isinstance(sha, str):
             return None
         return GitHubFileMeta(path=path, sha=sha)
-
-    async def put_file(
-        self,
-        path: str,
-        content: bytes,
-        message: str,
-        *,
-        sha: str | None = None,
-    ) -> GitHubFileMeta:
-        payload: dict[str, Any] = {
-            "message": message,
-            "content": base64.b64encode(content).decode("ascii"),
-            "branch": self._branch,
-        }
-        if sha:
-            payload["sha"] = sha
-
-        data = await self._request("PUT", self._contents_url(path), json=payload, allow_404=False)
-        if not data:
-            raise GitHubClientError("Unexpected empty response from GitHub")
-        content_obj = data.get("content") if isinstance(data.get("content"), dict) else data
-        new_sha = content_obj.get("sha") if isinstance(content_obj, dict) else data.get("sha")
-        if not isinstance(new_sha, str):
-            raise GitHubClientError("GitHub did not return file sha")
-        return GitHubFileMeta(path=path, sha=new_sha)
 
     async def delete_file(self, path: str, sha: str, message: str) -> None:
         payload = {
@@ -379,7 +363,7 @@ class GitHubClient:
         if not can_push:
             raise GitHubClientError(
                 "Token can read the repo but cannot push. Grant Contents: Write.",
-                status_code=403,
+                status_code=httpx.codes.FORBIDDEN,
             )
         await self.get_branch_ref()
         return {

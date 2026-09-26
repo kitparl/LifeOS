@@ -4,6 +4,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { SecretInputComponent } from '../../../shared/secret-input/secret-input.component';
 import { WordOfTheDayService } from '../../communication/vocabulary/services/word-of-the-day.service';
 import { IntegrationsService, WordnikConfigStatus } from '../services/integrations.service';
+import { apiErrorMessage } from '../../../core/utils/http';
 
 @Component({
   selector: 'app-wordnik-config',
@@ -114,10 +115,9 @@ export class WordnikConfigComponent implements OnInit {
     this.keyInput = '';
   }
 
-  private fail(err: { error?: { detail?: unknown } } | null, fallback: string): void {
-    const detail = err?.error?.detail;
+  private fail(err: unknown, fallback: string): void {
     this.ok.set(false);
-    this.message.set(typeof detail === 'string' ? detail : fallback);
+    this.message.set(apiErrorMessage(err, fallback));
     this.busy.set(false);
   }
 

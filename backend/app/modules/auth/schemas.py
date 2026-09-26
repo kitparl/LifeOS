@@ -15,10 +15,7 @@ class RegisterRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def _username(cls, v: str) -> str:
-        try:
-            return validate_username(v)
-        except ValueError as e:
-            raise ValueError(str(e)) from e
+        return validate_username(v)
 
 
 class RegistrationGateLoginRequest(BaseModel):
@@ -87,10 +84,7 @@ class UsernameChangeRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def _username(cls, v: str) -> str:
-        try:
-            return validate_username(v)
-        except ValueError as e:
-            raise ValueError(str(e)) from e
+        return validate_username(v)
 
 
 class UsernameAvailabilityResponse(BaseModel):

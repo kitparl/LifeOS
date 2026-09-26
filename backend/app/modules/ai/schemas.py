@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from app.modules.ai.adapters.base import MODEL_ID_PATTERN
 from pydantic import BaseModel, Field
+
+from app.modules.ai.adapters.base import MODEL_ID_PATTERN
 
 
 class AiStatusResponse(BaseModel):

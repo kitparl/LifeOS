@@ -8,40 +8,49 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from collections.abc import Awaitable, Callable
+from datetime import date, datetime
+from typing import TypeVar
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import event
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.core.database import async_session_factory
+from app.core.timezone import IST, safe_zone
 from app.modules.integrations.telegram.config import TelegramPreferences, parse_preferences
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 _scheduler: AsyncIOScheduler | None = None
 _nudge_pending = False
 
 CRON_JOB_TYPES = ("morning", "midday", "night", "weekly", "ai_briefing")
+# job type -> (enabled flag, "HH:MM" time) attribute names on TelegramPreferences
+_JOB_PREF_FIELDS: dict[str, tuple[str, str]] = {
+    "morning": ("morning_enabled", "morning_time"),
+    "midday": ("midday_enabled", "midday_time"),
+    "night": ("night_enabled", "night_time"),
+    "weekly": ("weekly_enabled", "weekly_time"),
+    "ai_briefing": ("ai_briefing_enabled", "ai_briefing_time"),
+}
 
 
 def get_scheduler() -> AsyncIOScheduler | None:
     return _scheduler
 
 
-def _job_id(user_id: str, job_type: str = "morning") -> str:
+def job_id_for(user_id: str, job_type: str) -> str:
     return f"telegram_{job_type}_{user_id}"
 
 
-def _safe_zone(tz_name: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(tz_name or "Asia/Kolkata")
-    except ZoneInfoNotFoundError:
-        logger.warning("Unknown timezone %s — falling back to Asia/Kolkata", tz_name)
-        return ZoneInfo("Asia/Kolkata")
+def job_enabled(prefs: TelegramPreferences, job_type: str) -> bool:
+    fields = _JOB_PREF_FIELDS.get(job_type)
+    return bool(fields and getattr(prefs, fields[0]))
 
 
 def _time_parts(time_s: str) -> tuple[int, int]:
@@ -50,50 +59,27 @@ def _time_parts(time_s: str) -> tuple[int, int]:
 
 
 def _cron_for_job(job_type: str, prefs: TelegramPreferences) -> CronTrigger | None:
-    tz = _safe_zone(prefs.timezone)
-    if job_type == "morning":
-        if not prefs.morning_enabled:
-            return None
-        h, m = _time_parts(prefs.morning_time)
-        return CronTrigger(hour=h, minute=m, timezone=tz)
-    if job_type == "midday":
-        if not prefs.midday_enabled:
-            return None
-        h, m = _time_parts(prefs.midday_time)
-        return CronTrigger(hour=h, minute=m, timezone=tz)
-    if job_type == "night":
-        if not prefs.night_enabled:
-            return None
-        h, m = _time_parts(prefs.night_time)
-        return CronTrigger(hour=h, minute=m, timezone=tz)
+    tz = safe_zone(prefs.timezone)
+    if not job_enabled(prefs, job_type):
+        return None
+    h, m = _time_parts(getattr(prefs, _JOB_PREF_FIELDS[job_type][1]))
     if job_type == "weekly":
-        if not prefs.weekly_enabled:
-            return None
-        h, m = _time_parts(prefs.weekly_time)
         return CronTrigger(day_of_week=str(prefs.weekly_weekday), hour=h, minute=m, timezone=tz)
-    if job_type == "ai_briefing":
-        if not prefs.ai_briefing_enabled:
+    return CronTrigger(hour=h, minute=m, timezone=tz)
+
+
+async def _run_in_session(label: str, work: Callable[[AsyncSession], Awaitable[T]]) -> T | None:
+    """Run one maintenance job in its own session: commit on success, roll back and log on failure."""
+    async with async_session_factory() as session:
+        try:
+            result = await work(session)
+            await session.commit()
+            return result
+        except Exception:
+            await session.rollback()
+            logger.exception("%s job failed", label)
             return None
-        h, m = _time_parts(prefs.ai_briefing_time)
-        return CronTrigger(hour=h, minute=m, timezone=tz)
-    return None
 
-
-def _cron_for_prefs(prefs: TelegramPreferences) -> CronTrigger:
-    """Backward-compatible helper used by older Phase 2 tests (legacy digest cron)."""
-    hour_s, minute_s = prefs.digest_time.split(":")
-    hour, minute = int(hour_s), int(minute_s)
-    tz = _safe_zone(prefs.timezone)
-    if prefs.digest_frequency == "weekdays":
-        return CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute, timezone=tz)
-    if prefs.digest_frequency == "weekly":
-        return CronTrigger(
-            day_of_week=str(prefs.digest_weekday),
-            hour=hour,
-            minute=minute,
-            timezone=tz,
-        )
-    return CronTrigger(hour=hour, minute=minute, timezone=tz)
 
 async def _run_user_report(user_id: str, job_type: str) -> None:
     from app.modules.integrations.scheduling.scheduled_report_service import ScheduledReportService
@@ -110,14 +96,9 @@ async def _run_user_report(user_id: str, job_type: str) -> None:
             logger.exception("Scheduled %s failed for user=%s", job_type, user_id)
 
 
-async def _run_user_digest(user_id: str) -> None:
-    """Backward-compatible alias used by older job ids."""
-    await _run_user_report(user_id, "morning")
-
-
 async def _run_reminder_poll() -> None:
-    from app.modules.integrations.scheduling.reminder_scanner import ReminderScanner
     from app.modules.integrations.repository import IntegrationRepository
+    from app.modules.integrations.scheduling.reminder_scanner import ReminderScanner
 
     async with async_session_factory() as session:
         try:
@@ -140,43 +121,25 @@ async def _run_outbox_drain() -> None:
 async def _run_qa_purge() -> None:
     from app.modules.qa.service import QAService
 
-    async with async_session_factory() as session:
-        try:
-            n = await QAService(session).purge_expired()
-            await session.commit()
-            if n:
-                logger.info("Purged %s expired Q&A entries", n)
-        except Exception:
-            await session.rollback()
-            logger.exception("Q&A purge job failed")
+    n = await _run_in_session("Q&A purge", lambda session: QAService(session).purge_expired())
+    if n:
+        logger.info("Purged %s expired Q&A entries", n)
 
 
 async def _run_sticky_notes_purge() -> None:
     from app.modules.sticky_notes.service import StickyNoteService
 
-    async with async_session_factory() as session:
-        try:
-            n = await StickyNoteService(session).purge_expired()
-            await session.commit()
-            if n:
-                logger.info("Purged %s expired sticky notes", n)
-        except Exception:
-            await session.rollback()
-            logger.exception("Sticky notes purge job failed")
+    n = await _run_in_session("Sticky notes purge", lambda session: StickyNoteService(session).purge_expired())
+    if n:
+        logger.info("Purged %s expired sticky notes", n)
 
 
 async def _run_news_saved_purge() -> None:
     from app.modules.news.service import NewsService
 
-    async with async_session_factory() as session:
-        try:
-            n = await NewsService(session).purge_expired()
-            await session.commit()
-            if n:
-                logger.info("Purged %s expired saved news articles", n)
-        except Exception:
-            await session.rollback()
-            logger.exception("Saved news purge job failed")
+    n = await _run_in_session("Saved news purge", lambda session: NewsService(session).purge_expired())
+    if n:
+        logger.info("Purged %s expired saved news articles", n)
 
 
 async def _run_google_calendar_sync() -> None:
@@ -189,18 +152,13 @@ async def _run_google_calendar_sync() -> None:
 
 
 async def _run_routines_expire() -> None:
-    from datetime import date
-
     from app.modules.routines.service import RoutineService
 
-    async with async_session_factory() as session:
-        try:
-            n = await RoutineService(session).deactivate_expired(date.today())
-            await session.commit()
-            logger.info("Expired %s routines", n)
-        except Exception:
-            await session.rollback()
-            logger.exception("Routine expiry job failed")
+    n = await _run_in_session(
+        "Routine expiry", lambda session: RoutineService(session).deactivate_expired(date.today())
+    )
+    if n is not None:
+        logger.info("Expired %s routines", n)
 
 
 def sync_user_jobs(
@@ -220,7 +178,7 @@ def sync_user_jobs(
         sched.remove_job(legacy)
 
     for job_type in CRON_JOB_TYPES:
-        jid = _job_id(user_id, job_type)
+        jid = job_id_for(user_id, job_type)
         if sched.get_job(jid):
             sched.remove_job(jid)
         if not enabled:
@@ -246,19 +204,9 @@ def next_run_times(user_id: str) -> dict[str, datetime | None]:
         return {}
     runs: dict[str, datetime | None] = {}
     for job_type in CRON_JOB_TYPES:
-        job = sched.get_job(_job_id(user_id, job_type))
+        job = sched.get_job(job_id_for(user_id, job_type))
         runs[job_type] = getattr(job, "next_run_time", None) if job else None
     return runs
-
-
-def sync_user_digest_job(
-    user_id: str,
-    prefs: TelegramPreferences,
-    *,
-    enabled: bool,
-) -> None:
-    """Alias for callers that still pass digest prefs."""
-    sync_user_jobs(user_id, prefs, enabled=enabled)
 
 
 def remove_user_digest_job(user_id: str) -> None:
@@ -269,7 +217,7 @@ def remove_user_digest_job(user_id: str) -> None:
     if sched.get_job(legacy):
         sched.remove_job(legacy)
     for job_type in CRON_JOB_TYPES:
-        jid = _job_id(user_id, job_type)
+        jid = job_id_for(user_id, job_type)
         if sched.get_job(jid):
             sched.remove_job(jid)
 
@@ -283,11 +231,6 @@ async def load_all_scheduled_jobs() -> None:
         for conn in conns:
             prefs = parse_preferences(conn.config_json)
             sync_user_jobs(conn.user_id, prefs, enabled=True)
-
-
-async def load_all_digest_jobs() -> None:
-    """Backward-compatible alias."""
-    await load_all_scheduled_jobs()
 
 
 def _schedule_nudge() -> None:
@@ -347,7 +290,7 @@ def start_scheduler() -> AsyncIOScheduler:
     )
     _scheduler.add_job(
         _run_routines_expire,
-        trigger=CronTrigger(hour=0, minute=1, timezone=_safe_zone("Asia/Kolkata")),
+        trigger=CronTrigger(hour=0, minute=1, timezone=IST),
         id="routines_expire",
         replace_existing=True,
         max_instances=1,
@@ -355,7 +298,7 @@ def start_scheduler() -> AsyncIOScheduler:
     )
     _scheduler.add_job(
         _run_qa_purge,
-        trigger=CronTrigger(hour=0, minute=5, timezone=_safe_zone("Asia/Kolkata")),
+        trigger=CronTrigger(hour=0, minute=5, timezone=IST),
         id="qa_purge",
         replace_existing=True,
         max_instances=1,
@@ -363,7 +306,7 @@ def start_scheduler() -> AsyncIOScheduler:
     )
     _scheduler.add_job(
         _run_sticky_notes_purge,
-        trigger=CronTrigger(hour=0, minute=6, timezone=_safe_zone("Asia/Kolkata")),
+        trigger=CronTrigger(hour=0, minute=6, timezone=IST),
         id="sticky_notes_purge",
         replace_existing=True,
         max_instances=1,
@@ -371,7 +314,7 @@ def start_scheduler() -> AsyncIOScheduler:
     )
     _scheduler.add_job(
         _run_news_saved_purge,
-        trigger=CronTrigger(hour=0, minute=7, timezone=_safe_zone("Asia/Kolkata")),
+        trigger=CronTrigger(hour=0, minute=7, timezone=IST),
         id="news_saved_purge",
         replace_existing=True,
         max_instances=1,

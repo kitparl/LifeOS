@@ -1,4 +1,3 @@
-import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   DEFAULT_HOME_MODULE_ID,
@@ -7,10 +6,10 @@ import {
   isAvailableHomeModule,
 } from '../../shared/layout/nav-registry';
 import {
-  PreferencesApi,
   readJsonLocalStorage,
   writeJsonLocalStorage,
 } from './preferences-sync';
+import { PreferencesApiService } from './preferences-api.service';
 
 export interface HomePrefsValue {
   moduleId: string;
@@ -35,7 +34,7 @@ function normalizePrefs(raw: unknown): HomePrefsValue {
 
 @Injectable({ providedIn: 'root' })
 export class HomePreferencesService {
-  private readonly prefsApi = new PreferencesApi(inject(HttpClient));
+  private readonly prefsApi = inject(PreferencesApiService);
 
   /** Seed from localStorage immediately so `/` can redirect before init(). */
   private readonly prefs = signal<HomePrefsValue>(this.readLocal());

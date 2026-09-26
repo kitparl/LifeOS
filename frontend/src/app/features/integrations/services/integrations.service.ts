@@ -265,18 +265,6 @@ export interface AiModelsResponse {
   refreshed_at: string | null;
 }
 
-/** API errors carry `detail` as a string, `{code, message}`, or a 422 validation list. */
-export function apiErrorMessage(err: unknown, fallback: string): string {
-  const detail = (err as { error?: { detail?: unknown } } | null)?.error?.detail;
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail)) {
-    const first = detail[0] as { msg?: string } | undefined;
-    return first?.msg ?? fallback;
-  }
-  const message = (detail as { message?: string } | undefined)?.message;
-  return message ?? fallback;
-}
-
 export type GoogleCalendarSyncDirection = 'google_to_lifeos' | 'two_way';
 
 export interface GoogleCalendarConfigStatus {

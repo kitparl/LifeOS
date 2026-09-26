@@ -6,8 +6,9 @@ import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from app.modules.files.backends.base import ObjectStat, StorageBackend, StoredObject
 from app.core.exceptions import AppError, NotFoundError
+from app.modules.files.backends.base import ObjectStat, StorageBackend, StoredObject
+
 
 class LocalStorageBackend(StorageBackend):
     def __init__(self, root: str | Path):

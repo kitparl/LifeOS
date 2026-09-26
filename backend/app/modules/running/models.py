@@ -1,12 +1,10 @@
-import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
-
-RACE_DISTANCES = ("5k", "10k", "15k", "half_marathon", "marathon", "other")
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 SUGGESTED_SHOES: tuple[str, ...] = (
     "Daily trainer",
@@ -19,7 +17,7 @@ SUGGESTED_SHOES: tuple[str, ...] = (
 class Run(Base):
     __tablename__ = "runs"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     run_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     distance_km: Mapped[float] = mapped_column(Float, nullable=False)
@@ -28,9 +26,9 @@ class Run(Base):
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
     shoe: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
 
@@ -39,10 +37,10 @@ class RunningShoe(Base):
 
     __tablename__ = "running_shoes"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(80), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_running_shoes_user_name"),)
 
@@ -50,7 +48,7 @@ class RunningShoe(Base):
 class RaceEvent(Base):
     __tablename__ = "race_events"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     race_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
@@ -70,9 +68,9 @@ class RaceEvent(Base):
     skipped: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     shoe: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
 
@@ -80,13 +78,13 @@ class RunningSettings(Base):
     __tablename__ = "running_settings"
     __table_args__ = (UniqueConstraint("user_id", name="uq_running_settings_user"),)
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     weekly_goal_km: Mapped[float] = mapped_column(Float, nullable=False, default=40.0)
     target_marathon_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     target_half_marathon_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     target_marathon_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )

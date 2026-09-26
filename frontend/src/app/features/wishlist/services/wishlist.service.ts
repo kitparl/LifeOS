@@ -1,13 +1,11 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { WishlistItem, WishlistListItem, WishlistStatusFilter } from '../models/wishlist.models';
+import { Page, toPage } from '../../../core/utils/http';
 
-export interface WishlistListResult {
-  items: WishlistListItem[];
-  total: number;
-}
+export type WishlistListResult = Page<WishlistListItem>;
 
 @Injectable({ providedIn: 'root' })
 export class WishlistService {
@@ -27,10 +25,7 @@ export class WishlistService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<WishlistListItem[]>(this.api, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<WishlistListItem[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

@@ -4,6 +4,8 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { Run, WEATHER_OPTIONS, durationToSeconds, secondsToParts } from './models/running.models';
 import { RunningService } from './services/running.service';
+import { utcIsoDate } from '../../core/utils/date';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-run-form',
@@ -101,7 +103,7 @@ export class RunFormComponent implements OnInit {
   error = '';
 
   form = this.fb.nonNullable.group({
-    run_date: [new Date().toISOString().slice(0, 10), Validators.required],
+    run_date: [utcIsoDate(), Validators.required],
     distance_km: [5, [Validators.required, Validators.min(0.1)]],
     hours: [0, [Validators.min(0)]],
     minutes: [25, [Validators.min(0)]],
@@ -172,7 +174,7 @@ export class RunFormComponent implements OnInit {
     req.subscribe({
       next: (run) => this.router.navigate(['/running', run.id]),
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save run';
+        this.error = apiErrorMessage(err, 'Failed to save run');
         this.saving = false;
       },
     });

@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { AiSettings, AiUseCase, AiUseCaseHistoryItem } from '../../ai/models/ai.models';
 import { AiService } from '../../ai/services/ai.service';
-import { IntegrationProvider, apiErrorMessage } from '../services/integrations.service';
+import { IntegrationProvider } from '../services/integrations.service';
+import { apiErrorMessage } from '../../../core/utils/http';
 
 /** Select values: '' = automatic, `model|<provider>|<id>` = a model from the provider's list. */
 const AUTOMATIC = '';

@@ -7,8 +7,9 @@ from io import BytesIO
 import anyio
 
 from app.core.config import Settings
-from app.modules.files.backends.base import ObjectStat, StorageBackend, StoredObject
 from app.core.exceptions import NotFoundError
+from app.modules.files.backends.base import ObjectStat, StorageBackend, StoredObject
+
 
 class S3StorageBackend(StorageBackend):
     def __init__(self, settings: Settings):

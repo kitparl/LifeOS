@@ -10,6 +10,7 @@ import {
   TelegramConfigUpdate,
   TelegramWebhookStatus,
 } from '../services/integrations.service';
+import { apiErrorMessage } from '../../../core/utils/http';
 
 @Component({
   selector: 'app-telegram-config',
@@ -490,7 +491,7 @@ export class TelegramConfigComponent implements OnInit {
       },
       error: (err) => {
         this.tgOk.set(false);
-        this.tgMessage.set(err?.error?.detail ?? 'Failed to save Telegram settings');
+        this.tgMessage.set(apiErrorMessage(err, 'Failed to save Telegram settings'));
         this.tgBusy.set(false);
       },
     });
@@ -508,7 +509,7 @@ export class TelegramConfigComponent implements OnInit {
       },
       error: (err) => {
         this.tgOk.set(false);
-        this.tgMessage.set(err?.error?.detail ?? `Failed to run ${jobType}`);
+        this.tgMessage.set(apiErrorMessage(err, `Failed to run ${jobType}`));
         this.tgBusy.set(false);
       },
     });
@@ -539,7 +540,7 @@ export class TelegramConfigComponent implements OnInit {
       },
       error: (err) => {
         this.tgOk.set(false);
-        this.tgMessage.set(err?.error?.detail ?? 'Test failed');
+        this.tgMessage.set(apiErrorMessage(err, 'Test failed'));
         this.tgBusy.set(false);
       },
     });
@@ -568,7 +569,7 @@ export class TelegramConfigComponent implements OnInit {
       },
       error: (err) => {
         this.tgOk.set(false);
-        this.tgMessage.set(err?.error?.detail ?? 'Detect chat id failed');
+        this.tgMessage.set(apiErrorMessage(err, 'Detect chat id failed'));
         this.tgBusy.set(false);
       },
     });
@@ -589,7 +590,7 @@ export class TelegramConfigComponent implements OnInit {
       },
       error: (err) => {
         this.tgOk.set(false);
-        this.tgMessage.set(err?.error?.detail ?? 'Digest failed');
+        this.tgMessage.set(apiErrorMessage(err, 'Digest failed'));
         this.tgBusy.set(false);
       },
     });
@@ -614,7 +615,7 @@ export class TelegramConfigComponent implements OnInit {
       },
       error: (err) => {
         this.tgOk.set(false);
-        this.tgMessage.set(err?.error?.detail ?? 'Webhook register failed');
+        this.tgMessage.set(apiErrorMessage(err, 'Webhook register failed'));
         this.tgBusy.set(false);
       },
     });
@@ -632,7 +633,7 @@ export class TelegramConfigComponent implements OnInit {
       },
       error: (err) => {
         this.tgOk.set(false);
-        this.tgMessage.set(err?.error?.detail ?? 'Webhook disable failed');
+        this.tgMessage.set(apiErrorMessage(err, 'Webhook disable failed'));
         this.tgBusy.set(false);
       },
     });

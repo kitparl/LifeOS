@@ -9,22 +9,18 @@ Revision, games, and bookmarks never call it (PRD §62 rules 11-13).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError
-from app.core.timezone import ist_today
+from app.core.timezone import ist_today, utc_now
 from app.modules.auth.models import User
 from app.modules.communication.vocabulary.models import Vocabulary, VocabularySet
 from app.modules.communication.vocabulary.repository import VocabularyRepository
 
 DAILY_SET_SIZE = 10
 
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 async def allocate_next(db: AsyncSession, repo: VocabularyRepository, user: User, count: int) -> list[Vocabulary]:
@@ -43,7 +39,7 @@ async def allocate_next(db: AsyncSession, repo: VocabularyRepository, user: User
 
     start = progress.next_sequence_number
     rows = await repo.get_next_unused(start, count)
-    now = _utcnow()
+    now = utc_now()
     for v in rows:
         repo.new_user_vocabulary(user.id, v.id, now)
     try:

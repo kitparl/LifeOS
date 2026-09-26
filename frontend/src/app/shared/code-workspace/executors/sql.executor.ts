@@ -4,7 +4,23 @@ import { map, catchError, timeout } from 'rxjs/operators';
 import { BaseExecutor, ExecutionType } from './base.executor';
 import { CodeExecutionRequest, CodeExecutionResult } from '../models/code-execution.model';
 
-declare const initSqlJs: any;
+/** The parts of sql.js this executor uses (loaded from the CDN at runtime). */
+interface SqlJsQueryResult {
+  columns: string[];
+  values: unknown[][];
+}
+
+interface SqlJsDatabase {
+  exec(sql: string): SqlJsQueryResult[];
+  getRowsModified(): number;
+  close(): void;
+}
+
+interface SqlJsStatic {
+  Database: new () => SqlJsDatabase;
+}
+
+declare const initSqlJs: (config: { locateFile: (file: string) => string }) => Promise<SqlJsStatic>;
 
 /**
  * SQL executor using SQLite WebAssembly.
@@ -23,8 +39,8 @@ export class SqlExecutor implements BaseExecutor {
   readonly language = 'sql';
   readonly executionType: ExecutionType = 'wasm';
 
-  private SQL: any = null;
-  private db: any = null;
+  private SQL: SqlJsStatic | null = null;
+  private db: SqlJsDatabase | null = null;
   private loading: boolean = false;
   private loadingPromise: Promise<void> | null = null;
   private readonly DEFAULT_TIMEOUT_MS = 10000;
@@ -72,8 +88,8 @@ export class SqlExecutor implements BaseExecutor {
                   stdout += `Query OK\n\n`;
                 }
               }
-            } catch (error: any) {
-              stderr += `Error in statement: ${trimmed}\n${error.message}\n\n`;
+            } catch (error: unknown) {
+              stderr += `Error in statement: ${trimmed}\n${(error as Error).message}\n\n`;
               success = false;
             }
           }
@@ -88,14 +104,14 @@ export class SqlExecutor implements BaseExecutor {
             executionTimeMs: Math.round(endTime - startTime),
             executionId,
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           const endTime = performance.now();
 
           return {
             success: false,
             stdout: stdout.trim(),
-            stderr: error.message,
-            error: error.message,
+            stderr: (error as Error).message,
+            error: (error as Error).message,
             exitCode: 1,
             executionTimeMs: Math.round(endTime - startTime),
             executionId,
@@ -132,7 +148,7 @@ export class SqlExecutor implements BaseExecutor {
   /**
    * Stop execution (not supported for SQL)
    */
-  stop(executionId: string): void {
+  stop(_executionId: string): void {
     console.warn('SQL execution cannot be stopped once started');
   }
 
@@ -189,7 +205,6 @@ export class SqlExecutor implements BaseExecutor {
       // Create a new database
       this.db = new this.SQL.Database();
 
-      console.log('SQL.js initialized successfully');
     } catch (error) {
       console.error('Failed to initialize SQL.js:', error);
       throw error;
@@ -221,7 +236,7 @@ export class SqlExecutor implements BaseExecutor {
   /**
    * Format SQL query results as a table
    */
-  private formatResults(results: any[]): string {
+  private formatResults(results: SqlJsQueryResult[]): string {
     let output = '';
 
     for (const result of results) {
@@ -235,7 +250,7 @@ export class SqlExecutor implements BaseExecutor {
       // Calculate column widths
       const columnWidths = columns.map((col: string, i: number) => {
         const maxValueLength = Math.max(
-          ...values.map((row: any[]) => String(row[i] ?? 'NULL').length)
+          ...values.map((row: unknown[]) => String(row[i] ?? 'NULL').length)
         );
         return Math.max(col.length, maxValueLength);
       });
@@ -254,7 +269,7 @@ export class SqlExecutor implements BaseExecutor {
       // Create rows
       for (const row of values) {
         const rowStr = row
-          .map((val: any, i: number) => String(val ?? 'NULL').padEnd(columnWidths[i]))
+          .map((val: unknown, i: number) => String(val ?? 'NULL').padEnd(columnWidths[i]))
           .join(' | ');
         output += rowStr + '\n';
       }
@@ -283,7 +298,8 @@ export class SqlExecutor implements BaseExecutor {
    * Reset database (clear all data)
    */
   resetDatabase(): void {
-    if (this.db) {
+    // `db` is only ever created from `SQL`, so both are set together.
+    if (this.db && this.SQL) {
       this.db.close();
       this.db = new this.SQL.Database();
     }

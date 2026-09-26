@@ -39,9 +39,7 @@ class EventUpdate(BaseModel):
 
     @model_validator(mode="after")
     def birthday_implies_yearly(self):
-        if self.event_kind == "birthday" and self.recurrence is not None and self.recurrence != "yearly":
-            self.recurrence = "yearly"
-        elif self.event_kind == "birthday" and self.recurrence is None:
+        if self.event_kind == "birthday" and self.recurrence != "yearly":
             self.recurrence = "yearly"
         return self
 

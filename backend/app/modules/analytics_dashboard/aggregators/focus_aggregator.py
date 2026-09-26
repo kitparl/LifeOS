@@ -8,7 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.analytics_dashboard.aggregators import utc_today, window_start
+from app.core.timezone import utc_today
+from app.modules.analytics_dashboard.aggregators import window_start
+from app.modules.routines.expiry import runs_on
 from app.modules.routines.models import Routine
 
 DEEP_WORK_AREAS = frozenset({"dsa", "learning", "book"})
@@ -49,13 +51,7 @@ async def planned_focus_hours(
     cursor = start
     while cursor <= today:
         for routine in routines:
-            if routine.start_date and cursor < routine.start_date:
-                continue
-            if routine.end_date and cursor > routine.end_date:
-                continue
-            if cursor.isoformat() in set(routine.skip_dates):
-                continue
-            if cursor.weekday() not in set(routine.days_of_week):
+            if not runs_on(routine, cursor):
                 continue
             for block in routine.blocks or []:
                 hours = _block_hours(block.start_time, block.end_time)

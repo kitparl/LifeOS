@@ -1,9 +1,12 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core import taxonomy
+from app.core.retention import purge_older_than
+from app.core.timezone import utc_now
 from app.modules.qa.models import QAEntry, QAType, QAVersion
 from app.modules.qa.schemas import QACreate, QAUpdate
 
@@ -92,24 +95,11 @@ class QARepository:
         return list(result.scalars().all()), int(total)
 
     async def list_type_names(self, user_id: str) -> list[str]:
-        result = await self.db.execute(
-            select(QAType.name).where(QAType.user_id == user_id).order_by(QAType.name.asc())
-        )
-        return list(result.scalars().all())
+        return await taxonomy.list_names(self.db, QAType, user_id)
 
     async def ensure_type(self, user_id: str, name: str) -> None:
-        """Register a type name for reuse (idempotent, case-insensitive)."""
-        clean = (name or "").strip()
-        if not clean:
-            return
-        existing = await self.db.execute(
-            select(QAType).where(QAType.user_id == user_id)
-        )
-        for row in existing.scalars().all():
-            if row.name.lower() == clean.lower():
-                return
-        self.db.add(QAType(user_id=user_id, name=clean))
-        await self.db.flush()
+        """Register a name for reuse (idempotent, case-insensitive)."""
+        await taxonomy.ensure_name(self.db, QAType, user_id, name)
 
     async def get_by_id(self, user_id: str, entry_id: str, *, include_deleted: bool = False) -> QAEntry | None:
         q = select(QAEntry).where(QAEntry.id == entry_id, QAEntry.user_id == user_id)
@@ -160,7 +150,7 @@ class QARepository:
         return entry
 
     async def soft_delete(self, entry: QAEntry) -> None:
-        entry.deleted_at = datetime.now(timezone.utc)
+        entry.deleted_at = utc_now()
         await self.db.flush()
 
     async def restore(self, entry: QAEntry) -> None:
@@ -168,19 +158,7 @@ class QARepository:
         await self.db.flush()
 
     async def purge_expired(self, days: int) -> int:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        result = await self.db.execute(
-            select(QAEntry).where(
-                QAEntry.deleted_at.is_not(None),
-                QAEntry.deleted_at < cutoff,
-            )
-        )
-        rows = list(result.scalars().all())
-        for row in rows:
-            await self.db.delete(row)
-        if rows:
-            await self.db.flush()
-        return len(rows)
+        return len(await purge_older_than(self.db, QAEntry, QAEntry.deleted_at, days))
 
     async def list_versions(self, user_id: str, entry_id: str) -> list[QAVersion]:
         entry = await self.get_by_id(user_id, entry_id)

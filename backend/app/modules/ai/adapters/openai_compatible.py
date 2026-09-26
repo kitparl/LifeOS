@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
+
 from app.modules.ai.adapters.base import (
     CAPABILITY_CHAT,
     CAPABILITY_EMBEDDING,
@@ -66,7 +68,7 @@ class OpenAiCompatibleAdapter:
             data = await self._post_chat(payload, timeout)
         except ProviderRequestError as exc:
             # Reasoning models only accept the default temperature; retry once without it.
-            if exc.status_code != 400 or "temperature" not in exc.vendor_message:
+            if exc.status_code != httpx.codes.BAD_REQUEST or "temperature" not in exc.vendor_message:
                 raise
             payload.pop("temperature")
             data = await self._post_chat(payload, timeout)

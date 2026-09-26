@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 
 import filetype
+
 from app.core.config import Settings, get_settings
 from app.core.exceptions import BadRequestError
 
@@ -158,17 +159,19 @@ def sniff_content_type(head_bytes: bytes, filename: str, settings: Settings | No
 
     sniffed = sniffed.lower()
 
-    if sniffed in NEVER_INLINE_TYPES or client_ext in {".html", ".htm", ".svg"}:
-        # Reject HTML/SVG uploads entirely when not on allowlist (they never are by default).
-        if sniffed not in allowed:
-            raise BadRequestError(f"File type '{sniffed}' is not allowed",)
+    # Reject HTML/SVG uploads entirely when not on allowlist (they never are by default).
+    if (sniffed in NEVER_INLINE_TYPES or client_ext in {".html", ".htm", ".svg"}) and sniffed not in allowed:
+        raise BadRequestError(f"File type '{sniffed}' is not allowed")
 
     if sniffed not in allowed and sniffed != "application/octet-stream":
-        raise BadRequestError(f"File type '{sniffed}' is not allowed",)
-    if sniffed == "application/octet-stream" and "application/octet-stream" not in allowed:
-        # Binary unknown — reject unless explicitly allowed.
-        if client_ext not in _TEXT_EXT_MIME:
-            raise BadRequestError("Could not determine an allowed file type",)
+        raise BadRequestError(f"File type '{sniffed}' is not allowed")
+    # Binary unknown — reject unless explicitly allowed.
+    if (
+        sniffed == "application/octet-stream"
+        and "application/octet-stream" not in allowed
+        and client_ext not in _TEXT_EXT_MIME
+    ):
+        raise BadRequestError("Could not determine an allowed file type")
 
     expected = _EXT_EXPECTED_MIME.get(client_ext)
     if expected is not None and expected and sniffed not in expected:

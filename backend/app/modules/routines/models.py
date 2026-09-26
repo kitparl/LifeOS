@@ -1,12 +1,12 @@
 import json
-import uuid
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 if TYPE_CHECKING:
     from app.modules.habits.models import Habit
@@ -38,7 +38,7 @@ class Routine(Base):
 
     __tablename__ = "routines"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -49,9 +49,9 @@ class Routine(Base):
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     skip_dates_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
     blocks: Mapped[list["RoutineBlock"]] = relationship(
@@ -104,7 +104,7 @@ class RoutineBlock(Base):
 
     __tablename__ = "routine_blocks"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     routine_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("routines.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -115,9 +115,9 @@ class RoutineBlock(Base):
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="personal")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
     routine: Mapped["Routine"] = relationship("Routine", back_populates="blocks")
@@ -133,10 +133,10 @@ class RoutineAreaOption(Base):
 
     __tablename__ = "routine_areas"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(32), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_routine_areas_user_name"),)
 
@@ -146,9 +146,9 @@ class RoutineCategoryOption(Base):
 
     __tablename__ = "routine_categories"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(32), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_routine_categories_user_name"),)

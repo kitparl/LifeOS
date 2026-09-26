@@ -1,5 +1,4 @@
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
-import { of } from 'rxjs';
 import { JavaScriptExecutor } from './javascript.executor';
 import { PythonExecutor } from './python.executor';
 import { SqlExecutor } from './sql.executor';

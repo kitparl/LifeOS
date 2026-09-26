@@ -18,6 +18,7 @@ import {
   defaultCategoryForArea,
 } from './models/routine.models';
 import { RoutinesService } from './services/routines.service';
+import { utcIsoDate } from '../../core/utils/date';
 
 @Component({
   selector: 'app-routine-form',
@@ -268,7 +269,7 @@ export class RoutineFormComponent implements OnInit {
     name: ['Weekday Focus', Validators.required],
     description: [''],
     timezone: ['Asia/Kolkata', Validators.required],
-    start_date: [new Date().toISOString().slice(0, 10), Validators.required],
+    start_date: [utcIsoDate(), Validators.required],
     end_date: [''],
     skip_dates: [[] as string[]],
     is_active: [true],

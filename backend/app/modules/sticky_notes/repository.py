@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.retention import purge_older_than
+from app.core.timezone import utc_now
 from app.modules.sticky_notes.models import StickyNote
 from app.modules.sticky_notes.schemas import StickyNoteCreate, StickyNoteUpdate, normalize_tag
 
@@ -115,7 +116,7 @@ class StickyNoteRepository:
         return note
 
     async def soft_delete(self, note: StickyNote) -> None:
-        note.deleted_at = datetime.now(timezone.utc)
+        note.deleted_at = utc_now()
         await self.db.flush()
 
     async def restore(self, note: StickyNote) -> None:
@@ -123,16 +124,4 @@ class StickyNoteRepository:
         await self.db.flush()
 
     async def purge_expired(self, days: int) -> int:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        result = await self.db.execute(
-            select(StickyNote).where(
-                StickyNote.deleted_at.is_not(None),
-                StickyNote.deleted_at < cutoff,
-            )
-        )
-        rows = list(result.scalars().all())
-        for row in rows:
-            await self.db.delete(row)
-        if rows:
-            await self.db.flush()
-        return len(rows)
+        return len(await purge_older_than(self.db, StickyNote, StickyNote.deleted_at, days))

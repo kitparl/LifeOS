@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from app.core.crypto import decrypt, encrypt
+from app.modules.integrations.common import load_json_object, mask_secret
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +31,6 @@ class WordnikUsage:
 class WordnikConfig:
     api_key: str
     usage: WordnikUsage | None = None
-
-
-def _load_json(config_json: str | None) -> dict[str, Any]:
-    if not config_json:
-        return {}
-    try:
-        parsed = json.loads(config_json)
-    except json.JSONDecodeError:
-        logger.warning("Invalid wordnik config_json (not JSON)")
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
 
 
 def _parse_usage(raw: Any) -> WordnikUsage | None:
@@ -64,7 +54,7 @@ def _usage_json(usage: WordnikUsage | None) -> dict[str, Any] | None:
 
 def load_config(config_json: str | None) -> WordnikConfig:
     """Always returns a config; `api_key` is empty when missing or undecryptable."""
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="wordnik")
     api_key = ""
     try:
         if data.get("api_key_enc"):
@@ -82,7 +72,7 @@ def parse_config(config_json: str | None) -> WordnikConfig | None:
 
 def serialize_config(*, existing_json: str | None, api_key: str | None) -> str:
     """A blank/None api_key keeps the stored key. A new key clears usage (it belonged to the old key)."""
-    existing = _load_json(existing_json)
+    existing = load_json_object(existing_json, label="wordnik")
     key_enc = str(existing.get("api_key_enc") or "")
     usage = existing.get("usage")
     if api_key is not None and api_key.strip():
@@ -92,17 +82,13 @@ def serialize_config(*, existing_json: str | None, api_key: str | None) -> str:
 
 
 def with_usage(config_json: str | None, usage: WordnikUsage) -> str:
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="wordnik")
     data["usage"] = _usage_json(usage)
     return json.dumps(data)
 
 
 def mask_key(api_key: str) -> str | None:
-    if not api_key:
-        return None
-    if len(api_key) <= 4:
-        return "****"
-    return f"****{api_key[-4:]}"
+    return mask_secret(api_key) if api_key else None
 
 
 def usage_remaining_pct(usage: WordnikUsage | None, now: datetime) -> int | None:

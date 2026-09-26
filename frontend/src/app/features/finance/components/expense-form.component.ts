@@ -3,7 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ModalComponent } from '../../../shared/modal/modal.component';
 import { TypeSelectComponent } from '../../../shared/type-select/type-select.component';
 import { Expense, ExpensePayload, RecurringPayload } from '../models/finance.models';
-import { todayIso } from '../utils/period';
+import { localIsoDate } from '../../../core/utils/date';
 
 /** Add/edit an expense. Date defaults to today so entry stays fast. */
 @Component({
@@ -121,7 +121,7 @@ export class ExpenseFormComponent implements OnChanges {
   readonly form = this.fb.nonNullable.group({
     title: ['', Validators.required],
     amount: [0, [Validators.required, Validators.min(0.01)]],
-    txn_date: [todayIso(), Validators.required],
+    txn_date: [localIsoDate(), Validators.required],
     expense_kind: ['soft' as 'soft' | 'hard', Validators.required],
     category: ['Other'],
     recurring: [false],
@@ -166,7 +166,7 @@ export class ExpenseFormComponent implements OnChanges {
       this.form.reset({
         title: '',
         amount: 0,
-        txn_date: todayIso(),
+        txn_date: localIsoDate(),
         expense_kind: 'soft',
         category: 'Other',
         recurring: false,

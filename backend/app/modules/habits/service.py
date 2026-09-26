@@ -2,6 +2,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import HABIT_CREATED, EntityCreated, event_bus
+from app.core.exceptions import get_or_404
 from app.modules.habits.repository import HabitRepository
 from app.modules.habits.schemas import (
     HabitCreate,
@@ -11,7 +12,6 @@ from app.modules.habits.schemas import (
     HabitStats,
     HabitUpdate,
 )
-from app.core.exceptions import get_or_404
 from app.modules.habits.stats import (
     calculate_completion_rate,
     calculate_streak,
@@ -19,18 +19,19 @@ from app.modules.habits.stats import (
     is_completed_for_period,
 )
 
+
 class HabitService:
     def __init__(self, db: AsyncSession):
         self.repo = HabitRepository(db)
 
     def _build_stats(self, habit) -> HabitStats:
-        recent = sorted(habit.logs, key=lambda l: l.log_date, reverse=True)[:90]
+        recent = sorted(habit.logs, key=lambda entry: entry.log_date, reverse=True)[:90]
         return HabitStats(
             streak=calculate_streak(habit),
             completion_rate=calculate_completion_rate(habit),
             total_logs=len(habit.logs),
             missed_periods=count_missed_periods(habit),
-            recent_logs=[HabitLogResponse.model_validate(l) for l in recent],
+            recent_logs=[HabitLogResponse.model_validate(entry) for entry in recent],
         )
 
     def _to_list_item(self, habit) -> HabitListItem:
@@ -109,7 +110,3 @@ class HabitService:
         await self.repo.uncomplete_today(habit)
         habit = await self.repo.get_by_id(user_id, habit_id)
         return self._to_response(habit)
-
-    async def get_dashboard_items(self, user_id: str) -> list[tuple[str, str, bool]]:
-        items = await self.repo.get_dashboard_habits(user_id)
-        return [(h.id, h.name, completed) for h, completed in items]

@@ -10,14 +10,15 @@ can receive messages (Telegram forbids webhook + polling together).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import Any
 
 from app.core.database import async_session_factory
 from app.modules.integrations.repository import IntegrationRepository
-from app.modules.integrations.telegram.update_router import route_update
 from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
 from app.modules.integrations.telegram.config import parse_config
+from app.modules.integrations.telegram.update_router import route_update
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +115,7 @@ async def stop_polling() -> None:
     if _poll_task is None:
         return
     _poll_task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await _poll_task
-    except asyncio.CancelledError:
-        pass
     _poll_task = None
     _webhooks_cleared.clear()

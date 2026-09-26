@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CodeWorkspaceComponent } from '../../shared/code-workspace';
 import { SPEAKING_CATEGORIES, SpeakingCategory } from './models/communication.models';
 import { CommunicationService } from './services/communication.service';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-speaking-form',
@@ -140,7 +141,7 @@ export class SpeakingFormComponent implements OnInit {
     req.subscribe({
       next: (s) => this.router.navigate(['/communication/speaking', s.id]),
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save';
+        this.error = apiErrorMessage(err, 'Failed to save');
         this.saving = false;
       },
     });

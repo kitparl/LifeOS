@@ -10,10 +10,6 @@ from __future__ import annotations
 import calendar
 from datetime import date
 
-MONTHLY = "monthly"
-
-PERIOD_PRESETS = ("this_month", "last_month", "this_year", "custom")
-
 
 def days_in_month(year: int, month: int) -> int:
     return calendar.monthrange(year, month)[1]

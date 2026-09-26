@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../../environments/environment';
@@ -25,6 +25,7 @@ import {
   RecurringPayload,
   UpcomingItem,
 } from '../models/finance.models';
+import { toPage } from '../../../core/utils/http';
 
 function periodParams(period: PeriodSelection): HttpParams {
   let params = new HttpParams().set('preset', period.preset);
@@ -69,7 +70,7 @@ export class FinanceService {
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http
       .get<Expense[]>(`${this.api}/expenses`, { params, observe: 'response' })
-      .pipe(map((res) => this.toListResult(res)));
+      .pipe(map(toPage));
   }
 
   createExpense(data: ExpensePayload): Observable<Expense> {
@@ -95,7 +96,7 @@ export class FinanceService {
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http
       .get<Income[]>(`${this.api}/income`, { params, observe: 'response' })
-      .pipe(map((res) => this.toListResult(res)));
+      .pipe(map(toPage));
   }
 
   createIncome(data: IncomePayload): Observable<Income> {
@@ -182,10 +183,4 @@ export class FinanceService {
     return this.http.post<LoanEMI>(`${this.api}/loans/${loanId}/emis/${emiId}/pay`, {});
   }
 
-  private toListResult<T>(response: HttpResponse<T[]>): FinanceListResult<T> {
-    return {
-      items: response.body ?? [],
-      total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-    };
-  }
 }

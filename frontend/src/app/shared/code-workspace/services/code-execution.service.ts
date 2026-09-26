@@ -1,5 +1,4 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { BaseExecutor } from '../executors/base.executor';
 import { JavaScriptExecutor } from '../executors/javascript.executor';
@@ -31,8 +30,7 @@ export class CodeExecutionService implements OnDestroy {
   constructor(
     private jsExecutor: JavaScriptExecutor,
     private pyExecutor: PythonExecutor,
-    private sqlExecutor: SqlExecutor,
-    private http: HttpClient
+    private sqlExecutor: SqlExecutor
   ) {
     this.registerExecutors();
   }
@@ -53,7 +51,7 @@ export class CodeExecutionService implements OnDestroy {
     const backendLanguages = ['java', 'c', 'cpp', 'csharp', 'go', 'rust', 'php'];
     for (const lang of backendLanguages) {
       // Create backend executors on demand
-      const executor = BackendExecutor.forLanguage(this.http, lang);
+      const executor = BackendExecutor.forLanguage(lang);
       this.executors.set(lang, executor);
     }
   }

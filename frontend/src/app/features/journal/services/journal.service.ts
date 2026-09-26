@@ -1,13 +1,11 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { JournalCreate, JournalEntry, JournalListItem, JournalUpdate } from '../models/journal.models';
+import { Page, toPage } from '../../../core/utils/http';
 
-export interface JournalListResult {
-  items: JournalListItem[];
-  total: number;
-}
+export type JournalListResult = Page<JournalListItem>;
 
 @Injectable({ providedIn: 'root' })
 export class JournalService {
@@ -26,10 +24,7 @@ export class JournalService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<JournalListItem[]>(this.api, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<JournalListItem[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

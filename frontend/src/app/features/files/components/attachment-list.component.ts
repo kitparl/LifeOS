@@ -6,6 +6,8 @@ import { ConfirmService } from '../../../shared/confirm/confirm.service';
 import { DocumentViewerService } from '../../../shared/document-viewer/document-viewer.service';
 import { FileRecord } from '../models/file.models';
 import { FilesService } from '../services/files.service';
+import { apiErrorMessage } from '../../../core/utils/http';
+import { formatBytes } from '../../../core/utils/format';
 
 @Component({
   selector: 'app-attachment-list',
@@ -222,8 +224,7 @@ export class AttachmentListComponent implements OnChanges {
           });
         });
       } catch (err: unknown) {
-        const detail = (err as { error?: { detail?: string } })?.error?.detail;
-        this.error = detail || 'Upload failed';
+        this.error = apiErrorMessage(err, 'Upload failed');
         this.uploading = false;
         this.load();
         return;
@@ -268,9 +269,5 @@ export class AttachmentListComponent implements OnChanges {
     });
   }
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
+  readonly formatSize = formatBytes;
 }

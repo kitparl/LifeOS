@@ -1,12 +1,14 @@
-from datetime import date, datetime, timedelta, timezone
+import calendar
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import CALENDAR_EVENT_CREATED, EntityCreated, event_bus
+from app.core.exceptions import get_or_404
+from app.core.timezone import as_utc
 from app.modules.calendar.models import CalendarEvent
 from app.modules.calendar.repository import CalendarRepository
 from app.modules.calendar.schemas import EventCreate, EventListItem, EventResponse, EventUpdate
-from app.core.exceptions import get_or_404
 
 # Modules whose calendar events mirror an owning entity. Editing/deleting such an
 # event from the Calendar propagates back to the source (two-way sync).
@@ -14,13 +16,8 @@ _RUNNING_SOURCE = "running"
 # Imported from Google Calendar; edits/deletes are gated (read-only unless two-way).
 _GOOGLE_SOURCE = "google_calendar"
 
-def _sort_key(dt: datetime) -> datetime:
-    """Coerce naive datetimes (e.g. from SQLite) to UTC-aware so mixed lists sort safely."""
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt
 
-def _expand_recurring_event(
+def expand_recurring_event(
     event: CalendarEvent, start: datetime, end: datetime
 ) -> list[EventListItem]:
     """Expand a single recurring template into occurrences overlapping [start, end).
@@ -51,22 +48,10 @@ def _expand_recurring_event(
             include = cursor_date.day == anchor.day
         elif event.recurrence == "yearly":
             # Same month/day; Feb 29 → Feb 28 in non-leap years
-            target_month = anchor.month
-            target_day = anchor.day
-            if target_month == 2 and target_day == 29:
-                try:
-                    include = cursor_date.month == 2 and cursor_date.day == 29
-                except ValueError:
-                    include = False
-                if not include and cursor_date.month == 2 and cursor_date.day == 28:
-                    # Non-leap year substitute
-                    try:
-                        date(cursor_date.year, 2, 29)
-                        include = False  # leap year — wait for actual 29th
-                    except ValueError:
-                        include = True
+            if (anchor.month, anchor.day) == (2, 29) and not calendar.isleap(cursor_date.year):
+                include = (cursor_date.month, cursor_date.day) == (2, 28)
             else:
-                include = cursor_date.month == target_month and cursor_date.day == target_day
+                include = (cursor_date.month, cursor_date.day) == (anchor.month, anchor.day)
 
         if include and cursor_date >= anchor.date():
             starts_at = datetime.combine(cursor_date, anchor.timetz())
@@ -84,7 +69,7 @@ def _expand_recurring_event(
                 continue
             items.append(
                 EventListItem(
-                    id=f"{event.id}:{cursor_date.isoformat()}" if event.recurrence != "none" else event.id,
+                    id=f"{event.id}:{cursor_date.isoformat()}",
                     title=event.title,
                     starts_at=starts_at,
                     ends_at=ends_at,
@@ -100,6 +85,7 @@ def _expand_recurring_event(
         cursor_date += timedelta(days=1)
 
     return items or [EventListItem.model_validate(event)]
+
 
 class CalendarService:
     def __init__(self, db: AsyncSession):
@@ -121,7 +107,7 @@ class CalendarService:
             # but recur into it (repo filters by starts_at overlap; expand handles rest).
             for e in events:
                 if e.recurrence and e.recurrence != "none":
-                    items.extend(_expand_recurring_event(e, start, end))
+                    items.extend(expand_recurring_event(e, start, end))
                 else:
                     items.append(EventListItem.model_validate(e))
             from app.modules.routines.service import RoutineService
@@ -130,7 +116,7 @@ class CalendarService:
         else:
             items = [EventListItem.model_validate(e) for e in events]
 
-        items.sort(key=lambda i: _sort_key(i.starts_at))
+        items.sort(key=lambda i: as_utc(i.starts_at))
         if any(i.source_module == _GOOGLE_SOURCE for i in items) and await self._google_read_only(user_id):
             for i in items:
                 if i.source_module == _GOOGLE_SOURCE:
@@ -219,7 +205,3 @@ class CalendarService:
         race = await repo.get_race(user_id, event.source_id)
         if race is not None:
             await repo.delete_race(race)
-
-    async def get_dashboard_preview(self, user_id: str) -> list[tuple[str, str, str]]:
-        events = await self.repo.get_upcoming(user_id, limit=5)
-        return [(e.id, e.title, e.starts_at) for e in events]

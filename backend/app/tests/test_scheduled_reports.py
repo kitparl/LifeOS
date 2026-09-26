@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
-from httpx import AsyncClient
-
 from app.modules.calendar.models import CalendarEvent
-from app.modules.calendar.service import _expand_recurring_event
+from app.modules.calendar.service import expand_recurring_event
 from app.modules.integrations.telegram.config import parse_preferences, serialize_config
 from app.modules.integrations.telegram.templates import chunk_text
-# CalendarService unused — expansion tested via _expand_recurring_event
+from httpx import AsyncClient
+
+# CalendarService unused — expansion tested via expand_recurring_event
 
 
 async def _auth_token(client: AsyncClient) -> str:
-    email = f"cycle8_{datetime.now(timezone.utc).timestamp()}@example.com"
+    email = f"cycle8_{datetime.now(UTC).timestamp()}@example.com"
     resp = await client.post(
         "/api/v1/auth/register",
         json={
@@ -71,16 +71,16 @@ def test_yearly_expansion_same_month_day():
         id="e1",
         user_id="u1",
         title="Birthday — Alice",
-        starts_at=datetime(2020, 3, 15, 0, 0, tzinfo=timezone.utc),
+        starts_at=datetime(2020, 3, 15, 0, 0, tzinfo=UTC),
         ends_at=None,
         all_day=True,
         category="personal",
         recurrence="yearly",
         event_kind="birthday",
     )
-    start = datetime(2026, 3, 1, tzinfo=timezone.utc)
-    end = datetime(2026, 3, 31, tzinfo=timezone.utc)
-    items = _expand_recurring_event(event, start, end)
+    start = datetime(2026, 3, 1, tzinfo=UTC)
+    end = datetime(2026, 3, 31, tzinfo=UTC)
+    items = expand_recurring_event(event, start, end)
     assert len(items) == 1
     assert items[0].starts_at.date() == date(2026, 3, 15)
     assert items[0].event_kind == "birthday"
@@ -91,7 +91,7 @@ def test_yearly_feb29_becomes_feb28_in_non_leap():
         id="e2",
         user_id="u1",
         title="Leap day",
-        starts_at=datetime(2020, 2, 29, 12, 0, tzinfo=timezone.utc),
+        starts_at=datetime(2020, 2, 29, 12, 0, tzinfo=UTC),
         ends_at=None,
         all_day=False,
         category="personal",
@@ -99,9 +99,9 @@ def test_yearly_feb29_becomes_feb28_in_non_leap():
         event_kind="immutable",
     )
     # 2025 is not a leap year
-    start = datetime(2025, 2, 1, tzinfo=timezone.utc)
-    end = datetime(2025, 3, 1, tzinfo=timezone.utc)
-    items = _expand_recurring_event(event, start, end)
+    start = datetime(2025, 2, 1, tzinfo=UTC)
+    end = datetime(2025, 3, 1, tzinfo=UTC)
+    items = expand_recurring_event(event, start, end)
     assert len(items) == 1
     assert items[0].starts_at.date() == date(2025, 2, 28)
 
@@ -258,11 +258,10 @@ async def test_midday_skip_when_empty(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_reminder_dedupe_claim():
     """Two claims with the same dedupe_key → second returns None."""
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
+    import app.modules.integrations.reports.models  # noqa: F401
     from app.core.database import Base
     from app.modules.integrations.reports.repository import ReportRunRepository
-    import app.modules.integrations.reports.models  # noqa: F401
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
@@ -311,7 +310,7 @@ async def test_telegram_prefs_status_exposes_new_fields(client: AsyncClient):
 
 
 def test_immutable_offset_window_helper():
-    from app.modules.integrations.scheduling.reminder_scanner import _in_window, POLL_GRACE
+    from app.modules.integrations.scheduling.reminder_scanner import POLL_GRACE, _in_window
 
     tz = ZoneInfo("Asia/Kolkata")
     now = datetime(2026, 7, 25, 12, 0, tzinfo=tz)
@@ -352,10 +351,9 @@ async def _backfill(config: dict) -> dict:
     """Run the startup timezone backfill over a single telegram connection row."""
     import json
 
+    from app.core.migrations import backfill_telegram_timezone
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
-
-    from app.core.migrations import backfill_telegram_timezone
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     try:

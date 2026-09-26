@@ -1,6 +1,6 @@
 # LifeOS — run & VPS cheatsheet
 
-Assumes the VPS layout from `docs/SSL_CADDY.md`:
+Assumes this VPS layout:
 - Repo at something like `/home/ubuntu/LifeOS`
 - systemd unit: `lifeos` (uvicorn on `127.0.0.1:8000`)
 - Caddy reverse-proxies HTTPS → that port
@@ -13,7 +13,7 @@ Assumes the VPS layout from `docs/SSL_CADDY.md`:
 ```bash
 # Backend
 cd backend
-python3 -m venv .venv && source .venv/bin/activate
+python3.12 -m venv .venv && source .venv/bin/activate   # Python 3.12, same as production
 pip install -r requirements.txt
 cp .env.example .env          # ENV=dev
 uvicorn app.main:app --reload --port 8000
@@ -28,7 +28,8 @@ npm run build:frontend        # from repo root
 # Tests / lint
 cd backend && source .venv/bin/activate
 pytest -q
-ruff check app --select F401,F841,F823
+ruff check app                 # expected to be clean
+cd ../frontend && npm run lint && npm run test:ci && npm run build
 ```
 
 ---
@@ -180,7 +181,7 @@ cp ~/LifeOS/backend/lifeos_dev.db ~/backups/lifeos-$(date +%F).db
 
 ## Uploads / disk
 
-Keep `UPLOAD_DIR` outside the repo so deploys do not wipe files (see `docs/FILE_STORAGE.md`). Same for `PREVIEW_CACHE_DIR` (converted Office→PDF document previews) — it's just a cache, safe to delete entirely if disk pressure hits; it repopulates on next preview.
+Keep `UPLOAD_DIR` outside the repo so deploys do not wipe files. Same for `PREVIEW_CACHE_DIR` (converted Office→PDF document previews) — it's just a cache, safe to delete entirely if disk pressure hits; it repopulates on next preview.
 
 ```bash
 # Disk pressure

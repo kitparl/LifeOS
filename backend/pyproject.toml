@@ -16,6 +16,11 @@ ignore = [
     "E501",   # line length — handled by formatter preference, existing code is long
     "B008",   # Depends() in function defaults is FastAPI idiomatic
     "SIM108", # ternary vs if/else — prefer clarity
+    # PEP 695 syntax (`type X = ...`, `def f[T]`) needs Python 3.12; code must still run on 3.11 venvs.
+    "UP040",
+    "UP046",
+    "UP047",
+    "UP042",  # (str, Enum) -> StrEnum changes str(member) output
 ]
 
 [tool.ruff.lint.per-file-ignores]

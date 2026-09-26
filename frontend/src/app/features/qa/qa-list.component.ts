@@ -76,7 +76,7 @@ interface ViewTab {
               [answer]="getAnswer(entry)"
               [loadingAnswer]="isLoadingAnswer(entry.id)"
               dateField="updated_at"
-              (toggle)="toggleExpand($event)"
+              (toggled)="toggleExpand($event)"
               (remove)="removeEntry($event)"
             />
           }
@@ -156,7 +156,7 @@ interface ViewTab {
               [loadingAnswer]="isLoadingAnswer(entry.id)"
               dateField="updated_at"
               [deletedMode]="true"
-              (toggle)="toggleExpand($event)"
+              (toggled)="toggleExpand($event)"
               (restore)="restoreEntry($event)"
             />
           }
@@ -182,7 +182,7 @@ interface ViewTab {
                     [showDayPrefix]="true"
                     [showDate]="false"
                     dateField="created_at"
-                    (toggle)="toggleExpand($event)"
+                    (toggled)="toggleExpand($event)"
                     (remove)="removeEntry($event)"
                   />
                 }

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import utc_now
 from app.modules.integrations.notifications.outbox_models import FAILED, PENDING, SENT, PendingNotification
 
 
@@ -53,7 +53,7 @@ class OutboxRepository:
 
     async def mark_sent(self, row: PendingNotification) -> None:
         row.status = SENT
-        row.sent_at = datetime.now(timezone.utc)
+        row.sent_at = utc_now()
         row.attempts += 1
         row.last_error = None
         await self.db.flush()

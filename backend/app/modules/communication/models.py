@@ -1,11 +1,11 @@
 import json
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 WRITING_CATEGORIES = (
     "LinkedIn",
@@ -15,20 +15,18 @@ WRITING_CATEGORIES = (
     "HR Answer",
     "Technical Answer",
 )
-SPEAKING_CATEGORIES = ("hr", "technical", "elevator", "mock_interview")
-
 
 class WritingPractice(Base):
     __tablename__ = "writing_practices"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str] = mapped_column(String(64), nullable=False, default="Notes")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
 
@@ -37,10 +35,10 @@ class WritingCategory(Base):
 
     __tablename__ = "writing_categories"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_writing_categories_user_name"),)
 
@@ -48,16 +46,16 @@ class WritingCategory(Base):
 class SpeakingPractice(Base):
     __tablename__ = "speaking_practices"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     response: Mapped[str | None] = mapped_column(Text, nullable=True)
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="hr")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
 
@@ -67,7 +65,7 @@ class WritingEvaluation(Base):
         UniqueConstraint("writing_id", "evaluation_key", name="uq_writing_evaluation_key"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     writing_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("writing_practices.id"), index=True, nullable=False
@@ -88,7 +86,7 @@ class WritingEvaluation(Base):
     already_strong: Mapped[bool] = mapped_column(default=False)
     truncated: Mapped[bool] = mapped_column(default=False)
     truncation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class WritingRewritePreview(Base):
@@ -99,7 +97,7 @@ class WritingRewritePreview(Base):
         UniqueConstraint("writing_id", "rewrite_key", name="uq_writing_rewrite_key"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     writing_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("writing_practices.id"), index=True, nullable=False
@@ -113,7 +111,7 @@ class WritingRewritePreview(Base):
     key_changes_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     truncated: Mapped[bool] = mapped_column(default=False)
     truncation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class WritingAIRun(Base):
@@ -121,7 +119,7 @@ class WritingAIRun(Base):
 
     __tablename__ = "writing_ai_runs"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     writing_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("writing_practices.id"), index=True, nullable=True
@@ -137,7 +135,7 @@ class WritingAIRun(Base):
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 def dumps_json(value) -> str:

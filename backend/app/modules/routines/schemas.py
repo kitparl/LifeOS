@@ -25,17 +25,6 @@ class RoutineBlockCreate(BaseModel):
         return self
 
 
-class RoutineBlockUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=1, max_length=200)
-    start_time: time | None = None
-    end_time: time | None = None
-    area: str | None = Field(default=None, min_length=1, max_length=32)
-    category: str | None = Field(default=None, min_length=1, max_length=32)
-    notes: str | None = None
-    sort_order: int | None = None
-    habit_ids: list[str] | None = None
-
-
 class RoutineBlockResponse(BaseModel):
     id: str
     title: str

@@ -11,13 +11,14 @@ vendor failures uniformly.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 from urllib.parse import quote
 
 import httpx
 
 from app.core.text import clean_text
+from app.core.timezone import utc_now
 from app.modules.integrations.wordnik.config import WordnikUsage
 
 BASE_URL = "https://api.wordnik.com/v4"
@@ -93,7 +94,7 @@ def _usage_from_headers(headers: httpx.Headers) -> WordnikUsage | None:
     limit = _header_int(headers, "x-ratelimit-limit-hour")
     if remaining is None or limit is None:
         return None
-    return WordnikUsage(remaining=remaining, limit=limit, observed_at=datetime.now(timezone.utc))
+    return WordnikUsage(remaining=remaining, limit=limit, observed_at=utc_now())
 
 
 def _definitions(raw: Any) -> list[Definition]:
@@ -140,13 +141,13 @@ class WordnikClient:
             raise WordnikUnavailableError(f"{_LABEL} is temporarily unavailable.") from exc
 
         self.last_usage = _usage_from_headers(res.headers) or self.last_usage
-        if res.status_code in (401, 403):
+        if res.status_code in (httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN):
             raise WordnikInvalidCredentialError(f"Invalid or revoked {_LABEL} API key. Check Integrations.")
-        if res.status_code == 429:
+        if res.status_code == httpx.codes.TOO_MANY_REQUESTS:
             raise WordnikRateLimitError(f"{_LABEL} hourly limit reached. Try again later.")
-        if res.status_code == 404:
+        if res.status_code == httpx.codes.NOT_FOUND:
             return None
-        if res.status_code >= 400:
+        if res.status_code >= httpx.codes.BAD_REQUEST:
             raise WordnikUnavailableError(f"{_LABEL} could not complete the request (HTTP {res.status_code}).")
         try:
             return res.json()

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram import conversation as conv
 from app.modules.integrations.telegram import keyboards as kb
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram.callbacks import CallbackContext, register
 from app.modules.integrations.telegram.navigation import back_home
 from app.modules.integrations.telegram.renderer import Screen
-from app.modules.integrations.telegram.state import clear_conversation, put_token, get_token
+from app.modules.integrations.telegram.state import clear_conversation, get_token, put_token
 from app.modules.search.service import SearchService
 
 PAGE_SIZE = 5

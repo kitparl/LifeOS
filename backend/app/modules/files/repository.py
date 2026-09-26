@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import utc_now
 from app.modules.files.models import FileRecord
 
 
@@ -113,7 +114,7 @@ class FileRepository:
         return int(used), int(count)
 
     async def uploads_in_last_hour(self, user_id: str) -> int:
-        since = datetime.now(timezone.utc) - timedelta(hours=1)
+        since = utc_now() - timedelta(hours=1)
         result = await self.db.execute(
             select(func.count()).select_from(FileRecord).where(
                 FileRecord.user_id == user_id,
@@ -144,7 +145,7 @@ class FileRepository:
         return result.scalar_one_or_none()
 
     async def soft_delete(self, record: FileRecord) -> None:
-        record.deleted_at = datetime.now(timezone.utc)
+        record.deleted_at = utc_now()
         record.updated_at = record.deleted_at
         await self.db.flush()
 
@@ -172,7 +173,7 @@ class FileRepository:
     ) -> int:
         if not entity_ids:
             return 0
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         result = await self.db.execute(
             select(FileRecord).where(
                 FileRecord.user_id == user_id,

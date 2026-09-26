@@ -31,11 +31,13 @@ __pycache__/
 .pytest_cache/
 
 
+# Local DB recovery dumps and logs (personal data; never commit)
+backend/db-recovery/
+
 # Local file storage
 backend/uploads/
 uploads/
 bulbul/
 setup/
 
-CLAUDE.md
 .cursorrules

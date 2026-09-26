@@ -9,12 +9,12 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError, get_or_404
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import TelegramWebhookRegisterResponse, TelegramWebhookStatus
-from app.modules.integrations.telegram.update_router import route_update
 from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
 from app.modules.integrations.telegram.config import parse_config
-from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError, get_or_404
+from app.modules.integrations.telegram.update_router import route_update
 
 logger = logging.getLogger(__name__)
 

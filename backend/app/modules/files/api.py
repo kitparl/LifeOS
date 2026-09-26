@@ -1,5 +1,8 @@
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
-from app.core.deps import get_current_admin_user, get_current_user
+from app.core.deps import get_current_admin_user, get_current_user, get_optional_user
 from app.modules.auth.models import User
 from app.modules.files.preview_schemas import PreviewInfoResponse
 from app.modules.files.preview_service import DocumentPreviewService
@@ -12,44 +15,8 @@ from app.modules.files.schemas import (
     PurgeResponse,
 )
 from app.modules.files.service import FileService
-from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/files", tags=["files"])
-_optional_bearer = HTTPBearer(auto_error=False)
-
-
-async def _resolve_optional_bearer_user_id(
-    creds: HTTPAuthorizationCredentials | None,
-    db: AsyncSession,
-) -> str | None:
-    """Bearer path for endpoints that also accept a `?token=` download token.
-
-    Used by <img>/<video>/<iframe>/PDF.js requests that can't send an
-    Authorization header — those pass `token` instead (see download_tokens.py).
-    """
-    if creds is None:
-        return None
-
-    from app.core.security import decode_token, verify_token_type
-    from jose import JWTError
-    from sqlalchemy import select
-
-    try:
-        payload = decode_token(creds.credentials)
-        user_id = verify_token_type(payload, "access")
-    except JWTError as exc:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return user.id
 
 
 @router.get("/usage", response_model=FileUsageResponse)
@@ -133,14 +100,13 @@ async def get_file_content(
     file_id: str,
     request: Request,
     token: str | None = Query(default=None),
-    creds: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
+    caller: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    user_id = await _resolve_optional_bearer_user_id(creds, db)
     return await FileService(db).content_response(
         file_id=file_id,
         request=request,
-        user_id=user_id,
+        user_id=caller.id if caller else None,
         token=token,
     )
 
@@ -165,15 +131,14 @@ async def get_file_preview(
     file_id: str,
     request: Request,
     token: str | None = Query(default=None),
-    creds: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
+    caller: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Renderable bytes: original for natively-viewable types, converted PDF for Office types."""
-    user_id = await _resolve_optional_bearer_user_id(creds, db)
     return await DocumentPreviewService(db).stream_preview(
         file_id=file_id,
         request=request,
-        user_id=user_id,
+        user_id=caller.id if caller else None,
         token=token,
     )
 
@@ -183,15 +148,14 @@ async def get_file_download(
     file_id: str,
     request: Request,
     token: str | None = Query(default=None),
-    creds: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
+    caller: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Always the original bytes, always Content-Disposition: attachment."""
-    user_id = await _resolve_optional_bearer_user_id(creds, db)
     return await DocumentPreviewService(db).stream_download(
         file_id=file_id,
         request=request,
-        user_id=user_id,
+        user_id=caller.id if caller else None,
         token=token,
     )
 

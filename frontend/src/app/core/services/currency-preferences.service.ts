@@ -1,4 +1,3 @@
-import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   CURRENCIES,
@@ -7,10 +6,10 @@ import {
   findCurrency,
 } from '../constants/currencies';
 import {
-  PreferencesApi,
   readJsonLocalStorage,
   writeJsonLocalStorage,
 } from './preferences-sync';
+import { PreferencesApiService } from './preferences-api.service';
 
 export interface CurrencyPrefsValue {
   code: string;
@@ -34,7 +33,7 @@ function normalize(raw: unknown): CurrencyPrefsValue {
  */
 @Injectable({ providedIn: 'root' })
 export class CurrencyPreferencesService {
-  private readonly prefsApi = new PreferencesApi(inject(HttpClient));
+  private readonly prefsApi = inject(PreferencesApiService);
 
   private readonly prefs = signal<CurrencyPrefsValue>({ code: DEFAULT_CURRENCY.code });
 

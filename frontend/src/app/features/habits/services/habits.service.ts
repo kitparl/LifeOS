@@ -1,13 +1,11 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Habit, HabitCreate, HabitListItem, HabitUpdate } from '../models/habit.models';
+import { Page, toPage } from '../../../core/utils/http';
 
-export interface HabitListResult {
-  items: HabitListItem[];
-  total: number;
-}
+export type HabitListResult = Page<HabitListItem>;
 
 @Injectable({ providedIn: 'root' })
 export class HabitsService {
@@ -23,10 +21,7 @@ export class HabitsService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<HabitListItem[]>(this.api, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<HabitListItem[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

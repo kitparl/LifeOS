@@ -10,11 +10,11 @@ from app.modules.running.schemas import (
     RaceUpdate,
     RunCreate,
     RunListItem,
-    RunResponse,
-    RunUpdate,
     RunningSettingsResponse,
     RunningSettingsUpdate,
     RunningStatsResponse,
+    RunResponse,
+    RunUpdate,
     ShoeCreate,
 )
 from app.modules.running.service import RunningService

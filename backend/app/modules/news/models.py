@@ -4,21 +4,13 @@ Only lightweight snapshots of articles a user saved (expiring after ARTICLE_RETE
 the user's collections referencing them.
 """
 
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _uuid() -> str:
-    return str(uuid.uuid4())
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 
 class NewsSavedArticle(Base):
@@ -29,7 +21,7 @@ class NewsSavedArticle(Base):
         Index("ix_news_saved_user_saved", "user_id", "saved_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -44,21 +36,21 @@ class NewsSavedArticle(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
 class NewsCollection(Base):
     __tablename__ = "news_collections"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     # Unique per user, case-insensitively (enforced in the service).
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
 class NewsCollectionArticle(Base):
@@ -67,11 +59,11 @@ class NewsCollectionArticle(Base):
     __tablename__ = "news_collection_articles"
     __table_args__ = (UniqueConstraint("collection_id", "saved_article_id", name="uq_news_collection_article"),)
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     collection_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("news_collections.id", ondelete="CASCADE"), index=True, nullable=False
     )
     saved_article_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("news_saved_articles.id", ondelete="CASCADE"), index=True, nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

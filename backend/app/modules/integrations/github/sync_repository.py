@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import utc_now
 from app.modules.integrations.github.sync_models import (
     SYNC_STATUS_NEVER,
     GitHubSyncState,
@@ -50,7 +50,7 @@ class GitHubSyncRepository:
         source_hash: str | None = None,
     ) -> GitHubSyncState:
         row = await self.get_by_section(user_id, section_id)
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         if row is None:
             row = GitHubSyncState(
                 user_id=user_id,

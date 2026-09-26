@@ -31,18 +31,24 @@ import {
   resolveDefaultSection,
   stripFileMarkdown,
 } from './knowledge-notes.utils';
+import {
+  SIDEBAR_DEFAULT,
+  SIDEBAR_MAX,
+  SIDEBAR_MIN,
+  readExpandedChapters,
+  readLastEdited,
+  readLastSections,
+  readSidebarWidth,
+  writeExpandedChapters,
+  writeLastEdited,
+  writeLastSections,
+  writeSidebarWidth,
+} from './knowledge-subject-view-state';
 
 type SyncState = 'synced' | 'unsaved' | 'saving';
 type RenameTarget = KnowledgeRenameTarget;
 type SearchGroup = { chapter_id: string; chapter_title: string; sections: KnowledgeSearchHit[] };
 
-const SIDEBAR_KEY = 'lifeos.kn.sidebarWidth';
-const EXPANDED_PREFIX = 'lifeos.kn.expanded.';
-const LAST_SECTION_PREFIX = 'lifeos.kn.lastSection.';
-const LAST_EDITED_PREFIX = 'lifeos.kn.lastEdited.';
-const SIDEBAR_DEFAULT = 256;
-const SIDEBAR_MIN = 180;
-const SIDEBAR_MAX = 480;
 const ARCHIVE_TTL_DAYS = 7;
 
 @Component({
@@ -203,7 +209,7 @@ const ARCHIVE_TTL_DAYS = 7;
               [chapterFilter]="documentsChapterId()"
               (removed)="onChapterDocumentRemoved($event)"
               (showAll)="openDocuments()"
-              (close)="closeDocuments()"
+              (closed)="closeDocuments()"
               (openSection)="openDocumentSection($event.sectionId, $event.chapterId)"
             />
           } @else {
@@ -295,7 +301,7 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   readonly detailsOpen = signal(false);
   readonly savingDetails = signal(false);
   readonly resizing = signal(false);
-  readonly sidebarWidth = signal(KnowledgeSubjectComponent.readSidebarWidth());
+  readonly sidebarWidth = signal(readSidebarWidth());
   readonly sectionListIds = computed(() =>
     (this.subject()?.chapters ?? []).map((c) => this.sectionListId(c.id))
   );
@@ -689,46 +695,33 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
   }
 
   private loadLastEdited(subjectId: string): void {
-    this.lastEditedSectionId = localStorage.getItem(LAST_EDITED_PREFIX + subjectId);
+    this.lastEditedSectionId = readLastEdited(subjectId);
   }
 
   private persistLastEdited(): void {
     const subjectId = this.subject()?.id;
     if (!subjectId || !this.lastEditedSectionId) return;
-    localStorage.setItem(LAST_EDITED_PREFIX + subjectId, this.lastEditedSectionId);
+    writeLastEdited(subjectId, this.lastEditedSectionId);
   }
 
   private loadExpandedState(subjectId: string): void {
-    try {
-      const raw = localStorage.getItem(EXPANDED_PREFIX + subjectId);
-      this.expandedChapterIds = new Set(raw ? (JSON.parse(raw) as string[]) : []);
-    } catch {
-      this.expandedChapterIds = new Set();
-    }
+    this.expandedChapterIds = readExpandedChapters(subjectId);
   }
 
   private persistExpandedState(): void {
     const subjectId = this.subject()?.id;
     if (!subjectId) return;
-    localStorage.setItem(
-      EXPANDED_PREFIX + subjectId,
-      JSON.stringify(Array.from(this.expandedChapterIds))
-    );
+    writeExpandedChapters(subjectId, this.expandedChapterIds);
   }
 
   private loadLastSections(subjectId: string): void {
-    try {
-      const raw = localStorage.getItem(LAST_SECTION_PREFIX + subjectId);
-      this.lastSectionByChapter = raw ? (JSON.parse(raw) as Record<string, string>) : {};
-    } catch {
-      this.lastSectionByChapter = {};
-    }
+    this.lastSectionByChapter = readLastSections(subjectId);
   }
 
   private persistLastSections(): void {
     const subjectId = this.subject()?.id;
     if (!subjectId) return;
-    localStorage.setItem(LAST_SECTION_PREFIX + subjectId, JSON.stringify(this.lastSectionByChapter));
+    writeLastSections(subjectId, this.lastSectionByChapter);
   }
 
   onSearchInput(event: Event): void {
@@ -1266,12 +1259,12 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     } catch {
       /* already released */
     }
-    localStorage.setItem(SIDEBAR_KEY, String(this.sidebarWidth()));
+    writeSidebarWidth(this.sidebarWidth());
   }
 
   resetSidebarWidth(): void {
     this.sidebarWidth.set(SIDEBAR_DEFAULT);
-    localStorage.setItem(SIDEBAR_KEY, String(SIDEBAR_DEFAULT));
+    writeSidebarWidth(SIDEBAR_DEFAULT);
   }
 
   onResizeKeydown(event: KeyboardEvent): void {
@@ -1279,22 +1272,16 @@ export class KnowledgeSubjectComponent implements OnInit, AfterViewChecked {
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
       this.sidebarWidth.update((w) => Math.max(SIDEBAR_MIN, w - step));
-      localStorage.setItem(SIDEBAR_KEY, String(this.sidebarWidth()));
+      writeSidebarWidth(this.sidebarWidth());
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
       this.sidebarWidth.update((w) => Math.min(SIDEBAR_MAX, w + step));
-      localStorage.setItem(SIDEBAR_KEY, String(this.sidebarWidth()));
+      writeSidebarWidth(this.sidebarWidth());
     }
   }
 
   private reload(): void {
     const s = this.subject();
     if (s) this.load(s.id);
-  }
-
-  private static readSidebarWidth(): number {
-    const raw = Number(localStorage.getItem(SIDEBAR_KEY));
-    if (!Number.isFinite(raw)) return SIDEBAR_DEFAULT;
-    return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, raw));
   }
 }

@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import get_or_404
+from app.core.timezone import utc_now
 from app.modules.sticky_notes.repository import StickyNoteRepository
 from app.modules.sticky_notes.schemas import (
     StickyNoteCreate,
@@ -53,7 +53,7 @@ class StickyNoteService:
         return StickyNoteResponse.model_validate(note)
 
     async def create_note(self, user_id: str, data: StickyNoteCreate) -> StickyNoteResponse:
-        month = datetime.now(timezone.utc).strftime("%Y-%m")
+        month = utc_now().strftime("%Y-%m")
         current_min = await self.repo.min_order_index(user_id, month)
         # New notes get an index below every existing note in the month, so
         # "newest first" is the default outcome without any manual reorder.

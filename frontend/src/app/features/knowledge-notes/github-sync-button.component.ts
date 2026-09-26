@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { IntegrationsService, GitHubSyncResponse } from '../integrations/services/integrations.service';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-github-sync-button',
@@ -48,7 +49,7 @@ export class GitHubSyncButtonComponent {
           this.syncing.set(false);
         },
         error: (err: { error?: { detail?: string } }) => {
-          const message = err?.error?.detail || 'GitHub sync failed';
+          const message = apiErrorMessage(err, 'GitHub sync failed');
           this.syncError.emit(typeof message === 'string' ? message : 'GitHub sync failed');
           this.syncing.set(false);
         },

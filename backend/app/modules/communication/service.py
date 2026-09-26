@@ -8,6 +8,7 @@ from app.core.exceptions import (
     ServiceUnavailableError,
     get_or_404,
 )
+from app.core.taxonomy import merge_names
 from app.modules.ai.adapters.base import AiProviderError, MissingCredentialError
 from app.modules.ai.gateway import AiGateway, to_app_error
 from app.modules.ai.use_cases import USE_CASE_WRITING_FEEDBACK
@@ -54,6 +55,12 @@ async def _resolve_writing_provider(db: AsyncSession, user_id: str) -> ChatWriti
         timeout=float(resolved.settings.timeout_seconds),
     )
 
+def _content_key(content: str, *parts: str) -> str:
+    """Stable cache key: hash of the content plus the versions/provider that shaped the result."""
+    payload = "\n".join([hashlib.sha256(content.encode("utf-8")).hexdigest(), *parts])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _evaluation_key(
     *,
     content: str,
@@ -63,17 +70,8 @@ def _evaluation_key(
     provider: str,
     model: str,
 ) -> str:
-    payload = "\n".join(
-        [
-            hashlib.sha256(content.encode("utf-8")).hexdigest(),
-            rubric_version,
-            prompt_version,
-            evaluation_version,
-            provider,
-            model,
-        ]
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return _content_key(content, rubric_version, prompt_version, evaluation_version, provider, model)
+
 
 def _rewrite_key(
     *,
@@ -82,15 +80,8 @@ def _rewrite_key(
     provider: str,
     model: str,
 ) -> str:
-    payload = "\n".join(
-        [
-            hashlib.sha256(content.encode("utf-8")).hexdigest(),
-            prompt_version,
-            provider,
-            model,
-        ]
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return _content_key(content, prompt_version, provider, model)
+
 
 def _to_evaluation_response(row: WritingEvaluation, *, cached: bool = False) -> WritingEvaluationResponse:
     issues_raw = loads_json(row.issues_json, [])
@@ -151,12 +142,7 @@ class CommunicationService:
     async def list_writing_categories(self, user_id: str) -> list[str]:
         stored = await self.repo.list_category_names(user_id)
         used = await self.repo.list_used_category_names(user_id)
-        seen: dict[str, str] = {}
-        for name in [*WRITING_CATEGORIES, *stored, *used]:
-            key = name.strip().lower()
-            if key and key not in seen:
-                seen[key] = name.strip()
-        return sorted(seen.values(), key=str.lower)
+        return merge_names(WRITING_CATEGORIES, stored, used)
 
     async def create_writing_category(self, user_id: str, name: str) -> str:
         clean = name.strip()
@@ -254,18 +240,10 @@ class CommunicationService:
                 category=item.category,
             )
         except AiProviderError as exc:
-            run.status = "error"
-            run.error_code = exc.code
-            run.error_message = str(exc)
-            run.latency_ms = int((time.perf_counter() - started) * 1000)
-            await self.repo.update_ai_run(run)
+            await self._record_run_failure(run, started, exc.code, str(exc))
             raise to_app_error(exc) from exc
         except Exception as exc:
-            run.status = "error"
-            run.error_code = "unknown"
-            run.error_message = str(exc)
-            run.latency_ms = int((time.perf_counter() - started) * 1000)
-            await self.repo.update_ai_run(run)
+            await self._record_run_failure(run, started, "unknown", str(exc))
             raise ServiceUnavailableError({
                     "code": "provider_unavailable",
                     "message": "AI feedback is temporarily unavailable. Your writing has not been changed.",
@@ -307,11 +285,7 @@ class CommunicationService:
                 return _to_evaluation_response(raced, cached=True)
             raise
 
-        run.status = "success"
-        run.latency_ms = latency_ms
-        run.prompt_tokens = usage.get("prompt_tokens")
-        run.completion_tokens = usage.get("completion_tokens")
-        await self.repo.update_ai_run(run)
+        await self._record_run_success(run, latency_ms, usage)
 
         return _to_evaluation_response(saved, cached=False)
 
@@ -358,18 +332,10 @@ class CommunicationService:
                 category=item.category,
             )
         except AiProviderError as exc:
-            run.status = "error"
-            run.error_code = exc.code
-            run.error_message = str(exc)
-            run.latency_ms = int((time.perf_counter() - started) * 1000)
-            await self.repo.update_ai_run(run)
+            await self._record_run_failure(run, started, exc.code, str(exc))
             raise to_app_error(exc) from exc
         except Exception as exc:
-            run.status = "error"
-            run.error_code = "unknown"
-            run.error_message = str(exc)
-            run.latency_ms = int((time.perf_counter() - started) * 1000)
-            await self.repo.update_ai_run(run)
+            await self._record_run_failure(run, started, "unknown", str(exc))
             raise ServiceUnavailableError({
                     "code": "provider_unavailable",
                     "message": "Coach rewrite is temporarily unavailable. Your writing has not been changed.",
@@ -402,10 +368,20 @@ class CommunicationService:
                 return _to_rewrite_response(raced, cached=True)
             raise
 
+        await self._record_run_success(run, latency_ms, usage)
+
+        return _to_rewrite_response(saved, cached=False)
+
+    async def _record_run_failure(self, run: WritingAIRun, started: float, code: str, message: str) -> None:
+        run.status = "error"
+        run.error_code = code
+        run.error_message = message
+        run.latency_ms = int((time.perf_counter() - started) * 1000)
+        await self.repo.update_ai_run(run)
+
+    async def _record_run_success(self, run: WritingAIRun, latency_ms: int, usage: dict) -> None:
         run.status = "success"
         run.latency_ms = latency_ms
         run.prompt_tokens = usage.get("prompt_tokens")
         run.completion_tokens = usage.get("completion_tokens")
         await self.repo.update_ai_run(run)
-
-        return _to_rewrite_response(saved, cached=False)

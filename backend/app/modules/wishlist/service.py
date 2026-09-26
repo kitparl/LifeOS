@@ -1,10 +1,12 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import BadRequestError, get_or_404
+from app.core.taxonomy import merge_names
 from app.modules.wishlist.models import SUGGESTED_WISHLIST_CATEGORIES
 from app.modules.wishlist.repository import WishlistRepository
 from app.modules.wishlist.schemas import WishlistCreate, WishlistListItem, WishlistResponse, WishlistUpdate
-from app.core.exceptions import BadRequestError, get_or_404
+
 
 class WishlistService:
     def __init__(self, db: AsyncSession):
@@ -26,12 +28,7 @@ class WishlistService:
     async def list_categories(self, user_id: str) -> list[str]:
         """Suggested defaults + user-created, de-duplicated (CI) and sorted."""
         stored = await self.repo.list_category_names(user_id)
-        seen: dict[str, str] = {}
-        for name in [*SUGGESTED_WISHLIST_CATEGORIES, *stored]:
-            key = name.strip().lower()
-            if key and key not in seen:
-                seen[key] = name.strip()
-        return sorted(seen.values(), key=str.lower)
+        return merge_names(SUGGESTED_WISHLIST_CATEGORIES, stored)
 
     async def create_category(self, user_id: str, name: str) -> str:
         clean = name.strip()

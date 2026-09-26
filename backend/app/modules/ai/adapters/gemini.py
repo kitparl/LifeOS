@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote
 
+import httpx
+
 from app.modules.ai.adapters.base import (
     CAPABILITY_CHAT,
     CAPABILITY_EMBEDDING,
@@ -47,7 +49,7 @@ class GeminiAdapter:
             )
         except ProviderRequestError as exc:
             # Gemini reports a bad key as 400 INVALID_ARGUMENT rather than 401/403.
-            if exc.status_code == 400 and "API key" in exc.vendor_message:
+            if exc.status_code == httpx.codes.BAD_REQUEST and "API key" in exc.vendor_message:
                 raise InvalidCredentialError(
                     "Invalid or revoked Gemini API key. Check Integrations → AI."
                 ) from exc

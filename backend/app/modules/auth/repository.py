@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Pagination, paginate
+from app.core.timezone import utc_now
 from app.modules.auth.models import User, UsernameHistory
 from app.modules.auth.username_rules import normalize_username
 
@@ -68,7 +68,7 @@ class UserRepository:
             new_username=new_username,
             changed_by=changed_by,
             reason=reason,
-            changed_at=datetime.now(timezone.utc),
+            changed_at=utc_now(),
         )
         self.db.add(entry)
         await self.db.flush()
