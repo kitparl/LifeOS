@@ -22,7 +22,17 @@ describe('HomePreferencesService', () => {
     localStorage.clear();
   });
 
-  it('defaults to the analytics home module', () => {
+  it('defaults to the quick action home module', () => {
+    expect(service.moduleId()).toBe('dashboard');
+    expect(service.homeRoute()).toBe('/quick-action');
+  });
+
+  it('keeps a saved analytics home even though analytics is hidden from the sidebar by default', () => {
+    service.init();
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/preferences/home`);
+    req.flush({ key: 'home', value: { moduleId: 'analytics' } });
+
     expect(service.moduleId()).toBe('analytics');
     expect(service.homeRoute()).toBe('/analytics/dashboard');
   });
@@ -38,14 +48,14 @@ describe('HomePreferencesService', () => {
     expect(service.homeRoute()).toBe('/tasks');
   });
 
-  it('falls back to analytics for an unknown or unavailable module', () => {
+  it('falls back to quick action for an unknown or unavailable module', () => {
     service.init();
 
     const req = httpMock.expectOne(`${environment.apiUrl}/preferences/home`);
     req.flush({ key: 'home', value: { moduleId: 'mood' } });
 
-    expect(service.moduleId()).toBe('analytics');
-    expect(service.homeRoute()).toBe('/analytics/dashboard');
+    expect(service.moduleId()).toBe('dashboard');
+    expect(service.homeRoute()).toBe('/quick-action');
   });
 
   it('keeps the local seed when the API has no preference', () => {
@@ -82,10 +92,10 @@ describe('HomePreferencesService', () => {
 
   it('ignores selecting an unavailable module and keeps the default', () => {
     service.setModuleId('does-not-exist');
-    expect(service.moduleId()).toBe('analytics');
+    expect(service.moduleId()).toBe('dashboard');
 
     const req = httpMock.expectOne(`${environment.apiUrl}/preferences/home`);
-    expect(req.request.body).toEqual({ value: { moduleId: 'analytics' } });
-    req.flush({ key: 'home', value: { moduleId: 'analytics' } });
+    expect(req.request.body).toEqual({ value: { moduleId: 'dashboard' } });
+    req.flush({ key: 'home', value: { moduleId: 'dashboard' } });
   });
 });

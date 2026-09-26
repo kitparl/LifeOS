@@ -2,7 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { CdkDragDrop, CdkDropList, CdkDrag, CdkDragHandle, CdkDragPlaceholder } from '@angular/cdk/drag-drop';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { NavPreferencesService } from '../../core/services/nav-preferences.service';
-import { NavDestination } from '../../shared/layout/nav-registry';
+import { NAV_CATEGORIES_ENABLED, NavDestination } from '../../shared/layout/nav-registry';
 
 @Component({
   selector: 'app-settings-sidebar-section',
@@ -15,8 +15,8 @@ import { NavDestination } from '../../shared/layout/nav-registry';
           <summary class="link cursor-pointer select-none">How this works</summary>
           <ul class="mt-2 list-disc space-y-1 pl-5" style="color: var(--text-muted)">
             <li><strong>Show</strong> adds or removes a module from the sidebar. Hidden modules stay reachable via Search (⌘K).</li>
-            <li><strong>Pin</strong> moves a module into the Pin group at the top of the sidebar.</li>
-            <li>Drag the <span aria-hidden="true">⋮⋮</span> handle to reorder modules within a group.</li>
+            <li><strong>Pin</strong> keeps a module at the top of the sidebar.</li>
+            <li>Drag the <span aria-hidden="true">⋮⋮</span> handle to reorder modules within their section.</li>
           </ul>
         </details>
         <button type="button" class="btn-secondary text-xs" (click)="navPrefs.resetToDefault()">Reset to defaults</button>
@@ -32,7 +32,9 @@ import { NavDestination } from '../../shared/layout/nav-registry';
 
         @for (group of settingsGroups(); track group.category) {
           <div class="border-b border-[var(--border)]">
-            <p class="sidebar-settings-group">{{ group.category }}</p>
+            @if (navCategoriesEnabled) {
+              <p class="sidebar-settings-group">{{ group.category }}</p>
+            }
             <ul
               class="divide-y divide-[var(--border)] text-sm"
               cdkDropList
@@ -99,7 +101,7 @@ import { NavDestination } from '../../shared/layout/nav-registry';
                     <svg class="settings-nav-icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
                   }
                   <span class="truncate">{{ item.label }}</span>
-                  @if (item.category) {
+                  @if (navCategoriesEnabled && item.category) {
                     <span class="hidden text-xs text-[var(--text-muted)] sm:inline">{{ item.category }}</span>
                   }
                 </div>
@@ -229,6 +231,7 @@ import { NavDestination } from '../../shared/layout/nav-registry';
 })
 export class SettingsSidebarSectionComponent {
   readonly navPrefs = inject(NavPreferencesService);
+  readonly navCategoriesEnabled = NAV_CATEGORIES_ENABLED;
 
   readonly settingsGroups = computed(() => this.navPrefs.navGroups());
 

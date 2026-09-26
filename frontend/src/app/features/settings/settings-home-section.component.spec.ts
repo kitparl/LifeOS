@@ -39,7 +39,7 @@ describe('SettingsHomeSectionComponent', () => {
   }
 
   it('lists every module the user can open and selects the default', () => {
-    expect(trigger().textContent).toContain('Analytics');
+    expect(trigger().textContent).toContain('Quick Action');
 
     openMenu();
 
@@ -52,7 +52,7 @@ describe('SettingsHomeSectionComponent', () => {
     expect(labels).toContain('Analytics');
     expect(labels).toContain('Tasks');
     expect(labels).not.toContain('Mood');
-    expect(options.find((option) => option.textContent?.trim() === 'Analytics')?.classList.contains('active')).toBe(true);
+    expect(options.find((option) => option.textContent?.trim() === 'Quick Action')?.classList.contains('active')).toBe(true);
   });
 
   it('keeps the option list scrollable when open', () => {

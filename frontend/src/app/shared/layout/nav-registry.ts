@@ -7,7 +7,12 @@ export interface NavDestination {
   shortLabel?: string;
   category?: string;
   hidden?: boolean;
+  /** `false` keeps a routable module out of the sidebar and Settings sidebar lists (still in ⌘K / Home). */
+  sidebar?: boolean;
 }
+
+/** Group the sidebar by `category`. Off = flat list; category data is kept so this can be flipped back on. */
+export const NAV_CATEGORIES_ENABLED = false;
 
 export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'analytics', label: 'Analytics', route: '/analytics/dashboard', icon: 'chart-line', shortLabel: 'Home', category: 'Core' },
@@ -23,7 +28,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'timeline', label: 'Timeline', route: '/timeline', icon: 'route', category: 'Insights' },
   { id: 'insights', label: 'Insights', route: '/insights', icon: 'chart-column', category: 'Insights' },
   { id: 'documents', label: 'Documents', route: '/documents', icon: 'file-text', category: 'Knowledge' },
-  { id: 'notifications', label: 'Notifications', route: '/notifications', icon: 'bell', shortLabel: 'Alerts', category: 'Core' },
+  { id: 'notifications', label: 'Notifications', route: '/notifications', icon: 'bell', shortLabel: 'Alerts', category: 'Core', sidebar: false },
   { id: 'assistant', label: 'AI Assistant', route: '/assistant', icon: 'sparkles', shortLabel: 'AI', category: 'System' },
   { id: 'settings', label: 'Settings', route: '/settings', icon: 'settings', category: 'System' },
   { id: 'mood', label: 'Mood', route: '/mood', icon: 'smile', category: 'Health', hidden: true },
@@ -45,10 +50,9 @@ export const NAV_DESTINATIONS: NavDestination[] = [
 ];
 
 /** Module that opens at `/` when the user has no valid home preference. */
-export const DEFAULT_HOME_MODULE_ID = 'analytics';
+export const DEFAULT_HOME_MODULE_ID = 'dashboard';
 
 export const DEFAULT_PINNED_IDS: string[] = [
-  'analytics',
   'dashboard',
   'tasks',
   'calendar',
@@ -60,9 +64,6 @@ export const DEFAULT_PINNED_IDS: string[] = [
   'finance',
   'timeline',
   'insights',
-  'documents',
-  'notifications',
-  'assistant',
   'settings',
   'sticky-notes',
 ];
@@ -71,6 +72,10 @@ const destinationById = new Map(NAV_DESTINATIONS.map((d) => [d.id, d]));
 
 export function getDestinationById(id: string): NavDestination | undefined {
   return destinationById.get(id);
+}
+
+export function isSidebarDestination(dest: NavDestination): boolean {
+  return !dest.hidden && dest.sidebar !== false;
 }
 
 export function isAvailableHomeModule(id: string): boolean {
@@ -102,7 +107,7 @@ export function homeRouteFor(moduleId: string): string {
   const dest = isAvailableHomeModule(moduleId)
     ? getDestinationById(moduleId)
     : getDestinationById(DEFAULT_HOME_MODULE_ID);
-  return dest?.route ?? '/analytics/dashboard';
+  return dest?.route ?? '/quick-action';
 }
 
 export function getDestinationByRoute(url: string): NavDestination | undefined {

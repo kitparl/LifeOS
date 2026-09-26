@@ -2,9 +2,11 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   DEFAULT_PINNED_IDS,
+  NAV_CATEGORIES_ENABLED,
   NAV_DESTINATIONS,
   NavDestination,
   getDestinationById,
+  isSidebarDestination,
 } from '../../shared/layout/nav-registry';
 import {
   PreferencesApi,
@@ -23,6 +25,14 @@ export interface NavPrefsValue {
 const STORAGE_KEY = 'lifeos-nav-pinned';
 const PREFS_KEY = 'nav';
 const DEFAULT_CATEGORY_ORDER = ['Core', 'Health', 'Growth', 'Knowledge', 'Insights', 'System'];
+const PIN_GROUP = 'Pin';
+/** Flat-mode group for non-pinned modules; its order is `visible`. */
+const FLAT_GROUP = 'Modules';
+
+interface NavGroup {
+  category: string;
+  items: NavDestination[];
+}
 
 function defaultModuleCategory(): Record<string, string> {
   const map: Record<string, string> = {};
@@ -59,58 +69,17 @@ export class NavPreferencesService {
 
   private readonly prefs = signal<NavPrefsValue>(buildDefaultPrefs());
 
-  readonly pinnedDestinations = computed(() => {
-    const p = this.prefs();
-    const topSet = new Set(p.pinnedTop);
-    const ordered: string[] = [];
-    // Flat visible order: pinnedTop first, then categories
-    for (const id of p.pinnedTop) {
-      if (p.visible.includes(id) && !ordered.includes(id)) ordered.push(id);
-    }
-    for (const cat of p.categoryOrder) {
-      for (const id of p.order[cat] || []) {
-        if (p.visible.includes(id) && !topSet.has(id) && !ordered.includes(id)) {
-          ordered.push(id);
-        }
-      }
-    }
-    // Any remaining visible not in order maps
-    for (const id of p.visible) {
-      if (!ordered.includes(id)) ordered.push(id);
-    }
-    return ordered
-      .map((id) => this.resolveDestination(id))
-      .filter((d): d is NavDestination => d !== undefined && !d.hidden);
-  });
+  readonly pinnedDestinations = computed(() =>
+    NAV_CATEGORIES_ENABLED ? this.categoryOrderedDestinations() : this.flatGroups().flatMap((g) => g.items),
+  );
 
   readonly unpinnedDestinations = computed(() => {
     const visible = new Set(this.prefs().visible);
-    return NAV_DESTINATIONS.filter((d) => !visible.has(d.id) && !d.hidden);
+    return NAV_DESTINATIONS.filter((d) => !visible.has(d.id) && isSidebarDestination(d));
   });
 
-  /** Grouped view for sidebar: Pin first, then categories. */
-  readonly navGroups = computed(() => {
-    const p = this.prefs();
-    const groups: { category: string; items: NavDestination[] }[] = [];
-    const topSet = new Set(p.pinnedTop);
-    const pinItems = p.pinnedTop
-      .filter((id) => p.visible.includes(id))
-      .map((id) => this.resolveDestination(id))
-      .filter((d): d is NavDestination => !!d && !d.hidden);
-    if (pinItems.length) {
-      groups.push({ category: 'Pin', items: pinItems });
-    }
-    for (const cat of p.categoryOrder) {
-      const items = (p.order[cat] || [])
-        .filter((id) => p.visible.includes(id) && !topSet.has(id))
-        .map((id) => this.resolveDestination(id))
-        .filter((d): d is NavDestination => !!d && !d.hidden);
-      if (items.length) {
-        groups.push({ category: cat, items });
-      }
-    }
-    return groups;
-  });
+  /** Sidebar/Settings groups: Pin first, then categories — or, when categories are off, Pin + one flat group. */
+  readonly navGroups = computed(() => (NAV_CATEGORIES_ENABLED ? this.categoryGroups() : this.flatGroups()));
 
   init(): void {
     // Seed from localStorage while API loads
@@ -190,11 +159,17 @@ export class NavPreferencesService {
     else this.pinTop(id);
   }
 
-  /** Reorder within a single category (or Pin). */
+  /** Reorder within a single category (or Pin, or the flat group). */
   reorderWithinCategory(category: string, fromIndex: number, toIndex: number): void {
     if (fromIndex === toIndex) return;
     const p = structuredClone(this.prefs());
-    if (category === 'Pin') {
+    if (category === FLAT_GROUP) {
+      const list = this.flatGroups().find((g) => g.category === FLAT_GROUP)?.items.map((d) => d.id) ?? [];
+      if (fromIndex < 0 || fromIndex >= list.length || toIndex < 0 || toIndex >= list.length) return;
+      const [moved] = list.splice(fromIndex, 1);
+      list.splice(toIndex, 0, moved);
+      p.visible = [...list, ...p.visible.filter((id) => !list.includes(id))];
+    } else if (category === PIN_GROUP) {
       const list = [...p.pinnedTop];
       if (fromIndex < 0 || fromIndex >= list.length || toIndex < 0 || toIndex >= list.length) return;
       const [moved] = list.splice(fromIndex, 1);
@@ -212,6 +187,55 @@ export class NavPreferencesService {
 
   resetToDefault(): void {
     this.commit(buildDefaultPrefs());
+  }
+
+  private pinGroup(p: NavPrefsValue): NavGroup {
+    return { category: PIN_GROUP, items: this.sidebarItems(p.pinnedTop.filter((id) => p.visible.includes(id))) };
+  }
+
+  private flatGroups(): NavGroup[] {
+    const p = this.prefs();
+    const topSet = new Set(p.pinnedTop);
+    const rest: NavGroup = { category: FLAT_GROUP, items: this.sidebarItems(p.visible.filter((id) => !topSet.has(id))) };
+    return [this.pinGroup(p), rest].filter((g) => g.items.length > 0);
+  }
+
+  private categoryGroups(): NavGroup[] {
+    const p = this.prefs();
+    const topSet = new Set(p.pinnedTop);
+    const groups: NavGroup[] = [this.pinGroup(p)];
+    for (const cat of p.categoryOrder) {
+      groups.push({
+        category: cat,
+        items: this.sidebarItems((p.order[cat] || []).filter((id) => p.visible.includes(id) && !topSet.has(id))),
+      });
+    }
+    return groups.filter((g) => g.items.length > 0);
+  }
+
+  /** pinnedTop first, then categories, then any visible id missing from the order maps. */
+  private categoryOrderedDestinations(): NavDestination[] {
+    const p = this.prefs();
+    const topSet = new Set(p.pinnedTop);
+    const ordered: string[] = [];
+    for (const id of p.pinnedTop) {
+      if (p.visible.includes(id) && !ordered.includes(id)) ordered.push(id);
+    }
+    for (const cat of p.categoryOrder) {
+      for (const id of p.order[cat] || []) {
+        if (p.visible.includes(id) && !topSet.has(id) && !ordered.includes(id)) ordered.push(id);
+      }
+    }
+    for (const id of p.visible) {
+      if (!ordered.includes(id)) ordered.push(id);
+    }
+    return this.sidebarItems(ordered);
+  }
+
+  private sidebarItems(ids: string[]): NavDestination[] {
+    return ids
+      .map((id) => this.resolveDestination(id))
+      .filter((d): d is NavDestination => d !== undefined && isSidebarDestination(d));
   }
 
   private resolveDestination(id: string): NavDestination | undefined {

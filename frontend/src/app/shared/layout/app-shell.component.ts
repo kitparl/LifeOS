@@ -23,7 +23,7 @@ import { DocumentViewerHostComponent } from '../document-viewer/document-viewer-
 import { MarkdownImportChoiceHostComponent } from '../markdown/markdown-import-choice-host.component';
 import { NotificationDropdownComponent } from './notification-dropdown.component';
 import { WordOfTheDayChipComponent } from './word-of-the-day-chip.component';
-import { resolvePageTitle } from './nav-registry';
+import { NAV_CATEGORIES_ENABLED, resolvePageTitle } from './nav-registry';
 
 const STORAGE_AI_OPEN    = 'lifeos-ai-panel-open';
 const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
@@ -110,7 +110,7 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
         <!-- Nav items -->
         <nav class="flex-1 overflow-y-auto" style="padding: 0.375rem 0.375rem; min-height: 0">
           @for (group of navGroups(); track group.category) {
-            @if (!sidebarCollapsed()) {
+            @if (navCategoriesEnabled && !sidebarCollapsed()) {
               <p class="section-heading" style="padding: 0.5rem 0.5rem 0.25rem">{{ group.category }}</p>
             }
             @for (item of group.items; track item.id) {
@@ -324,7 +324,9 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
       </div>
       <nav class="flex-1 overflow-y-auto" style="padding: 0.375rem 0.5rem; min-height: 0">
         @for (group of navGroups(); track group.category) {
-          <p class="section-heading" style="padding: 0.5rem 0.375rem 0.25rem">{{ group.category }}</p>
+          @if (navCategoriesEnabled) {
+            <p class="section-heading" style="padding: 0.5rem 0.375rem 0.25rem">{{ group.category }}</p>
+          }
           @for (item of group.items; track item.id) {
             <div
               class="nav-row"
@@ -418,6 +420,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   );
 
   readonly navGroups = this.navPrefs.navGroups;
+  readonly navCategoriesEnabled = NAV_CATEGORIES_ENABLED;
 
   readonly aiPanelOpen = signal(this.readStorage(STORAGE_AI_OPEN, true));
   readonly drawerOpen = signal(false);
