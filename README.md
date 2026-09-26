@@ -16,12 +16,12 @@ It's built for exactly one person to use (you), which is why it can be this pers
 
 Think of it as a private personal dashboard with a bunch of rooms, all under one roof:
 
-- **Stay on track** — goals, to-do tasks (with sub-tasks and reminders), daily habits, recurring routines, a calendar, and a journal for your thoughts.
+- **Stay on track** — to-do tasks (with sub-tasks and reminders), daily habits, recurring routines, a calendar, and a journal for your thoughts.
 - **Track your running** — log runs and races, see your personal bests, and watch progress over time.
-- **Grow your career and skills** — learning tracks and notes, career projects, and job applications, all in one timeline.
+- **Practice communication** — writing and speaking practice with AI feedback, plus a vocabulary word lab.
 - **Manage money** — record income/expenses and keep an eye on budgets.
-- **Keep the personal stuff somewhere safe** — a wishlist ("things I want to do/get"), a private Q&A journal, knowledge notes (with optional syncing to GitHub), mood tracking, and a life timeline of memories and milestones.
-- **Get AI help that actually knows your data** — ask questions and get answers grounded in your own goals/tasks/journal (not generic chatbot answers), get coaching in specific areas (running, career, finance, learning, communication), and get writing feedback on your practice writing.
+- **Keep the personal stuff somewhere safe** — a wishlist ("things I want to do/get"), a private Q&A journal, knowledge notes (with optional syncing to GitHub), and mood tracking.
+- **Get AI help that actually knows your data** — ask questions and get answers grounded in your own tasks/journal/notes (not generic chatbot answers), and get writing feedback on your practice writing.
 - **Get nudged on Telegram** — LifeOS can message you digests, reminders, and scheduled reports, and you can even manage tasks/habits by chatting with a Telegram bot when you're away from the app.
 - **Use it like a real app, not a website** — it installs like an app on your phone or laptop (PWA) and keeps working even with a flaky connection.
 
@@ -44,7 +44,7 @@ You don't need to know any of this to use LifeOS, but if you're maintaining or e
 | Background jobs | APScheduler — Telegram digests, reminders, cleanup jobs |
 | File storage | Local disk or S3-compatible object storage |
 
-**Backend shape** — one folder per feature area (`goals`, `tasks`, `habits`, `running`, `finance`, …) under `backend/app/modules/`, each following the same simple flow:
+**Backend shape** — one folder per feature area (`tasks`, `habits`, `running`, `finance`, `journal`, …) under `backend/app/modules/`, each following the same simple flow:
 
 ```text
 api.py (HTTP routes)  →  service.py (business rules)  →  repository.py (database)  →  models.py
@@ -74,7 +74,7 @@ Browser (Angular app)  →  JWT in Authorization header  →  /api/v1/<feature>
 
 ```bash
 cd backend
-python3 -m venv .venv
+python3.12 -m venv .venv          # Python 3.12, same as production
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env               # ENV=dev; set SECRET_KEY
@@ -108,10 +108,17 @@ Without the admin gate configured, registration stays locked for everyone — by
 ### Running tests & lint
 
 ```bash
+# Backend
 cd backend
 source .venv/bin/activate
 pytest -q
-ruff check app --select F401,F841,F823
+ruff check app          # full ruff config in pyproject.toml; expected to be clean
+
+# Frontend
+cd frontend
+npm run lint            # ESLint; expected to be clean (0 errors, 0 warnings)
+npm run test:ci         # Karma, headless Chrome
+npm run build
 ```
 
 ## Configuration
@@ -155,9 +162,8 @@ Known limitations: TIFF previews are unsupported (download-only) rather than con
 ```text
 backend/           FastAPI application (app/core + app/modules + app/tests)
 frontend/          Angular single-page app
-docs/              Deployment, Telegram, and product docs
-requirements/      Feature specs and cleanup briefs
-aidlc-docs/        AI-DLC planning artifacts and summaries
+requirements/      Feature specs and cleanup briefs (local only, gitignored)
+aidlc-docs/        AI-DLC planning artifacts and summaries (local only, gitignored)
 ```
 
 ## Documentation
@@ -165,13 +171,7 @@ aidlc-docs/        AI-DLC planning artifacts and summaries
 | Document | Description |
 |----------|-------------|
 | [runProject.md](runProject.md) | Local run commands + VPS operations cheatsheet |
-| [docs/SSL_CADDY.md](docs/SSL_CADDY.md) | VPS HTTPS setup with Caddy |
-| [docs/TELEGRAM_BOT_GUIDE.md](docs/TELEGRAM_BOT_GUIDE.md) | How to use the Telegram bot |
-| [docs/TELEGRAM_NOTIFIER.md](docs/TELEGRAM_NOTIFIER.md) | Engineer setup for Telegram notifications |
-| [docs/SCHEDULED_REPORTS.md](docs/SCHEDULED_REPORTS.md) | Scheduled reports & reminders |
-| [docs/FILE_STORAGE.md](docs/FILE_STORAGE.md) | Uploads and S3 storage |
-| [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) | The long-term vision behind this project |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | What's planned next |
+| [code-quality.md](code-quality.md) | Code conventions, shared helpers, and quality gates |
 
 ## Deploying (VPS)
 
@@ -193,7 +193,7 @@ pip install -r requirements.txt
 sudo systemctl restart lifeos
 ```
 
-Full HTTPS/reverse-proxy setup: [docs/SSL_CADDY.md](docs/SSL_CADDY.md). Day-to-day operations (deploy script, logs, rollback): [runProject.md](runProject.md).
+Day-to-day operations (deploy script, logs, rollback): [runProject.md](runProject.md).
 
 ## License
 
