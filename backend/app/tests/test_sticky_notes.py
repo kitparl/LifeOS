@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -26,7 +26,7 @@ async def test_create_note_defaults_and_month_grouping(client):
     note = create.json()
     assert note["color"] == "yellow"
     assert note["is_pinned"] is False
-    current_month = datetime.now(UTC).strftime("%Y-%m")
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
     assert note["note_month"] == current_month
 
     months = await client.get("/api/v1/sticky-notes/months", headers=headers)
@@ -42,7 +42,7 @@ async def test_create_note_defaults_and_month_grouping(client):
 async def test_newest_note_sorts_first_by_default(client):
     token = await _auth_token(client, "order@example.com")
     headers = {"Authorization": f"Bearer {token}"}
-    current_month = datetime.now(UTC).strftime("%Y-%m")
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
 
     first = await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "First"})
     second = await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "Second"})
@@ -57,7 +57,7 @@ async def test_newest_note_sorts_first_by_default(client):
 async def test_pinned_notes_sort_before_unpinned(client):
     token = await _auth_token(client, "pin@example.com")
     headers = {"Authorization": f"Bearer {token}"}
-    current_month = datetime.now(UTC).strftime("%Y-%m")
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
 
     await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "Newer"})
     older = await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "Older"})
@@ -75,7 +75,7 @@ async def test_pinned_notes_sort_before_unpinned(client):
 async def test_reorder_via_patch_order_index(client):
     token = await _auth_token(client, "reorder@example.com")
     headers = {"Authorization": f"Bearer {token}"}
-    current_month = datetime.now(UTC).strftime("%Y-%m")
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
 
     a = (await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "A"})).json()
     b = (await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "B"})).json()
@@ -119,7 +119,7 @@ async def test_search_across_months(client):
 async def test_delete_note_is_soft_delete(client):
     token = await _auth_token(client, "delete@example.com")
     headers = {"Authorization": f"Bearer {token}"}
-    current_month = datetime.now(UTC).strftime("%Y-%m")
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
 
     created = (await client.post("/api/v1/sticky-notes", headers=headers, json={"content": "temp"})).json()
 
@@ -193,7 +193,7 @@ async def test_purge_hard_deletes_after_retention(client):
 
     async with client.session_factory() as db:
         rec = (await db.execute(select(StickyNote).where(StickyNote.id == created["id"]))).scalar_one()
-        rec.deleted_at = datetime.now(UTC) - timedelta(days=STICKY_NOTES_PURGE_AFTER_DAYS + 1)
+        rec.deleted_at = datetime.now(timezone.utc) - timedelta(days=STICKY_NOTES_PURGE_AFTER_DAYS + 1)
         await db.commit()
 
     async with client.session_factory() as db:
@@ -329,7 +329,7 @@ def test_response_accepts_tags_stored_as_json_text(stored, expected):
     # Postgres returns the TEXT-backed JSON column as a raw string.
     from app.modules.sticky_notes.schemas import StickyNoteResponse
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     resp = StickyNoteResponse.model_validate(
         {
             "id": "n1", "title": None, "content": "x", "color": "yellow", "is_pinned": False,

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, time
+from datetime import datetime, time, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -210,7 +210,7 @@ class TaskRepository:
     def _today_bounds(self) -> tuple[datetime, datetime]:
         now = utc_now()
         start = start_of_day_utc(now.date())
-        end = datetime.combine(now.date(), time.max, tzinfo=UTC)
+        end = datetime.combine(now.date(), time.max, tzinfo=timezone.utc)
         return start, end
 
     async def get_stats(self, user_id: str) -> tuple[int, int]:

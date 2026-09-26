@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,7 @@ from app.modules.integrations.telegram.renderer import Screen
 
 def _day_bounds(d: date) -> tuple[datetime, datetime]:
     start = start_of_day_utc(d)
-    end = datetime.combine(d, time.max, tzinfo=UTC)
+    end = datetime.combine(d, time.max, tzinfo=timezone.utc)
     return start, end
 
 
@@ -53,7 +53,7 @@ async def today_screen(db: AsyncSession, user_id: str) -> Screen:
 async def week_screen(db: AsyncSession, user_id: str) -> Screen:
     today = date.today()
     start = start_of_day_utc(today)
-    end = datetime.combine(today + timedelta(days=7), time.max, tzinfo=UTC)
+    end = datetime.combine(today + timedelta(days=7), time.max, tzinfo=timezone.utc)
     events, _ = await CalendarService(db).list_events(user_id, start=start, end=end, limit=None)
     if not events:
         text = tpl.join_blocks(tpl._header("This week"), "No upcoming events.")
@@ -83,7 +83,7 @@ async def week_screen(db: AsyncSession, user_id: str) -> Screen:
 async def event_detail_screen(db: AsyncSession, user_id: str, token: str) -> Screen:
     today = date.today()
     start = start_of_day_utc(today - timedelta(days=1))
-    end = datetime.combine(today + timedelta(days=30), time.max, tzinfo=UTC)
+    end = datetime.combine(today + timedelta(days=30), time.max, tzinfo=timezone.utc)
     events, _ = await CalendarService(db).list_events(user_id, start=start, end=end, limit=None)
     summary = resolve_one(list(events), token)
     if summary is None:

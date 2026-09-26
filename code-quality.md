@@ -46,6 +46,7 @@ How LifeOS code is organised, why, and how to keep it that way. This came out of
 ## 4. Conventions going forward
 
 **Backend**
+- Code must run on **Python 3.10** (production). Ruff's `target-version = "py310"` keeps pyupgrade from emitting 3.11+ code, but it doesn't know stdlib APIs: don't use `datetime.UTC` (use `timezone.utc`), `typing.Self` (use `typing_extensions`), `StrEnum`, `tomllib`, `asyncio.TaskGroup`, or 3.11 `fromisoformat` formats.
 - Never call `datetime.now(...)` or `ZoneInfo(...)` inline. Use `app.core.timezone`.
 - Model ids use `default=new_id`; timestamps use `default=utc_now` (and `onupdate=utc_now`).
 - For a missing row, `get_or_404(await repo.get(...), "X not found")`.

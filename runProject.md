@@ -13,7 +13,7 @@ Assumes this VPS layout:
 ```bash
 # Backend
 cd backend
-python3.12 -m venv .venv && source .venv/bin/activate   # Python 3.12, same as production
+python3 -m venv .venv && source .venv/bin/activate   # Python 3.10+ (production runs 3.10)
 pip install -r requirements.txt
 cp .env.example .env          # ENV=dev
 uvicorn app.main:app --reload --port 8000

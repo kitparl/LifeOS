@@ -1,8 +1,8 @@
 from functools import lru_cache
-from typing import Self
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing_extensions import Self
 
 _DEV_ENVS = frozenset({"dev", "development", "local"})
 _DEFAULT_SECRET_KEY = "dev-secret-change-in-production"

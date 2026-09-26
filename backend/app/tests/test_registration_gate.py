@@ -1,6 +1,6 @@
 """Registration gate enforcement tests (no dependency override)."""
 
-from datetime import UTC
+from datetime import timezone
 
 import bcrypt
 import pytest
@@ -163,7 +163,7 @@ async def test_unlock_token_bound_to_wrong_email_rejected(gated_client, gate_set
     wrong = jwt.encode(
         {
             "sub": "other@example.com",
-            "exp": datetime.now(UTC) + timedelta(hours=1),
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
             "type": "reg_unlock",
         },
         gate_settings.secret_key,
@@ -190,7 +190,7 @@ async def test_access_token_cannot_masquerade_as_unlock(gated_client, gate_setti
     fake = jwt.encode(
         {
             "sub": "some-user-id",
-            "exp": datetime.now(UTC) + timedelta(hours=1),
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
             "type": "access",
         },
         gate_settings.secret_key,

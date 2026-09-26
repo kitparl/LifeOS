@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 MAX_TITLE = 200
@@ -28,12 +28,12 @@ def _zone(tz_name: str | None) -> timezone | ZoneInfo:
             return ZoneInfo(tz_name)
         except (ZoneInfoNotFoundError, ValueError):
             pass
-    return UTC
+    return timezone.utc
 
 
 def _parse_dt(value: str) -> datetime:
     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 def _truncate(value: object, limit: int) -> str | None:
@@ -66,8 +66,8 @@ def map_google_event(item: dict, calendar_tz: str | None) -> MappedEvent | None:
             start_day = date.fromisoformat(str(start["date"]))
             end_day = date.fromisoformat(str(end["date"])) - timedelta(days=1) if end.get("date") else start_day
             end_day = max(end_day, start_day)
-            starts_at = datetime.combine(start_day, time(0, 0), tzinfo=tz).astimezone(UTC)
-            ends_at = datetime.combine(end_day, time(23, 59, 59), tzinfo=tz).astimezone(UTC)
+            starts_at = datetime.combine(start_day, time(0, 0), tzinfo=tz).astimezone(timezone.utc)
+            ends_at = datetime.combine(end_day, time(23, 59, 59), tzinfo=tz).astimezone(timezone.utc)
             all_day = True
         else:
             return None
@@ -97,9 +97,9 @@ def to_google_patch(
 ) -> dict:
     """Build a PATCH body for a LifeOS edit of a Google-linked event (two-way only)."""
     if starts_at.tzinfo is None:
-        starts_at = starts_at.replace(tzinfo=UTC)
+        starts_at = starts_at.replace(tzinfo=timezone.utc)
     if ends_at is not None and ends_at.tzinfo is None:
-        ends_at = ends_at.replace(tzinfo=UTC)
+        ends_at = ends_at.replace(tzinfo=timezone.utc)
     body: dict = {"summary": title, "description": description or "", "location": location or ""}
     if all_day:
         tz = _zone(calendar_tz)

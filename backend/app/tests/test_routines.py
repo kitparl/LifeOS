@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -24,7 +24,7 @@ async def test_routine_crud_and_calendar_expansion(client):
             "name": "Weekday Focus",
             "days_of_week": [0, 1, 2, 3, 4, 5, 6],
             "timezone": "UTC",
-            "start_date": datetime.now(UTC).date().isoformat(),
+            "start_date": datetime.now(timezone.utc).date().isoformat(),
             "blocks": [
                 {
                     "title": "DSA",
@@ -58,7 +58,7 @@ async def test_routine_crud_and_calendar_expansion(client):
     assert len(listing.json()) == 1
     assert listing.json()[0]["block_count"] == 2
 
-    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=2)
     cal = await client.get(
         "/api/v1/calendar/events",
@@ -83,7 +83,7 @@ async def test_routine_period_and_skip_dates(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    today = datetime.now(UTC).date()
+    today = datetime.now(timezone.utc).date()
     skip = today.isoformat()
     create = await client.post(
         "/api/v1/routines",
@@ -111,7 +111,7 @@ async def test_routine_period_and_skip_dates(client):
     assert body["start_date"] == (today - timedelta(days=1)).isoformat()
     assert skip in body["skip_dates"]
 
-    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
     cal = await client.get(
         "/api/v1/calendar/events",
@@ -166,7 +166,7 @@ async def test_routine_start_date_required(client):
 async def test_routine_list_sort_and_custom_taxonomy(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
-    today = datetime.now(UTC).date()
+    today = datetime.now(timezone.utc).date()
     older = await client.post(
         "/api/v1/routines",
         headers=headers,
@@ -209,7 +209,7 @@ async def test_routine_list_sort_and_custom_taxonomy(client):
 async def test_expired_routine_saved_inactive(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
-    today = datetime.now(UTC).date()
+    today = datetime.now(timezone.utc).date()
     create = await client.post(
         "/api/v1/routines",
         headers=headers,

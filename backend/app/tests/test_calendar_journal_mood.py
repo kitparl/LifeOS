@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -16,7 +16,7 @@ async def _auth_token(client, email="unit7@example.com"):
 async def test_calendar_event_crud(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
-    starts = datetime.now(UTC) + timedelta(days=1)
+    starts = datetime.now(timezone.utc) + timedelta(days=1)
 
     create = await client.post(
         "/api/v1/calendar/events",

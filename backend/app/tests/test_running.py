@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -176,7 +176,7 @@ async def test_create_race_get_by_id_past_event(client):
 
 
 def test_race_response_handles_legacy_nulls_and_string_photos():
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     race = SimpleNamespace(
         id="legacy-race",
         name="Legacy Race",

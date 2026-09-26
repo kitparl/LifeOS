@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 _NOON = time(12, 0)
 
 
 def noon_utc(day: date) -> datetime:
     """Tasks created from a bare date are due at 12:00 UTC so the day survives timezone shifts."""
-    return datetime.combine(day, _NOON, tzinfo=UTC)
+    return datetime.combine(day, _NOON, tzinfo=timezone.utc)
 
 
 def resolve_due_token(token: str, today: date) -> date | None:

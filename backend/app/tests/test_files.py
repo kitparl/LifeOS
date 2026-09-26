@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -346,7 +346,7 @@ async def test_soft_delete_then_purge(client, tmp_path, monkeypatch):
         rec = (
             await db.execute(select(FileRecord).where(FileRecord.id == file_id))
         ).scalar_one()
-        rec.deleted_at = datetime.now(UTC) - timedelta(days=1)
+        rec.deleted_at = datetime.now(timezone.utc) - timedelta(days=1)
         await db.commit()
     finally:
         await agen.aclose()

@@ -4,7 +4,7 @@ All vendor HTTP is mocked (see the `wordnik` fixture in conftest.py)."""
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.modules.integrations.models import IntegrationConnection
 from app.modules.integrations.wordnik.config import (
@@ -57,7 +57,7 @@ def test_serialize_encrypts_and_blank_key_keeps_existing():
 
 
 def test_new_key_clears_usage_of_the_old_key():
-    usage = WordnikUsage(remaining=10, limit=100, observed_at=datetime.now(UTC))
+    usage = WordnikUsage(remaining=10, limit=100, observed_at=datetime.now(timezone.utc))
     stored = with_usage(serialize_config(existing_json=None, api_key=KEY), usage)
     assert load_config(stored).usage == usage
     replaced = serialize_config(existing_json=stored, api_key="another-key-9999")
@@ -65,7 +65,7 @@ def test_new_key_clears_usage_of_the_old_key():
 
 
 def test_usage_pct_is_unknown_for_an_earlier_hour_or_zero_limit():
-    now = datetime(2026, 9, 25, 10, 30, tzinfo=UTC)
+    now = datetime(2026, 9, 25, 10, 30, tzinfo=timezone.utc)
     fresh = WordnikUsage(remaining=73, limit=100, observed_at=now - timedelta(minutes=10))
     stale = WordnikUsage(remaining=73, limit=100, observed_at=now - timedelta(minutes=31))
     assert usage_remaining_pct(fresh, now) == 73

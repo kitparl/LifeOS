@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -356,7 +356,7 @@ async def test_ai_parse_and_create_task_fallback():
     db = MagicMock()
     created = MagicMock()
     created.title = "Call the dentist"
-    created.due_date = datetime.combine(date.today(), time(12, 0), tzinfo=UTC)
+    created.due_date = datetime.combine(date.today(), time(12, 0), tzinfo=timezone.utc)
 
     with patch("app.modules.ai.service.TaskService") as Svc:
         Svc.return_value.create_task = AsyncMock(return_value=created)

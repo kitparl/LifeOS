@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time, timezone
 from typing import TypeAlias
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,7 +74,7 @@ async def cmd_today(db: AsyncSession, user_id: str, args: str):
 
         today = date.today()
         start = start_of_day_utc(today)
-        end = datetime.combine(today, time.max, tzinfo=UTC)
+        end = datetime.combine(today, time.max, tzinfo=timezone.utc)
 
         due_tasks, _ = await TS(db).list_tasks(user_id, due_today=True)
         task_lines = [f"[{t.id[:8]}] {t.title}" for t in due_tasks[:10]]

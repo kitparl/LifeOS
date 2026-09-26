@@ -74,7 +74,7 @@ Browser (Angular app)  →  JWT in Authorization header  →  /api/v1/<feature>
 
 ```bash
 cd backend
-python3.12 -m venv .venv          # Python 3.12, same as production
+python3 -m venv .venv             # Python 3.10+ (production runs 3.10)
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env               # ENV=dev; set SECRET_KEY

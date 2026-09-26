@@ -1,4 +1,4 @@
-from datetime import UTC
+from datetime import timezone
 
 import pytest
 
@@ -155,7 +155,7 @@ async def test_qa_soft_delete_hides_entry_then_purges_after_month(client):
     async with client.session_factory() as db:
         rec = (await db.execute(select(QAEntry).where(QAEntry.id == entry_id))).scalar_one()
         assert rec.deleted_at is not None
-        rec.deleted_at = datetime.now(UTC) - timedelta(days=31)
+        rec.deleted_at = datetime.now(timezone.utc) - timedelta(days=31)
         await db.commit()
 
     listed_again = await client.get("/api/v1/qa/entries", headers=headers)

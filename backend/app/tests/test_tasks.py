@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -77,7 +77,7 @@ async def test_list_tasks_due_date_filters(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     today = now.replace(hour=12, minute=0, second=0, microsecond=0)
     yesterday = today - timedelta(days=1)
     tomorrow = today + timedelta(days=1)
@@ -156,7 +156,7 @@ async def test_list_tasks_due_later(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     today = now.replace(hour=12, minute=0, second=0, microsecond=0)
     tomorrow = today + timedelta(days=1)
 
@@ -185,7 +185,7 @@ async def test_list_tasks_exclude_due_today_inbox(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     today = now.replace(hour=12, minute=0, second=0, microsecond=0)
     tomorrow = today + timedelta(days=1)
 

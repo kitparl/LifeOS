@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -16,7 +16,7 @@ from httpx import AsyncClient
 
 
 async def _auth_token(client: AsyncClient) -> str:
-    email = f"cycle8_{datetime.now(UTC).timestamp()}@example.com"
+    email = f"cycle8_{datetime.now(timezone.utc).timestamp()}@example.com"
     resp = await client.post(
         "/api/v1/auth/register",
         json={
@@ -71,15 +71,15 @@ def test_yearly_expansion_same_month_day():
         id="e1",
         user_id="u1",
         title="Birthday — Alice",
-        starts_at=datetime(2020, 3, 15, 0, 0, tzinfo=UTC),
+        starts_at=datetime(2020, 3, 15, 0, 0, tzinfo=timezone.utc),
         ends_at=None,
         all_day=True,
         category="personal",
         recurrence="yearly",
         event_kind="birthday",
     )
-    start = datetime(2026, 3, 1, tzinfo=UTC)
-    end = datetime(2026, 3, 31, tzinfo=UTC)
+    start = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 3, 31, tzinfo=timezone.utc)
     items = expand_recurring_event(event, start, end)
     assert len(items) == 1
     assert items[0].starts_at.date() == date(2026, 3, 15)
@@ -91,7 +91,7 @@ def test_yearly_feb29_becomes_feb28_in_non_leap():
         id="e2",
         user_id="u1",
         title="Leap day",
-        starts_at=datetime(2020, 2, 29, 12, 0, tzinfo=UTC),
+        starts_at=datetime(2020, 2, 29, 12, 0, tzinfo=timezone.utc),
         ends_at=None,
         all_day=False,
         category="personal",
@@ -99,8 +99,8 @@ def test_yearly_feb29_becomes_feb28_in_non_leap():
         event_kind="immutable",
     )
     # 2025 is not a leap year
-    start = datetime(2025, 2, 1, tzinfo=UTC)
-    end = datetime(2025, 3, 1, tzinfo=UTC)
+    start = datetime(2025, 2, 1, tzinfo=timezone.utc)
+    end = datetime(2025, 3, 1, tzinfo=timezone.utc)
     items = expand_recurring_event(event, start, end)
     assert len(items) == 1
     assert items[0].starts_at.date() == date(2025, 2, 28)
