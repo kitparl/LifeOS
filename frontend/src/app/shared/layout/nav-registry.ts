@@ -51,6 +51,9 @@ export const DEFAULT_PINNED_IDS: string[] = [
   'habits',
   'communication',
   'finance',
+  'qa',
+  'knowledge',
+  'integrations',
   'settings',
   'sticky-notes',
 ];

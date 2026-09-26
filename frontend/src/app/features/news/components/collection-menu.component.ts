@@ -13,7 +13,10 @@ import { NewsService } from '../services/news.service';
   selector: 'app-collection-menu',
   standalone: true,
   imports: [LucideDynamicIcon],
-  host: { class: 'relative inline-block' },
+  host: {
+    class: 'relative inline-block',
+    '[class.z-50]': 'open()',
+  },
   template: `
     <button
       type="button"
@@ -29,7 +32,7 @@ import { NewsService } from '../services/news.service';
 
     @if (open()) {
       <div
-        class="menu absolute right-0 z-30 mt-1 w-64 max-w-[80vw] p-1"
+        class="menu absolute right-0 bottom-full z-50 mb-1 w-64 max-w-[80vw] p-1"
         role="dialog"
         [attr.aria-label]="heading()"
         (keydown.escape)="close()"

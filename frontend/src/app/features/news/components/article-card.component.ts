@@ -10,8 +10,15 @@ import { NewsThumbComponent } from './news-thumb.component';
   standalone: true,
   imports: [RouterLink, NewsThumbComponent],
   template: `
-    <article class="panel--flat flex h-full flex-col overflow-hidden !p-0">
-      <a [routerLink]="['/news/article']" [queryParams]="{ url: article().url }" tabindex="-1" aria-hidden="true">
+    <article class="panel--flat relative flex h-full flex-col !p-0 has-[[aria-expanded=true]]:z-50">
+      <a
+        class="block overflow-hidden"
+        style="border-radius: var(--radius-lg) var(--radius-lg) 0 0"
+        [routerLink]="['/news/article']"
+        [queryParams]="{ url: article().url }"
+        tabindex="-1"
+        aria-hidden="true"
+      >
         <app-news-thumb class="aspect-video w-full" [src]="article().image" />
       </a>
       <div class="flex flex-1 flex-col gap-1.5 p-3">

@@ -11,7 +11,7 @@ import { NewsThumbComponent } from './news-thumb.component';
   standalone: true,
   imports: [RouterLink, LucideDynamicIcon, NewsThumbComponent],
   template: `
-    <article class="panel--flat flex gap-3 !p-3">
+    <article class="panel--flat relative flex gap-3 !p-3 has-[[aria-expanded=true]]:z-50">
       <a
         class="shrink-0"
         [routerLink]="['/news/article']"
