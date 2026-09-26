@@ -144,6 +144,10 @@
         [content]="currentContent"
         [theme]="resolvedTheme"
         [variant]="previewVariant"
+        [runnableBlocks]="runnableBlocks"
+        [runningBlockId]="runningBlockId"
+        [runDisabled]="runDisabled"
+        (runBlock)="runBlock.emit($event)"
       ></app-markdown-preview>
     </div>
 

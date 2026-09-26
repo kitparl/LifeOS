@@ -58,3 +58,46 @@ export function normalizeExecutableLanguage(language: string): string {
 export function isExecutableLanguage(language: string): boolean {
   return EXECUTABLE_LANGUAGES.has(language.toLowerCase());
 }
+
+/** A fence as it appears in rendered markdown (`pre > code.language-*`). */
+export interface RenderedFence {
+  language: string;
+  code: string;
+}
+
+function trimTrailingNewlines(code: string): string {
+  return code.replace(/\n+$/, '');
+}
+
+/**
+ * Pairs rendered fences with parsed blocks in document order by language and
+ * code text. A rendered fence the parser did not pick up maps to `null`, so a
+ * Run control can never point at the wrong block.
+ */
+export function matchRenderedFences<T extends ParsedCodeBlock>(
+  rendered: RenderedFence[],
+  blocks: T[]
+): (T | null)[] {
+  let cursor = 0;
+  return rendered.map((fence) => {
+    const language = normalizeExecutableLanguage(fence.language);
+    const code = trimTrailingNewlines(fence.code);
+    for (let i = cursor; i < blocks.length; i++) {
+      const block = blocks[i];
+      if (
+        normalizeExecutableLanguage(block.language) === language &&
+        trimTrailingNewlines(block.code) === code
+      ) {
+        cursor = i + 1;
+        return block;
+      }
+    }
+    return null;
+  });
+}
+
+/** First non-empty line of a code block, trimmed and truncated for labels. */
+export function codeBlockFirstLine(code: string, max = 40): string {
+  const line = code.split('\n').find((item) => item.trim() !== '')?.trim() ?? '';
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+}

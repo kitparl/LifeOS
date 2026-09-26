@@ -30,6 +30,7 @@ import { ThemeIntegrationService } from '../../services/theme/theme-integration.
 import { EditorDocument } from '../../models/editor-document.model';
 import { CodeExecutionRequest, CodeExecutionResult } from '../../models/code-execution.model';
 import {
+  ParsedCodeBlock,
   isExecutableLanguage,
   normalizeExecutableLanguage,
   parseFencedCodeBlocks,
@@ -94,6 +95,10 @@ export class CodeWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   @Input() defaultViewMode: WorkspaceViewMode = 'write';
   @Input() previewVariant: 'default' | 'journal' = 'default';
   @Input() enableFilePaste = false;
+  /** Executable fences that get an inline Run button in the preview (opt-in). */
+  @Input() runnableBlocks: ParsedCodeBlock[] = [];
+  @Input() runningBlockId: string | null = null;
+  @Input() runDisabled = false;
 
   // ========== OUTPUTS ==========
   
@@ -101,6 +106,7 @@ export class CodeWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   @Output() run = new EventEmitter<CodeExecutionRequest>();
   @Output() save = new EventEmitter<EditorDocument>();
   @Output() filesPasted = new EventEmitter<File[]>();
+  @Output() runBlock = new EventEmitter<ParsedCodeBlock>();
 
   // ========== STATE ==========
   

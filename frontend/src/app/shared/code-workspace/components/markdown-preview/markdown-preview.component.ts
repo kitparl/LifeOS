@@ -1,24 +1,32 @@
 import {
   Component,
+  EventEmitter,
   Input,
   OnChanges,
+  Output,
   SimpleChanges,
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { MarkdownService } from '../../services/markdown.service';
 import { FileImageSrcDirective } from '../../../markdown/file-image-src.directive';
+import { RunnableFencesDirective } from '../../directives/runnable-fences.directive';
+import { ParsedCodeBlock } from '../../utils/fenced-code-blocks';
 
 @Component({
   selector: 'app-markdown-preview',
   standalone: true,
-  imports: [CommonModule, FileImageSrcDirective],
+  imports: [CommonModule, FileImageSrcDirective, RunnableFencesDirective],
   template: `
     <div
       class="markdown-preview-container markdown-body"
       role="article"
       aria-label="Markdown preview"
       appFileImageSrc
+      [appRunnableFences]="runnableBlocks"
+      [runningFenceId]="runningBlockId"
+      [fenceRunDisabled]="runDisabled"
+      (fenceRun)="runBlock.emit($event)"
       [class.theme-light]="theme === 'light'"
       [class.theme-dark]="theme === 'dark'"
       [class.journal-reader]="variant === 'journal'"
@@ -59,6 +67,12 @@ export class MarkdownPreviewComponent implements OnChanges {
   @Input() content = '';
   @Input() theme: 'light' | 'dark' | 'system' = 'light';
   @Input() variant: 'default' | 'journal' = 'default';
+  /** Executable fences to decorate with an inline Run button (opt-in). */
+  @Input() runnableBlocks: ParsedCodeBlock[] = [];
+  @Input() runningBlockId: string | null = null;
+  @Input() runDisabled = false;
+
+  @Output() runBlock = new EventEmitter<ParsedCodeBlock>();
 
   renderedContent: SafeHtml = '';
 

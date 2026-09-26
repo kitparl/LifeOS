@@ -1,6 +1,5 @@
 import {
   Component,
-  DestroyRef,
   EventEmitter,
   Input,
   OnChanges,
@@ -9,55 +8,26 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import {
   CodeOutputComponent,
   CodeWorkspaceComponent,
 } from '../../shared/code-workspace';
-import { CodeExecutionService } from '../../shared/code-workspace/services/code-execution.service';
-import { CodeExecutionResult } from '../../shared/code-workspace/models/code-execution.model';
 import { EditorDocument } from '../../shared/code-workspace/models/editor-document.model';
-import {
-  isExecutableLanguage,
-  normalizeExecutableLanguage,
-} from '../../shared/code-workspace/utils/fenced-code-blocks';
 import { FilesService } from '../files/services/files.service';
 import { FileRecord } from '../files/models/file.models';
 import { CodeBlock, KnowledgeSection } from './models/knowledge-notes.models';
 import { KnowledgeNotesService } from './services/knowledge-notes.service';
+import { KnowledgeCodeRunnerService } from './services/knowledge-code-runner.service';
+import { KnowledgeRunBarComponent } from './components/knowledge-run-bar.component';
 
 @Component({
   selector: 'app-knowledge-notes-editor',
   standalone: true,
-  imports: [CodeWorkspaceComponent, CodeOutputComponent],
+  imports: [CodeWorkspaceComponent, CodeOutputComponent, KnowledgeRunBarComponent],
   template: `
     <div class="space-y-2">
-      @if (executableBlocks.length > 0) {
-        <div class="kn-python">
-          @if (executionEnabled) {
-            <span class="kn-python__status">Python enabled</span>
-            @for (block of executableBlocks; track block.id) {
-              <button
-                type="button"
-                class="btn-secondary text-xs"
-                [disabled]="runningBlockId === block.id"
-                (click)="onRunCode(block)"
-              >
-                {{ runningBlockId === block.id ? 'Running…' : 'Run ' + block.language }}
-              </button>
-            }
-            <button type="button" class="btn-ghost text-xs" (click)="executionEnabled = false">
-              Disable run
-            </button>
-          } @else {
-            <span class="kn-python__status kn-python__status--off">Python disabled</span>
-            <button type="button" class="btn-ghost text-xs" (click)="executionEnabled = true">
-              Enable
-            </button>
-          }
-        </div>
-      }
+      <app-knowledge-run-bar [blocks]="executableBlocks" [sectionId]="section.id" [showPicker]="true" />
 
       @if (uploadStatus || uploadError) {
         <div class="kn-python">
@@ -87,16 +57,20 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
             (contentChange)="onContentChange($event)"
             (save)="onSave($event)"
             (filesPasted)="onFilesPasted($event)"
+            [runnableBlocks]="executableBlocks"
+            [runningBlockId]="runner.runningBlockId()"
+            [runDisabled]="!runner.enabled()"
+            (runBlock)="onRunCode($event)"
           />
         </div>
       }
 
-      @if (lastResult) {
+      @if (runner.lastResult(); as result) {
         <app-code-output
-          [result]="lastResult"
+          [result]="result"
           [expanded]="true"
           [maxHeight]="240"
-          (cleared)="clearOutput()"
+          (cleared)="runner.clear()"
         />
       }
     </div>
@@ -104,9 +78,8 @@ import { KnowledgeNotesService } from './services/knowledge-notes.service';
 })
 export class KnowledgeNotesEditorComponent implements OnChanges {
   private readonly knowledgeNotes = inject(KnowledgeNotesService);
-  private readonly execution = inject(CodeExecutionService);
+  readonly runner = inject(KnowledgeCodeRunnerService);
   private readonly filesService = inject(FilesService);
-  private readonly destroyRef = inject(DestroyRef);
 
   @ViewChild(CodeWorkspaceComponent) workspace?: CodeWorkspaceComponent;
 
@@ -120,14 +93,9 @@ export class KnowledgeNotesEditorComponent implements OnChanges {
 
   editorReady = false;
   editorContent = '';
-  executionEnabled = true;
   executableBlocks: CodeBlock[] = [];
-  runningBlockId: string | null = null;
-  lastResult: CodeExecutionResult | null = null;
   uploadStatus = '';
   uploadError = '';
-
-  private blockResults = new Map<string, CodeExecutionResult>();
 
   ngOnChanges(changes: SimpleChanges): void {
     const change = changes['section'];
@@ -189,53 +157,12 @@ export class KnowledgeNotesEditorComponent implements OnChanges {
     return type.startsWith('image/') ? `![${name}](${url})` : `[${name}](${url})`;
   }
 
-  clearOutput(): void {
-    this.lastResult = null;
-  }
-
   onRunCode(block: CodeBlock): void {
-    if (!this.executionEnabled || this.runningBlockId) {
-      return;
-    }
-    const language = normalizeExecutableLanguage(block.language);
-    this.runningBlockId = block.id;
-    this.execution
-      .execute({
-        language,
-        code: block.code,
-        executionId: `${this.section.id}_${block.id}`,
-      })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (result) => this.storeResult(block, result),
-        error: (error) =>
-          this.storeResult(block, {
-            success: false,
-            stdout: '',
-            stderr: '',
-            error: error?.message || 'Execution failed',
-            exitCode: 1,
-          }),
-      });
-  }
-
-  private storeResult(block: CodeBlock, result: CodeExecutionResult): void {
-    this.runningBlockId = null;
-    this.lastResult = result;
-    this.blockResults.set(block.id, result);
-    block.executionResult = {
-      output: result.stdout || result.stderr || '',
-      error: result.success ? null : result.error || result.stderr || 'Execution failed',
-      executionTime: result.executionTimeMs ?? 0,
-      timestamp: new Date(),
-    };
+    this.runner.run(this.section.id, block);
   }
 
   private prepareSection(section: KnowledgeSection): void {
     this.editorReady = false;
-    this.lastResult = null;
-    this.blockResults.clear();
-    this.runningBlockId = null;
     this.uploadStatus = '';
     this.uploadError = '';
 
@@ -253,7 +180,6 @@ export class KnowledgeNotesEditorComponent implements OnChanges {
   }
 
   private refreshBlocks(content: string): void {
-    const blocks = this.knowledgeNotes.parseCodeBlocks(content);
-    this.executableBlocks = blocks.filter((block) => isExecutableLanguage(block.language));
+    this.executableBlocks = this.knowledgeNotes.executableCodeBlocks(content);
   }
 }

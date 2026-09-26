@@ -129,6 +129,10 @@ export class KnowledgeNotesService {
     return blocks;
   }
 
+  executableCodeBlocks(markdown: string): CodeBlock[] {
+    return this.parseCodeBlocks(markdown).filter((block) => isExecutableLanguage(block.language));
+  }
+
   hasExecutableCode(section: KnowledgeSection): boolean {
     const blocks = section.codeBlocks ?? this.parseCodeBlocks(section.content || '');
     return blocks.some((block) => isExecutableLanguage(block.language));

@@ -59,6 +59,7 @@ describe('KnowledgeSubjectComponent', () => {
   let notes: {
     getSubject: jasmine.Spy;
     parseCodeBlocks: jasmine.Spy;
+    executableCodeBlocks: jasmine.Spy;
     enrichSection: jasmine.Spy;
     updateSection: jasmine.Spy;
     updateChapter: jasmine.Spy;
@@ -79,6 +80,7 @@ describe('KnowledgeSubjectComponent', () => {
     notes = {
       getSubject: jasmine.createSpy('getSubject').and.callFake(() => of(structuredClone(subject))),
       parseCodeBlocks: jasmine.createSpy('parseCodeBlocks').and.returnValue([]),
+      executableCodeBlocks: jasmine.createSpy('executableCodeBlocks').and.returnValue([]),
       enrichSection: jasmine.createSpy('enrichSection').and.callFake((s: unknown) => s),
       updateSection: jasmine
         .createSpy('updateSection')

@@ -1,4 +1,13 @@
-import { Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MarkdownImportButtonComponent } from '../../../shared/markdown/markdown-import-button.component';
 import { MarkdownImportResult } from '../../../shared/markdown/markdown-import.service';
@@ -10,7 +19,12 @@ import { FileRecord } from '../../files/models/file.models';
 import { GitHubSectionSyncDisplay } from '../../integrations/services/integrations.service';
 import { KnowledgeNotesEditorComponent } from '../knowledge-notes-editor.component';
 import { GitHubSyncButtonComponent } from '../github-sync-button.component';
-import { KnowledgeSection } from '../models/knowledge-notes.models';
+import { CodeBlock, KnowledgeSection } from '../models/knowledge-notes.models';
+import { CodeOutputComponent } from '../../../shared/code-workspace/components/code-output/code-output.component';
+import { RunnableFencesDirective } from '../../../shared/code-workspace/directives/runnable-fences.directive';
+import { KnowledgeNotesService } from '../services/knowledge-notes.service';
+import { KnowledgeCodeRunnerService } from '../services/knowledge-code-runner.service';
+import { KnowledgeRunBarComponent } from './knowledge-run-bar.component';
 
 @Component({
   selector: 'app-knowledge-section-editor',
@@ -24,7 +38,11 @@ import { KnowledgeSection } from '../models/knowledge-notes.models';
     MarkdownImportButtonComponent,
     MarkdownExportButtonComponent,
     GitHubSyncButtonComponent,
+    KnowledgeRunBarComponent,
+    RunnableFencesDirective,
+    CodeOutputComponent,
   ],
+  providers: [KnowledgeCodeRunnerService],
   host: { class: 'contents' },
   template: `
           <section class="kn-main">
@@ -111,7 +129,26 @@ import { KnowledgeSection } from '../models/knowledge-notes.models';
                   </div>
                 </div>
                 @if (previewOnly) {
-                  <div class="markdown-body panel" appFileImageSrc [innerHTML]="form.controls.content.value | markdown"></div>
+                  <div class="space-y-2">
+                    <app-knowledge-run-bar [blocks]="viewBlocks" [sectionId]="sec.id" />
+                    <div
+                      class="markdown-body panel"
+                      appFileImageSrc
+                      [appRunnableFences]="viewBlocks"
+                      [runningFenceId]="runner.runningBlockId()"
+                      [fenceRunDisabled]="!runner.enabled()"
+                      (fenceRun)="runner.run(sec.id, $event)"
+                      [innerHTML]="form.controls.content.value | markdown"
+                    ></div>
+                    @if (runner.lastResult(); as result) {
+                      <app-code-output
+                        [result]="result"
+                        [expanded]="true"
+                        [maxHeight]="240"
+                        (cleared)="runner.clear()"
+                      />
+                    }
+                  </div>
                 } @else {
                   <app-knowledge-notes-editor
                     [section]="sec"
@@ -151,7 +188,10 @@ import { KnowledgeSection } from '../models/knowledge-notes.models';
           </section>
   `,
 })
-export class KnowledgeSectionEditorComponent {
+export class KnowledgeSectionEditorComponent implements OnChanges {
+  private readonly knowledgeNotes = inject(KnowledgeNotesService);
+  readonly runner = inject(KnowledgeCodeRunnerService);
+
   @ViewChild(KnowledgeNotesEditorComponent) editor?: KnowledgeNotesEditorComponent;
   @ViewChild('historyList') historyList?: AttachmentListComponent;
 
@@ -187,6 +227,27 @@ export class KnowledgeSectionEditorComponent {
   @Output() readonly editorReady = new EventEmitter<void>();
   @Output() readonly inlineFilesChanged = new EventEmitter<void>();
   @Output() readonly documentRemoved = new EventEmitter<FileRecord>();
+
+  private viewBlocksContent: string | null = null;
+  private viewBlocksCache: CodeBlock[] = [];
+
+  ngOnChanges(changes: SimpleChanges): void {
+    const change = changes['section'];
+    const previous = change?.previousValue as KnowledgeSection | null | undefined;
+    if (change && previous?.id !== this.section?.id) {
+      this.runner.reset();
+    }
+  }
+
+  /** Executable blocks for view mode; stable reference while content is unchanged. */
+  get viewBlocks(): CodeBlock[] {
+    const content = this.form.controls.content.value ?? '';
+    if (content !== this.viewBlocksContent) {
+      this.viewBlocksContent = content;
+      this.viewBlocksCache = this.knowledgeNotes.executableCodeBlocks(content);
+    }
+    return this.viewBlocksCache;
+  }
 
   resolveGitHubSyncStatus(sectionId: string): GitHubSectionSyncDisplay | null {
     if (!this.githubConfigured) return null;
