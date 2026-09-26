@@ -1,3 +1,4 @@
+import { HttpStatusCode } from '@angular/common/http';
 import { Component, ElementRef, HostListener, OnInit, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { Observable } from 'rxjs';
@@ -193,7 +194,7 @@ export class CollectionMenuComponent implements OnInit {
       error: (err: unknown) => {
         this.busy.set(false);
         this.error.set(
-          (err as { status?: number })?.status === 409
+          (err as { status?: number })?.status === HttpStatusCode.Conflict
             ? 'A collection with this name already exists.'
             : newsErrorMessage(newsErrorCode(err)),
         );

@@ -6,6 +6,7 @@ import { DateTimeInputComponent } from '../../shared/date-time-input.component';
 import { DevHistoryPanelComponent } from '../../shared/dev-history-panel.component';
 import { DevHistoryEntry, DevHistoryService } from '../../shared/dev-history.service';
 import { extractWallClockParts } from '../../shared/datetime-parse.util';
+import { utcIsoMinute } from '../../../../core/utils/date';
 
 const OFFSETS: number[] = [];
 for (let m = -12 * 60; m <= 14 * 60; m += 30) OFFSETS.push(m);
@@ -85,7 +86,7 @@ export class Iso8601FormatterToolComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const now = new Date();
     now.setSeconds(0, 0);
-    this.localValue.set(now.toISOString().slice(0, 16));
+    this.localValue.set(utcIsoMinute(now));
     this.scheduleHistoryRecord();
   }
 

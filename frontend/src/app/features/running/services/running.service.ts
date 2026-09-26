@@ -13,6 +13,7 @@ import {
   RunningSettings,
   RunningStats,
 } from '../models/running.models';
+import { toPage } from '../../../core/utils/http';
 
 @Injectable({ providedIn: 'root' })
 export class RunningService {
@@ -29,10 +30,7 @@ export class RunningService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<RunListItem[]>(`${this.api}/runs`, { params, observe: 'response' }).pipe(
-      map((response) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

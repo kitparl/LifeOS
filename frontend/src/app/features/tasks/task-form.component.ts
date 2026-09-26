@@ -4,8 +4,10 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { PublicUser } from '../../core/models/auth.models';
 import { UserPickerComponent } from './components/user-picker.component';
 import { TASK_PRIORITIES, TASK_RECURRENCE, TASK_STATUSES, TaskPriority, TaskRecurrence, TaskStatus } from './models/task.models';
-import { combineDueDate, localDateInputValue, splitDueDate } from './task-due-date.util';
+import { combineDueDate, splitDueDate } from './task-due-date.util';
 import { TasksService } from './services/tasks.service';
+import { localIsoDate } from '../../core/utils/date';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-task-form',
@@ -124,7 +126,7 @@ export class TaskFormComponent implements OnInit {
     category: [''],
     tags: [''],
     description: [''],
-    due_date: [localDateInputValue()],
+    due_date: [localIsoDate()],
     due_time: [''],
   });
 
@@ -201,7 +203,7 @@ export class TaskFormComponent implements OnInit {
     req.subscribe({
       next: (task) => this.router.navigate(['/tasks', task.id]),
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save task';
+        this.error = apiErrorMessage(err, 'Failed to save task');
         this.saving = false;
       },
     });

@@ -13,11 +13,11 @@ import {
   StickyNote,
   StickyNoteMonth,
   stickyNoteDisplayTitle,
-  stickyNoteMonthKey,
   stickyNoteMonthLabel,
   stickyNoteYearOptions,
 } from './models/sticky-note.models';
 import { StickyNotesService } from './services/sticky-notes.service';
+import { yearMonthKey } from '../../core/utils/date';
 
 type NotesView = 'period' | 'all' | 'deleted';
 
@@ -223,7 +223,7 @@ export class StickyNotesPageComponent implements OnInit {
   readonly year = signal(new Date().getFullYear());
   readonly month = signal(new Date().getMonth() + 1);
   readonly view = signal<NotesView>('period');
-  readonly monthKey = computed(() => stickyNoteMonthKey(this.year(), this.month()));
+  readonly monthKey = computed(() => yearMonthKey(this.year(), this.month()));
   readonly isPeriodView = computed(() => this.view() === 'period');
   readonly isAllView = computed(() => this.view() === 'all');
   readonly isDeletedView = computed(() => this.view() === 'deleted');

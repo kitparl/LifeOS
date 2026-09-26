@@ -1,3 +1,4 @@
+import { HttpStatusCode } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
@@ -127,7 +128,7 @@ export class NewsCollectionPageComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.loading.set(false);
-        if ((err as { status?: number })?.status === 404) this.notFound.set(true);
+        if ((err as { status?: number })?.status === HttpStatusCode.NotFound) this.notFound.set(true);
         else this.error.set(newsErrorCode(err));
       },
     });

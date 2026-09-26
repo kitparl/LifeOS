@@ -1,93 +1,32 @@
-import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { delay, catchError } from 'rxjs/operators';
+import { delay } from 'rxjs/operators';
 import { BaseExecutor, ExecutionType } from './base.executor';
 import { CodeExecutionRequest, CodeExecutionResult } from '../models/code-execution.model';
 
 /**
- * Backend executor for server-side code execution.
- * 
- * Phase 1: Mock implementation that returns appropriate messages
- * Phase 2: Will integrate with real backend API
- * 
- * API Contract:
- * POST /api/code/execute
- * Request: { language, code, stdin?, timeoutMs? }
- * Response: { success, stdout, stderr, exitCode?, executionTimeMs?, error? }
- * 
- * Supported languages (backend execution):
- * - Java
- * - C
- * - C++
- * - C#
- * - Go
- * - Rust
- * - PHP
+ * Executor for languages that would need server-side execution
+ * (Java, C, C++, C#, Go, Rust, PHP).
+ *
+ * The backend has no code-execution endpoint, so this returns a "not implemented yet"
+ * message that echoes the user's code. Browser/WASM languages use their own executors.
  */
 export class BackendExecutor implements BaseExecutor {
   readonly language: string;
   readonly executionType: ExecutionType = 'backend';
 
-  private readonly API_ENDPOINT = '/api/code/execute';
-  /** Backend `/api/code/execute` is not implemented; mock responses only. Keep CDN pyodide/sql.js. */
-  private readonly MOCK_MODE = true;
-
-  constructor(
-    private http: HttpClient,
-    language: string
-  ) {
+  constructor(language: string) {
     this.language = language;
   }
 
-  /**
-   * Execute code via backend API (or mock for Phase 1)
-   */
   execute(request: CodeExecutionRequest): Observable<CodeExecutionResult> {
-    const executionId = request.executionId || this.generateExecutionId();
-
-    if (this.MOCK_MODE) {
-      return this.mockExecute(request, executionId);
-    }
-
-    // Real backend execution (Phase 2)
-    return this.http.post<CodeExecutionResult>(this.API_ENDPOINT, {
-      language: request.language,
-      code: request.code,
-      stdin: request.stdin,
-      timeoutMs: request.timeoutMs || 30000,
-    }).pipe(
-      catchError(error => {
-        return of({
-          success: false,
-          stdout: '',
-          stderr: '',
-          error: `Backend execution failed: ${error.message}`,
-          exitCode: 1,
-          executionId,
-        });
-      })
-    );
+    return this.mockExecute(request, request.executionId || this.generateExecutionId());
   }
 
-  /**
-   * Stop execution (send cancel request to backend)
-   */
-  stop(executionId: string): void {
-    if (this.MOCK_MODE) {
-      console.log(`Mock: Stopping execution ${executionId}`);
-      return;
-    }
-
-    // Send cancel request to backend (Phase 2)
-    this.http.post(`${this.API_ENDPOINT}/cancel`, { executionId }).subscribe({
-      next: () => console.log(`Execution ${executionId} cancelled`),
-      error: (error) => console.error(`Failed to cancel execution: ${error.message}`),
-    });
+  /** Nothing runs server-side, so there is nothing to cancel. */
+  stop(_executionId: string): void {
+    return;
   }
 
-  /**
-   * Backend is always ready (mock mode)
-   */
   async isReady(): Promise<boolean> {
     return true;
   }
@@ -223,10 +162,7 @@ Next Steps:
     return `backend_${this.language}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Create backend executor for a specific language
-   */
-  static forLanguage(http: HttpClient, language: string): BackendExecutor {
-    return new BackendExecutor(http, language);
+  static forLanguage(language: string): BackendExecutor {
+    return new BackendExecutor(language);
   }
 }

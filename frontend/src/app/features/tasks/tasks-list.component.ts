@@ -3,9 +3,10 @@ import { FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { forkJoin, Observable, tap } from 'rxjs';
 import { TaskListSectionComponent } from './task-list-section.component';
-import { combineDueDate, localDateInputValue } from './task-due-date.util';
+import { combineDueDate } from './task-due-date.util';
 import { TaskListItem, TaskScope } from './models/task.models';
 import { TasksService } from './services/tasks.service';
+import { localIsoDate } from '../../core/utils/date';
 
 type TaskListKey = 'today' | 'overdue' | 'nodate' | 'upcoming';
 /** Overdue is shown inside the Today view, so it has no view of its own. */
@@ -322,7 +323,7 @@ export class TasksListComponent implements OnInit {
     this.scheduleTaskTitle = this.findTask(id)?.title ?? 'task';
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    this.scheduleDate = localDateInputValue(d);
+    this.scheduleDate = localIsoDate(d);
     this.scheduleTime = '';
   }
 

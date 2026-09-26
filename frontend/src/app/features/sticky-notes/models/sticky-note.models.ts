@@ -22,12 +22,6 @@ export interface StickyNoteMonth {
 /** Matches STICKY_NOTES_PURGE_AFTER_DAYS in backend/app/modules/sticky_notes/service.py. */
 export const STICKY_NOTES_PURGE_AFTER_DAYS = 60;
 
-/** Special filter value meaning "every month", as opposed to a "YYYY-MM" month key. */
-export const ALL_MONTHS_FILTER = 'all';
-
-/** Special filter value for browsing soft-deleted notes. */
-export const DELETED_FILTER = 'deleted';
-
 export const STICKY_NOTE_COLORS: { value: StickyNoteColor; label: string }[] = [
   { value: 'yellow', label: 'Yellow' },
   { value: 'pink', label: 'Pink' },
@@ -50,13 +44,6 @@ export function stickyNoteMonthLabel(month: string): string {
   return new Date(year, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
-export function stickyNoteMonthKey(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, '0')}`;
-}
-
-export function currentMonthKey(now = new Date()): string {
-  return stickyNoteMonthKey(now.getFullYear(), now.getMonth() + 1);
-}
 
 /** Years with notes, the selected year, and the last 10 calendar years. */
 export function stickyNoteYearOptions(

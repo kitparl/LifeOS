@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, Output, OnChanges, SimpleChanges, injec
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ModalComponent } from '../../../shared/modal/modal.component';
 import { LoanForeclosurePayload } from '../models/finance.models';
-import { todayIso } from '../utils/period';
+import { localIsoDate } from '../../../core/utils/date';
 
 /**
  * Records an early loan settlement. The foreclosure amount is entered by the
@@ -54,14 +54,14 @@ export class ForecloseFormComponent implements OnChanges {
   @Output() readonly saved = new EventEmitter<LoanForeclosurePayload>();
 
   readonly form = this.fb.nonNullable.group({
-    foreclosure_date: [todayIso(), Validators.required],
+    foreclosure_date: [localIsoDate(), Validators.required],
     foreclosure_amount: [0, [Validators.required, Validators.min(0.01)]],
     notes: [''],
   });
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!changes['open'] || !this.open) return;
-    this.form.reset({ foreclosure_date: todayIso(), foreclosure_amount: 0, notes: '' });
+    this.form.reset({ foreclosure_date: localIsoDate(), foreclosure_amount: 0, notes: '' });
   }
 
   submit(): void {

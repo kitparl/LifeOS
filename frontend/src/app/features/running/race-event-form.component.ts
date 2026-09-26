@@ -11,7 +11,9 @@ import {
   raceDistanceLabel,
 } from './models/running.models';
 import { RunningService } from './services/running.service';
-import { isPastDate, todayIsoDate } from './running-date.utils';
+import { isPastDate } from './running-date.utils';
+import { utcIsoDate } from '../../core/utils/date';
+import { apiErrorMessage } from '../../core/utils/http';
 
 interface EventPhotoItem {
   url: string;
@@ -323,7 +325,7 @@ export class RaceEventFormComponent implements OnInit {
 
   form = this.fb.nonNullable.group({
     name: ['', Validators.required],
-    race_date: [todayIsoDate(), Validators.required],
+    race_date: [utcIsoDate(), Validators.required],
     distance_label: ['Marathon', Validators.required],
     organizer: [''],
     location: [''],
@@ -545,7 +547,7 @@ export class RaceEventFormComponent implements OnInit {
         void this.router.navigate(['/running'], { queryParams: { tab: 'events' } });
       },
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save event';
+        this.error = apiErrorMessage(err, 'Failed to save event');
         this.saving = false;
       },
     });

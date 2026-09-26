@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HABIT_FREQUENCIES, HabitFrequency } from './models/habit.models';
 import { HabitsService } from './services/habits.service';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-habit-form',
@@ -107,7 +108,7 @@ export class HabitFormComponent implements OnInit {
     req.subscribe({
       next: (habit) => this.router.navigate(['/habits', habit.id]),
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save habit';
+        this.error = apiErrorMessage(err, 'Failed to save habit');
         this.saving = false;
       },
     });

@@ -1,4 +1,4 @@
-import { combineDueDate, localDateInputValue, splitDueDate } from './task-due-date.util';
+import { combineDueDate, splitDueDate } from './task-due-date.util';
 
 describe('task-due-date.util', () => {
   it('combines date-only as noon local', () => {
@@ -23,9 +23,5 @@ describe('task-due-date.util', () => {
   it('splits noon-only due dates without time field', () => {
     const noon = combineDueDate('2026-08-22', '')!;
     expect(splitDueDate(noon)).toEqual({ date: '2026-08-22', time: '' });
-  });
-
-  it('formats today for date input', () => {
-    expect(localDateInputValue(new Date(2026, 7, 22))).toBe('2026-08-22');
   });
 });

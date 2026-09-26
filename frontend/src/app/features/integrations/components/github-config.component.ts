@@ -6,6 +6,7 @@ import {
   GitHubConfigUpdate,
   IntegrationsService,
 } from '../services/integrations.service';
+import { apiErrorMessage } from '../../../core/utils/http';
 
 @Component({
   selector: 'app-github-config',
@@ -206,7 +207,7 @@ export class GithubConfigComponent implements OnInit {
       },
       error: (err) => {
         this.ghOk.set(false);
-        this.ghMessage.set(err?.error?.detail || 'Failed to save GitHub settings');
+        this.ghMessage.set(apiErrorMessage(err, 'Failed to save GitHub settings'));
         this.ghBusy.set(false);
       },
     });
@@ -224,7 +225,7 @@ export class GithubConfigComponent implements OnInit {
       },
       error: (err) => {
         this.ghOk.set(false);
-        this.ghMessage.set(err?.error?.detail || 'GitHub test failed');
+        this.ghMessage.set(apiErrorMessage(err, 'GitHub test failed'));
         this.ghBusy.set(false);
       },
     });

@@ -29,22 +29,22 @@ const originalConsole = {
   error: console.error,
 };
 
-console.log = (...args: any[]) => {
+console.log = (...args: unknown[]) => {
   consoleOutput.push(args.map(arg => String(arg)).join(' '));
   originalConsole.log(...args);
 };
 
-console.info = (...args: any[]) => {
+console.info = (...args: unknown[]) => {
   consoleOutput.push(args.map(arg => String(arg)).join(' '));
   originalConsole.info(...args);
 };
 
-console.warn = (...args: any[]) => {
+console.warn = (...args: unknown[]) => {
   consoleErrors.push('[WARN] ' + args.map(arg => String(arg)).join(' '));
   originalConsole.warn(...args);
 };
 
-console.error = (...args: any[]) => {
+console.error = (...args: unknown[]) => {
   consoleErrors.push('[ERROR] ' + args.map(arg => String(arg)).join(' '));
   originalConsole.error(...args);
 };
@@ -101,14 +101,15 @@ addEventListener('message', ({ data }: MessageEvent<ExecutionMessage>) => {
           executionTimeMs: Math.round(endTime - startTime),
         } as ResultMessage);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const endTime = performance.now();
+      const message = (error as Error).message;
       postMessage({
         type: 'error',
         executionId: data.executionId,
         stdout: consoleOutput.join('\n'),
-        stderr: consoleErrors.join('\n') + '\n' + error.message,
-        error: error.message,
+        stderr: consoleErrors.join('\n') + '\n' + message,
+        error: message,
         exitCode: 1,
         executionTimeMs: Math.round(endTime - startTime),
       } as ResultMessage);

@@ -83,3 +83,16 @@ export const EVENT_KINDS: { value: EventKind; label: string }[] = [
   { value: 'birthday', label: 'Birthday (yearly reminders)' },
   { value: 'immutable', label: 'Immutable (long reminder ladder)' },
 ];
+
+/** Category → display color */
+export const CATEGORY_COLORS: Record<EventCategory, string> = {
+  personal: '#3b82f6',
+  task: '#8b5cf6',
+  running: '#22c55e',
+  bill: '#ef4444',
+  learning: '#f59e0b',
+};
+
+export function categoryColor(category: EventCategory): string {
+  return CATEGORY_COLORS[category] ?? '#6b7280';
+}

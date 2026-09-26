@@ -1,10 +1,8 @@
 import {
   STICKY_NOTES_PURGE_AFTER_DAYS,
-  currentMonthKey,
   daysUntilPurge,
   normalizeTag,
   stickyNoteDisplayTitle,
-  stickyNoteMonthKey,
   stickyNoteMonthLabel,
   stickyNoteYearOptions,
 } from './sticky-note.models';
@@ -27,22 +25,6 @@ describe('sticky-note.models', () => {
   describe('stickyNoteMonthLabel', () => {
     it('formats a YYYY-MM key as a month/year label', () => {
       expect(stickyNoteMonthLabel('2026-01')).toBe('January 2026');
-    });
-  });
-
-  describe('currentMonthKey', () => {
-    it('returns a YYYY-MM string', () => {
-      expect(currentMonthKey()).toMatch(/^\d{4}-\d{2}$/);
-    });
-
-    it('uses the provided date', () => {
-      expect(currentMonthKey(new Date(2026, 8, 20))).toBe('2026-09');
-    });
-  });
-
-  describe('stickyNoteMonthKey', () => {
-    it('pads single-digit months', () => {
-      expect(stickyNoteMonthKey(2026, 1)).toBe('2026-01');
     });
   });
 

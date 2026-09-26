@@ -6,6 +6,7 @@ import { DateTimeInputComponent } from '../../shared/date-time-input.component';
 import { DevHistoryPanelComponent } from '../../shared/dev-history-panel.component';
 import { DevHistoryEntry, DevHistoryService } from '../../shared/dev-history.service';
 import { TIMEZONE_PRESETS, convertTimezone, listTimeZones } from './timezone.util';
+import { utcIsoMinute } from '../../../../core/utils/date';
 
 const HISTORY_DEBOUNCE_MS = 900;
 /** Matches the `input` shape recorded by scheduleHistoryRecord: "<dateTimeLocal> (<from> → <to>)". */
@@ -103,7 +104,7 @@ export class TimezoneConverterToolComponent implements OnInit, OnDestroy {
     this.fromZone.set(tz);
     const now = new Date();
     now.setSeconds(0, 0);
-    this.dateTimeLocal.set(now.toISOString().slice(0, 16));
+    this.dateTimeLocal.set(utcIsoMinute(now));
     this.scheduleHistoryRecord();
   }
 

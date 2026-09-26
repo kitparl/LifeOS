@@ -1,15 +1,11 @@
 import { PeriodSelection } from '../models/finance.models';
+import { localIsoDate, pad2 } from '../../../core/utils/date';
 
 /** 0 means every month in the selected year. */
 export const ALL_MONTHS = 0;
 
-export function todayIso(now = new Date()): string {
-  const offset = now.getTimezoneOffset() * 60000;
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
-}
-
 export function startOfMonthIso(now = new Date()): string {
-  return `${todayIso(now).slice(0, 7)}-01`;
+  return `${localIsoDate(now).slice(0, 7)}-01`;
 }
 
 export function currentYear(now = new Date()): number {
@@ -30,7 +26,7 @@ export function yearOptions(now = new Date()): number[] {
 
 export function lastDayOfMonthIso(year: number, month: number): string {
   const day = new Date(year, month, 0).getDate();
-  return `${year}-${pad(month)}-${pad(day)}`;
+  return `${year}-${pad2(month)}-${pad2(day)}`;
 }
 
 /** Default selection: the current calendar month, whether or not it has activity. */
@@ -54,11 +50,7 @@ export function periodFromYearMonth(
 
   return {
     preset: 'custom',
-    start: `${year}-${pad(month)}-01`,
+    start: `${year}-${pad2(month)}-01`,
     end: lastDayOfMonthIso(year, month),
   };
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
 }

@@ -1,13 +1,11 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { DownloadToken, FileRecord, FileUsage } from '../models/file.models';
+import { Page, toPage } from '../../../core/utils/http';
 
-export interface FileListResult {
-  items: FileRecord[];
-  total: number;
-}
+export type FileListResult = Page<FileRecord>;
 
 @Injectable({ providedIn: 'root' })
 export class FilesService {
@@ -26,10 +24,7 @@ export class FilesService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<FileRecord[]>(this.api, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<FileRecord[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

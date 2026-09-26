@@ -1,13 +1,11 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Notification, NotificationSettings } from '../models/notification.models';
+import { Page, toPage } from '../../../core/utils/http';
 
-export interface NotificationListResult {
-  items: Notification[];
-  total: number;
-}
+export type NotificationListResult = Page<Notification>;
 
 @Injectable({ providedIn: 'root' })
 export class NotificationsService {
@@ -24,10 +22,7 @@ export class NotificationsService {
       .set('limit', String(opts?.limit ?? 25));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<Notification[]>(this.api, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<Notification[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

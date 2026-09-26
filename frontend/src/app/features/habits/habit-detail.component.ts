@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Habit } from './models/habit.models';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { HabitsService } from './services/habits.service';
+import { utcIsoDate } from '../../core/utils/date';
 
 interface HeatmapDay {
   date: string;
@@ -150,7 +151,7 @@ export class HabitDetailComponent implements OnInit {
     for (let i = 89; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+      const key = utcIsoDate(d);
       days.push({ date: key, completed: logDates.has(key) });
     }
     return days;

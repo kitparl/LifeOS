@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, Output, OnChanges, SimpleChanges, injec
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ModalComponent } from '../../../shared/modal/modal.component';
 import { LoanPartPaymentPayload } from '../models/finance.models';
-import { todayIso } from '../utils/period';
+import { localIsoDate } from '../../../core/utils/date';
 
 /**
  * Records a part-payment as a tracking event. The user picks whether it
@@ -86,7 +86,7 @@ export class PartPaymentFormComponent implements OnChanges {
   // new_tenure_months / new_emi_amount are validated conditionally in canSubmit() —
   // only whichever one the chosen impact actually uses, not both unconditionally.
   readonly form = this.fb.nonNullable.group({
-    payment_date: [todayIso(), Validators.required],
+    payment_date: [localIsoDate(), Validators.required],
     amount: [0, [Validators.required, Validators.min(0.01)]],
     impact: ['REDUCE_TENURE' as 'REDUCE_TENURE' | 'REDUCE_EMI', Validators.required],
     new_tenure_months: [1],
@@ -97,7 +97,7 @@ export class PartPaymentFormComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (!changes['open'] || !this.open) return;
     this.form.reset({
-      payment_date: todayIso(),
+      payment_date: localIsoDate(),
       amount: 0,
       impact: 'REDUCE_TENURE',
       new_tenure_months: 1,

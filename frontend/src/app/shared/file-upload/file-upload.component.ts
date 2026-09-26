@@ -2,6 +2,7 @@ import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleCha
 import { FilesService } from '../../features/files/services/files.service';
 import { fileMatchesAccept, filesFromClipboard, filesFromDataTransfer, filterAccepted } from './clipboard-files';
 import { fileFingerprint, sha256Hex } from './file-hash';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-file-upload',
@@ -270,7 +271,7 @@ export class FileUploadComponent implements OnChanges, OnDestroy {
           });
         },
         error: (err) => {
-          this.error = err?.error?.detail || 'Upload failed';
+          this.error = apiErrorMessage(err, 'Upload failed');
           this.uploading = false;
           this.revokeLocalPreview();
           this.pendingPreview = '';

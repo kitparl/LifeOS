@@ -7,6 +7,7 @@ import {
   KnowledgeChapterDocument,
   KnowledgeChapterDocumentsGroup,
 } from '../models/knowledge-notes.models';
+import { formatBytes } from '../../../core/utils/format';
 
 @Component({
   selector: 'app-knowledge-chapter-documents',
@@ -21,7 +22,7 @@ import {
           @if (chapterFilter) {
             <button type="button" class="btn-ghost text-xs" (click)="showAll.emit()">All chapters</button>
           }
-          <button type="button" class="btn-secondary text-xs" (click)="close.emit()">Back to note</button>
+          <button type="button" class="btn-secondary text-xs" (click)="closed.emit()">Back to note</button>
         </div>
       </div>
 
@@ -97,7 +98,7 @@ export class KnowledgeChapterDocumentsComponent {
 
   @Output() readonly removed = new EventEmitter<KnowledgeChapterDocument>();
   @Output() readonly showAll = new EventEmitter<void>();
-  @Output() readonly close = new EventEmitter<void>();
+  @Output() readonly closed = new EventEmitter<void>();
   @Output() readonly openSection = new EventEmitter<{ sectionId: string; chapterId: string }>();
 
   get heading(): string {
@@ -128,9 +129,5 @@ export class KnowledgeChapterDocumentsComponent {
     });
   }
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
+  readonly formatSize = formatBytes;
 }

@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { QAEntry, QAListItem, QAListOptions, QAListResult } from '../models/qa.models';
+import { toPage } from '../../../core/utils/http';
 
 interface QAWritePayload {
   question?: string;
@@ -31,10 +32,7 @@ export class QAService {
     if (opts?.include_answer === false) params = params.set('include_answer', 'false');
     if (opts?.deleted === true) params = params.set('deleted', 'true');
     return this.http.get<QAListItem[]>(this.api, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<QAListItem[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

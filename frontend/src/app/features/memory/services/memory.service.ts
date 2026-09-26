@@ -1,7 +1,8 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { Page, toPage } from '../../../core/utils/http';
 
 export interface MemoryItem {
   id: string;
@@ -19,10 +20,7 @@ export interface MemorySummary {
   top_preferences: MemoryItem[];
 }
 
-export interface MemoryListResult {
-  items: MemoryItem[];
-  total: number;
-}
+export type MemoryListResult = Page<MemoryItem>;
 
 @Injectable({ providedIn: 'root' })
 export class MemoryService {
@@ -39,10 +37,7 @@ export class MemoryService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<MemoryItem[]>(`${this.api}/items`, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<MemoryItem[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

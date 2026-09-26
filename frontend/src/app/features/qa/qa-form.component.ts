@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { QAService } from './services/qa.service';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-qa-form',
@@ -119,7 +120,7 @@ export class QAFormComponent implements OnInit {
     req.subscribe({
       next: (e) => this.router.navigate(['/qa', e.id]),
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save';
+        this.error = apiErrorMessage(err, 'Failed to save');
         this.saving = false;
       },
     });

@@ -10,6 +10,8 @@ import {
   EventRecurrence,
 } from './models/calendar.models';
 import { CalendarService } from './services/calendar.service';
+import { utcIsoMinute } from '../../core/utils/date';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-event-form',
@@ -163,7 +165,7 @@ export class EventFormComponent implements OnInit {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(9, 0, 0, 0);
-      this.form.patchValue({ starts_at: tomorrow.toISOString().slice(0, 16) });
+      this.form.patchValue({ starts_at: utcIsoMinute(tomorrow) });
     }
   }
 
@@ -229,7 +231,7 @@ export class EventFormComponent implements OnInit {
     req.subscribe({
       next: (event) => this.router.navigate(['/calendar', event.id]),
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save event';
+        this.error = apiErrorMessage(err, 'Failed to save event');
         this.saving = false;
       },
     });

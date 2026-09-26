@@ -8,6 +8,7 @@ import {
   usernameErrorMessage,
   usernameFormatValidator,
 } from '../../core/validators/username.validator';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-profile',
@@ -238,8 +239,7 @@ export class ProfileComponent {
         this.usernameForm.markAsPristine();
       },
       error: (err) => {
-        const detail = err?.error?.detail;
-        this.usernameError.set(typeof detail === 'string' ? detail : 'Could not change username.');
+        this.usernameError.set(apiErrorMessage(err, 'Could not change username.'));
         this.confirmOpen.set(false);
         this.usernameSaving.set(false);
       },

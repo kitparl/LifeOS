@@ -91,7 +91,7 @@ import { Loan, LoanEMI, LoanSummary } from '../models/finance.models';
               </div>
             }
 
-            @if (loan.status === 'FORECLOSED' && loan.foreclosure_amount != null) {
+            @if (loan.status === 'FORECLOSED' && loan.foreclosure_amount !== null) {
               <p class="border-t border-[var(--xp-border)] px-3 py-2 text-xs" style="color: var(--text-muted)">
                 Foreclosed {{ loan.foreclosed_at | date: 'dd MMM yyyy' }} · {{ money(loan.foreclosure_amount) }}
               </p>

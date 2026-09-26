@@ -1,4 +1,3 @@
-import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   DEFAULT_PINNED_IDS,
@@ -9,10 +8,10 @@ import {
   isSidebarDestination,
 } from '../../shared/layout/nav-registry';
 import {
-  PreferencesApi,
   readJsonLocalStorage,
   writeJsonLocalStorage,
 } from './preferences-sync';
+import { PreferencesApiService } from './preferences-api.service';
 
 export interface NavPrefsValue {
   categoryOrder: string[];
@@ -65,7 +64,7 @@ function migrateFromLegacyPinned(ids: string[]): NavPrefsValue {
 
 @Injectable({ providedIn: 'root' })
 export class NavPreferencesService {
-  private readonly prefsApi = new PreferencesApi(inject(HttpClient));
+  private readonly prefsApi = inject(PreferencesApiService);
 
   private readonly prefs = signal<NavPrefsValue>(buildDefaultPrefs());
 

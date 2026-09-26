@@ -8,6 +8,7 @@ import {
   GoogleCalendarSyncDirection,
   IntegrationsService,
 } from '../services/integrations.service';
+import { apiErrorMessage } from '../../../core/utils/http';
 
 @Component({
   selector: 'app-google-calendar-config',
@@ -193,7 +194,7 @@ export class GoogleCalendarConfigComponent implements OnInit {
     this.message.set(null);
     this.integrations.startGoogleCalendarOAuth(this.direction).subscribe({
       next: (res) => (window.location.href = res.auth_url),
-      error: (err) => this.fail(err?.error?.detail || 'Could not start Google authorization'),
+      error: (err) => this.fail(apiErrorMessage(err, 'Could not start Google authorization')),
     });
   }
 
@@ -210,7 +211,7 @@ export class GoogleCalendarConfigComponent implements OnInit {
         this.connectionsChanged.emit();
       },
       error: (err) => {
-        this.fail(err?.error?.detail || 'Could not connect Google Calendar');
+        this.fail(apiErrorMessage(err, 'Could not connect Google Calendar'));
         this.load();
       },
     });
@@ -229,7 +230,7 @@ export class GoogleCalendarConfigComponent implements OnInit {
           this.busy.set(false);
           this.connectionsChanged.emit();
         },
-        error: (err) => this.fail(err?.error?.detail || 'Failed to save Google Calendar settings'),
+        error: (err) => this.fail(apiErrorMessage(err, 'Failed to save Google Calendar settings')),
       });
   }
 
@@ -243,7 +244,7 @@ export class GoogleCalendarConfigComponent implements OnInit {
         this.busy.set(false);
         this.load();
       },
-      error: (err) => this.fail(err?.error?.detail || 'Sync failed'),
+      error: (err) => this.fail(apiErrorMessage(err, 'Sync failed')),
     });
   }
 
@@ -263,7 +264,7 @@ export class GoogleCalendarConfigComponent implements OnInit {
         this.load();
         this.connectionsChanged.emit();
       },
-      error: (err) => this.fail(err?.error?.detail || 'Failed to disconnect'),
+      error: (err) => this.fail(apiErrorMessage(err, 'Failed to disconnect')),
     });
   }
 }

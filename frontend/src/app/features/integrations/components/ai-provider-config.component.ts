@@ -9,8 +9,8 @@ import {
   AiProviderConfigStatus,
   AiProviderConfigUpdate,
   IntegrationsService,
-  apiErrorMessage,
 } from '../services/integrations.service';
+import { apiErrorMessage } from '../../../core/utils/http';
 
 /** Where to create an API key for each provider (docs links only; model lists come from the API). */
 const KEY_URLS: Record<string, string> = {

@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { QAListItem, qaDaysUntilPurge } from './models/qa.models';
+import { yearMonthKey } from '../../core/utils/date';
 
 @Component({
   selector: 'app-qa-expandable-entry',
@@ -9,7 +10,7 @@ import { QAListItem, qaDaysUntilPurge } from './models/qa.models';
   imports: [RouterLink, DatePipe],
   template: `
     <article class="panel space-y-2">
-      <button type="button" class="w-full text-left" (click)="toggle.emit(entry.id)">
+      <button type="button" class="w-full text-left" (click)="toggled.emit(entry.id)">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
             @if (showDayPrefix) {
@@ -79,7 +80,7 @@ export class QAExpandableEntryComponent {
   @Input() dateFormat = 'mediumDate';
   @Input() deletedMode = false;
 
-  @Output() toggle = new EventEmitter<string>();
+  @Output() toggled = new EventEmitter<string>();
   @Output() remove = new EventEmitter<string>();
   @Output() restore = new EventEmitter<string>();
 
@@ -104,7 +105,7 @@ export class QAExpandableEntryComponent {
 
 export function monthGroupKey(isoDate: string): string {
   const d = new Date(isoDate);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return yearMonthKey(d.getFullYear(), d.getMonth() + 1);
 }
 
 export function monthGroupLabel(isoDate: string): string {

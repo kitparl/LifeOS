@@ -1,3 +1,4 @@
+import { HttpStatusCode } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
@@ -158,7 +159,7 @@ export class NewsCollectionsTabComponent implements OnInit {
 }
 
 function collectionError(err: unknown): string {
-  return (err as { status?: number })?.status === 409
+  return (err as { status?: number })?.status === HttpStatusCode.Conflict
     ? 'A collection with this name already exists.'
     : newsErrorMessage(newsErrorCode(err));
 }

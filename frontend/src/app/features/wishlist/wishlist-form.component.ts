@@ -11,6 +11,7 @@ import {
   WishlistStatus,
 } from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
+import { apiErrorMessage } from '../../core/utils/http';
 
 interface PhotoItem {
   url: string;
@@ -277,7 +278,7 @@ export class WishlistFormComponent implements OnInit {
     req.subscribe({
       next: (item) => this.router.navigate(['/wishlist', item.id]),
       error: (err) => {
-        this.error = err?.error?.detail || 'Failed to save';
+        this.error = apiErrorMessage(err, 'Failed to save');
         this.saving = false;
       },
     });

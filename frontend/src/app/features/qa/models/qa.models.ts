@@ -1,3 +1,4 @@
+import { Page } from '../../../core/utils/http';
 export interface QAVersion {
   id: string;
   version_number: number;
@@ -31,10 +32,7 @@ export interface QAEntry {
   versions: QAVersion[];
 }
 
-export interface QAListResult {
-  items: QAListItem[];
-  total: number;
-}
+export type QAListResult = Page<QAListItem>;
 
 export const QA_PURGE_AFTER_DAYS = 30;
 export type QAViewMode = 'all' | 'month' | 'deep' | 'deleted';

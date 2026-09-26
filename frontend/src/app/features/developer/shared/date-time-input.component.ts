@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { toDatetimeLocalValue } from './datetime-parse.util';
+import { toDatetimeLocalValue } from '../../../core/utils/date';
 
 /**
  * A date/time input that supports free typing and pasting (any format `Date` or

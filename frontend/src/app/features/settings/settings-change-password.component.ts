@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { SecretInputComponent } from '../../shared/secret-input/secret-input.component';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-settings-change-password',
@@ -95,7 +96,7 @@ export class SettingsChangePasswordComponent {
         this.form.reset();
       },
       error: (err) => {
-        const msg = err?.error?.detail ?? 'Could not change password. Please try again.';
+        const msg = apiErrorMessage(err, 'Could not change password. Please try again.');
         this.error.set(msg);
         this.saving.set(false);
       },

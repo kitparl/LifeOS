@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
@@ -15,11 +15,9 @@ import {
   TaskUpdate,
   TaskWatcher,
 } from '../models/task.models';
+import { Page, toPage } from '../../../core/utils/http';
 
-export interface TaskListResult {
-  items: TaskListItem[];
-  total: number;
-}
+export type TaskListResult = Page<TaskListItem>;
 
 export interface TaskStats {
   completed_today: number;
@@ -66,10 +64,7 @@ export class TasksService {
     return this.http
       .get<TaskListItem[]>(this.api, { params, observe: 'response' })
       .pipe(
-        map((response: HttpResponse<TaskListItem[]>) => ({
-          items: response.body ?? [],
-          total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-        })),
+        map(toPage),
       );
   }
 

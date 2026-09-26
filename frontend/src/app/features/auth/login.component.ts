@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, ElementRef, NgZone, ViewChild, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpStatusCode } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -456,7 +456,7 @@ export class LoginComponent implements AfterViewInit {
     this.auth.googleLogin(credential).subscribe({
       next: () => this.router.navigateByUrl('/'),
       error: (err: unknown) => {
-        const detail = err instanceof HttpErrorResponse && err.status === 401 ? err.error?.detail : null;
+        const detail = err instanceof HttpErrorResponse && err.status === HttpStatusCode.Unauthorized ? err.error?.detail : null;
         this.error.set(
           typeof detail === 'string' ? detail : 'Something went wrong signing in with Google. Please try again.',
         );

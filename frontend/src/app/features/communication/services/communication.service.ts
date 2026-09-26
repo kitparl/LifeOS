@@ -1,13 +1,11 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { SpeakingPractice, WritingEvaluation, WritingPractice, WritingRewrite } from '../models/communication.models';
+import { Page, toPage } from '../../../core/utils/http';
 
-export interface CommunicationListResult<T> {
-  items: T[];
-  total: number;
-}
+export type CommunicationListResult<T> = Page<T>;
 
 @Injectable({ providedIn: 'root' })
 export class CommunicationService {
@@ -24,10 +22,7 @@ export class CommunicationService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<WritingPractice[]>(`${this.api}/writing`, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<WritingPractice[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 
@@ -81,10 +76,7 @@ export class CommunicationService {
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http.get<SpeakingPractice[]>(`${this.api}/speaking`, { params, observe: 'response' }).pipe(
-      map((response: HttpResponse<SpeakingPractice[]>) => ({
-        items: response.body ?? [],
-        total: Number(response.headers.get('X-Total-Count') ?? response.body?.length ?? 0),
-      })),
+      map(toPage),
     );
   }
 

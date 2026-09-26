@@ -11,9 +11,3 @@ export function extractWallClockParts(raw: string): string {
   }
   return `${match[1]}T${match[2]}${match[3] ?? ':00'}`;
 }
-
-/** Formats a Date as the "YYYY-MM-DDTHH:mm" value the native datetime-local picker expects. */
-export function toDatetimeLocalValue(date: Date): string {
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}

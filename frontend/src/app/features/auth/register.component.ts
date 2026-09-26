@@ -9,6 +9,7 @@ import {
   usernameErrorMessage,
   usernameFormatValidator,
 } from '../../core/validators/username.validator';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-register',
@@ -133,12 +134,7 @@ export class RegisterComponent {
     this.auth.register(this.form.getRawValue()).subscribe({
       next: () => this.router.navigateByUrl('/'),
       error: (err) => {
-        const detail = err?.error?.detail;
-        this.error.set(
-          typeof detail === 'string'
-            ? detail
-            : 'Registration failed. Email or username may already be in use.',
-        );
+        this.error.set(apiErrorMessage(err, 'Registration failed. Email or username may already be in use.'));
         this.submitting.set(false);
       },
       complete: () => this.submitting.set(false),

@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, ParamMap, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
@@ -11,9 +11,11 @@ import { QAListComponent } from './qa-list.component';
 describe('QAListComponent', () => {
   let fixture: ComponentFixture<QAListComponent>;
   let http: HttpTestingController;
-  const queryParams$ = new BehaviorSubject(convertToParamMap({}));
+  // Fresh per test: a shared subject leaks `view` between tests under random spec order.
+  let queryParams$: BehaviorSubject<ParamMap>;
 
   beforeEach(async () => {
+    queryParams$ = new BehaviorSubject(convertToParamMap({}));
     await TestBed.configureTestingModule({
       imports: [QAListComponent],
       providers: [

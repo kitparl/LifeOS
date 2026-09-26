@@ -9,6 +9,8 @@ import { MarkdownExportButtonComponent } from '../../shared/markdown/markdown-ex
 import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { JOURNAL_TYPES, JournalType } from './models/journal.models';
 import { JournalService } from './services/journal.service';
+import { utcIsoDate } from '../../core/utils/date';
+import { apiErrorMessage } from '../../core/utils/http';
 
 @Component({
   selector: 'app-journal-form',
@@ -153,7 +155,7 @@ export class JournalFormComponent implements OnInit {
   previewOnly = false;
 
   form = this.fb.nonNullable.group({
-    entry_date: [new Date().toISOString().slice(0, 10), Validators.required],
+    entry_date: [utcIsoDate(), Validators.required],
     entry_type: ['morning' as JournalType, Validators.required],
     title: [''],
     content: ['', Validators.required],
@@ -233,7 +235,7 @@ export class JournalFormComponent implements OnInit {
     req.subscribe({
       next: (entry) => this.router.navigate(['/journal', entry.id]),
       error: (err) => {
-        this.error = typeof err?.error?.detail === 'string' ? err.error.detail : 'Failed to save entry';
+        this.error = apiErrorMessage(err, 'Failed to save entry');
         this.saving = false;
       },
     });
