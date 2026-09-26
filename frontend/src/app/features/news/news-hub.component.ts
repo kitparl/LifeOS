@@ -1,7 +1,9 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
+import { GuestLockedPanelComponent } from '../../shared/guest-locked/guest-locked-panel.component';
 import { TabHubComponent } from '../../shared/tab-hub/tab-hub.component';
+import { NEWS_ACCESS_MODE } from './news-access-mode';
 import { NewsCategoriesTabComponent } from './pages/categories-tab.component';
 import { NewsCollectionsTabComponent } from './pages/collections-tab.component';
 import { NewsLatestTabComponent } from './pages/latest-tab.component';
@@ -18,11 +20,15 @@ const TABS: { id: NewsTab; label: string }[] = [
   { id: 'collections', label: 'Collections' },
 ];
 
-/** News module: live news from FreeNewsAPI plus the user's saved articles and collections. */
+/**
+ * News module: live news from FreeNewsAPI plus the user's saved articles and collections.
+ * Guests keep every tab, but Saved and Collections show a Sign in panel and load nothing.
+ */
 @Component({
   selector: 'app-news-hub',
   standalone: true,
   imports: [
+    GuestLockedPanelComponent,
     TabHubComponent,
     NewsLatestTabComponent,
     NewsCategoriesTabComponent,
@@ -44,10 +50,18 @@ const TABS: { id: NewsTab; label: string }[] = [
           <app-news-search-tab />
         }
         @case ('saved') {
-          <app-news-saved-tab />
+          @if (isGuest) {
+            <app-guest-locked-panel [message]="lockedMessage" testId="news-saved-locked" />
+          } @else {
+            <app-news-saved-tab />
+          }
         }
         @case ('collections') {
-          <app-news-collections-tab />
+          @if (isGuest) {
+            <app-guest-locked-panel [message]="lockedMessage" testId="news-collections-locked" />
+          } @else {
+            <app-news-collections-tab />
+          }
         }
         @default {
           <app-news-latest-tab />
@@ -62,6 +76,8 @@ export class NewsHubComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly tabs = TABS;
+  readonly isGuest = inject(NEWS_ACCESS_MODE) === 'guest';
+  readonly lockedMessage = 'Saving and collections are part of your LifeOS account.';
   readonly tab = signal<NewsTab>('latest');
 
   ngOnInit(): void {

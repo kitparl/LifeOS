@@ -1,8 +1,8 @@
 # Feature: Explore Tools (guest access)
 
-Visitors can use a set of free LifeOS tools without an account. The login page has an **Explore free tools** button that opens a public shell with the same look and layout as the app (sidebar, header, mobile drawer and bottom nav). The only tool so far is **Developer**.
+Visitors can use a set of free LifeOS tools without an account. The login page has an **Explore free tools** button that opens a public shell with the same look and layout as the app (sidebar, header, mobile drawer and bottom nav). The free tools are **Developer** and **News**.
 
-This is frontend only. No backend, API, or database is involved.
+Developer is frontend only. News calls the public live-news endpoints (see [News for guests](#news-for-guests)); nothing a guest does creates a database row.
 
 ---
 
@@ -13,6 +13,9 @@ This is frontend only. No backend, API, or database is involved.
 | `/explore` | The tool list page (a card for each free tool) |
 | `/explore/developer` | The Developer dashboard |
 | `/explore/developer/<tool>` | A Developer tool, e.g. `/explore/developer/base64` |
+| `/explore/news` | The News hub (Latest, Categories, Search; Saved and Collections are locked) |
+| `/explore/news/article?url=…` | News article details |
+| `/explore/news/collections/<id>` | Redirects to `/explore/news?tab=collections` (locked) |
 | `/explore/<unknown>` | Redirects to `/explore` |
 
 - **Logged-in users** who open any `/explore/**` URL are redirected to the same page inside the app, keeping the sub-path, query string, and fragment. For example, `/explore/developer/base64` goes to `/developer/base64`. `/explore` itself goes to `/`. The redirect is `exploreGuard` in `frontend/src/app/features/explore/explore.guard.ts`.
@@ -54,7 +57,7 @@ Add **one entry** to `EXPLORE_TOOLS` in `frontend/src/app/features/explore/explo
 
 The sidebar, drawer, bottom nav (first 3 tools), tool list page, header title, and logged-in redirect all read from this registry. You don't need to change the shell.
 
-Only add tools that work fully client-side, or whose backend calls are public. Never add a private module.
+Only add tools that work fully client-side, or whose backend calls are public. Never add a private module. A tool with account-only parts (like News) must lock those parts for guests, not hide or call them.
 
 ---
 
@@ -84,3 +87,27 @@ How the scoping works:
 - `DEV_TOOLS_STORAGE_SCOPE` (`features/developer/shared/dev-storage-scope.ts`) defaults to `'user'`.
 - The explore route sets `'guest'` through `DEVELOPER_GUEST_PROVIDERS`, which also creates guest-only instances of `DevFavoritesService` and `DevHistoryService`.
 - The logged-in keys are unchanged, so no migration is needed.
+
+---
+
+## News for guests
+
+News routes live in `features/news/news.routes.ts` (`NEWS_ROUTES`) and are mounted at `/news` (app shell) and `/explore/news` (guest shell), like Developer. Back links are relative (`..`, `../..`). Article cards and rows render at different route depths (hub and collection page), so they build their link from `newsRootPath(mode)`.
+
+**Access mode.** `NEWS_ACCESS_MODE` (`features/news/news-access-mode.ts`) defaults to `'user'`. The explore mount sets `'guest'` through `NEWS_GUEST_PROVIDERS`. Components read the token; nothing sniffs the URL.
+
+| Surface | Signed in | Guest |
+|---------|-----------|-------|
+| Latest, Categories, Search, article details | Live news with saved stars | Same, `saved_article_id` always `null` |
+| Save star | Saves / unsaves, then offers "Add to collection?" | Locked star; click opens "Sign in to save articles" + **Sign in** |
+| Saved and Collections tabs | The user's library | Tab stays visible; shows "Not available for free users" + **Sign in**; loads nothing |
+| `/news/collections/:id` | Collection page | `newsAccountGuard` redirects to the locked Collections tab |
+
+Sign in links go to plain `/login` (the login page has no return-URL support yet). Guests are never auto-redirected to login.
+
+**Shared locked UI** (`shared/guest-locked/`), reusable by any future free tool:
+
+- `GuestLockedControlComponent`: keeps the projected trigger visible with `aria-disabled`, opens a small popover (`.menu` styles) on click with a message and **Sign in**. Closes on Escape (focus returns to the trigger) or an outside click. Works on touch.
+- `GuestLockedPanelComponent`: an `.empty-state` with a title, message, and **Sign in**.
+
+**Backend.** `GET /news/categories`, `/news/articles` and `/news/article` use `get_optional_user` (`app/core/deps.py`): no token means anonymous, and a bad token is still a 401. Anonymous callers get no saved-state lookup. The FreeNewsAPI proxy limit (`news_proxy_per_minute`) is per user when signed in and per client IP (hashed, `guest:<sha256>`) when anonymous; see `proxy_limit_key` in `app/modules/news/rate_limit.py`. Saved-article and collection routes still require `get_current_user`.

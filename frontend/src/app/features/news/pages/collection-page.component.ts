@@ -33,7 +33,7 @@ const PAGE_SIZE = 20;
   ],
   template: `
     <div class="mx-auto max-w-3xl space-y-3">
-      <a class="btn-ghost !min-h-8 !px-2 text-xs" routerLink="/news" [queryParams]="{ tab: 'collections' }">
+      <a class="btn-ghost !min-h-8 !px-2 text-xs" routerLink="../.." [queryParams]="{ tab: 'collections' }">
         <svg class="h-3.5 w-3.5" lucideIcon="chevron-left" aria-hidden="true"></svg>
         Collections
       </a>

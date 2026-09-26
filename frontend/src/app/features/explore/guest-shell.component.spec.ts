@@ -23,6 +23,12 @@ describe('GuestShellComponent', () => {
     }
   });
 
+  it('lists News alongside Developer', () => {
+    const el = render();
+    expect(el.querySelector('[data-testid="guest-shell-nav-news"]')?.getAttribute('href')).toBe('/explore/news');
+    expect(el.querySelector('[data-testid="guest-shell-nav-developer"]')).not.toBeNull();
+  });
+
   it('offers Sign in links to /login', () => {
     const el = render();
     for (const id of ['guest-shell-header-sign-in', 'guest-shell-sidebar-sign-in', 'guest-shell-mobile-sign-in']) {

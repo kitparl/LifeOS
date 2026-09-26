@@ -53,9 +53,36 @@ async def _expire(client, saved_id: str) -> None:
 # ------------------------------------------------------------------ live news proxy
 
 
-async def test_endpoints_require_auth(client):
-    for path in ("/api/v1/news/categories", "/api/v1/news/articles", "/api/v1/news/saved", "/api/v1/news/collections"):
+async def test_library_endpoints_require_auth(client):
+    for path in ("/api/v1/news/saved", "/api/v1/news/collections", "/api/v1/news/collections/c1/articles"):
         assert (await client.get(path)).status_code == 401
+    assert (await client.post("/api/v1/news/saved", json=_snapshot())).status_code == 401
+    assert (await client.delete("/api/v1/news/saved/s1")).status_code == 401
+    assert (await client.post("/api/v1/news/collections", json={"name": "AI"})).status_code == 401
+
+
+async def test_live_news_is_public_without_saved_state(client, fake_news):
+    """Explore guests browse live news; nothing is annotated from (or written to) the database."""
+    owner = await _headers(client, "owner@example.com")
+    assert (await client.post("/api/v1/news/saved", headers=owner, json=_snapshot())).status_code == 201
+
+    categories = await client.get("/api/v1/news/categories")
+    assert categories.status_code == 200
+    articles = await client.get("/api/v1/news/articles", params={"category": "ai"})
+    assert articles.status_code == 200
+    assert articles.json()["items"][0]["saved_article_id"] is None
+    fake_news.article = {**NEWS_RESULT, "text": "P1."}
+    detail = await client.get("/api/v1/news/article", params={"url": URL})
+    assert detail.status_code == 200
+    assert detail.json()["saved_article_id"] is None
+
+    async with client.session_factory() as session:
+        assert len((await session.execute(select(NewsSavedArticle))).scalars().all()) == 1
+
+
+async def test_live_news_rejects_an_invalid_token(client, fake_news):
+    res = await client.get("/api/v1/news/articles", headers={"Authorization": "Bearer not-a-jwt"})
+    assert res.status_code == 401
 
 
 async def test_categories_listed(client):
@@ -141,6 +168,18 @@ async def test_proxy_rate_limit(client, fake_news, monkeypatch):
     res = await client.get("/api/v1/news/articles", headers=headers)
     assert res.status_code == 429
     assert res.json()["detail"]["code"] == "rate_limit"
+
+
+async def test_anonymous_proxy_rate_limit_is_per_client_and_separate_from_users(client, fake_news, monkeypatch):
+    monkeypatch.setattr(get_settings(), "news_proxy_per_minute", 2)
+    news_service.reset_vendor_state()
+    for _ in range(2):
+        assert (await client.get("/api/v1/news/articles")).status_code == 200
+    res = await client.get("/api/v1/news/article", params={"url": URL})
+    assert res.status_code == 429
+    assert res.json()["detail"]["code"] == "rate_limit"
+    headers = await _headers(client, "notguest@example.com")
+    assert (await client.get("/api/v1/news/articles", headers=headers)).status_code == 200
 
 
 async def test_article_detail_returns_excerpt_only(client, fake_news):

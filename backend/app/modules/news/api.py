@@ -1,11 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import AfterValidator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_optional_user
 from app.core.pagination import Pagination, pagination_params
 from app.modules.auth.models import User
 from app.modules.news.categories import CATEGORY_IDS
@@ -30,6 +30,7 @@ from app.modules.news.schemas import (
     SavedFilter,
     is_http_url,
 )
+from app.modules.news.rate_limit import proxy_limit_key
 from app.modules.news.service import VENDOR_MAX_OFFSET, ArticleQuery, NewsService
 
 router = APIRouter(prefix="/news", tags=["news"])
@@ -59,13 +60,22 @@ CategoryParam = Annotated[str | None, AfterValidator(_known_category), Query(max
 ArticleUrlParam = Annotated[str, AfterValidator(_http_url), Query(max_length=URL_MAX)]
 
 
+def _proxy_key(user: User | None, request: Request) -> str:
+    return proxy_limit_key(user.id if user else None, request.client.host if request.client else None)
+
+
+# ------------------------------------------------------------------ live news (public: Explore guests browse too)
+# Signed-in callers get saved-state annotations; anonymous callers get `saved_article_id: null`.
+
+
 @router.get("/categories", response_model=list[NewsCategory])
-async def list_news_categories(user: User = Depends(get_current_user)):
+async def list_news_categories():
     return NewsService.list_categories()
 
 
 @router.get("/articles", response_model=NewsArticlePage)
 async def list_news_articles(
+    request: Request,
     q: SearchParam = None,
     category: CategoryParam = None,
     country: str | None = Query(default=None, pattern=COUNTRY_PATTERN),
@@ -75,25 +85,26 @@ async def list_news_articles(
     sort: NewsSort = Query(default="date"),
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=VENDOR_MAX_OFFSET),
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     query = ArticleQuery(
         q=q, category=category, country=country, lang=lang, host=host, date=date, sort=sort, limit=limit, offset=offset
     )
-    return await NewsService(db).articles(user.id, query)
+    return await NewsService(db).articles(user.id if user else None, query, proxy_key=_proxy_key(user, request))
 
 
 @router.get("/article", response_model=NewsArticleDetail)
 async def get_news_article(
+    request: Request,
     url: ArticleUrlParam,
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await NewsService(db).article_detail(user.id, url)
+    return await NewsService(db).article_detail(user.id if user else None, url, proxy_key=_proxy_key(user, request))
 
 
-# ------------------------------------------------------------------ saved articles
+# ------------------------------------------------------------------ saved articles (account only)
 
 @router.get("/saved", response_model=SavedArticlePage)
 async def list_saved_articles(
@@ -127,7 +138,7 @@ async def delete_saved_article(
     await NewsService(db).delete_saved(user.id, saved_id)
 
 
-# ------------------------------------------------------------------ collections
+# ------------------------------------------------------------------ collections (account only)
 
 @router.get("/collections", response_model=list[CollectionResponse])
 async def list_collections(

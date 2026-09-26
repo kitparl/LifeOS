@@ -58,7 +58,7 @@ import { NewsService } from '../services/news.service';
                   <button type="button" class="btn-ghost !min-h-8" (click)="editingId.set(null)">Cancel</button>
                 </form>
               } @else {
-                <a class="link flex-1 font-medium" [routerLink]="['/news/collections', c.id]" data-testid="news-collections-open-link">
+                <a class="link flex-1 font-medium" [routerLink]="['collections', c.id]" data-testid="news-collections-open-link">
                   {{ c.name }}
                 </a>
                 <span class="text-xs" style="color: var(--text-muted)">

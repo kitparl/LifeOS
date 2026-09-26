@@ -1,6 +1,7 @@
 import { Provider } from '@angular/core';
 import { LoadChildrenCallback } from '@angular/router';
 import { DEVELOPER_GUEST_PROVIDERS } from '../developer/developer.routes';
+import { NEWS_GUEST_PROVIDERS } from '../news/news.routes';
 
 /** A free tool exposed to logged-out visitors under `/explore/<path>`. */
 export interface ExploreTool {
@@ -33,6 +34,16 @@ export const EXPLORE_TOOLS: ExploreTool[] = [
     authRoute: '/developer',
     providers: DEVELOPER_GUEST_PROVIDERS,
     loadChildren: () => import('../developer/developer.routes').then((m) => m.DEVELOPER_ROUTES),
+  },
+  {
+    id: 'news',
+    label: 'News',
+    description: 'Browse live headlines by category or search. Saving and collections require sign-in.',
+    icon: 'newspaper',
+    path: 'news',
+    authRoute: '/news',
+    providers: NEWS_GUEST_PROVIDERS,
+    loadChildren: () => import('../news/news.routes').then((m) => m.NEWS_ROUTES),
   },
 ];
 

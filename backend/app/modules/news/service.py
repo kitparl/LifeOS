@@ -162,16 +162,17 @@ class NewsService:
     def list_categories() -> list[NewsCategory]:
         return [NewsCategory(id=c.id, label=c.label) for c in categories.CATEGORIES]
 
-    def _enforce_proxy_limit(self, user_id: str) -> None:
-        if not _limiter(self.settings).hit(user_id):
+    def _enforce_proxy_limit(self, key: str) -> None:
+        if not _limiter(self.settings).hit(key):
             raise TooManyRequestsError(
                 {"code": "rate_limit", "message": "Too many news requests. Please wait a moment."}
             )
 
-    async def articles(self, user_id: str, query: ArticleQuery) -> NewsArticlePage:
+    async def articles(self, user_id: str | None, query: ArticleQuery, *, proxy_key: str) -> NewsArticlePage:
+        """Live search. `user_id` is None for anonymous (Explore) callers: no saved-state lookup."""
         if query.q and query.category:
             raise BadRequestError("Use either a search query or a category, not both")
-        self._enforce_proxy_limit(user_id)
+        self._enforce_proxy_limit(proxy_key)
         params = _vendor_params(query)
         key = _cache_key("/v1/search", params)
         result = _vendor_cache.get(key)
@@ -194,8 +195,8 @@ class NewsService:
             has_more=bool(result.articles) and next_offset < result.total and next_offset <= VENDOR_MAX_OFFSET,
         )
 
-    async def article_detail(self, user_id: str, url: str) -> NewsArticleDetail:
-        self._enforce_proxy_limit(user_id)
+    async def article_detail(self, user_id: str | None, url: str, *, proxy_key: str) -> NewsArticleDetail:
+        self._enforce_proxy_limit(proxy_key)
         key = _cache_key("/v1/article", {"url": url})
         detail = _vendor_cache.get(key)
         if not isinstance(detail, NewsArticleDetail):
@@ -209,10 +210,14 @@ class NewsService:
             detail = NewsArticleDetail(**found.article.model_dump(), excerpt=build_excerpt(found.text))
             _vendor_cache.set(key, detail)
 
+        if user_id is None:
+            return detail
         saved = await self.repo.saved_ids_for_urls(user_id, [detail.url], _utcnow())
         return detail.model_copy(update={"saved_article_id": saved.get(detail.url)})
 
-    async def _annotate_saved(self, user_id: str, articles: list[NewsArticle]) -> list[NewsArticle]:
+    async def _annotate_saved(self, user_id: str | None, articles: list[NewsArticle]) -> list[NewsArticle]:
+        if user_id is None:
+            return articles
         saved = await self.repo.saved_ids_for_urls(user_id, [a.url for a in articles], _utcnow())
         return [a.model_copy(update={"saved_article_id": saved.get(a.url)}) for a in articles]
 

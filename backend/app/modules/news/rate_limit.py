@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import time
 from collections import deque
 from collections.abc import Callable
@@ -27,3 +28,11 @@ class SlidingWindowLimiter:
 
     def reset(self) -> None:
         self._hits.clear()
+
+
+def proxy_limit_key(user_id: str | None, client_ip: str | None) -> str:
+    """Signed-in callers are limited per user; anonymous (Explore) callers per client IP, hashed so raw IPs aren't held."""
+    if user_id is not None:
+        return user_id
+    digest = hashlib.sha256((client_ip or "unknown").encode()).hexdigest()[:32]
+    return f"guest:{digest}"

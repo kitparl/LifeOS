@@ -1,7 +1,8 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { ArticleView } from '../models/news.models';
+import { NEWS_ACCESS_MODE, newsRootPath } from '../news-access-mode';
 import { formatAttribution } from './article-card.component';
 import { NewsThumbComponent } from './news-thumb.component';
 
@@ -14,7 +15,7 @@ import { NewsThumbComponent } from './news-thumb.component';
     <article class="panel--flat relative flex gap-3 !p-3 has-[[aria-expanded=true]]:z-50">
       <a
         class="shrink-0"
-        [routerLink]="['/news/article']"
+        [routerLink]="articleLink"
         [queryParams]="{ url: article().url }"
         tabindex="-1"
         aria-hidden="true"
@@ -23,7 +24,7 @@ import { NewsThumbComponent } from './news-thumb.component';
       </a>
       <div class="flex min-w-0 flex-1 flex-col gap-1">
         <h3 class="text-sm font-semibold leading-snug">
-          <a class="link" [routerLink]="['/news/article']" [queryParams]="{ url: article().url }" data-testid="article-row-title-link">
+          <a class="link" [routerLink]="articleLink" [queryParams]="{ url: article().url }" data-testid="article-row-title-link">
             {{ article().title }}
           </a>
         </h3>
@@ -54,5 +55,7 @@ import { NewsThumbComponent } from './news-thumb.component';
 })
 export class ArticleRowComponent {
   readonly article = input.required<ArticleView>();
+  /** Absolute: cards render on the hub and on collection pages (different route depths). */
+  readonly articleLink = `${newsRootPath(inject(NEWS_ACCESS_MODE))}/article`;
   readonly attribution = computed(() => formatAttribution(this.article()));
 }

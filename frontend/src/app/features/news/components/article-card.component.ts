@@ -1,6 +1,7 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ArticleView } from '../models/news.models';
+import { NEWS_ACCESS_MODE, newsRootPath } from '../news-access-mode';
 import { relativeTime } from '../utils/news-dates';
 import { NewsThumbComponent } from './news-thumb.component';
 
@@ -14,7 +15,7 @@ import { NewsThumbComponent } from './news-thumb.component';
       <a
         class="block overflow-hidden"
         style="border-radius: var(--radius-lg) var(--radius-lg) 0 0"
-        [routerLink]="['/news/article']"
+        [routerLink]="articleLink"
         [queryParams]="{ url: article().url }"
         tabindex="-1"
         aria-hidden="true"
@@ -35,7 +36,7 @@ import { NewsThumbComponent } from './news-thumb.component';
         <h3 class="text-sm font-semibold leading-snug">
           <a
             class="link"
-            [routerLink]="['/news/article']"
+            [routerLink]="articleLink"
             [queryParams]="{ url: article().url }"
             data-testid="article-card-title-link"
           >
@@ -57,6 +58,8 @@ import { NewsThumbComponent } from './news-thumb.component';
 })
 export class ArticleCardComponent {
   readonly article = input.required<ArticleView>();
+  /** Absolute: cards render on the hub and on collection pages (different route depths). */
+  readonly articleLink = `${newsRootPath(inject(NEWS_ACCESS_MODE))}/article`;
   readonly attribution = computed(() => formatAttribution(this.article()));
 }
 

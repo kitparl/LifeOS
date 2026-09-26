@@ -305,17 +305,7 @@ export const routes: Routes = [
       },
       {
         path: 'news',
-        loadComponent: () => import('./features/news/news-hub.component').then((m) => m.NewsHubComponent),
-      },
-      {
-        path: 'news/article',
-        loadComponent: () =>
-          import('./features/news/pages/article-page.component').then((m) => m.NewsArticlePageComponent),
-      },
-      {
-        path: 'news/collections/:id',
-        loadComponent: () =>
-          import('./features/news/pages/collection-page.component').then((m) => m.NewsCollectionPageComponent),
+        loadChildren: () => import('./features/news/news.routes').then((m) => m.NEWS_ROUTES),
       },
       {
         path: 'search',

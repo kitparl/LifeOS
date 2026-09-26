@@ -9,12 +9,13 @@ from app.modules.auth.models import User
 
 bearer = HTTPBearer(auto_error=False)
 
-async def get_current_user(
+async def get_optional_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_db),
-) -> User:
+) -> User | None:
+    """The caller when a Bearer token is sent, else None (public endpoints). A bad token is still a 401."""
     if creds is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        return None
     try:
         payload = decode_token(creds.credentials)
         user_id = verify_token_type(payload, "access")
@@ -24,6 +25,12 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user
+
+
+async def get_current_user(user: User | None = Depends(get_optional_user)) -> User:
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return user
 
 

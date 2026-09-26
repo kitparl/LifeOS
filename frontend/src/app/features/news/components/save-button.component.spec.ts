@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { provideLucideIcons, LucideFolderPlus, LucideStar } from '@lucide/angular';
 import { environment } from '../../../../environments/environment';
 import { NewsArticle } from '../models/news.models';
+import { NEWS_ACCESS_MODE } from '../news-access-mode';
 import { NewsSaveButtonComponent } from './save-button.component';
 
 describe('NewsSaveButtonComponent', () => {
@@ -106,5 +108,61 @@ describe('NewsSaveButtonComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('You have saved a lot this hour');
     expect(button().getAttribute('aria-label')).toBe('Save article');
+  });
+
+  describe('guest mode (Explore)', () => {
+    let guestFixture: ComponentFixture<NewsSaveButtonComponent>;
+    const el = (): HTMLElement => guestFixture.nativeElement as HTMLElement;
+    const locked = (): HTMLButtonElement =>
+      el().querySelector('[data-testid="news-save-button-locked"]') as HTMLButtonElement;
+
+    beforeEach(() => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [NewsSaveButtonComponent],
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideRouter([]),
+          provideLucideIcons(LucideStar, LucideFolderPlus),
+          { provide: NEWS_ACCESS_MODE, useValue: 'guest' },
+        ],
+      });
+      http = TestBed.inject(HttpTestingController);
+      guestFixture = TestBed.createComponent(NewsSaveButtonComponent);
+      guestFixture.componentRef.setInput('article', article);
+      guestFixture.detectChanges();
+    });
+
+    it('shows a locked star instead of the save button', () => {
+      expect(el().querySelector('[data-testid="news-save-button"]')).toBeNull();
+      expect(locked().getAttribute('aria-disabled')).toBe('true');
+      expect(locked().getAttribute('aria-label')).toBe('Save article (sign in required)');
+    });
+
+    it('explains sign-in on click and never calls the save API', () => {
+      locked().click();
+      guestFixture.detectChanges();
+
+      expect(locked().getAttribute('aria-expanded')).toBe('true');
+      expect(el().textContent).toContain('Sign in to save articles');
+      const signIn = el().querySelector('[data-testid="news-save-button-locked-sign-in-link"]');
+      expect(signIn?.getAttribute('href')).toBe('/login');
+      http.expectNone(() => true);
+    });
+
+    it('closes on Escape and on an outside click', () => {
+      locked().click();
+      guestFixture.detectChanges();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      guestFixture.detectChanges();
+      expect(el().querySelector('[role="dialog"]')).toBeNull();
+
+      locked().click();
+      guestFixture.detectChanges();
+      document.body.click();
+      guestFixture.detectChanges();
+      expect(el().querySelector('[role="dialog"]')).toBeNull();
+    });
   });
 });

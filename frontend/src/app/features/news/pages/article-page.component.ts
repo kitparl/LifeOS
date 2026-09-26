@@ -23,7 +23,7 @@ type ArticleState =
   imports: [RouterLink, LucideDynamicIcon, NewsSaveButtonComponent, NewsSkeletonComponent, NewsStateComponent, NewsThumbComponent],
   template: `
     <div class="mx-auto max-w-3xl space-y-3">
-      <a class="btn-ghost !min-h-8 !px-2 text-xs" routerLink="/news" data-testid="news-article-back-link">
+      <a class="btn-ghost !min-h-8 !px-2 text-xs" routerLink=".." data-testid="news-article-back-link">
         <svg class="h-3.5 w-3.5" lucideIcon="chevron-left" aria-hidden="true"></svg>
         News
       </a>
