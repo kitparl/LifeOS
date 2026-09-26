@@ -26,16 +26,6 @@ export const EXPLORE_HOME_TITLE = 'Explore Tools';
 /** Single source for the guest nav, the tool list page, header titles, and the logged-in redirect. */
 export const EXPLORE_TOOLS: ExploreTool[] = [
   {
-    id: 'developer',
-    label: 'Developer',
-    description: 'Encoders, formatters, generators, and converters. Everything runs in your browser.',
-    icon: 'terminal',
-    path: 'developer',
-    authRoute: '/developer',
-    providers: DEVELOPER_GUEST_PROVIDERS,
-    loadChildren: () => import('../developer/developer.routes').then((m) => m.DEVELOPER_ROUTES),
-  },
-  {
     id: 'news',
     label: 'News',
     description: 'Browse live headlines by category or search. Saving and collections require sign-in.',
@@ -45,6 +35,16 @@ export const EXPLORE_TOOLS: ExploreTool[] = [
     providers: NEWS_GUEST_PROVIDERS,
     loadChildren: () => import('../news/news.routes').then((m) => m.NEWS_ROUTES),
   },
+  {
+    id: 'developer',
+    label: 'Developer',
+    description: 'Encoders, formatters, generators, and converters. Everything runs in your browser.',
+    icon: 'terminal',
+    path: 'developer',
+    authRoute: '/developer',
+    providers: DEVELOPER_GUEST_PROVIDERS,
+    loadChildren: () => import('../developer/developer.routes').then((m) => m.DEVELOPER_ROUTES),
+  }
 ];
 
 export function exploreToolRoute(tool: ExploreTool): string {
