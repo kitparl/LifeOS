@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import TtlCache
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     AppError,
@@ -22,9 +23,10 @@ from app.core.exceptions import (
     get_or_404,
 )
 from app.core.pagination import Pagination
+from app.core.rate_limit import SlidingWindowLimiter
 from app.core.text import clean_text
+from app.core.timezone import as_utc, utc_now
 from app.modules.news import categories
-from app.modules.news.cache import TtlCache
 from app.modules.news.client import (
     FreeNewsClient,
     NewsApiError,
@@ -34,7 +36,6 @@ from app.modules.news.client import (
 )
 from app.modules.news.dedupe import dedupe_articles
 from app.modules.news.models import NewsCollection, NewsSavedArticle
-from app.modules.news.rate_limit import SlidingWindowLimiter
 from app.modules.news.repository import NewsRepository
 from app.modules.news.schemas import (
     CollectionResponse,
@@ -81,14 +82,6 @@ def _limiter(settings: Settings) -> SlidingWindowLimiter:
         _proxy_limiter = SlidingWindowLimiter(settings.news_proxy_per_minute, 60)
     return _proxy_limiter
 
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
-
-
-def _as_utc(value: datetime) -> datetime:
-    """SQLite returns naive datetimes; every stored timestamp is UTC."""
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
 def _to_app_error(exc: NewsApiError) -> AppError:
@@ -212,13 +205,13 @@ class NewsService:
 
         if user_id is None:
             return detail
-        saved = await self.repo.saved_ids_for_urls(user_id, [detail.url], _utcnow())
+        saved = await self.repo.saved_ids_for_urls(user_id, [detail.url], utc_now())
         return detail.model_copy(update={"saved_article_id": saved.get(detail.url)})
 
     async def _annotate_saved(self, user_id: str | None, articles: list[NewsArticle]) -> list[NewsArticle]:
         if user_id is None:
             return articles
-        saved = await self.repo.saved_ids_for_urls(user_id, [a.url for a in articles], _utcnow())
+        saved = await self.repo.saved_ids_for_urls(user_id, [a.url for a in articles], utc_now())
         return [a.model_copy(update={"saved_article_id": saved.get(a.url)}) for a in articles]
 
     # ------------------------------------------------------------------ saved articles
@@ -247,19 +240,19 @@ class NewsService:
             publisher=saved.publisher,
             host=saved.host,
             author=saved.author,
-            published_at=_as_utc(saved.published_at) if saved.published_at else None,
-            saved_at=_as_utc(saved.saved_at),
-            expires_at=_as_utc(saved.expires_at),
+            published_at=as_utc(saved.published_at) if saved.published_at else None,
+            saved_at=as_utc(saved.saved_at),
+            expires_at=as_utc(saved.expires_at),
             collection_ids=collection_ids,
             already_saved=already_saved,
         )
 
     async def save(self, user_id: str, data: SavedArticleCreate) -> tuple[SavedArticleResponse, bool]:
         """Save a metadata snapshot. Returns (article, created); an existing live save is returned as is."""
-        now = _utcnow()
+        now = utc_now()
         existing = await self.repo.get_saved_by_url(user_id, data.article_url)
         if existing is not None:
-            if _as_utc(existing.expires_at) > now:
+            if as_utc(existing.expires_at) > now:
                 return await self._saved_response(existing, already_saved=True), False
             await self.repo.delete_saved(existing)
 
@@ -282,7 +275,7 @@ class NewsService:
         return self._to_saved_response(saved, []), True
 
     async def list_saved(self, user_id: str, saved_filter: SavedFilter, pagination: Pagination) -> SavedArticlePage:
-        now = _utcnow()
+        now = utc_now()
         await self.repo.purge_expired(now, user_id)
         rows, total = await self.repo.list_saved(user_id, saved_filter, now, pagination)
         return await self._saved_page(rows, total)
@@ -295,7 +288,7 @@ class NewsService:
 
     async def _get_live_saved(self, user_id: str, saved_id: str) -> NewsSavedArticle:
         saved = get_or_404(await self.repo.get_saved(user_id, saved_id), "Saved article not found")
-        if _as_utc(saved.expires_at) <= _utcnow():
+        if as_utc(saved.expires_at) <= utc_now():
             raise NotFoundError("Saved article not found")
         return saved
 
@@ -305,7 +298,7 @@ class NewsService:
 
     async def purge_expired(self) -> int:
         """Scheduled cleanup for every user."""
-        return await self.repo.purge_expired(_utcnow())
+        return await self.repo.purge_expired(utc_now())
 
     # ------------------------------------------------------------------ collections
 
@@ -315,8 +308,8 @@ class NewsService:
             id=collection.id,
             name=collection.name,
             article_count=count,
-            created_at=_as_utc(collection.created_at),
-            updated_at=_as_utc(collection.updated_at),
+            created_at=as_utc(collection.created_at),
+            updated_at=as_utc(collection.updated_at),
         )
 
     async def _get_collection(self, user_id: str, collection_id: str) -> NewsCollection:
@@ -328,14 +321,14 @@ class NewsService:
             raise ConflictError("A collection with this name already exists")
 
     async def list_collections(self, user_id: str) -> list[CollectionResponse]:
-        now = _utcnow()
+        now = utc_now()
         await self.repo.purge_expired(now, user_id)
         rows = await self.repo.list_collections_with_counts(user_id, now)
         return [self._to_collection_response(c, n) for c, n in rows]
 
     async def create_collection(self, user_id: str, name: str) -> CollectionResponse:
         await self._ensure_unique_name(user_id, name)
-        await self._enforce_write_limit(user_id, _utcnow())
+        await self._enforce_write_limit(user_id, utc_now())
         collection = await self.repo.create_collection(user_id, name)
         return self._to_collection_response(collection, 0)
 
@@ -343,7 +336,7 @@ class NewsService:
         collection = await self._get_collection(user_id, collection_id)
         await self._ensure_unique_name(user_id, name, exclude_id=collection.id)
         collection = await self.repo.rename_collection(collection, name)
-        count = await self.repo.count_members(collection.id, _utcnow())
+        count = await self.repo.count_members(collection.id, utc_now())
         return self._to_collection_response(collection, count)
 
     async def delete_collection(self, user_id: str, collection_id: str) -> None:
@@ -355,7 +348,7 @@ class NewsService:
         self, user_id: str, collection_id: str, pagination: Pagination
     ) -> SavedArticlePage:
         collection = await self._get_collection(user_id, collection_id)
-        now = _utcnow()
+        now = utc_now()
         await self.repo.purge_expired(now, user_id)
         rows, total = await self.repo.list_members(collection.id, now, pagination)
         return await self._saved_page(rows, total)

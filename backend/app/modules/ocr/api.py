@@ -1,10 +1,11 @@
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
 from app.modules.ocr.schemas import OcrDocumentCreate, OcrDocumentResponse
 from app.modules.ocr.service import OcrService
-from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/ocr", tags=["ocr"])
 

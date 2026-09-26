@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import time
-from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime
 
-from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.events import (
     TASK_ASSIGNED,
@@ -20,28 +16,30 @@ from app.core.events import (
     EntityCreated,
     event_bus,
 )
-from app.core.exceptions import AppError, ConflictError, ForbiddenError, NotFoundError, UnprocessableError, get_or_404
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    TooManyRequestsError,
+    UnprocessableError,
+    get_or_404,
+)
+from app.core.rate_limit import SlidingWindowLimiter
+from app.core.timezone import utc_now
 from app.modules.auth.repository import UserRepository
 from app.modules.tasks.activity_service import ActivityService
-from app.modules.tasks.models import Task, TaskAssignment
-from app.modules.tasks.permissions import TaskPermissions
+from app.modules.tasks.models import ACTIVE_ASSIGNMENT_STATUSES, Task, TaskAssignment
+from app.modules.tasks.permissions import TaskPermissions, TaskRole
+from app.modules.tasks.repository import TaskRepository
 
-# Simple in-process rate limit for assignment mutations (SECURITY-11)
-_assign_hits: dict[str, list[float]] = defaultdict(list)
-_RATE_WINDOW_S = 60.0
-_RATE_MAX = 30
+# Per-user limit on assignment mutations (SECURITY-11).
+_assign_limiter = SlidingWindowLimiter(limit=30, window_seconds=60.0)
+
 
 def _check_rate(user_id: str) -> None:
-    now = time.monotonic()
-    hits = _assign_hits[user_id]
-    _assign_hits[user_id] = [t for t in hits if now - t < _RATE_WINDOW_S]
-    if len(_assign_hits[user_id]) >= _RATE_MAX:
-        _err = AppError("Too many assignment actions")
-        _err.status_code = status.HTTP_429_TOO_MANY_REQUESTS
-        raise _err
-    _assign_hits[user_id].append(now)
+    if not _assign_limiter.hit(user_id):
+        raise TooManyRequestsError("Too many assignment actions")
 
-ACTIVE_STATUSES = ("pending", "accepted")
 
 class AssignmentService:
     def __init__(self, db: AsyncSession):
@@ -55,7 +53,7 @@ class AssignmentService:
             select(TaskAssignment)
             .where(
                 TaskAssignment.task_id == task_id,
-                TaskAssignment.status.in_(ACTIVE_STATUSES),
+                TaskAssignment.status.in_(ACTIVE_ASSIGNMENT_STATUSES),
             )
             .order_by(TaskAssignment.assigned_at.desc())
             .limit(1)
@@ -77,8 +75,8 @@ class AssignmentService:
             assignee_user_id=actor_id,
             assigned_by_user_id=actor_id,
             status="accepted",
-            assigned_at=datetime.now(UTC),
-            accepted_at=datetime.now(UTC),
+            assigned_at=utc_now(),
+            accepted_at=utc_now(),
         )
         self.db.add(row)
         await self.db.flush()
@@ -106,7 +104,7 @@ class AssignmentService:
         # Self-assign → accepted, no notify
         is_self = assignee_user_id == actor_id
         new_status = "accepted" if is_self else "pending"
-        now = datetime.now(UTC)
+        now = utc_now()
 
         old_active = await self._close_active(task.id, now, new_status="reassigned")
 
@@ -172,7 +170,7 @@ class AssignmentService:
         if row.status != "pending":
             raise ConflictError("Assignment is not pending")
         row.status = "accepted"
-        row.accepted_at = datetime.now(UTC)
+        row.accepted_at = utc_now()
         await self.db.flush()
         await self.activity.log(task.id, actor_id, "accept", field="assignment_status", old_value="pending", new_value="accepted")
         await event_bus.emit(
@@ -196,7 +194,7 @@ class AssignmentService:
             raise ForbiddenError("Permission denied")
         if row.status != "pending":
             raise ConflictError("Assignment is not pending")
-        now = datetime.now(UTC)
+        now = utc_now()
         row.status = "rejected"
         row.rejected_at = now
         row.reason = reason
@@ -241,11 +239,11 @@ class AssignmentService:
         _check_rate(actor_id)
         await self.perms.require(actor_id, task, "assign")
         row = await self._get_assignment(task.id, assignment_id)
-        if row.status not in ACTIVE_STATUSES:
+        if row.status not in ACTIVE_ASSIGNMENT_STATUSES:
             raise ConflictError("Assignment is not active")
         previous_assignee = row.assignee_user_id
         row.status = "cancelled"
-        row.cancelled_at = datetime.now(UTC)
+        row.cancelled_at = utc_now()
         await self.db.flush()
         await self.activity.log(task.id, actor_id, "cancel", field="assignment_status", new_value="cancelled")
         # Ensure owner is active assignee
@@ -270,10 +268,10 @@ class AssignmentService:
         result = await self.db.execute(
             select(TaskAssignment).where(
                 TaskAssignment.task_id == task.id,
-                TaskAssignment.status.in_(ACTIVE_STATUSES),
+                TaskAssignment.status.in_(ACTIVE_ASSIGNMENT_STATUSES),
             )
         )
-        now = datetime.now(UTC)
+        now = utc_now()
         for row in result.scalars().all():
             row.status = "completed"
             row.completed_at = now
@@ -301,17 +299,10 @@ class AssignmentService:
             raise NotFoundError("Assignment not found")
         return row
 
+
 async def load_task_for_actor(db: AsyncSession, task_id: str, user_id: str) -> Task:
     """Load non-deleted task if actor is owner, assignee, or watcher; else 404."""
-    result = await db.execute(
-        select(Task)
-        .where(Task.id == task_id, Task.deleted_at.is_(None))
-        .options(selectinload(Task.subtasks), selectinload(Task.assignments))
-    )
-    task = result.scalar_one_or_none()
-    if task is None:
-        raise NotFoundError("Task not found")
-    role = await TaskPermissions(db).resolve_role(user_id, task)
-    if role.value == "none":
+    task = get_or_404(await TaskRepository(db).get_by_id_any(task_id), "Task not found")
+    if await TaskPermissions(db).resolve_role(user_id, task) == TaskRole.NONE:
         raise NotFoundError("Task not found")
     return task

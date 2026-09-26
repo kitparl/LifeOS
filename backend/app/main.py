@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -68,8 +68,6 @@ async def lifespan(app: FastAPI):
     yield
 
     if polling_started:
-        from app.modules.integrations.telegram.polling import stop_polling
-
         await stop_polling()
     await shutdown_scheduler()
 
@@ -123,6 +121,7 @@ app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(sticky_notes_router, prefix="/api/v1")
 app.include_router(news_router, prefix="/api/v1")
 
+
 @app.get("/health")
 async def health():
     return {
@@ -173,14 +172,14 @@ def _register_spa_routes() -> None:
     @app.get("/{full_path:path}")
     async def spa_files(full_path: str):
         if full_path.startswith("api/") or full_path == "health":
-            raise HTTPException(status_code=404, detail="Not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
         candidate = (STATIC_DIR / full_path).resolve()
         if candidate.is_relative_to(STATIC_DIR.resolve()) and candidate.is_file():
             return FileResponse(candidate, headers=_static_headers(candidate))
         index = STATIC_DIR / "index.html"
         if index.is_file():
             return FileResponse(index, headers=NO_CACHE_HEADERS)
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
 
 _register_spa_routes()

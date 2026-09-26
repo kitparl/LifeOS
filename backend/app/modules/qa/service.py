@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError, get_or_404
+from app.core.taxonomy import merge_names
 from app.modules.qa.models import SUGGESTED_QA_TYPES
 from app.modules.qa.repository import QARepository
 from app.modules.qa.schemas import QACreate, QAListItem, QAResponse, QAUpdate, QAVersionResponse
@@ -77,12 +78,7 @@ class QAService:
         """Return the reusable type registry: suggested defaults + user-created,
         de-duplicated (case-insensitive) and alphabetically sorted."""
         stored = await self.repo.list_type_names(user_id)
-        seen: dict[str, str] = {}
-        for name in [*SUGGESTED_QA_TYPES, *stored]:
-            key = name.strip().lower()
-            if key and key not in seen:
-                seen[key] = name.strip()
-        return sorted(seen.values(), key=str.lower)
+        return merge_names(SUGGESTED_QA_TYPES, stored)
 
     async def create_type(self, user_id: str, name: str) -> str:
         clean = name.strip()

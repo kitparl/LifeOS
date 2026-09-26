@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
-
-def utc_today() -> date:
-    return datetime.now(UTC).date()
+from app.core.timezone import utc_today
 
 
 def window_start(range_days: int, ref: date | None = None) -> date:

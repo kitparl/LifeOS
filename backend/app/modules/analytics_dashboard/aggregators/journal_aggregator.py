@@ -8,7 +8,8 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.analytics_dashboard.aggregators import utc_today, window_start, word_count
+from app.core.timezone import utc_today
+from app.modules.analytics_dashboard.aggregators import window_start, word_count
 from app.modules.analytics_dashboard.schemas import (
     JournalAnalytics,
     PlaceholderField,

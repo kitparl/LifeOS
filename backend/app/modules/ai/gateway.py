@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     AppError,
@@ -39,7 +41,6 @@ from app.modules.ai.schemas import AiSettings
 from app.modules.ai.use_cases import get_use_case
 from app.modules.integrations.ai.config import AiProviderConfig, parse_config
 from app.modules.integrations.repository import IntegrationRepository
-from sqlalchemy.ext.asyncio import AsyncSession
 
 ENV_PROVIDER = "openai"
 

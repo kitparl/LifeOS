@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.crypto import decrypt, encrypt
+from app.modules.integrations.common import load_json_object, mask_secret
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class MaskedGitHubConfig:
 
 
 def parse_preferences(config_json: str | None) -> GitHubPreferences:
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="github")
     # Legacy single toggle → both channels when new keys are absent.
     legacy = data.get("notify_github_sync")
     if "notify_github_sync_in_app" in data:
@@ -59,24 +60,6 @@ def parse_preferences(config_json: str | None) -> GitHubPreferences:
         notify_github_sync_in_app=in_app,
         notify_github_sync_telegram=telegram,
     )
-
-
-def _mask_token(token: str) -> str:
-    if not token:
-        return ""
-    if len(token) <= 4:
-        return "****"
-    return f"****{token[-4:]}"
-
-
-def _load_json(config_json: str | None) -> dict[str, Any]:
-    if not config_json:
-        return {}
-    try:
-        parsed = json.loads(config_json)
-        return parsed if isinstance(parsed, dict) else {}
-    except json.JSONDecodeError:
-        return {}
 
 
 def _normalize_repo(raw: str | None) -> str:
@@ -138,7 +121,7 @@ def serialize_config(
     notify_github_sync_telegram: bool | None = None,
     existing_json: str | None = None,
 ) -> str:
-    existing = _load_json(existing_json)
+    existing = load_json_object(existing_json, label="github")
     token_enc = existing.get("token_enc") or existing.get("pat_enc") or ""
 
     if not token_enc and existing.get("token"):
@@ -179,7 +162,7 @@ def serialize_config(
 
 
 def parse_config(config_json: str | None) -> DecryptedGitHubConfig | None:
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="github")
     if not data:
         if config_json:
             logger.warning("Invalid github config_json (not JSON)")
@@ -213,7 +196,7 @@ def parse_config(config_json: str | None) -> DecryptedGitHubConfig | None:
 
 def mask_config(config_json: str | None) -> MaskedGitHubConfig:
     parsed = parse_config(config_json)
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="github")
     branch = _normalize_branch(str(data.get("branch") or DEFAULT_BRANCH))
     if "base_path" in data:
         base_path = _normalize_base_path(str(data.get("base_path") or ""))
@@ -235,7 +218,7 @@ def mask_config(config_json: str | None) -> MaskedGitHubConfig:
 
     return MaskedGitHubConfig(
         configured=True,
-        token_masked=_mask_token(parsed.token),
+        token_masked=mask_secret(parsed.token),
         repo=parsed.repo,
         branch=parsed.branch,
         base_path=parsed.base_path,

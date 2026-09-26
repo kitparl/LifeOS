@@ -7,12 +7,12 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from app.modules.calendar.models import CalendarEvent
-from app.modules.calendar.service import _expand_recurring_event
+from app.modules.calendar.service import expand_recurring_event
 from app.modules.integrations.telegram.config import parse_preferences, serialize_config
 from app.modules.integrations.telegram.templates import chunk_text
 from httpx import AsyncClient
 
-# CalendarService unused — expansion tested via _expand_recurring_event
+# CalendarService unused — expansion tested via expand_recurring_event
 
 
 async def _auth_token(client: AsyncClient) -> str:
@@ -80,7 +80,7 @@ def test_yearly_expansion_same_month_day():
     )
     start = datetime(2026, 3, 1, tzinfo=UTC)
     end = datetime(2026, 3, 31, tzinfo=UTC)
-    items = _expand_recurring_event(event, start, end)
+    items = expand_recurring_event(event, start, end)
     assert len(items) == 1
     assert items[0].starts_at.date() == date(2026, 3, 15)
     assert items[0].event_kind == "birthday"
@@ -101,7 +101,7 @@ def test_yearly_feb29_becomes_feb28_in_non_leap():
     # 2025 is not a leap year
     start = datetime(2025, 2, 1, tzinfo=UTC)
     end = datetime(2025, 3, 1, tzinfo=UTC)
-    items = _expand_recurring_event(event, start, end)
+    items = expand_recurring_event(event, start, end)
     assert len(items) == 1
     assert items[0].starts_at.date() == date(2025, 2, 28)
 

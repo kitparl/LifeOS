@@ -1,12 +1,12 @@
-from datetime import UTC
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import taxonomy
 from app.core.pagination import Pagination, paginate
+from app.core.timezone import utc_today
 from app.modules.running.models import RaceEvent, Run, RunningSettings, RunningShoe
 from app.modules.running.schemas import RaceCreate, RaceUpdate, RunCreate, RunningSettingsUpdate, RunUpdate
-from app.modules.running.stats import weekly_km
 
 
 class RunningRepository:
@@ -23,22 +23,11 @@ class RunningRepository:
         return list(result.scalars().all())
 
     async def list_shoe_names(self, user_id: str) -> list[str]:
-        result = await self.db.execute(
-            select(RunningShoe.name).where(RunningShoe.user_id == user_id).order_by(RunningShoe.name.asc())
-        )
-        return list(result.scalars().all())
+        return await taxonomy.list_names(self.db, RunningShoe, user_id)
 
     async def ensure_shoe(self, user_id: str, name: str) -> None:
-        """Register a shoe name for reuse (idempotent, case-insensitive)."""
-        clean = (name or "").strip()
-        if not clean:
-            return
-        existing = await self.db.execute(select(RunningShoe).where(RunningShoe.user_id == user_id))
-        for row in existing.scalars().all():
-            if row.name.lower() == clean.lower():
-                return
-        self.db.add(RunningShoe(user_id=user_id, name=clean))
-        await self.db.flush()
+        """Register a name for reuse (idempotent, case-insensitive)."""
+        await taxonomy.ensure_name(self.db, RunningShoe, user_id, name)
 
     async def get_run(self, user_id: str, run_id: str) -> Run | None:
         result = await self.db.execute(select(Run).where(Run.id == run_id, Run.user_id == user_id))
@@ -89,9 +78,8 @@ class RunningRepository:
     ) -> tuple[list[RaceEvent], int]:
         q = select(RaceEvent).where(RaceEvent.user_id == user_id)
         if upcoming_only:
-            from datetime import datetime
 
-            today = datetime.now(UTC).date()
+            today = utc_today()
             q = q.where(RaceEvent.race_date >= today)
         q = q.order_by(RaceEvent.race_date.desc())
         if limit is None:
@@ -186,7 +174,3 @@ class RunningRepository:
         await self.db.flush()
         await self.db.refresh(settings)
         return settings
-
-    async def get_weekly_km(self, user_id: str) -> float:
-        runs = await self.list_runs(user_id)
-        return weekly_km(runs)

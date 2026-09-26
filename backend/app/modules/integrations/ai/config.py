@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.crypto import decrypt, encrypt
+from app.modules.integrations.common import load_json_object, mask_secret
 
 logger = logging.getLogger(__name__)
 
@@ -31,23 +32,6 @@ class MaskedAiProviderConfig:
     base_url: str | None
 
 
-def _mask_key(key: str) -> str:
-    if len(key) <= 4:
-        return "****"
-    return f"****{key[-4:]}"
-
-
-def _load_json(config_json: str | None) -> dict[str, Any]:
-    if not config_json:
-        return {}
-    try:
-        parsed = json.loads(config_json)
-    except json.JSONDecodeError:
-        logger.warning("Invalid AI provider config_json (not JSON)")
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
 def _optional_str(value: Any) -> str | None:
     text = str(value).strip() if value is not None else ""
     return text or None
@@ -55,7 +39,7 @@ def _optional_str(value: Any) -> str | None:
 
 def load_config(config_json: str | None) -> AiProviderConfig:
     """Always returns a config; `api_key` is empty when missing or undecryptable."""
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="AI provider")
     api_key = ""
     try:
         if data.get("api_key_enc"):
@@ -85,7 +69,7 @@ def serialize_config(
     base_url: str | None,
 ) -> str:
     """A blank/None api_key keeps the stored key; default_model/base_url are written as given."""
-    existing = _load_json(existing_json)
+    existing = load_json_object(existing_json, label="AI provider")
     key_enc = str(existing.get("api_key_enc") or "")
     if not key_enc and existing.get("api_key"):
         key_enc = encrypt(str(existing["api_key"]))
@@ -104,7 +88,7 @@ def mask_config(config_json: str | None) -> MaskedAiProviderConfig:
     cfg = load_config(config_json)
     return MaskedAiProviderConfig(
         configured=bool(cfg.api_key),
-        api_key_masked=_mask_key(cfg.api_key) if cfg.api_key else None,
+        api_key_masked=mask_secret(cfg.api_key) if cfg.api_key else None,
         default_model=cfg.default_model,
         base_url=cfg.base_url,
     )

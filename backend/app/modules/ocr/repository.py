@@ -1,8 +1,9 @@
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.pagination import Pagination, paginate
 from app.modules.ocr.models import OcrDocument
 from app.modules.ocr.schemas import OcrDocumentCreate
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class OcrRepository:

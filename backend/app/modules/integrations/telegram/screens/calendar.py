@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import start_of_day_utc
 from app.modules.calendar.service import CalendarService
 from app.modules.integrations.telegram import keyboards as kb
 from app.modules.integrations.telegram import templates as tpl
@@ -16,7 +17,7 @@ from app.modules.integrations.telegram.renderer import Screen
 
 
 def _day_bounds(d: date) -> tuple[datetime, datetime]:
-    start = datetime.combine(d, time.min, tzinfo=UTC)
+    start = start_of_day_utc(d)
     end = datetime.combine(d, time.max, tzinfo=UTC)
     return start, end
 
@@ -51,7 +52,7 @@ async def today_screen(db: AsyncSession, user_id: str) -> Screen:
 
 async def week_screen(db: AsyncSession, user_id: str) -> Screen:
     today = date.today()
-    start = datetime.combine(today, time.min, tzinfo=UTC)
+    start = start_of_day_utc(today)
     end = datetime.combine(today + timedelta(days=7), time.max, tzinfo=UTC)
     events, _ = await CalendarService(db).list_events(user_id, start=start, end=end, limit=None)
     if not events:
@@ -81,7 +82,7 @@ async def week_screen(db: AsyncSession, user_id: str) -> Screen:
 
 async def event_detail_screen(db: AsyncSession, user_id: str, token: str) -> Screen:
     today = date.today()
-    start = datetime.combine(today - timedelta(days=1), time.min, tzinfo=UTC)
+    start = start_of_day_utc(today - timedelta(days=1))
     end = datetime.combine(today + timedelta(days=30), time.max, tzinfo=UTC)
     events, _ = await CalendarService(db).list_events(user_id, start=start, end=end, limit=None)
     summary = resolve_one(list(events), token)

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError, get_or_404
 from app.core.pagination import Pagination
-from app.core.timezone import ist_today
+from app.core.timezone import ist_today, utc_now
 from app.modules.auth.models import User
 from app.modules.communication.vocabulary.mastery import next_mastery_level
 from app.modules.communication.vocabulary.models import VocabularySet
@@ -48,9 +48,6 @@ _GAME_SOURCE_TO_REVISION_SOURCE = {
     "level": "level",
 }
 
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 async def _set_response(repo: VocabularyRepository, vset: VocabularySet, user_id: str) -> VocabularySetResponse:
@@ -109,7 +106,7 @@ class VocabularyService:
         if vset.status != "active":
             raise ConflictError("This set is not active and cannot be accepted")
 
-        now = _utcnow()
+        now = utc_now()
         vset.status = "accepted"
         vset.accepted_at = now
 
@@ -420,7 +417,7 @@ class VocabularyService:
         if session.completed_at is not None:
             raise ConflictError("This game session is already completed")
 
-        now = _utcnow()
+        now = utc_now()
         question = self.repo.new_game_question(
             session.id, user.id, payload.vocabulary_id, payload.question_type,
             payload.is_correct, payload.user_answer, now,
@@ -447,7 +444,7 @@ class VocabularyService:
     async def complete_game_session(self, user: User, session_id: str) -> GameSessionResponse:
         session = await self._get_owned_session(user, session_id)
         if session.completed_at is None:
-            session.completed_at = _utcnow()
+            session.completed_at = utc_now()
             await self.db.flush()
         return GameSessionResponse.model_validate(session)
 

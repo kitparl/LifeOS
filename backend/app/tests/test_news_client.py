@@ -2,11 +2,11 @@
 
 import httpx
 import pytest
+from app.core.cache import TtlCache
+from app.core.rate_limit import SlidingWindowLimiter
 from app.modules.news import categories
-from app.modules.news.cache import TtlCache
 from app.modules.news.client import FreeNewsClient, NewsApiError, parse_article
 from app.modules.news.dedupe import dedupe_articles, normalize_url
-from app.modules.news.rate_limit import SlidingWindowLimiter
 from app.modules.news.schemas import NewsArticle
 from app.modules.news.service import EXCERPT_MAX_CHARS, build_excerpt
 from app.tests.conftest import NEWS_RESULT

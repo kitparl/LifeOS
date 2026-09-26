@@ -1,5 +1,9 @@
 from datetime import date
 
+from sqlalchemy import case, delete, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
+
 from app.core.pagination import Pagination, paginate
 from app.modules.finance.models import (
     FinanceBudget,
@@ -12,9 +16,6 @@ from app.modules.finance.models import (
     LoanPartPayment,
 )
 from app.modules.finance.schemas import BudgetCreate, TransactionCreate, TransactionUpdate
-from sqlalchemy import case, delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql.elements import ColumnElement
 
 
 def _expense_sum(*conditions: ColumnElement[bool]) -> ColumnElement[float]:
@@ -414,7 +415,7 @@ class FinanceRepository:
         return int(row[0] or 0), float(row[1] or 0)
 
     # ------------------------------------------------------------------
-    # Budgets — retained for Coaches / Predictions / Automations
+    # Budgets — legacy /finance/budgets endpoints
     # ------------------------------------------------------------------
 
     async def list_budgets(

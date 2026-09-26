@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.pagination import Pagination, paginate
+from app.core.timezone import utc_today
 from app.modules.habits.models import Habit, HabitLog
 from app.modules.habits.schemas import HabitCreate, HabitUpdate
-from app.modules.habits.stats import _today, is_completed_for_period
 
 
 class HabitRepository:
@@ -61,7 +61,7 @@ class HabitRepository:
         await self.db.flush()
 
     async def complete_today(self, habit: Habit) -> HabitLog:
-        today = _today()
+        today = utc_today()
         existing = next((log for log in habit.logs if log.log_date == today), None)
         if existing:
             return existing
@@ -72,13 +72,9 @@ class HabitRepository:
         return log
 
     async def uncomplete_today(self, habit: Habit) -> None:
-        today = _today()
-        log = next((l for l in habit.logs if l.log_date == today), None)
+        today = utc_today()
+        log = next((entry for entry in habit.logs if entry.log_date == today), None)
         if log:
             await self.db.delete(log)
             await self.db.flush()
             await self.db.refresh(habit, ["logs"])
-
-    async def get_dashboard_habits(self, user_id: str) -> list[tuple[Habit, bool]]:
-        habits = await self.list_habits(user_id, active_only=True)
-        return [(h, is_completed_for_period(h)) for h in habits]

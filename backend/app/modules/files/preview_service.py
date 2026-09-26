@@ -7,10 +7,14 @@ import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+from fastapi import Request, status
+from fastapi.responses import Response, StreamingResponse
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from app.core.config import Settings, get_settings
-from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError, get_or_404
+from app.core.exceptions import ConflictError, NotFoundError, get_or_404
 from app.modules.files.backends import resolve_backend
-from app.modules.files.download_tokens import verify_download_token
 from app.modules.files.models import FileRecord
 from app.modules.files.preview.office_converter import (
     ConversionError,
@@ -23,10 +27,6 @@ from app.modules.files.preview_models import DocumentPreview
 from app.modules.files.preview_schemas import PreviewInfoResponse
 from app.modules.files.repository import FileRepository
 from app.modules.files.service import FileService
-from fastapi import Request, status
-from fastapi.responses import Response, StreamingResponse
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +229,7 @@ class DocumentPreviewService:
         user_id: str | None = None,
         token: str | None = None,
     ) -> Response:
-        record = await self._resolve_record(file_id, user_id=user_id, token=token)
+        record = await self.files.resolve_record(file_id, user_id=user_id, token=token)
         preview_type = detect_preview_type(record.content_type)
         if preview_type == "unsupported":
             raise NotFoundError("Preview not available for this file")
@@ -263,17 +263,6 @@ class DocumentPreviewService:
             token=token,
             force_disposition="attachment",
         )
-
-    async def _resolve_record(self, file_id: str, *, user_id: str | None, token: str | None) -> FileRecord:
-        if token:
-            try:
-                token_user = verify_download_token(token, file_id, self.settings)
-            except ValueError as exc:
-                raise UnauthorizedError("Invalid download token") from exc
-            return get_or_404(await self.repo.get(token_user, file_id), "File not found")
-        if user_id:
-            return get_or_404(await self.repo.get(user_id, file_id), "File not found")
-        raise UnauthorizedError("Not authenticated")
 
     async def _stream_local_pdf(self, path: Path, request: Request) -> Response:
         if not path.is_file():

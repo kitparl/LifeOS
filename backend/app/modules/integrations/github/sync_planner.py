@@ -104,7 +104,7 @@ def build_sync_plan(
                 )
 
     # Orphan assets (tracked before, not desired now)
-    for file_id, path, sha in previous_assets:
+    for _file_id, path, sha in previous_assets:
         if path not in desired_paths and path != previous_md_path:
             plan.deletes.append(PlannedFile(action="delete", path=path, previous_sha=sha))
 

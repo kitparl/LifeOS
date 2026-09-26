@@ -6,13 +6,14 @@ admin gate email so a generically minted unlock cookie cannot be reused.
 No refresh — expires or is cleared.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
 
 from app.core.config import get_settings
 from app.core.security import verify_password
+from app.core.timezone import utc_now
 
 REG_UNLOCK_COOKIE = "reg_unlock"
 _UNLOCK_TYPE = "reg_unlock"
@@ -23,7 +24,7 @@ settings = get_settings()
 
 def create_unlock_token(email: str) -> str:
     """Mint an unlock JWT bound to the admin gate email."""
-    expire = datetime.now(UTC) + timedelta(hours=_UNLOCK_TTL_HOURS)
+    expire = utc_now() + timedelta(hours=_UNLOCK_TTL_HOURS)
     return jwt.encode(
         {
             "sub": email.strip().lower(),
@@ -76,12 +77,3 @@ def verify_gate_credentials(email: str, password: str) -> bool:
     if email.strip().lower() != expected_email:
         return False
     return password_ok
-
-
-def unlock_cookie_kwargs() -> dict:
-    return {
-        "httponly": True,
-        "samesite": "lax",
-        "secure": settings.cookie_secure,
-        # No max_age → session cookie (cleared when browser fully closes)
-    }

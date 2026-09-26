@@ -9,12 +9,14 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time
 from typing import TypeAlias
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import start_of_day_utc
 from app.modules.integrations.telegram import templates as tpl
+from app.modules.tasks.due_dates import noon_utc, resolve_due_token
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ async def cmd_today(db: AsyncSession, user_id: str, args: str):
         from app.modules.tasks.service import TaskService as TS
 
         today = date.today()
-        start = datetime.combine(today, time.min, tzinfo=UTC)
+        start = start_of_day_utc(today)
         end = datetime.combine(today, time.max, tzinfo=UTC)
 
         due_tasks, _ = await TS(db).list_tasks(user_id, due_today=True)
@@ -147,9 +149,6 @@ def _parse_add_task_args(raw: str) -> tuple[str, datetime, str | None]:
     text = raw.strip()
     today = date.today()
 
-    def as_due(d: date) -> datetime:
-        return datetime.combine(d, time(12, 0), tzinfo=UTC)
-
     # due YYYY-MM-DD | due today | due tomorrow
     m = re.search(
         r"\s+due\s+(today|tomorrow|\d{4}-\d{2}-\d{2})\s*$",
@@ -159,10 +158,10 @@ def _parse_add_task_args(raw: str) -> tuple[str, datetime, str | None]:
     if m:
         token = m.group(1).lower()
         title = text[: m.start()].strip()
-        parsed = _resolve_due_token(token, today)
+        parsed = resolve_due_token(token, today)
         if parsed is None:
-            return title, as_due(today), token
-        return title, as_due(parsed), None
+            return title, noon_utc(today), token
+        return title, noon_utc(parsed), None
 
     # trailing YYYY-MM-DD | today | tomorrow (without "due")
     m = re.search(r"\s+(today|tomorrow|\d{4}-\d{2}-\d{2})\s*$", text, flags=re.IGNORECASE)
@@ -171,23 +170,12 @@ def _parse_add_task_args(raw: str) -> tuple[str, datetime, str | None]:
         # Only treat as due if it's a date keyword / ISO date (not part of a normal title word)
         title = text[: m.start()].strip()
         if title:
-            parsed = _resolve_due_token(token, today)
+            parsed = resolve_due_token(token, today)
             if parsed is None:
-                return title, as_due(today), token
-            return title, as_due(parsed), None
+                return title, noon_utc(today), token
+            return title, noon_utc(parsed), None
 
-    return text, as_due(today), None
-
-
-def _resolve_due_token(token: str, today: date) -> date | None:
-    if token == "today":
-        return today
-    if token == "tomorrow":
-        return today + timedelta(days=1)
-    try:
-        return date.fromisoformat(token)
-    except ValueError:
-        return None
+    return text, noon_utc(today), None
 
 
 async def cmd_habits(db: AsyncSession, user_id: str, args: str):

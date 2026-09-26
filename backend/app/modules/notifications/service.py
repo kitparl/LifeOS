@@ -71,7 +71,3 @@ class NotificationService:
         n.telegram_sent = True
         await self.repo.db.flush()
         return TelegramSendResponse(sent=True, detail="Telegram message sent")
-
-    async def get_dashboard_notifications(self, user_id: str, limit: int = 5) -> list[NotificationResponse]:
-        items, _ = await self.list_notifications(user_id, unread_only=True, limit=limit)
-        return items

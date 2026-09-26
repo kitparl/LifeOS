@@ -50,16 +50,9 @@ class WishlistUpdate(BaseModel):
 
     @model_validator(mode="after")
     def sync_photos_and_cover(self):
+        # Only sync when either field is being set (partial updates).
         if self.photos is not None or self.image_url is not None:
-            # Only sync when either field is being set (partial updates).
-            if self.photos is not None:
-                photos, cover = _sync_cover(self.photos, self.image_url)
-                self.photos = photos
-                self.image_url = cover
-            elif self.image_url is not None:
-                photos, cover = _sync_cover(None, self.image_url)
-                self.photos = photos
-                self.image_url = cover
+            self.photos, self.image_url = _sync_cover(self.photos, self.image_url)
         return self
 
 

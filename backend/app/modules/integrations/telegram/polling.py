@@ -10,6 +10,7 @@ can receive messages (Telegram forbids webhook + polling together).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import Any
 
@@ -114,9 +115,7 @@ async def stop_polling() -> None:
     if _poll_task is None:
         return
     _poll_task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await _poll_task
-    except asyncio.CancelledError:
-        pass
     _poll_task = None
     _webhooks_cleared.clear()

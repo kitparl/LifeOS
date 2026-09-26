@@ -1,9 +1,15 @@
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError
 from app.modules.preferences.repository import PreferenceRepository
 from app.modules.preferences.schemas import PreferenceListItem, PreferenceResponse
+
+MAX_KEY_LENGTH = 64
+
+
+def _validate_key(key: str) -> None:
+    if not key or len(key) > MAX_KEY_LENGTH:
+        raise BadRequestError("Invalid preference key")
 
 
 class PreferenceService:
@@ -22,8 +28,7 @@ class PreferenceService:
         ]
 
     async def get_preference(self, user_id: str, key: str) -> PreferenceResponse:
-        if not key or len(key) > 64:
-            raise BadRequestError("Invalid preference key")
+        _validate_key(key)
         row = await self.repo.get(user_id, key)
         return PreferenceResponse(
             key=key,
@@ -32,8 +37,7 @@ class PreferenceService:
         )
 
     async def put_preference(self, user_id: str, key: str, value: object) -> PreferenceResponse:
-        if not key or len(key) > 64:
-            raise BadRequestError("Invalid preference key")
+        _validate_key(key)
         row = await self.repo.upsert(user_id, key, value)
         return PreferenceResponse(
             key=row.key,

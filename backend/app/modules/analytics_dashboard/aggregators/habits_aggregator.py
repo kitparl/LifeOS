@@ -9,7 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.analytics_dashboard.aggregators import utc_today, window_start
+from app.core.timezone import utc_today
+from app.modules.analytics_dashboard.aggregators import window_start
 from app.modules.analytics_dashboard.schemas import HabitAnalytics, HabitItemAnalytics, HeatmapCell
 from app.modules.habits.models import Habit
 from app.modules.habits.stats import calculate_completion_rate, calculate_streak

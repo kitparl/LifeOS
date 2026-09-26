@@ -41,6 +41,7 @@ from typing import Any
 
 from app.core.crypto import decrypt, encrypt
 from app.core.events import ALL_EVENT_TYPES, DEFAULT_NOTIFY_ON
+from app.modules.integrations.common import load_json_object, mask_secret
 
 logger = logging.getLogger(__name__)
 
@@ -91,24 +92,6 @@ class TelegramPreferences:
     routine_reminders_enabled: bool = True
 
 
-def _mask_token(token: str) -> str:
-    if not token:
-        return ""
-    if len(token) <= 4:
-        return "****"
-    return f"****{token[-4:]}"
-
-
-def _load_json(config_json: str | None) -> dict[str, Any]:
-    if not config_json:
-        return {}
-    try:
-        parsed = json.loads(config_json)
-        return parsed if isinstance(parsed, dict) else {}
-    except json.JSONDecodeError:
-        return {}
-
-
 def _normalize_notify_on(raw: Any) -> list[str]:
     if not isinstance(raw, list):
         return list(DEFAULT_NOTIFY_ON)
@@ -139,7 +122,7 @@ def _bool_or(data: dict[str, Any], key: str, default: bool) -> bool:
 
 
 def parse_preferences(config_json: str | None) -> TelegramPreferences:
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="telegram")
     freq = str(data.get("digest_frequency") or "daily").lower()
     if freq not in _DIGEST_FREQUENCIES:
         freq = "daily"
@@ -210,7 +193,7 @@ def serialize_config(
     routine_reminders_enabled: bool | None = None,
 ) -> str:
     """Build encrypted config_json. Unset fields preserve existing values."""
-    existing = _load_json(existing_json)
+    existing = load_json_object(existing_json, label="telegram")
 
     token_enc = existing.get("bot_token_enc")
     chat_enc = existing.get("chat_id_enc")
@@ -298,7 +281,7 @@ def serialize_config(
 
 def parse_config(config_json: str | None) -> DecryptedTelegramConfig | None:
     """Decrypt config in memory. Returns None if incomplete or invalid."""
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="telegram")
     if not data:
         if config_json:
             logger.warning("Invalid telegram config_json (not JSON)")
@@ -329,7 +312,7 @@ def mask_config(config_json: str | None) -> MaskedTelegramConfig:
     parsed = parse_config(config_json)
     if parsed is None:
         chat_public: str | None = None
-        data = _load_json(config_json)
+        data = load_json_object(config_json, label="telegram")
         if data.get("chat_id_enc"):
             try:
                 chat_public = decrypt(str(data["chat_id_enc"]))
@@ -340,6 +323,6 @@ def mask_config(config_json: str | None) -> MaskedTelegramConfig:
         return MaskedTelegramConfig(configured=False, bot_token_masked=None, chat_id=chat_public)
     return MaskedTelegramConfig(
         configured=True,
-        bot_token_masked=_mask_token(parsed.bot_token),
+        bot_token_masked=mask_secret(parsed.bot_token),
         chat_id=parsed.chat_id,
     )

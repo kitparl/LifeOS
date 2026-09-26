@@ -203,44 +203,6 @@ def habits_list(lines: list[str]) -> str:
     )
 
 
-# --- Digest template ---
-
-
-def digest_message(
-    *,
-    stamp: datetime | str,
-    pending_tasks: list[str],
-    upcoming_events: list[str],
-    upcoming_races: list[str],
-    habits_due: list[str],
-) -> str:
-    if isinstance(stamp, datetime):
-        stamp_s = stamp.strftime("%Y-%m-%d %H:%M UTC")
-    else:
-        stamp_s = str(stamp)
-
-    sections: list[tuple[str, list[str]]] = [
-        ("Pending tasks", pending_tasks),
-        ("Upcoming calendar", upcoming_events),
-        ("Upcoming races", upcoming_races),
-        ("Habits due", habits_due),
-    ]
-    if not any(items for _, items in sections):
-        return join_blocks(
-            _header("LifeOS Digest", stamp_s),
-            "Nothing pending — you're all caught up.",
-        )
-
-    blocks = [_header("LifeOS Digest", stamp_s)]
-    for title, items in sections:
-        if not items:
-            continue
-        blocks.append(
-            _section(f"{title} ({len(items)})", _bullets(items, limit=15))
-        )
-    return join_blocks(*blocks)
-
-
 # --- Scheduled report templates (Cycle 8) ---
 
 
@@ -386,18 +348,6 @@ def routine_reminder(*, title: str, starts: str, offset_label: str) -> str:
         _header("⏱️ Routine starting soon", offset_label),
         f"<b>{esc(title)}</b>\nStarts at {esc(starts)}",
     )
-
-
-# --- Outbound event push templates (optional reuse) ---
-
-
-def event_task_created(title: str, due: str | None = None) -> str:
-    due_bit = f" (due {esc(due)})" if due else ""
-    return join_blocks(_header("New task"), f"{esc(title)}{due_bit}")
-
-
-def event_generic(title: str, body: str) -> str:
-    return join_blocks(_header(title), esc(body))
 
 
 def test_connection_message() -> str:

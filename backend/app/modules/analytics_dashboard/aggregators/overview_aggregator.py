@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import utc_now
 from app.modules.analytics_dashboard.aggregators.focus_aggregator import planned_focus_hours
 from app.modules.analytics_dashboard.aggregators.habits_aggregator import habit_consistency_avg
 from app.modules.analytics_dashboard.aggregators.journal_aggregator import mood_score_avg, writing_streak
@@ -46,7 +45,7 @@ def compute_life_score(
 
 
 async def upcoming_events(db: AsyncSession, user_id: str, limit: int = 10) -> list[dict]:
-    now = datetime.now(UTC)
+    now = utc_now()
     result = await db.execute(
         select(CalendarEvent)
         .where(CalendarEvent.user_id == user_id, CalendarEvent.starts_at >= now)

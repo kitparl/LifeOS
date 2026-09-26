@@ -70,7 +70,7 @@ class TelegramClient:
                 status_code=response.status_code,
             ) from exc
 
-        if response.status_code >= 400 or not data.get("ok"):
+        if response.status_code >= httpx.codes.BAD_REQUEST or not data.get("ok"):
             description = data.get("description") if isinstance(data, dict) else None
             safe = _redact_token(self._token, str(description or "Telegram API error"))
             benign = (
@@ -154,7 +154,7 @@ class TelegramClient:
                 response = await client.get(url)
         except httpx.HTTPError as exc:
             raise TelegramClientError("Telegram file download failed") from exc
-        if response.status_code >= 400:
+        if response.status_code >= httpx.codes.BAD_REQUEST:
             raise TelegramClientError(
                 "Telegram file download failed",
                 status_code=response.status_code,

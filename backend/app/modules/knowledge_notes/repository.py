@@ -1,10 +1,11 @@
-from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.pagination import Pagination, paginate
+from app.core.retention import purge_older_than
+from app.core.timezone import utc_now
 from app.modules.knowledge_notes.models import (
     KnowledgeChapter,
     KnowledgeSection,
@@ -120,7 +121,7 @@ class KnowledgeNotesRepository:
         payload = data.model_dump(exclude_unset=True)
         closed = payload.pop("closed", None)
         if closed is not None:
-            chapter.closed_at = datetime.now(UTC) if closed else None
+            chapter.closed_at = utc_now() if closed else None
         for key, value in payload.items():
             setattr(chapter, key, value)
         await self.db.flush()
@@ -167,7 +168,7 @@ class KnowledgeNotesRepository:
         payload = data.model_dump(exclude_unset=True)
         closed = payload.pop("closed", None)
         if closed is not None:
-            section.closed_at = datetime.now(UTC) if closed else None
+            section.closed_at = utc_now() if closed else None
         for key, value in payload.items():
             setattr(section, key, value)
         await self.db.flush()
@@ -179,7 +180,7 @@ class KnowledgeNotesRepository:
         await self.db.flush()
 
     async def archive_section(self, section: KnowledgeSection) -> KnowledgeSection:
-        section.archived_at = datetime.now(UTC)
+        section.archived_at = utc_now()
         await self.db.flush()
         await self.db.refresh(section)
         return section
@@ -191,21 +192,10 @@ class KnowledgeNotesRepository:
         return section
 
     async def purge_expired_archives(self, user_id: str, days: int = 7) -> list[str]:
-        cutoff = datetime.now(UTC) - timedelta(days=days)
-        result = await self.db.execute(
-            select(KnowledgeSection).where(
-                KnowledgeSection.user_id == user_id,
-                KnowledgeSection.archived_at.is_not(None),
-                KnowledgeSection.archived_at < cutoff,
-            )
+        rows = await purge_older_than(
+            self.db, KnowledgeSection, KnowledgeSection.archived_at, days, KnowledgeSection.user_id == user_id
         )
-        rows = list(result.scalars().all())
-        ids = [row.id for row in rows]
-        for row in rows:
-            await self.db.delete(row)
-        if rows:
-            await self.db.flush()
-        return ids
+        return [row.id for row in rows]
 
     # ---- Search ----
     async def search_sections(

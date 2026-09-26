@@ -1,7 +1,11 @@
 import json
 import math
-from datetime import UTC, datetime
 
+from pydantic import ValidationError
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.timezone import utc_now
 from app.modules.ai.adapters.base import ModelInfo
 from app.modules.ai.models import (
     MODEL_SOURCE_FETCHED,
@@ -13,9 +17,6 @@ from app.modules.ai.models import (
 )
 from app.modules.ai.schemas import AiSettings
 from app.modules.preferences.repository import PreferenceRepository
-from pydantic import ValidationError
-from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 AI_SETTINGS_PREFERENCE_KEY = "ai_settings"
 
@@ -67,16 +68,10 @@ class AiRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list_selections(self, user_id: str) -> list[AIUseCaseModelSelection]:
-        result = await self.db.execute(
-            select(AIUseCaseModelSelection).where(AIUseCaseModelSelection.user_id == user_id)
-        )
-        return list(result.scalars().all())
-
     async def set_selection(
         self, user_id: str, use_case: str, provider: str, model: str
     ) -> AIUseCaseModelSelection:
-        now = datetime.now(UTC)
+        now = utc_now()
         open_history = await self.db.execute(
             select(AIUseCaseModelSelectionHistory).where(
                 AIUseCaseModelSelectionHistory.user_id == user_id,
@@ -133,7 +128,7 @@ class AiRepository:
         )
         current_open = open_history.scalar_one_or_none()
         if current_open is not None:
-            current_open.effective_to = datetime.now(UTC)
+            current_open.effective_to = utc_now()
         await self.db.execute(
             delete(AIUseCaseModelSelection).where(
                 AIUseCaseModelSelection.user_id == user_id,
@@ -173,7 +168,7 @@ class AiRepository:
             )
         )
         manual_ids = {m.model_id for m in await self.list_models(user_id, provider)}
-        now = datetime.now(UTC)
+        now = utc_now()
         unique = {m.model_id: m for m in models if m.model_id not in manual_ids}
         self.db.add_all(
             AIProviderModel(
@@ -208,7 +203,7 @@ class AiRepository:
                 display_name=model_id,
                 capabilities=capability,
                 source=MODEL_SOURCE_MANUAL,
-                refreshed_at=datetime.now(UTC),
+                refreshed_at=utc_now(),
             )
         )
         await self.db.flush()

@@ -1,9 +1,10 @@
+from fastapi import UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.exceptions import get_or_404
 from app.modules.files.service import FileService
 from app.modules.ocr.repository import OcrRepository
 from app.modules.ocr.schemas import OcrDocumentCreate, OcrDocumentResponse
-from fastapi import UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class OcrService:
@@ -44,10 +45,7 @@ class OcrService:
 
     def _extract_text(self, filename: str, content_type: str, content: bytes) -> tuple[str, str]:
         if content_type.startswith("text/") or filename.lower().endswith((".txt", ".md", ".csv")):
-            try:
-                return content.decode("utf-8", errors="replace"), "processed"
-            except Exception:
-                pass
+            return content.decode("utf-8", errors="replace"), "processed"
         if filename.lower().endswith(".pdf"):
             return (
                 "[PDF OCR stub] Install Tesseract or a PDF parser for full extraction. "

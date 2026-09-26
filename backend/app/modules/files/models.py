@@ -1,9 +1,10 @@
-import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
-from app.core.database import Base
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 
 class FileRecord(Base):
@@ -12,7 +13,7 @@ class FileRecord(Base):
         Index("ix_file_records_user_module_entity", "user_id", "module", "entity_id"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(128), nullable=False, default="application/octet-stream")
@@ -27,4 +28,4 @@ class FileRecord(Base):
     visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="private")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

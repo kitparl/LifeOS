@@ -1,24 +1,28 @@
-import time
-from collections import defaultdict
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from jose import JWTError
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.core.security import create_access_token, create_refresh_token, decode_token, verify_token_type
+from app.core.exceptions import TooManyRequestsError
+from app.core.rate_limit import SlidingWindowLimiter
+from app.core.security import (
+    cookie_kwargs,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    verify_token_type,
+)
 from app.modules.auth.models import User
 from app.modules.auth.registration_gate import (
     REG_UNLOCK_COOKIE,
     create_unlock_token,
     is_registration_unlocked,
     require_registration_unlock,
-    unlock_cookie_kwargs,
     verify_gate_credentials,
 )
+from app.modules.auth.repository import UserRepository
 from app.modules.auth.schemas import (
     ChangePasswordRequest,
     GoogleConfigResponse,
@@ -42,73 +46,23 @@ settings = get_settings()
 
 _REFRESH_MAX_AGE = 60 * 60 * 24 * settings.refresh_token_expire_days
 
-# Simple in-memory sliding window: IP -> list of request timestamps (last 60s)
-_AVAIL_HITS: dict[str, list[float]] = defaultdict(list)
-_AVAIL_LIMIT = 30
-_AVAIL_WINDOW_S = 60.0
-
-_GATE_HITS: dict[str, list[float]] = defaultdict(list)
-_GATE_LIMIT = 10
-_GATE_WINDOW_S = 60.0
-
-
-def _cookie_kwargs() -> dict:
-    return {
-        "httponly": True,
-        "samesite": "lax",
-        "secure": settings.cookie_secure,
-    }
+# Per-client-IP sliding windows.
+_availability_limiter = SlidingWindowLimiter(limit=30, window_seconds=60.0)
+_gate_login_limiter = SlidingWindowLimiter(limit=10, window_seconds=60.0)
 
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
-    response.set_cookie(
-        REFRESH_COOKIE,
-        refresh_token,
-        max_age=_REFRESH_MAX_AGE,
-        **_cookie_kwargs(),
-    )
+    response.set_cookie(REFRESH_COOKIE, refresh_token, max_age=_REFRESH_MAX_AGE, **cookie_kwargs())
 
 
-def _sliding_window_rate_limit(
-    store: dict[str, list[float]],
-    key: str,
-    *,
-    limit: int,
-    window_s: float,
-    detail: str,
-) -> None:
-    now = time.monotonic()
-    hits = [t for t in store[key] if now - t < window_s]
-    if len(hits) >= limit:
-        store[key] = hits
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=detail,
-        )
-    hits.append(now)
-    store[key] = hits
+def _clear_cookie(response: Response, name: str) -> None:
+    response.delete_cookie(name, secure=settings.cookie_secure, samesite="lax")
 
 
-def _check_availability_rate_limit(request: Request) -> None:
+def _enforce_ip_limit(limiter: SlidingWindowLimiter, request: Request, detail: str) -> None:
     ip = request.client.host if request.client else "unknown"
-    _sliding_window_rate_limit(
-        _AVAIL_HITS,
-        ip,
-        limit=_AVAIL_LIMIT,
-        window_s=_AVAIL_WINDOW_S,
-        detail="Too many availability checks. Try again shortly.",
-    )
-
-
-def _check_gate_login_rate_limit(request: Request) -> None:
-    ip = request.client.host if request.client else "unknown"
-    _sliding_window_rate_limit(
-        _GATE_HITS,
-        ip,
-        limit=_GATE_LIMIT,
-        window_s=_GATE_WINDOW_S,
-        detail="Too many gate login attempts. Try again shortly.",
-    )
+    if not limiter.hit(ip):
+        raise TooManyRequestsError(detail)
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -119,7 +73,7 @@ async def register(
     _: None = Depends(require_registration_unlock),
 ):
     service = AuthService(db)
-    user, access, refresh = await service.register(data)
+    _user, access, refresh = await service.register(data)
     _set_refresh_cookie(response, refresh)
     return TokenResponse(access_token=access)
 
@@ -142,21 +96,18 @@ async def registration_gate_login(
     request: Request,
     response: Response,
 ):
-    _check_gate_login_rate_limit(request)
+    _enforce_ip_limit(_gate_login_limiter, request, "Too many gate login attempts. Try again shortly.")
     if not verify_gate_credentials(data.email, data.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = create_unlock_token(data.email)
-    response.set_cookie(REG_UNLOCK_COOKIE, token, **unlock_cookie_kwargs())
+    # No max_age: a session cookie, cleared when the browser fully closes.
+    response.set_cookie(REG_UNLOCK_COOKIE, token, **cookie_kwargs())
     return {"ok": True}
 
 
 @router.post("/registration-gate/logout")
 async def registration_gate_logout(response: Response):
-    response.delete_cookie(
-        REG_UNLOCK_COOKIE,
-        secure=settings.cookie_secure,
-        samesite="lax",
-    )
+    _clear_cookie(response, REG_UNLOCK_COOKIE)
     return {"ok": True}
 
 
@@ -168,7 +119,7 @@ async def registration_gate_status(request: Request):
 @router.post("/login", response_model=TokenResponse)
 async def login(data: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
-    user, access, refresh = await service.login(data.identifier, data.password)
+    _user, access, refresh = await service.login(data.identifier, data.password)
     _set_refresh_cookie(response, refresh)
     return TokenResponse(access_token=access)
 
@@ -182,7 +133,7 @@ async def google_config():
 @router.post("/google", response_model=TokenResponse)
 async def google_login(data: GoogleLoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
-    user, access, refresh = await service.google_login(data.credential)
+    _user, access, refresh = await service.google_login(data.credential)
     _set_refresh_cookie(response, refresh)
     return TokenResponse(access_token=access)
 
@@ -195,12 +146,10 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
     try:
         payload = decode_token(token)
         user_id = verify_token_type(payload, "refresh")
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    except JWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from exc
 
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None:
+    if await UserRepository(db).get_by_id(user_id) is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     new_access = create_access_token(user_id)
@@ -211,7 +160,7 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
 
 @router.post("/logout")
 async def logout(response: Response):
-    response.delete_cookie(REFRESH_COOKIE, secure=settings.cookie_secure, samesite="lax")
+    _clear_cookie(response, REFRESH_COOKIE)
     return {"ok": True}
 
 
@@ -221,7 +170,7 @@ async def username_available(
     username: str = Query(min_length=1, max_length=30),
     db: AsyncSession = Depends(get_db),
 ):
-    _check_availability_rate_limit(request)
+    _enforce_ip_limit(_availability_limiter, request, "Too many availability checks. Try again shortly.")
     service = AuthService(db)
     normalized, available, reason = await service.check_username_availability(username)
     return UsernameAvailabilityResponse(username=normalized, available=available, reason=reason)
@@ -239,8 +188,7 @@ async def update_me(
     db: AsyncSession = Depends(get_db),
 ):
     service = AuthService(db)
-    updated = await service.update_profile(user.id, data)
-    return updated
+    return await service.update_profile(user.id, data)
 
 
 @router.patch("/me/username", response_model=UserResponse)

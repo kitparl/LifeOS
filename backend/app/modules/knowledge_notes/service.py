@@ -3,7 +3,7 @@ import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, get_or_404
 from app.modules.files.repository import FileRepository
 from app.modules.knowledge_notes.repository import KnowledgeNotesRepository
 from app.modules.knowledge_notes.schemas import (
@@ -38,9 +38,6 @@ def _file_content_url(file_id: str) -> str:
     return f"/api/v1/files/{file_id}/content"
 
 logger = logging.getLogger(__name__)
-
-def _not_found(what: str) -> NotFoundError:
-    return NotFoundError(f"{what} not found")
 
 class KnowledgeNotesService:
     def __init__(self, db: AsyncSession):
@@ -95,9 +92,7 @@ class KnowledgeNotesService:
 
     async def get_subject(self, user_id: str, subject_id: str) -> SubjectDetail:
         await self._purge_expired(user_id)
-        subject = await self.repo.get_subject(user_id, subject_id)
-        if subject is None:
-            raise _not_found("Subject")
+        subject = get_or_404(await self.repo.get_subject(user_id, subject_id), "Subject not found")
         return self._subject_detail(subject)
 
     def _subject_detail(self, subject) -> SubjectDetail:
@@ -138,39 +133,29 @@ class KnowledgeNotesService:
         return await self.get_subject(user_id, subject.id)
 
     async def update_subject(self, user_id: str, subject_id: str, data: SubjectUpdate) -> SubjectDetail:
-        subject = await self.repo.get_subject(user_id, subject_id)
-        if subject is None:
-            raise _not_found("Subject")
+        subject = get_or_404(await self.repo.get_subject(user_id, subject_id), "Subject not found")
         await self.repo.update_subject(subject, data)
         return await self.get_subject(user_id, subject_id)
 
     async def delete_subject(self, user_id: str, subject_id: str) -> None:
-        subject = await self.repo.get_subject(user_id, subject_id)
-        if subject is None:
-            raise _not_found("Subject")
+        subject = get_or_404(await self.repo.get_subject(user_id, subject_id), "Subject not found")
         await self.repo.delete_subject(subject)
 
     # ---- Chapters ----
     async def create_chapter(
         self, user_id: str, subject_id: str, data: ChapterCreate
     ) -> ChapterResponse:
-        subject = await self.repo.get_subject(user_id, subject_id)
-        if subject is None:
-            raise _not_found("Subject")
+        get_or_404(await self.repo.get_subject(user_id, subject_id), "Subject not found")
         chapter = await self.repo.create_chapter(user_id, subject_id, data)
         return ChapterResponse.model_validate(chapter)
 
     async def update_chapter(self, user_id: str, chapter_id: str, data: ChapterUpdate) -> ChapterResponse:
-        chapter = await self.repo.get_chapter(user_id, chapter_id)
-        if chapter is None:
-            raise _not_found("Chapter")
+        chapter = get_or_404(await self.repo.get_chapter(user_id, chapter_id), "Chapter not found")
         updated = await self.repo.update_chapter(chapter, data)
         return ChapterResponse.model_validate(updated)
 
     async def delete_chapter(self, user_id: str, chapter_id: str) -> None:
-        chapter = await self.repo.get_chapter(user_id, chapter_id)
-        if chapter is None:
-            raise _not_found("Chapter")
+        chapter = get_or_404(await self.repo.get_chapter(user_id, chapter_id), "Chapter not found")
         await self.repo.delete_chapter(chapter)
 
     async def list_subject_documents(
@@ -179,14 +164,12 @@ class KnowledgeNotesService:
         subject_id: str,
         chapter_id: str | None = None,
     ) -> list[ChapterDocumentsGroup]:
-        subject = await self.repo.get_subject(user_id, subject_id)
-        if subject is None:
-            raise _not_found("Subject")
+        subject = get_or_404(await self.repo.get_subject(user_id, subject_id), "Subject not found")
         chapters = list(subject.chapters)
         if chapter_id is not None:
             chapters = [chapter for chapter in chapters if chapter.id == chapter_id]
             if not chapters:
-                raise _not_found("Chapter")
+                raise NotFoundError("Chapter not found")
 
         section_lookup: dict[str, tuple] = {}
         for chapter in chapters:
@@ -238,38 +221,28 @@ class KnowledgeNotesService:
 
     # ---- Sections ----
     async def get_section(self, user_id: str, section_id: str) -> SectionResponse:
-        section = await self.repo.get_section(user_id, section_id)
-        if section is None:
-            raise _not_found("Section")
+        section = get_or_404(await self.repo.get_section(user_id, section_id), "Section not found")
         return SectionResponse.model_validate(section)
 
     async def create_section(
         self, user_id: str, chapter_id: str, data: SectionCreate
     ) -> SectionResponse:
-        chapter = await self.repo.get_chapter(user_id, chapter_id)
-        if chapter is None:
-            raise _not_found("Chapter")
+        get_or_404(await self.repo.get_chapter(user_id, chapter_id), "Chapter not found")
         section = await self.repo.create_section(user_id, chapter_id, data)
         return SectionResponse.model_validate(section)
 
     async def update_section(self, user_id: str, section_id: str, data: SectionUpdate) -> SectionResponse:
-        section = await self.repo.get_section(user_id, section_id)
-        if section is None:
-            raise _not_found("Section")
+        section = get_or_404(await self.repo.get_section(user_id, section_id), "Section not found")
         # If moving to another chapter, verify ownership of the target.
         if data.chapter_id and data.chapter_id != section.chapter_id:
-            target = await self.repo.get_chapter(user_id, data.chapter_id)
-            if target is None:
-                raise _not_found("Target chapter")
+            get_or_404(await self.repo.get_chapter(user_id, data.chapter_id), "Target chapter not found")
         updated = await self.repo.update_section(section, data)
         if data.content is not None:
             await self._sync_inline_files(user_id, section_id, updated.content)
         return SectionResponse.model_validate(updated)
 
     async def delete_section(self, user_id: str, section_id: str) -> None:
-        section = await self.repo.get_section(user_id, section_id)
-        if section is None:
-            raise _not_found("Section")
+        section = get_or_404(await self.repo.get_section(user_id, section_id), "Section not found")
         await self.repo.delete_section(section)
         await self._cleanup_section_files(user_id, [section_id])
         try:
@@ -280,16 +253,12 @@ class KnowledgeNotesService:
             logger.exception("GitHub sync cleanup failed for section=%s", section_id)
 
     async def archive_section(self, user_id: str, section_id: str) -> SectionResponse:
-        section = await self.repo.get_section(user_id, section_id)
-        if section is None:
-            raise _not_found("Section")
+        section = get_or_404(await self.repo.get_section(user_id, section_id), "Section not found")
         updated = await self.repo.archive_section(section)
         return SectionResponse.model_validate(updated)
 
     async def restore_section(self, user_id: str, section_id: str) -> SectionResponse:
-        section = await self.repo.get_section(user_id, section_id)
-        if section is None:
-            raise _not_found("Section")
+        section = get_or_404(await self.repo.get_section(user_id, section_id), "Section not found")
         updated = await self.repo.restore_section(section)
         return SectionResponse.model_validate(updated)
 

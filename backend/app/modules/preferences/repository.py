@@ -1,9 +1,9 @@
 import json
-from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import utc_now
 from app.modules.preferences.models import UserPreference
 
 
@@ -31,7 +31,7 @@ class PreferenceRepository:
             self.db.add(row)
         else:
             row.value_json = payload
-            row.updated_at = datetime.now(UTC)
+            row.updated_at = utc_now()
         await self.db.flush()
         await self.db.refresh(row)
         return row

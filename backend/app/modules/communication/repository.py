@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import taxonomy
 from app.core.pagination import Pagination, paginate
 from app.modules.communication.models import (
     SpeakingPractice,
@@ -42,10 +43,7 @@ class CommunicationRepository:
         return result.scalar_one_or_none()
 
     async def list_category_names(self, user_id: str) -> list[str]:
-        result = await self.db.execute(
-            select(WritingCategory.name).where(WritingCategory.user_id == user_id).order_by(WritingCategory.name.asc())
-        )
-        return list(result.scalars().all())
+        return await taxonomy.list_names(self.db, WritingCategory, user_id)
 
     async def list_used_category_names(self, user_id: str) -> list[str]:
         result = await self.db.execute(
@@ -54,15 +52,8 @@ class CommunicationRepository:
         return [name for name in result.scalars().all() if name]
 
     async def ensure_category(self, user_id: str, name: str) -> None:
-        clean = (name or "").strip()
-        if not clean:
-            return
-        existing = await self.db.execute(select(WritingCategory).where(WritingCategory.user_id == user_id))
-        for row in existing.scalars().all():
-            if row.name.lower() == clean.lower():
-                return
-        self.db.add(WritingCategory(user_id=user_id, name=clean))
-        await self.db.flush()
+        """Register a name for reuse (idempotent, case-insensitive)."""
+        await taxonomy.ensure_name(self.db, WritingCategory, user_id, name)
 
     async def create_writing(self, user_id: str, data: WritingCreate) -> WritingPractice:
         item = WritingPractice(user_id=user_id, **data.model_dump())

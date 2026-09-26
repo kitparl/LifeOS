@@ -1,15 +1,20 @@
+import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
 from app.modules.integrations.ai.service import AiProviderIntegrationService
+from app.modules.integrations.github.config_service import GitHubConfigService
 from app.modules.integrations.github.sync_service import GitHubSyncService
 from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
+from app.modules.integrations.reports.repository import ReportRunRepository
 from app.modules.integrations.scheduling.digest_service import DigestService
+from app.modules.integrations.scheduling.scheduled_report_service import ScheduledReportService
+from app.modules.integrations.scheduling.scheduler import CRON_JOB_TYPES
 from app.modules.integrations.schemas import (
     AiModelAdd,
     AiModelRef,
@@ -47,10 +52,12 @@ from app.modules.integrations.schemas import (
     WordnikTestResponse,
 )
 from app.modules.integrations.service import IntegrationService, list_integration_providers
+from app.modules.integrations.telegram.config_service import TelegramConfigService
 from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 from app.modules.integrations.wordnik.service import WordnikIntegrationService
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/providers", response_model=list[IntegrationProviderInfo])
@@ -63,14 +70,15 @@ async def get_telegram_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    status_resp = await IntegrationService(db).get_telegram_status(user.id)
+    status_resp = await TelegramConfigService(db).get_telegram_status(user.id)
     try:
         wh = await TelegramWebhookService(db).webhook_status(user.id)
         if wh.url:
             status_resp.webhook_url = wh.url
             status_resp.webhook_configured = True
     except Exception:
-        pass
+        # Webhook info is optional on this screen; the rest of the status is still valid.
+        logger.warning("Could not read Telegram webhook status for user=%s", user.id, exc_info=True)
     return status_resp
 
 
@@ -80,7 +88,7 @@ async def save_telegram_config(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).save_telegram_config(user.id, data)
+    return await TelegramConfigService(db).save_telegram_config(user.id, data)
 
 
 @router.get("/github", response_model=GitHubConfigStatus)
@@ -88,7 +96,7 @@ async def get_github_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).get_github_status(user.id)
+    return await GitHubConfigService(db).get_github_status(user.id)
 
 
 @router.put("/github/config", response_model=GitHubConfigStatus)
@@ -97,7 +105,7 @@ async def save_github_config(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).save_github_config(user.id, data)
+    return await GitHubConfigService(db).save_github_config(user.id, data)
 
 
 @router.post("/github/test", response_model=GitHubTestResponse)
@@ -105,7 +113,7 @@ async def test_github(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).test_github(user.id)
+    return await GitHubConfigService(db).test_github(user.id)
 
 
 @router.get("/google-calendar", response_model=GoogleCalendarConfigStatus)
@@ -300,10 +308,6 @@ async def run_scheduled_report(
     db: AsyncSession = Depends(get_db),
 ):
     """Manually fire a scheduled report (morning/midday/night/weekly/ai_briefing)."""
-    from fastapi import HTTPException
-
-    from app.modules.integrations.scheduling.scheduled_report_service import CRON_JOB_TYPES, ScheduledReportService
-
     if job_type not in CRON_JOB_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -319,8 +323,6 @@ async def list_report_runs(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.modules.integrations.reports.repository import ReportRunRepository
-
     runs = await ReportRunRepository(db).list_runs(user.id, job_type=job_type, limit=min(limit, 200))
     return [ReportRunResponse.model_validate(r) for r in runs]
 
@@ -423,7 +425,7 @@ async def test_integration(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await IntegrationService(db).test_connection(user.id, conn_id)
+    return await TelegramConfigService(db).test_connection(user.id, conn_id)
 
 
 @router.post("/{conn_id}/detect-chat-id", response_model=DetectChatIdResponse)
@@ -434,4 +436,4 @@ async def detect_chat_id(
     db: AsyncSession = Depends(get_db),
 ):
     override = data.bot_token if data else None
-    return await IntegrationService(db).detect_chat_id(user.id, conn_id, bot_token_override=override)
+    return await TelegramConfigService(db).detect_chat_id(user.id, conn_id, bot_token_override=override)

@@ -1,10 +1,10 @@
-import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 SYNC_STATUS_NEVER = "never_synced"
 SYNC_STATUS_SYNCING = "syncing"
@@ -17,7 +17,7 @@ class GitHubSyncState(Base):
     __tablename__ = "github_sync_state"
     __table_args__ = (UniqueConstraint("user_id", "section_id", name="uq_github_sync_user_section"),)
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     section_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
     md_path: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -30,10 +30,10 @@ class GitHubSyncState(Base):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), default=utc_now
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        default=utc_now,
+        onupdate=utc_now,
     )

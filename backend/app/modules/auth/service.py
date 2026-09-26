@@ -1,10 +1,10 @@
-from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError, ConflictError, UnauthorizedError, get_or_404
 from app.core.security import create_access_token, create_refresh_token, hash_password, verify_password
+from app.core.timezone import utc_now
 from app.modules.auth.google_auth import verify_google_id_token
 from app.modules.auth.repository import UserRepository
 from app.modules.auth.schemas import RegisterRequest, UsernameChangeRequest, UserUpdateRequest
@@ -82,7 +82,7 @@ class AuthService:
             user = await self.repo.update(
                 user,
                 username=new_username,
-                username_changed_at=datetime.now(UTC),
+                username_changed_at=utc_now(),
                 username_change_count=(user.username_change_count or 0) + 1,
             )
             await self.repo.add_username_history(

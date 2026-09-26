@@ -15,7 +15,7 @@ from app.modules.integrations.telegram.client import TelegramClient, TelegramCli
 from app.modules.integrations.telegram.config import parse_config
 from app.modules.integrations.telegram.navigation import back_home
 from app.modules.integrations.telegram.renderer import Screen
-from app.modules.integrations.telegram.state import get_conversation, start_conversation
+from app.modules.integrations.telegram.state import get_conversation
 
 logger = logging.getLogger(__name__)
 
@@ -99,23 +99,6 @@ async def handle_media(db: AsyncSession, user_id: str, msg: dict[str, Any]) -> S
             tpl._header("Attachment saved"),
             f"<b>{tpl.esc(filename)}</b> ({len(content)} bytes)\n"
             f"Linked to: {tpl.esc(target)}{extra}",
-        ),
-        keyboard=kb.inline_keyboard([back_home()]),
-    )
-
-
-async def begin_attach_to_task(db: AsyncSession, user_id: str, task_id: str, *, message_id: int | None = None) -> Screen:
-    start_conversation(
-        user_id,
-        "attach",
-        "wait_file",
-        data={"module": "tasks", "entity_id": task_id},
-        message_id=message_id,
-    )
-    return Screen(
-        text=tpl.join_blocks(
-            tpl._header("Attach file"),
-            "Send a photo, document, or voice note.\nOr /cancel.",
         ),
         keyboard=kb.inline_keyboard([back_home()]),
     )

@@ -4,13 +4,27 @@ import hashlib
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Literal
 from urllib.parse import quote
 
+from fastapi import HTTPException, Request, UploadFile, status
+from fastapi.responses import Response, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import Settings, get_settings
-from app.core.exceptions import AppError, BadRequestError, ConflictError, NotFoundError, UnauthorizedError, get_or_404
-from app.modules.files.backends import get_storage_backend, resolve_backend
+from app.core.exceptions import (
+    AppError,
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+    PayloadTooLargeError,
+    TooManyRequestsError,
+    UnauthorizedError,
+    get_or_404,
+)
+from app.core.timezone import utc_now
+from app.modules.files.backends import default_backend_name, get_storage_backend, resolve_backend
 from app.modules.files.backends.base import StorageBackend
 from app.modules.files.download_tokens import mint_download_token, verify_download_token
 from app.modules.files.keys import build_storage_key
@@ -29,9 +43,6 @@ from app.modules.files.validation import (
     sniff_content_type,
     validate_module,
 )
-from fastapi import HTTPException, Request, UploadFile, status
-from fastapi.responses import Response, StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +116,7 @@ class FileService:
             first = chunk
             break
         if len(first) > self.settings.max_upload_bytes:
-            _err = AppError("File too large")
-            _err.status_code = status.HTTP_413_CONTENT_TOO_LARGE
-            raise _err
+            raise PayloadTooLargeError("File too large")
 
         sniffed = sniff_content_type(first[:8192], filename, self.settings)
         ext = extension_for_mime(sniffed)
@@ -119,9 +128,7 @@ class FileService:
             extension=ext,
         )
         storage = get_storage_backend()
-        backend_name = (self.settings.storage_backend or "local").strip().lower()
-        if backend_name not in ("local", "s3"):
-            backend_name = "local"
+        backend_name = default_backend_name(self.settings)
 
         max_bytes = self.settings.max_upload_bytes
         hasher = hashlib.sha256()
@@ -133,17 +140,13 @@ class FileService:
             if first:
                 total += len(first)
                 if total > max_bytes:
-                    _err = AppError("File too large")
-                    _err.status_code = status.HTTP_413_CONTENT_TOO_LARGE
-                    raise _err
+                    raise PayloadTooLargeError("File too large")
                 hasher.update(first)
                 yield first
             async for chunk in rest_iter:
                 total += len(chunk)
                 if total > max_bytes:
-                    _err = AppError("File too large")
-                    _err.status_code = status.HTTP_413_CONTENT_TOO_LARGE
-                    raise _err
+                    raise PayloadTooLargeError("File too large")
                 hasher.update(chunk)
                 yield chunk
 
@@ -153,7 +156,7 @@ class FileService:
             try:
                 await storage.delete(storage_key)
             except Exception:
-                pass
+                logger.exception("Failed to clean up rejected upload: %s", storage_key)
             raise
 
         size_bytes = stored.size_bytes
@@ -165,7 +168,7 @@ class FileService:
                 await storage.delete(storage_key)
             except Exception:
                 logger.exception("Failed to clean up duplicate upload: %s", storage_key)
-            raise ConflictError("This file has already been uploaded",)
+            raise ConflictError("This file has already been uploaded")
 
         await self._enforce_quota(user_id, additional=size_bytes)
 
@@ -184,7 +187,7 @@ class FileService:
             checksum_sha256=checksum,
             extension=ext.lstrip(".") if ext else None,
             visibility="private",
-            updated_at=datetime.now(UTC),
+            updated_at=utc_now(),
         )
         try:
             saved = await self.repo.create(record)
@@ -222,16 +225,12 @@ class FileService:
     async def _enforce_rate_limit(self, user_id: str) -> None:
         count = await self.repo.uploads_in_last_hour(user_id)
         if count >= self.settings.uploads_per_hour:
-            _err = AppError("Upload rate limit exceeded",)
-            _err.status_code = status.HTTP_429_TOO_MANY_REQUESTS
-            raise _err
+            raise TooManyRequestsError("Upload rate limit exceeded")
 
     async def _enforce_quota(self, user_id: str, *, additional: int) -> None:
         used, _ = await self.repo.usage_stats(user_id)
         if used + additional > self.settings.user_storage_quota_bytes:
-            _err = AppError("User storage quota exceeded",)
-            _err.status_code = status.HTTP_413_CONTENT_TOO_LARGE
-            raise _err
+            raise PayloadTooLargeError("User storage quota exceeded")
 
     async def list_files(
         self,
@@ -272,7 +271,7 @@ class FileService:
         record = get_or_404(await self.repo.get(user_id, file_id), "File not found")
         old = record.visibility
         record.visibility = visibility
-        record.updated_at = datetime.now(UTC)
+        record.updated_at = utc_now()
         await self.db.flush()
         await self.db.refresh(record)
         logger.info(
@@ -289,15 +288,9 @@ class FileService:
         record = get_or_404(await self.repo.get(user_id, file_id), "File not found")
         await self.repo.soft_delete(record)
 
-    async def hard_delete_file(self, user_id: str, file_id: str) -> None:
-        record = get_or_404(await self.repo.get(user_id, file_id, include_deleted=True), "File not found")
-        backend = self._backend_for(record)
-        await backend.delete(record.storage_key)
-        await self.repo.hard_delete(record)
-
     async def purge_soft_deleted(self, *, older_than_days: int | None = None) -> PurgeResponse:
         days = older_than_days if older_than_days is not None else self.settings.file_purge_after_days
-        cutoff = datetime.now(UTC) - timedelta(days=days)
+        cutoff = utc_now() - timedelta(days=days)
         candidates = await self.repo.list_purge_candidates(cutoff)
         purged = 0
         for record in candidates:
@@ -310,6 +303,25 @@ class FileService:
             purged += 1
         return PurgeResponse(purged=purged)
 
+    async def resolve_record(
+        self, file_id: str, *, user_id: str | None, token: str | None, public: bool = False
+    ) -> FileRecord:
+        """Authorize a read: public link, signed download token, or the signed-in owner."""
+        if public:
+            record = await self.repo.get_by_id(file_id)
+            if not record or record.visibility != "public":
+                raise NotFoundError("File not found")
+            return record
+        if token:
+            try:
+                token_user = verify_download_token(token, file_id, self.settings)
+            except ValueError as exc:
+                raise UnauthorizedError("Invalid download token") from exc
+            return get_or_404(await self.repo.get(token_user, file_id), "File not found")
+        if user_id:
+            return get_or_404(await self.repo.get(user_id, file_id), "File not found")
+        raise UnauthorizedError("Not authenticated")
+
     async def content_response(
         self,
         *,
@@ -320,20 +332,7 @@ class FileService:
         public: bool = False,
         force_disposition: Literal["inline", "attachment"] | None = None,
     ) -> Response:
-        if public:
-            record = await self.repo.get_by_id(file_id)
-            if not record or record.visibility != "public":
-                raise NotFoundError("File not found")
-        elif token:
-            try:
-                token_user = verify_download_token(token, file_id, self.settings)
-            except ValueError:
-                raise UnauthorizedError("Invalid download token")
-            record = get_or_404(await self.repo.get(token_user, file_id), "File not found")
-        elif user_id:
-            record = get_or_404(await self.repo.get(user_id, file_id), "File not found")
-        else:
-            raise UnauthorizedError("Not authenticated")
+        record = await self.resolve_record(file_id, user_id=user_id, token=token, public=public)
 
         etag = f'"{record.checksum_sha256}"' if record.checksum_sha256 else None
         if etag and request.headers.get("if-none-match") == etag:
@@ -439,10 +438,10 @@ class FileService:
             if start < 0 or end >= size or start > end:
                 raise ValueError
             return start, end
-        except ValueError:
+        except ValueError as exc:
             # Keep HTTPException: AppError handler does not forward response headers.
             raise HTTPException(
                 status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
                 detail="Invalid Range",
                 headers={"Content-Range": f"bytes */{size}"},
-            )
+            ) from exc

@@ -116,12 +116,10 @@ def _assignment_keyboard(entity_id: str, assignment_id: str | None) -> dict[str,
 
 
 async def _create_in_app(db: AsyncSession, event: EntityCreated) -> None:
-    if event.event_type not in _TASK_EVENTS or event.event_type == TASK_CREATED:
-        # TASK_CREATED already notifies via Telegram for owner; skip duplicate in-app spam on create
-        if event.event_type == TASK_CREATED:
-            return
-        if event.event_type not in _TASK_EVENTS:
-            return
+    # Only task events notify in-app; TASK_CREATED already notifies the owner via Telegram,
+    # so skip duplicate in-app spam on create.
+    if event.event_type == TASK_CREATED or event.event_type not in _TASK_EVENTS:
+        return
     try:
         plain = format_entity_message(event)
         # Strip HTML entities for in-app
@@ -172,10 +170,7 @@ async def on_entity_created(db: AsyncSession, event: EntityCreated) -> None:
         parse_mode="HTML",
         reply_markup=markup,
     )
-    try:
-        db.info["outbox_enqueued"] = True
-    except Exception:
-        pass
+    db.info["outbox_enqueued"] = True
 
 
 def register_subscribers() -> None:

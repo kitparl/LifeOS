@@ -10,6 +10,7 @@ from app.modules.auth.models import User
 
 bearer = HTTPBearer(auto_error=False)
 
+
 async def get_optional_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_db),
@@ -20,8 +21,8 @@ async def get_optional_user(
     try:
         payload = decode_token(creds.credentials)
         user_id = verify_token_type(payload, "access")
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except JWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:

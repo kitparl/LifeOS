@@ -4,9 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
+from app.modules.auth.repository import UserRepository
 from app.modules.tasks.activity_service import ActivityService
 from app.modules.tasks.assignment_service import AssignmentService, load_task_for_actor
 from app.modules.tasks.collaboration_service import CollaborationService
+from app.modules.tasks.models import TaskWatcher
 from app.modules.tasks.permissions import TaskPermissions
 from app.modules.tasks.schemas import (
     ActivityLogResponse,
@@ -252,6 +254,18 @@ async def activity_log(
     return [ActivityLogResponse.model_validate(r) for r in rows]
 
 
+
+def _watcher_response(watcher: TaskWatcher, watcher_user: User | None) -> WatcherResponse:
+    return WatcherResponse(
+        id=watcher.id,
+        task_id=watcher.task_id,
+        user_id=watcher.user_id,
+        username=watcher_user.username if watcher_user else None,
+        display_name=watcher_user.display_name if watcher_user else None,
+        created_at=watcher.created_at,
+    )
+
+
 @router.get("/{task_id}/watchers", response_model=list[WatcherResponse])
 async def list_watchers(
     task_id: str,
@@ -261,17 +275,7 @@ async def list_watchers(
     task = await load_task_for_actor(db, task_id, user.id)
     await TaskPermissions(db).require(user.id, task, "view")
     pairs = await CollaborationService(db).list_watchers(task)
-    return [
-        WatcherResponse(
-            id=w.id,
-            task_id=w.task_id,
-            user_id=w.user_id,
-            username=u.username if u else None,
-            display_name=u.display_name if u else None,
-            created_at=w.created_at,
-        )
-        for w, u in pairs
-    ]
+    return [_watcher_response(w, u) for w, u in pairs]
 
 
 @router.post("/{task_id}/watchers", response_model=WatcherResponse, status_code=status.HTTP_201_CREATED)
@@ -285,17 +289,7 @@ async def add_watcher(
     w = await CollaborationService(db).add_watcher(
         task, user.id, username=data.username, user_id=data.user_id
     )
-    from app.modules.auth.repository import UserRepository
-
-    u = await UserRepository(db).get_by_id(w.user_id)
-    return WatcherResponse(
-        id=w.id,
-        task_id=w.task_id,
-        user_id=w.user_id,
-        username=u.username if u else None,
-        display_name=u.display_name if u else None,
-        created_at=w.created_at,
-    )
+    return _watcher_response(w, await UserRepository(db).get_by_id(w.user_id))
 
 
 @router.delete("/{task_id}/watchers/{watcher_user_id}", status_code=status.HTTP_204_NO_CONTENT)

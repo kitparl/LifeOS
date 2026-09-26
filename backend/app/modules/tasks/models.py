@@ -1,23 +1,25 @@
 import json
-import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 TASK_STATUSES = ("pending", "in_progress", "hold", "delayed", "completed", "cancelled")
 TASK_PRIORITIES = ("low", "medium", "high", "urgent")
 TASK_RECURRENCE = ("none", "daily", "weekly", "monthly")
 ASSIGNMENT_STATUSES = ("pending", "accepted", "rejected", "cancelled", "reassigned", "completed")
 OPEN_TASK_STATUSES = ("pending", "in_progress", "hold", "delayed")
+# Assignment statuses that still make the assignee a participant on the task.
+ACTIVE_ASSIGNMENT_STATUSES = ("pending", "accepted")
 
 
 class Task(Base):
     __tablename__ = "tasks"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -32,9 +34,9 @@ class Task(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
     subtasks: Mapped[list["Task"]] = relationship(
@@ -84,14 +86,14 @@ class TaskAssignment(Base):
         Index("ix_task_assignments_assignee_status", "assignee_user_id", "status"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
     assignee_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     assigned_by_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     assigned_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True), default=utc_now, nullable=False
     )
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -105,14 +107,14 @@ class TaskAssignment(Base):
 class TaskStatusHistory(Base):
     __tablename__ = "task_status_history"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
     from_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     to_status: Mapped[str] = mapped_column(String(16), nullable=False)
     changed_by_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True), default=utc_now, nullable=False
     )
 
     task: Mapped["Task"] = relationship("Task", back_populates="status_history")
@@ -121,7 +123,7 @@ class TaskStatusHistory(Base):
 class TaskActivityLog(Base):
     __tablename__ = "task_activity_log"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
     actor_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     action: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -130,7 +132,7 @@ class TaskActivityLog(Base):
     new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True), default=utc_now, nullable=False
     )
 
     task: Mapped["Task"] = relationship("Task", back_populates="activity_logs")
@@ -140,11 +142,11 @@ class TaskWatcher(Base):
     __tablename__ = "task_watchers"
     __table_args__ = (UniqueConstraint("task_id", "user_id", name="uq_task_watchers_task_user"),)
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True), default=utc_now, nullable=False
     )
 
     task: Mapped["Task"] = relationship("Task", back_populates="watchers")
@@ -153,16 +155,16 @@ class TaskWatcher(Base):
 class TaskNote(Base):
     __tablename__ = "task_notes"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
     author_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True), default=utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
     task: Mapped["Task"] = relationship("Task", back_populates="notes")
@@ -172,11 +174,11 @@ class TaskTag(Base):
     __tablename__ = "task_tags"
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_task_tags_user_name"),)
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True), default=utc_now, nullable=False
     )
 
     links: Mapped[list["TaskTagLink"]] = relationship("TaskTagLink", back_populates="tag", cascade="all, delete-orphan")
@@ -186,7 +188,7 @@ class TaskTagLink(Base):
     __tablename__ = "task_tag_links"
     __table_args__ = (UniqueConstraint("task_id", "tag_id", name="uq_task_tag_links_task_tag"),)
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
     tag_id: Mapped[str] = mapped_column(String(36), ForeignKey("task_tags.id"), nullable=False, index=True)
 

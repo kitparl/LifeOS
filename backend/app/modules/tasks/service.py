@@ -1,9 +1,9 @@
-from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import TASK_COMPLETED, TASK_CREATED, TASK_STATUS_CHANGED, EntityCreated, event_bus
 from app.core.exceptions import ConflictError, get_or_404
+from app.core.timezone import utc_now
 from app.modules.tasks.activity_service import ActivityService
 from app.modules.tasks.assignment_service import AssignmentService, load_task_for_actor
 from app.modules.tasks.collaboration_service import CollaborationService
@@ -136,7 +136,7 @@ class TaskService:
                 from_status=None,
                 to_status=task.status,
                 changed_by_user_id=user_id,
-                created_at=datetime.now(UTC),
+                created_at=utc_now(),
             )
         )
         await self.db.flush()

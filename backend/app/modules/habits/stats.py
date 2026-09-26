@@ -1,10 +1,7 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
+from app.core.timezone import utc_today
 from app.modules.habits.models import Habit
-
-
-def _today() -> date:
-    return datetime.now(UTC).date()
 
 
 def _week_start(d: date) -> date:
@@ -16,7 +13,7 @@ def _month_start(d: date) -> date:
 
 
 def is_completed_for_period(habit: Habit, ref: date | None = None) -> bool:
-    ref = ref or _today()
+    ref = ref or utc_today()
     log_dates = {log.log_date for log in habit.logs}
     if habit.frequency == "daily":
         return ref in log_dates
@@ -30,7 +27,7 @@ def is_completed_for_period(habit: Habit, ref: date | None = None) -> bool:
 def calculate_streak(habit: Habit) -> int:
     if not habit.logs:
         return 0
-    today = _today()
+    today = utc_today()
     streak = 0
 
     if habit.frequency == "daily":
@@ -63,7 +60,7 @@ def calculate_streak(habit: Habit) -> int:
 def calculate_completion_rate(habit: Habit, lookback_days: int = 30) -> float:
     if not habit.logs:
         return 0.0
-    today = _today()
+    today = utc_today()
     start = today - timedelta(days=lookback_days - 1)
     log_dates = [log.log_date for log in habit.logs if log.log_date >= start]
 

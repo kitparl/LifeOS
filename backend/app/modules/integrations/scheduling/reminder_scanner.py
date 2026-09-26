@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import safe_zone
 from app.modules.calendar.repository import CalendarRepository
-from app.modules.calendar.service import _expand_recurring_event
+from app.modules.calendar.service import expand_recurring_event
 from app.modules.integrations.notifications.notifier import NotifierMessage
 from app.modules.integrations.notifications.notifier_registry import build_user_notifier
 from app.modules.integrations.reports.repository import ReportRunRepository
@@ -49,13 +50,6 @@ ROUTINE_OFFSETS = (
 POLL_GRACE = timedelta(minutes=10)
 
 
-def _safe_zone(tz_name: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(tz_name or "Asia/Kolkata")
-    except ZoneInfoNotFoundError:
-        return ZoneInfo("Asia/Kolkata")
-
-
 def _aware(dt: datetime, tz: ZoneInfo) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=tz)
@@ -79,7 +73,7 @@ class ReminderScanner:
         if conn is None or not conn.enabled:
             return 0
         prefs = parse_preferences(conn.config_json)
-        tz = _safe_zone(prefs.timezone)
+        tz = safe_zone(prefs.timezone)
         now = datetime.now(tz)
         sent = 0
 
@@ -137,7 +131,7 @@ class ReminderScanner:
             if kind != "birthday":
                 continue
             # Expand yearly occurrences in the window
-            occurrences = _expand_recurring_event(event, start, end)
+            occurrences = expand_recurring_event(event, start, end)
             for occ in occurrences:
                 occ_date = occ.starts_at.astimezone(tz).date() if occ.starts_at.tzinfo else occ.starts_at.date()
                 master_id = event.id
@@ -148,12 +142,9 @@ class ReminderScanner:
                     target_day = occ_date - timedelta(days=days_before)
                     if target_day != today:
                         continue
-                    # Fire at 06:00 local on the reminder day (within poller grace)
+                    # Any poll on the reminder day may send it (dedupe keeps it to one);
+                    # scheduled_for records the nominal 06:00 local fire time.
                     fire_at = datetime.combine(target_day, datetime.min.time().replace(hour=6), tzinfo=tz)
-                    # Also accept any poll during that calendar day if we haven't sent yet —
-                    # use start-of-day as scheduled_for and rely on dedupe.
-                    if not (target_day == today):
-                        continue
                     label = "tomorrow" if days_before == 1 else f"in {days_before} days"
                     key = f"bday:{master_id}:{occ_date.isoformat()}:tminus{days_before}"
                     text = tpl.birthday_reminder(title=event.title, when=f"Birthday {label}")
@@ -200,7 +191,7 @@ class ReminderScanner:
             if kind != "immutable":
                 continue
             if event.recurrence and event.recurrence != "none":
-                occurrences = _expand_recurring_event(event, start, end)
+                occurrences = expand_recurring_event(event, start, end)
             else:
                 from app.modules.calendar.schemas import EventListItem
 

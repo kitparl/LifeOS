@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.integrations.telegram import conversation as conv
 from app.modules.integrations.telegram.callbacks import CallbackContext, dispatch, parse_callback
 from app.modules.integrations.telegram.command_handler import handle_command
-from app.modules.integrations.telegram.renderer import Screen, render_screen, send_text
+from app.modules.integrations.telegram.renderer import Screen, _client_for_user, render_screen, send_text
+from app.modules.integrations.telegram.state import get_conversation
 
 logger = logging.getLogger(__name__)
 
@@ -65,27 +66,22 @@ async def route_update(
         return {"ok": "ignored"}
 
     # Active conversation takes priority over slash commands (except /cancel)
-    if text.lower() in ("/cancel", "cancel"):
-        if conv.is_active(user_id):
-            screen = conv.cancel(user_id)
-            await render_screen(db, user_id, screen, message_id=None)
-            return {"ok": "cancelled"}
+    if text.lower() in ("/cancel", "cancel") and conv.is_active(user_id):
+        screen = conv.cancel(user_id)
+        await render_screen(db, user_id, screen, message_id=None)
+        return {"ok": "cancelled"}
 
     if conv.is_active(user_id) and not text.startswith("/"):
         screen = await conv.handle_text(db, user_id, text)
         if screen is not None:
-            state = __import__(
-                "app.modules.integrations.telegram.state", fromlist=["get_conversation"]
-            ).get_conversation(user_id)
+            state = get_conversation(user_id)
             mid = state.message_id if state else None
             await render_screen(db, user_id, screen, message_id=mid if screen.edit else None)
             return {"ok": "conversation"}
 
     # Slash commands (and free-text falling through to command handler hints)
     reply = await handle_command(db, user_id, text)
-    from app.modules.integrations.telegram.renderer import Screen as ScreenCls
-
-    if isinstance(reply, ScreenCls):
+    if isinstance(reply, Screen):
         await render_screen(db, user_id, reply)
         return {"ok": "command_screen"}
     if isinstance(reply, str):
@@ -149,13 +145,12 @@ async def _handle_callback(
         )
     elif callback_id:
         # Answer even when no screen (e.g. noop)
-        pair = await __import__(
-            "app.modules.integrations.telegram.renderer", fromlist=["_client_for_user"]
-        )._client_for_user(db, user_id)
+        pair = await _client_for_user(db, user_id)
         if pair is not None:
             client, _ = pair
             try:
                 await client.answer_callback_query(callback_id, text=toast or "")
             except Exception:
-                pass
+                # Unanswered callbacks only leave Telegram's spinner showing; nothing to retry.
+                logger.warning("answer_callback_query failed for user=%s", user_id, exc_info=True)
     return {"ok": "callback"}

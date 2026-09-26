@@ -1,8 +1,10 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
-from app.core.database import Base
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base
+from app.core.timezone import utc_now
 
 
 class DocumentPreview(Base):
@@ -24,10 +26,10 @@ class DocumentPreview(Base):
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     cache_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), default=utc_now
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        default=utc_now,
+        onupdate=utc_now,
     )

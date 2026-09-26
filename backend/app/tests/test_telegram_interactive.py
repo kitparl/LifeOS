@@ -287,19 +287,6 @@ async def test_subscriber_attaches_task_keyboard():
 
 
 @pytest.mark.asyncio
-async def test_digest_has_section_buttons():
-    from app.modules.integrations.scheduling.digest_service import DigestContent, format_digest
-
-    msg = format_digest(DigestContent(pending_tasks=["A"]))
-    assert msg.reply_markup is not None
-    assert any(
-        b.get("callback_data") == "task:list:0"
-        for row in msg.reply_markup["inline_keyboard"]
-        for b in row
-    )
-
-
-@pytest.mark.asyncio
 async def test_webhook_rejects_unknown_secret():
     from app.core.exceptions import NotFoundError
     from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
@@ -371,7 +358,7 @@ async def test_ai_parse_and_create_task_fallback():
     created.title = "Call the dentist"
     created.due_date = datetime.combine(date.today(), time(12, 0), tzinfo=UTC)
 
-    with patch("app.modules.tasks.service.TaskService") as Svc:
+    with patch("app.modules.ai.service.TaskService") as Svc:
         Svc.return_value.create_task = AsyncMock(return_value=created)
         svc = AiService(db)
         svc.gateway.chat = AsyncMock(side_effect=MissingCredentialError("no provider"))

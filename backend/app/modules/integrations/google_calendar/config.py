@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from app.core.crypto import decrypt, encrypt
+from app.modules.integrations.common import load_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -44,23 +45,12 @@ class GoogleCalendarConfig:
         return SCOPE_READWRITE in self.scope.split()
 
 
-def _load_json(config_json: str | None) -> dict[str, Any]:
-    if not config_json:
-        return {}
-    try:
-        parsed = json.loads(config_json)
-        return parsed if isinstance(parsed, dict) else {}
-    except json.JSONDecodeError:
-        logger.warning("Invalid google_calendar config_json (not JSON)")
-        return {}
-
-
 def _direction(value: Any) -> str:
     return value if value in SYNC_DIRECTIONS else DEFAULT_DIRECTION
 
 
 def parse_config(config_json: str | None) -> GoogleCalendarConfig:
-    data = _load_json(config_json)
+    data = load_json_object(config_json, label="google_calendar")
     token = ""
     if data.get("refresh_token_enc"):
         try:
@@ -95,7 +85,7 @@ def serialize_config(
     last_sync_ok: Any = _UNSET,
 ) -> str:
     """Merge updates into the existing config. Omitted fields keep their stored value."""
-    data = _load_json(existing_json)
+    data = load_json_object(existing_json, label="google_calendar")
     if refresh_token is not None:
         data["refresh_token_enc"] = encrypt(refresh_token) if refresh_token else ""
     if scope is not None:

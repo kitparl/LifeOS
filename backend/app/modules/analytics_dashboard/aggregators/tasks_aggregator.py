@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.analytics_dashboard.aggregators import utc_today, window_start
+from app.core.timezone import start_of_day_utc, utc_now, utc_today
+from app.modules.analytics_dashboard.aggregators import window_start
 from app.modules.analytics_dashboard.schemas import HeatmapCell, SeriesPoint, TimeSeries
 from app.modules.tasks.models import OPEN_TASK_STATUSES, Task
 
@@ -19,7 +20,7 @@ def _alive():
 
 async def task_completion_breakdown(db: AsyncSession, user_id: str, range_days: int) -> list[SeriesPoint]:
     start = window_start(range_days)
-    start_dt = datetime.combine(start, datetime.min.time(), tzinfo=UTC)
+    start_dt = start_of_day_utc(start)
     rows = await db.execute(
         select(Task.status, func.count())
         .where(Task.user_id == user_id, _alive(), Task.created_at >= start_dt)
@@ -29,7 +30,7 @@ async def task_completion_breakdown(db: AsyncSession, user_id: str, range_days: 
 
 
 async def overdue_count(db: AsyncSession, user_id: str) -> int:
-    now = datetime.now(UTC)
+    now = utc_now()
     result = await db.execute(
         select(func.count())
         .select_from(Task)
@@ -51,7 +52,7 @@ async def category_distribution(db: AsyncSession, user_id: str, range_days: int)
     different bind params in SELECT vs GROUP BY.
     """
     start = window_start(range_days)
-    start_dt = datetime.combine(start, datetime.min.time(), tzinfo=UTC)
+    start_dt = start_of_day_utc(start)
     rows = await db.execute(
         select(Task.category, func.count())
         .where(Task.user_id == user_id, _alive(), Task.created_at >= start_dt)
@@ -69,7 +70,7 @@ async def completed_series(
     """Daily / weekly / monthly completed-task series + completion heatmap."""
     today = utc_today()
     start = window_start(range_days, today)
-    start_dt = datetime.combine(start, datetime.min.time(), tzinfo=UTC)
+    start_dt = start_of_day_utc(start)
 
     rows = await db.execute(
         select(Task.completed_at)
@@ -124,7 +125,7 @@ async def completed_series(
 
 async def todays_open_tasks(db: AsyncSession, user_id: str) -> int:
     today = utc_today()
-    start_dt = datetime.combine(today, datetime.min.time(), tzinfo=UTC)
+    start_dt = start_of_day_utc(today)
     end_dt = start_dt + timedelta(days=1)
     result = await db.execute(
         select(func.count())
@@ -143,7 +144,7 @@ async def todays_open_tasks(db: AsyncSession, user_id: str) -> int:
 
 async def completed_in_range(db: AsyncSession, user_id: str, range_days: int) -> int:
     start = window_start(range_days)
-    start_dt = datetime.combine(start, datetime.min.time(), tzinfo=UTC)
+    start_dt = start_of_day_utc(start)
     result = await db.execute(
         select(func.count())
         .select_from(Task)
@@ -160,7 +161,7 @@ async def completed_in_range(db: AsyncSession, user_id: str, range_days: int) ->
 
 async def completion_rate(db: AsyncSession, user_id: str, range_days: int) -> float:
     start = window_start(range_days)
-    start_dt = datetime.combine(start, datetime.min.time(), tzinfo=UTC)
+    start_dt = start_of_day_utc(start)
     completed = await db.execute(
         select(func.count())
         .select_from(Task)

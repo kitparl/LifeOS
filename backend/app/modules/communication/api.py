@@ -170,7 +170,7 @@ async def update_vocabulary_example(
     return await VocabularyService(db).update_personal_example(user, example_id, payload)
 
 
-@router.delete("/vocabulary/examples/{example_id}", status_code=204)
+@router.delete("/vocabulary/examples/{example_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_vocabulary_example(
     example_id: str,
     user: User = Depends(get_current_user),
@@ -192,7 +192,7 @@ async def add_vocabulary_bookmark(
     return await VocabularyService(db).bookmark_vocabulary(user, vocabulary_id)
 
 
-@router.delete("/vocabulary/bookmarks/{vocabulary_id}", status_code=204)
+@router.delete("/vocabulary/bookmarks/{vocabulary_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_vocabulary_bookmark(
     vocabulary_id: str,
     user: User = Depends(get_current_user),

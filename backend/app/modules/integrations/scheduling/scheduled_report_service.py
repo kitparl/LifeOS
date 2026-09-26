@@ -3,45 +3,21 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import safe_zone, utc_now
 from app.modules.integrations.notifications.notifier import NotifierMessage
 from app.modules.integrations.notifications.notifier_registry import build_user_notifier
 from app.modules.integrations.reports.builders import BUILDERS, SKIP_IF_EMPTY
 from app.modules.integrations.reports.repository import ReportRunRepository
 from app.modules.integrations.repository import IntegrationRepository
+from app.modules.integrations.scheduling.scheduler import job_enabled, job_id_for
 from app.modules.integrations.schemas import DigestResponse
 from app.modules.integrations.telegram import templates as tpl
-from app.modules.integrations.telegram.config import TelegramPreferences, parse_preferences
+from app.modules.integrations.telegram.config import parse_preferences
 
 logger = logging.getLogger(__name__)
-
-CRON_JOB_TYPES = ("morning", "midday", "night", "weekly", "ai_briefing")
-
-
-def _safe_zone(tz_name: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(tz_name or "Asia/Kolkata")
-    except ZoneInfoNotFoundError:
-        return ZoneInfo("Asia/Kolkata")
-
-
-def _pref_enabled(prefs: TelegramPreferences, job_type: str) -> bool:
-    return {
-        "morning": prefs.morning_enabled,
-        "midday": prefs.midday_enabled,
-        "night": prefs.night_enabled,
-        "weekly": prefs.weekly_enabled,
-        "ai_briefing": prefs.ai_briefing_enabled,
-    }.get(job_type, False)
-
-
-def job_id_for(user_id: str, job_type: str) -> str:
-    return f"telegram_{job_type}_{user_id}"
-
 
 class ScheduledReportService:
     def __init__(self, db: AsyncSession):
@@ -68,7 +44,7 @@ class ScheduledReportService:
             )
             return DigestResponse(sent=False, detail="Telegram not configured or disabled", sections={})
 
-        if not _pref_enabled(prefs, job_type):
+        if not job_enabled(prefs, job_type):
             await self.runs.start_run(
                 user_id=user_id,
                 job_type=job_type,
@@ -86,7 +62,7 @@ class ScheduledReportService:
             connection_id=conn.id,
         )
 
-        tz = _safe_zone(prefs.timezone)
+        tz = safe_zone(prefs.timezone)
         try:
             built = await BUILDERS[job_type](self.db, user_id, tz)
         except Exception as exc:
@@ -125,7 +101,7 @@ class ScheduledReportService:
                 return DigestResponse(sent=False, detail=result.detail, sections=built.sections)
 
         if job_type == "morning":
-            conn.last_digest_at = datetime.now(UTC)
+            conn.last_digest_at = utc_now()
             await self.db.flush()
 
         await self.runs.finish_run(

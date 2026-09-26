@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import taxonomy
 from app.core.pagination import Pagination, paginate
 from app.modules.wishlist.models import WishlistCategory, WishlistItem
 from app.modules.wishlist.schemas import WishlistCreate, WishlistUpdate
@@ -29,22 +30,11 @@ class WishlistRepository:
         return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
 
     async def list_category_names(self, user_id: str) -> list[str]:
-        result = await self.db.execute(
-            select(WishlistCategory.name).where(WishlistCategory.user_id == user_id).order_by(WishlistCategory.name.asc())
-        )
-        return list(result.scalars().all())
+        return await taxonomy.list_names(self.db, WishlistCategory, user_id)
 
     async def ensure_category(self, user_id: str, name: str) -> None:
-        """Register a category name for reuse (idempotent, case-insensitive)."""
-        clean = (name or "").strip()
-        if not clean:
-            return
-        existing = await self.db.execute(select(WishlistCategory).where(WishlistCategory.user_id == user_id))
-        for row in existing.scalars().all():
-            if row.name.lower() == clean.lower():
-                return
-        self.db.add(WishlistCategory(user_id=user_id, name=clean))
-        await self.db.flush()
+        """Register a name for reuse (idempotent, case-insensitive)."""
+        await taxonomy.ensure_name(self.db, WishlistCategory, user_id, name)
 
     async def get_by_id(self, user_id: str, item_id: str) -> WishlistItem | None:
         result = await self.db.execute(

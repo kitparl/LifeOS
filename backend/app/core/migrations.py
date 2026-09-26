@@ -122,8 +122,6 @@ _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
     ("vocabulary", "source", "dataset"),
 ]
 
-_INTEGER_DEFAULTS_TO_BACKFILL: list[tuple[str, str, int]] = []
-
 # Columns removed from the ORM but still present on older databases.
 # Must be dropped (or at least made nullable) or INSERTs omit them and fail NOT NULL.
 _COLUMNS_TO_DROP: list[tuple[str, str]] = [
@@ -194,15 +192,6 @@ async def ensure_columns(conn: AsyncConnection) -> None:
             logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
 
     for table, column, default in _STRING_DEFAULTS_TO_BACKFILL:
-        try:
-            await conn.execute(
-                text(f"UPDATE {table} SET {column} = :default WHERE {column} IS NULL"),
-                {"default": default},
-            )
-        except Exception as exc:
-            logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
-
-    for table, column, default in _INTEGER_DEFAULTS_TO_BACKFILL:
         try:
             await conn.execute(
                 text(f"UPDATE {table} SET {column} = :default WHERE {column} IS NULL"),

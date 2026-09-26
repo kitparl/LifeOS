@@ -55,7 +55,7 @@ class GoogleCalendarClient:
             if page_token:
                 params["pageToken"] = page_token
             res = await self._request("GET", self._base, params=params)
-            if res.status_code != 200:
+            if res.status_code != httpx.codes.OK:
                 raise GoogleCalendarClientError(
                     f"List events failed with HTTP {res.status_code}", status_code=res.status_code
                 )
@@ -73,7 +73,7 @@ class GoogleCalendarClient:
 
     async def patch_event(self, event_id: str, body: dict[str, Any]) -> None:
         res = await self._request("PATCH", f"{self._base}/{quote(event_id, safe='')}", json=body)
-        if res.status_code != 200:
+        if res.status_code != httpx.codes.OK:
             raise GoogleCalendarClientError(
                 f"Update event failed with HTTP {res.status_code}", status_code=res.status_code
             )
@@ -81,7 +81,7 @@ class GoogleCalendarClient:
     async def delete_event(self, event_id: str) -> None:
         res = await self._request("DELETE", f"{self._base}/{quote(event_id, safe='')}")
         # 404/410: already gone on Google — the desired end state.
-        if res.status_code not in (200, 204, 404, 410):
+        if res.status_code not in (httpx.codes.OK, httpx.codes.NO_CONTENT, httpx.codes.NOT_FOUND, httpx.codes.GONE):
             raise GoogleCalendarClientError(
                 f"Delete event failed with HTTP {res.status_code}", status_code=res.status_code
             )

@@ -8,7 +8,6 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 from fastapi import status
 from sqlalchemy import select
@@ -25,6 +24,7 @@ from app.core.exceptions import (
     UnprocessableError,
     get_or_404,
 )
+from app.core.timezone import utc_now
 from app.modules.files.backends import resolve_backend
 from app.modules.files.repository import FileRepository
 from app.modules.integrations.github.client import (
@@ -378,7 +378,7 @@ class GitHubSyncService:
                     # Local hash matches, but file may have been deleted on GitHub.
                     remote = await client.get_file(md_path)
                     if remote is not None:
-                        now = datetime.now(UTC)
+                        now = utc_now()
                         conn.last_sync_at = now
                         await self.sync_repo.upsert(
                             user_id=user_id,
@@ -421,7 +421,7 @@ class GitHubSyncService:
                     )
 
                 md_sha = path_to_sha.get(md_path) or (state.md_sha if state else None)
-                now = datetime.now(UTC)
+                now = utc_now()
                 await self.sync_repo.upsert(
                     user_id=user_id,
                     section_id=section_id,
@@ -459,66 +459,46 @@ class GitHubSyncService:
             except GitHubClientError as exc:
                 detail = user_facing_github_error(exc)
                 if ctx is not None:
-                    await self.sync_repo.set_status(
-                        user_id,
-                        section_id,
-                        sync_status=SYNC_STATUS_FAILED,
-                        last_error=detail,
-                        md_path=md_path or None,
-                    )
-                    await notify_github_sync_result(
-                        self.db,
-                        user_id=user_id,
-                        section_id=section_id,
-                        subject_id=ctx.subject.id,
-                        section_title=ctx.section.title,
-                        status="failed",
-                        message=detail,
-                        repo=cfg.repo if cfg else None,
-                    )
+                    await self._record_sync_failure(user_id, section_id, ctx, cfg, md_path, detail)
                 raise _error_from_github(exc) from exc
             except AppError as exc:
                 if ctx is not None and exc.status_code != status.HTTP_409_CONFLICT:
                     detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
-                    await self.sync_repo.set_status(
-                        user_id,
-                        section_id,
-                        sync_status=SYNC_STATUS_FAILED,
-                        last_error=detail,
-                        md_path=md_path or None,
-                    )
-                    await notify_github_sync_result(
-                        self.db,
-                        user_id=user_id,
-                        section_id=section_id,
-                        subject_id=ctx.subject.id,
-                        section_title=ctx.section.title,
-                        status="failed",
-                        message=detail,
-                        repo=cfg.repo if cfg else None,
-                    )
+                    await self._record_sync_failure(user_id, section_id, ctx, cfg, md_path, detail)
                 raise
             except Exception as exc:
                 detail = str(exc) or "Sync failed"
                 if ctx is not None:
-                    await self.sync_repo.set_status(
-                        user_id,
-                        section_id,
-                        sync_status=SYNC_STATUS_FAILED,
-                        last_error=detail,
-                        md_path=md_path or None,
-                    )
-                    await notify_github_sync_result(
-                        self.db,
-                        user_id=user_id,
-                        section_id=section_id,
-                        subject_id=ctx.subject.id,
-                        section_title=ctx.section.title,
-                        status="failed",
-                        message=detail,
-                        repo=cfg.repo if cfg else None,
-                    )
+                    await self._record_sync_failure(user_id, section_id, ctx, cfg, md_path, detail)
                 raise
+
+    async def _record_sync_failure(
+        self,
+        user_id: str,
+        section_id: str,
+        ctx: SectionContext,
+        cfg: DecryptedGitHubConfig | None,
+        md_path: str,
+        detail: str,
+    ) -> None:
+        """Persist a failed sync on the section and tell the user (in-app / Telegram per prefs)."""
+        await self.sync_repo.set_status(
+            user_id,
+            section_id,
+            sync_status=SYNC_STATUS_FAILED,
+            last_error=detail,
+            md_path=md_path or None,
+        )
+        await notify_github_sync_result(
+            self.db,
+            user_id=user_id,
+            section_id=section_id,
+            subject_id=ctx.subject.id,
+            section_title=ctx.section.title,
+            status="failed",
+            message=detail,
+            repo=cfg.repo if cfg else None,
+        )
 
     async def get_subject_sync_statuses(self, user_id: str, subject_id: str) -> list[dict]:
         await self._load_github_config(user_id)

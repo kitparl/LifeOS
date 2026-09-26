@@ -7,13 +7,14 @@ this flow requests Calendar scopes and a refresh token. Never logs tokens or cod
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from urllib.parse import urlencode
 
 import httpx
 from jose import JWTError, jwt
 
 from app.core.config import get_settings
+from app.core.timezone import utc_now
 from app.modules.integrations.google_calendar.config import (
     SCOPE_READONLY,
     SCOPE_READWRITE,
@@ -50,7 +51,7 @@ def create_state(user_id: str, direction: str) -> str:
         "sub": user_id,
         "purpose": STATE_PURPOSE,
         "mode": direction,
-        "exp": datetime.now(UTC) + STATE_TTL,
+        "exp": utc_now() + STATE_TTL,
     }
     return jwt.encode(payload, s.secret_key, algorithm=s.algorithm)
 
@@ -94,7 +95,7 @@ async def _post_token(data: dict[str, str]) -> dict:
             res = await client.post(TOKEN_URL, data=body)
     except httpx.HTTPError as exc:
         raise GoogleOAuthError(f"Token endpoint unreachable: {type(exc).__name__}") from exc
-    if res.status_code != 200:
+    if res.status_code != httpx.codes.OK:
         # Google returns {"error": "invalid_grant", ...}; log only the error code.
         try:
             err = res.json().get("error", "unknown")
@@ -137,7 +138,7 @@ async def revoke(token: str) -> None:
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
             res = await client.post(REVOKE_URL, data={"token": token})
-        if res.status_code not in (200, 400):  # 400 = already revoked/invalid
+        if res.status_code not in (httpx.codes.OK, httpx.codes.BAD_REQUEST):  # 400 = already revoked/invalid
             logger.warning("Google token revoke returned %s", res.status_code)
     except httpx.HTTPError as exc:
         logger.warning("Google token revoke failed: %s", type(exc).__name__)

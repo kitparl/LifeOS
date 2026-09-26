@@ -6,13 +6,13 @@ transaction never notifies. A dispatcher drains pending rows after commit.
 
 from __future__ import annotations
 
-import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.core.database import Base, new_id
+from app.core.timezone import utc_now
 
 PENDING = "pending"
 SENT = "sent"
@@ -22,7 +22,7 @@ FAILED = "failed"
 class PendingNotification(Base):
     __tablename__ = "pending_notifications"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
     channel: Mapped[str] = mapped_column(String(32), nullable=False, default="telegram")
     text: Mapped[str] = mapped_column(Text, nullable=False)
@@ -33,6 +33,6 @@ class PendingNotification(Base):
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), default=utc_now
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

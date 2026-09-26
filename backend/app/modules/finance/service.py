@@ -12,6 +12,8 @@ Two rules shape this module:
 import calendar
 from datetime import date
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.finance.generation import (
     add_months,
@@ -65,7 +67,6 @@ from app.modules.finance.schemas import (
     TransactionUpdate,
     UpcomingItem,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def _period_label(start: date, end: date) -> str:
@@ -655,9 +656,7 @@ class FinanceService:
         # An EMI amount change applies to what has not been paid yet. Paid EMIs
         # and the expenses behind them are historical records — never rewritten.
         if "emi_amount" in fields:
-            for emi in await self.repo.list_emis(loan.id):
-                if emi.status == "PENDING":
-                    emi.amount = loan.emi_amount
+            await self._apply_amount_to_pending_emis(loan)
 
         if schedule_fields:
             last_emi_date = schedule_fields.get("last_emi_date")
@@ -685,6 +684,12 @@ class FinanceService:
 
         await self.repo.flush()
         return await self._loan_response(loan)
+
+    async def _apply_amount_to_pending_emis(self, loan: Loan) -> None:
+        """Only unpaid instalments follow the loan's EMI amount; paid ones are history."""
+        for emi in await self.repo.list_emis(loan.id):
+            if emi.status == "PENDING":
+                emi.amount = loan.emi_amount
 
     async def foreclose_loan(self, user_id: str, loan_id: str, data: LoanForecloseRequest) -> LoanResponse:
         loan = get_or_404(await self.repo.get_loan(user_id, loan_id), "Loan not found")
@@ -732,9 +737,7 @@ class FinanceService:
             if data.new_emi_amount is None:
                 raise BadRequestError("new_emi_amount is required when reducing the EMI")
             loan.emi_amount = data.new_emi_amount
-            for emi in await self.repo.list_emis(loan.id):
-                if emi.status == "PENDING":
-                    emi.amount = loan.emi_amount
+            await self._apply_amount_to_pending_emis(loan)
             resulting_emi_amount = data.new_emi_amount
         else:
             if data.new_tenure_months is None:

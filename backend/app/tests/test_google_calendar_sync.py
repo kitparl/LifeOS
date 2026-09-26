@@ -264,10 +264,14 @@ async def test_oauth_callback_rejects_state_for_other_user(client, fake_google):
 
 async def test_oauth_start_requires_server_config(client, fake_google, monkeypatch):
     headers, _uid = await _login(client)
+    s = get_settings()
+    # Start unconfigured regardless of the developer's local .env.
+    monkeypatch.setattr(s, "google_client_id", "")
+    monkeypatch.setattr(s, "google_client_secret", "")
+    monkeypatch.setattr(s, "google_calendar_redirect_uri", "")
     res = await client.get(f"{API}/integrations/google-calendar/oauth/start", headers=headers)
     assert res.status_code == 503
 
-    s = get_settings()
     monkeypatch.setattr(s, "google_client_id", "cid.apps.googleusercontent.com")
     monkeypatch.setattr(s, "google_client_secret", "sec")
     monkeypatch.setattr(s, "google_calendar_redirect_uri", "http://localhost:4200/integrations")

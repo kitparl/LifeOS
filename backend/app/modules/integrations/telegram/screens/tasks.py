@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from app.modules.integrations.telegram.callbacks import CallbackContext, registe
 from app.modules.integrations.telegram.ids import resolve_one, short_id
 from app.modules.integrations.telegram.navigation import back_home
 from app.modules.integrations.telegram.renderer import Screen
+from app.modules.tasks.due_dates import noon_utc, resolve_due_token
 from app.modules.tasks.schemas import TaskCreate, TaskUpdate
 from app.modules.tasks.service import TaskService
 
@@ -183,7 +184,7 @@ async def on_setdue(ctx: CallbackContext) -> tuple[Screen, str]:
     task = resolve_one(items, token)
     if task is None:
         return await tasks_list_screen(ctx.db, ctx.user_id, 0), "Not found"
-    due = datetime.combine(date.today() + timedelta(days=offset), time(12, 0), tzinfo=UTC)
+    due = noon_utc(date.today() + timedelta(days=offset))
     await TaskService(ctx.db).update_task(ctx.user_id, task.id, TaskUpdate(due_date=due))
     screen = await task_detail_screen(ctx.db, ctx.user_id, token)
     return screen, f"Due → {due.date().isoformat()}"
@@ -284,7 +285,7 @@ async def on_adddue(ctx: CallbackContext) -> tuple[Screen, str]:
         return await tasks_list_screen(ctx.db, ctx.user_id, 0), "No active add"
     title = state.data.get("title") or "Untitled"
     offset = int(ctx.args[0]) if ctx.args else 0
-    due = datetime.combine(date.today() + timedelta(days=offset), time(12, 0), tzinfo=UTC)
+    due = noon_utc(date.today() + timedelta(days=offset))
     task = await TaskService(ctx.db).create_task(ctx.user_id, TaskCreate(title=title, due_date=due))
     clear_conversation(ctx.user_id)
     screen = await tasks_list_screen(ctx.db, ctx.user_id, 0)
@@ -325,17 +326,7 @@ async def step_due_date(db: AsyncSession, user_id: str, text: str, data: dict) -
 def _parse_due(raw: str) -> tuple[datetime | None, str | None]:
     token = (raw or "").strip().lower()
     today = date.today()
-
-    def as_due(d: date) -> datetime:
-        return datetime.combine(d, time(12, 0), tzinfo=UTC)
-
-    if not token:
-        return as_due(today), None
-    if token == "today":
-        return as_due(today), None
-    if token == "tomorrow":
-        return as_due(today + timedelta(days=1)), None
-    try:
-        return as_due(date.fromisoformat(token)), None
-    except ValueError:
+    day = resolve_due_token(token, today) if token else today
+    if day is None:
         return None, token
+    return noon_utc(day), None

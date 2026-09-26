@@ -84,7 +84,6 @@ class Settings(BaseSettings):
     news_proxy_per_minute: int = Field(default=60, ge=1, validation_alias="NEWS_PROXY_PER_MINUTE")
     news_writes_per_hour: int = Field(default=300, ge=1, validation_alias="NEWS_WRITES_PER_HOUR")
 
-
     @field_validator("database_url", mode="before")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:

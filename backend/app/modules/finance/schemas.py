@@ -3,6 +3,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Soft = variable/lifestyle spend. Hard = fixed/committed obligation.
+# The distinction exists to show expense burden and composition — it is not an
+# accounting classification.
 ExpenseKind = Literal["soft", "hard"]
 LoanStatus = Literal["ACTIVE", "COMPLETED", "FORECLOSED"]
 EMIStatus = Literal["PENDING", "PAID", "CANCELLED"]
@@ -89,14 +92,6 @@ class IncomeResponse(BaseModel):
 class CategoryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=32)
     txn_type: Literal["expense", "income"] = "expense"
-
-
-class CategoryResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    name: str
-    txn_type: str
 
 
 class CategoryOptions(BaseModel):
@@ -319,8 +314,7 @@ class UpcomingItem(BaseModel):
 
 
 # --------------------------------------------------------------------------
-# Legacy contracts — preserved for the pre-existing transactions/budgets API
-# and the modules that read them (coaches, predictions, automations).
+# Legacy contracts — preserved for the pre-existing transactions/budgets API.
 # --------------------------------------------------------------------------
 
 class TransactionCreate(BaseModel):
@@ -362,10 +356,6 @@ class TransactionResponse(BaseModel):
 
 class BudgetCreate(BaseModel):
     category: str
-    monthly_limit: float = Field(gt=0)
-
-
-class BudgetUpdate(BaseModel):
     monthly_limit: float = Field(gt=0)
 
 

@@ -80,6 +80,13 @@ class TooManyRequestsError(AppError):
         super().__init__(detail)
 
 
+class PayloadTooLargeError(AppError):
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
+
+    def __init__(self, detail: str | dict = "Payload too large"):
+        super().__init__(detail)
+
+
 class UnprocessableError(AppError):
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
 
@@ -92,14 +99,3 @@ def get_or_404(entity: T | None, detail: str = "Not found") -> T:
     if entity is None:
         raise NotFoundError(detail)
     return entity
-
-
-def client_safe_message(exc: BaseException, fallback: str = "Operation failed") -> str:
-    """User-facing message for response bodies. Prefer AppError.detail; otherwise use fallback.
-
-    Callers should log the full exception separately — never put raw ``str(exc)`` in API/Telegram
-    responses for unexpected errors.
-    """
-    if isinstance(exc, AppError):
-        return exc.detail if isinstance(exc.detail, str) else fallback
-    return fallback

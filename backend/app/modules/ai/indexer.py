@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.calendar.models import CalendarEvent
 from app.modules.finance.models import FinanceTransaction
 from app.modules.habits.models import Habit
@@ -8,8 +11,6 @@ from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
 from app.modules.tasks.models import Task
 from app.modules.wishlist.models import WishlistItem
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @dataclass
