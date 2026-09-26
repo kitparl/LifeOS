@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +46,7 @@ def compute_life_score(
 
 
 async def upcoming_events(db: AsyncSession, user_id: str, limit: int = 10) -> list[dict]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = await db.execute(
         select(CalendarEvent)
         .where(CalendarEvent.user_id == user_id, CalendarEvent.starts_at >= now)

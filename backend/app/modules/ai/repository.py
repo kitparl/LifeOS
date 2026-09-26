@@ -1,10 +1,6 @@
 import json
 import math
-from datetime import datetime, timezone
-
-from pydantic import ValidationError
-from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime
 
 from app.modules.ai.adapters.base import ModelInfo
 from app.modules.ai.models import (
@@ -17,6 +13,9 @@ from app.modules.ai.models import (
 )
 from app.modules.ai.schemas import AiSettings
 from app.modules.preferences.repository import PreferenceRepository
+from pydantic import ValidationError
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 AI_SETTINGS_PREFERENCE_KEY = "ai_settings"
 
@@ -77,7 +76,7 @@ class AiRepository:
     async def set_selection(
         self, user_id: str, use_case: str, provider: str, model: str
     ) -> AIUseCaseModelSelection:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         open_history = await self.db.execute(
             select(AIUseCaseModelSelectionHistory).where(
                 AIUseCaseModelSelectionHistory.user_id == user_id,
@@ -134,7 +133,7 @@ class AiRepository:
         )
         current_open = open_history.scalar_one_or_none()
         if current_open is not None:
-            current_open.effective_to = datetime.now(timezone.utc)
+            current_open.effective_to = datetime.now(UTC)
         await self.db.execute(
             delete(AIUseCaseModelSelection).where(
                 AIUseCaseModelSelection.user_id == user_id,
@@ -174,7 +173,7 @@ class AiRepository:
             )
         )
         manual_ids = {m.model_id for m in await self.list_models(user_id, provider)}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         unique = {m.model_id: m for m in models if m.model_id not in manual_ids}
         self.db.add_all(
             AIProviderModel(
@@ -209,7 +208,7 @@ class AiRepository:
                 display_name=model_id,
                 capabilities=capability,
                 source=MODEL_SOURCE_MANUAL,
-                refreshed_at=datetime.now(timezone.utc),
+                refreshed_at=datetime.now(UTC),
             )
         )
         await self.db.flush()

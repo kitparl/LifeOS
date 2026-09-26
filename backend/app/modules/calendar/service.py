@@ -1,12 +1,12 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import CALENDAR_EVENT_CREATED, EntityCreated, event_bus
+from app.core.exceptions import get_or_404
 from app.modules.calendar.models import CalendarEvent
 from app.modules.calendar.repository import CalendarRepository
 from app.modules.calendar.schemas import EventCreate, EventListItem, EventResponse, EventUpdate
-from app.core.exceptions import get_or_404
 
 # Modules whose calendar events mirror an owning entity. Editing/deleting such an
 # event from the Calendar propagates back to the source (two-way sync).
@@ -17,7 +17,7 @@ _GOOGLE_SOURCE = "google_calendar"
 def _sort_key(dt: datetime) -> datetime:
     """Coerce naive datetimes (e.g. from SQLite) to UTC-aware so mixed lists sort safely."""
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 def _expand_recurring_event(

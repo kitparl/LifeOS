@@ -3,9 +3,9 @@ import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import NotFoundError
 from app.modules.files.repository import FileRepository
 from app.modules.knowledge_notes.repository import KnowledgeNotesRepository
-from app.core.exceptions import NotFoundError
 from app.modules.knowledge_notes.schemas import (
     ChapterCreate,
     ChapterDocument,

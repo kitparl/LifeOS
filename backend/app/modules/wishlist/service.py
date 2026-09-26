@@ -1,10 +1,11 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.wishlist.models import SUGGESTED_WISHLIST_CATEGORIES
 from app.modules.wishlist.repository import WishlistRepository
 from app.modules.wishlist.schemas import WishlistCreate, WishlistListItem, WishlistResponse, WishlistUpdate
-from app.core.exceptions import BadRequestError, get_or_404
+
 
 class WishlistService:
     def __init__(self, db: AsyncSession):

@@ -9,6 +9,7 @@ from app.core.deps import get_current_user, get_optional_user
 from app.core.pagination import Pagination, pagination_params
 from app.modules.auth.models import User
 from app.modules.news.categories import CATEGORY_IDS
+from app.modules.news.rate_limit import proxy_limit_key
 from app.modules.news.schemas import (
     COUNTRY_PATTERN,
     HOST_PATTERN,
@@ -30,7 +31,6 @@ from app.modules.news.schemas import (
     SavedFilter,
     is_http_url,
 )
-from app.modules.news.rate_limit import proxy_limit_key
 from app.modules.news.service import VENDOR_MAX_OFFSET, ArticleQuery, NewsService
 
 router = APIRouter(prefix="/news", tags=["news"])

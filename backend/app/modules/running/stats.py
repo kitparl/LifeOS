@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from app.modules.running.models import Run
 
@@ -23,7 +23,7 @@ def _week_start(d: date) -> date:
 
 
 def weekly_km(runs: list[Run], ref: date | None = None) -> float:
-    ref = ref or datetime.now(timezone.utc).date()
+    ref = ref or datetime.now(UTC).date()
     ws = _week_start(ref)
     we = ws + timedelta(days=6)
     total = sum(r.distance_km for r in runs if ws <= r.run_date <= we)
@@ -89,7 +89,7 @@ def compute_shoe_totals(runs: list[Run], races: list | None = None) -> list[dict
 
 def compute_event_stats(races: list, ref: date | None = None) -> dict:
     """Event attendance / distance / next-last summary for Running stats cards."""
-    ref = ref or datetime.now(timezone.utc).date()
+    ref = ref or datetime.now(UTC).date()
     year = ref.year
     attended = [r for r in races if getattr(r, "attended", False)]
     registered = [r for r in races if getattr(r, "registered", False)]
@@ -232,7 +232,7 @@ def compute_weekly_totals(runs: list[Run], races: list | None = None, weeks: int
         if getattr(race, "attended", False):
             add(race.race_date, _race_distance_km(race))
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     current = _week_start(today)
     series = []
     for i in range(weeks - 1, -1, -1):

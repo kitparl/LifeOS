@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,7 +68,7 @@ class UserRepository:
             new_username=new_username,
             changed_by=changed_by,
             reason=reason,
-            changed_at=datetime.now(timezone.utc),
+            changed_at=datetime.now(UTC),
         )
         self.db.add(entry)
         await self.db.flush()

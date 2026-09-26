@@ -23,6 +23,7 @@ from app.modules.journal.api import router as journal_router
 from app.modules.knowledge_notes.api import router as knowledge_notes_router
 from app.modules.memory.api import router as memory_router
 from app.modules.mood.api import router as mood_router
+from app.modules.news.api import router as news_router
 from app.modules.notifications.api import router as notifications_router
 from app.modules.ocr.api import router as ocr_router
 from app.modules.preferences.api import router as preferences_router
@@ -31,7 +32,6 @@ from app.modules.routines.api import router as routines_router
 from app.modules.running.api import router as running_router
 from app.modules.search.api import router as search_router
 from app.modules.sticky_notes.api import router as sticky_notes_router
-from app.modules.news.api import router as news_router
 from app.modules.tasks.api import router as tasks_router
 from app.modules.users.api import router as users_router
 from app.modules.wishlist.api import router as wishlist_router

@@ -19,7 +19,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -203,7 +203,7 @@ def _dialect_name(db: AsyncSession) -> str:
 
 def _row_from_record(record: dict[str, Any], collection_id: str, dataset_version: str) -> dict[str, Any]:
     rid = record["id"]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         "id": rid,
         "collection_id": collection_id,

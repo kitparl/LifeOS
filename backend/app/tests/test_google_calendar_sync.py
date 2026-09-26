@@ -4,10 +4,9 @@ All Google HTTP is mocked (token endpoint + Calendar API) — no network.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from app.core.config import get_settings
 from app.modules.integrations.google_calendar import oauth
 from app.modules.integrations.google_calendar import sync_service as gsync
@@ -59,7 +58,7 @@ def test_map_timed_event():
         "Asia/Kolkata",
     )
     assert m.all_day is False
-    assert m.starts_at == datetime(2026, 9, 24, 3, 30, tzinfo=timezone.utc)
+    assert m.starts_at == datetime(2026, 9, 24, 3, 30, tzinfo=UTC)
     assert m.ends_at - m.starts_at == timedelta(minutes=30)
 
 
@@ -70,9 +69,9 @@ def test_map_all_day_event_uses_calendar_tz_and_inclusive_end():
     assert m.all_day is True
     assert m.title == "(No title)"
     # local midnight IST = 18:30 UTC previous day
-    assert m.starts_at == datetime(2026, 9, 23, 18, 30, tzinfo=timezone.utc)
+    assert m.starts_at == datetime(2026, 9, 23, 18, 30, tzinfo=UTC)
     # exclusive end 26th -> last day 25th 23:59:59 IST
-    assert m.ends_at == datetime(2026, 9, 25, 18, 29, 59, tzinfo=timezone.utc)
+    assert m.ends_at == datetime(2026, 9, 25, 18, 29, 59, tzinfo=UTC)
 
 
 def test_map_skips_cancelled_and_oversized_ids():
@@ -180,7 +179,7 @@ async def _connect(client, headers, user_id, mode="google_to_lifeos"):
 
 
 async def _events(client, headers):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     res = await client.get(
         f"{API}/calendar/events",
         headers=headers,
@@ -195,7 +194,7 @@ async def _events(client, headers):
 
 async def test_connect_imports_and_resync_is_idempotent(client, fake_google):
     headers, uid = await _login(client)
-    soon = datetime.now(timezone.utc) + timedelta(days=2)
+    soon = datetime.now(UTC) + timedelta(days=2)
     fake_google.events = [_gevent("g1", "Dentist", soon), _gevent("g2", "Gym", soon + timedelta(days=1))]
 
     status = await _connect(client, headers, uid)
@@ -215,7 +214,7 @@ async def test_connect_imports_and_resync_is_idempotent(client, fake_google):
 
 async def test_sync_updates_and_removes_vanished_but_keeps_local_events(client, fake_google):
     headers, uid = await _login(client)
-    soon = datetime.now(timezone.utc) + timedelta(days=2)
+    soon = datetime.now(UTC) + timedelta(days=2)
     local = await client.post(
         f"{API}/calendar/events", headers=headers, json={"title": "Local only", "starts_at": soon.isoformat()}
     )
@@ -234,7 +233,7 @@ async def test_sync_updates_and_removes_vanished_but_keeps_local_events(client, 
 
 async def test_fetch_failure_does_not_delete_local_copies(client, fake_google):
     headers, uid = await _login(client)
-    fake_google.events = [_gevent("g1", "Keep me", datetime.now(timezone.utc) + timedelta(days=1))]
+    fake_google.events = [_gevent("g1", "Keep me", datetime.now(UTC) + timedelta(days=1))]
     await _connect(client, headers, uid)
 
     fake_google.list_error = True
@@ -298,7 +297,7 @@ async def test_generic_endpoints_never_expose_or_accept_config(client, fake_goog
 
 async def test_one_way_rejects_edit_and_delete_and_never_writes_google(client, fake_google):
     headers, uid = await _login(client)
-    fake_google.events = [_gevent("g1", "Imported", datetime.now(timezone.utc) + timedelta(days=1))]
+    fake_google.events = [_gevent("g1", "Imported", datetime.now(UTC) + timedelta(days=1))]
     await _connect(client, headers, uid)
     ev = (await _events(client, headers))[0]
 
@@ -309,7 +308,7 @@ async def test_one_way_rejects_edit_and_delete_and_never_writes_google(client, f
 
 async def test_two_way_without_write_scope_stays_read_only(client, fake_google):
     headers, uid = await _login(client)
-    fake_google.events = [_gevent("g1", "Imported", datetime.now(timezone.utc) + timedelta(days=1))]
+    fake_google.events = [_gevent("g1", "Imported", datetime.now(UTC) + timedelta(days=1))]
     await _connect(client, headers, uid)  # read-only grant
     status = (
         await client.put(f"{API}/integrations/google-calendar/config", headers=headers, json={"sync_direction": "two_way"})
@@ -323,7 +322,7 @@ async def test_two_way_without_write_scope_stays_read_only(client, fake_google):
 async def test_two_way_pushes_linked_edits_and_deletes_only(client, fake_google):
     headers, uid = await _login(client)
     fake_google.scope = SCOPE_READWRITE
-    soon = datetime.now(timezone.utc) + timedelta(days=1)
+    soon = datetime.now(UTC) + timedelta(days=1)
     fake_google.events = [_gevent("g1", "Imported", soon), _gevent("g2", "Second", soon)]
     await _connect(client, headers, uid, mode="two_way")
     local = await client.post(f"{API}/calendar/events", headers=headers, json={"title": "Local", "starts_at": soon.isoformat()})
@@ -357,7 +356,7 @@ async def test_two_way_pushes_linked_edits_and_deletes_only(client, fake_google)
 async def test_two_way_google_failure_rolls_back_local_edit(client, fake_google, monkeypatch):
     headers, uid = await _login(client)
     fake_google.scope = SCOPE_READWRITE
-    fake_google.events = [_gevent("g1", "Imported", datetime.now(timezone.utc) + timedelta(days=1))]
+    fake_google.events = [_gevent("g1", "Imported", datetime.now(UTC) + timedelta(days=1))]
     await _connect(client, headers, uid, mode="two_way")
 
     async def failing_patch(self, event_id, body):
@@ -391,7 +390,7 @@ async def test_cannot_enable_without_oauth(client, fake_google):
 
 async def test_disconnect_revokes_and_removes_only_google_events(client, fake_google):
     headers, uid = await _login(client)
-    soon = datetime.now(timezone.utc) + timedelta(days=1)
+    soon = datetime.now(UTC) + timedelta(days=1)
     await client.post(f"{API}/calendar/events", headers=headers, json={"title": "Local", "starts_at": soon.isoformat()})
     fake_google.events = [_gevent("g1", "Imported", soon)]
     await _connect(client, headers, uid)

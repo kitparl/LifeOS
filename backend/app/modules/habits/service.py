@@ -2,6 +2,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import HABIT_CREATED, EntityCreated, event_bus
+from app.core.exceptions import get_or_404
 from app.modules.habits.repository import HabitRepository
 from app.modules.habits.schemas import (
     HabitCreate,
@@ -11,13 +12,13 @@ from app.modules.habits.schemas import (
     HabitStats,
     HabitUpdate,
 )
-from app.core.exceptions import get_or_404
 from app.modules.habits.stats import (
     calculate_completion_rate,
     calculate_streak,
     count_missed_periods,
     is_completed_for_period,
 )
+
 
 class HabitService:
     def __init__(self, db: AsyncSession):

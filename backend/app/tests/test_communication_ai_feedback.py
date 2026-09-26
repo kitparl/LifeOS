@@ -3,10 +3,9 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from app.core.crypto import decrypt, encrypt
-from app.modules.communication.ai.metrics import compute_deterministic_metrics
 from app.modules.ai.adapters.base import InvalidCredentialError, MalformedResponseError, parse_json_object
+from app.modules.communication.ai.metrics import compute_deterministic_metrics
 from app.modules.communication.ai.provider import _validate_canonical
 from app.modules.communication.ai.rubric import compute_overall_score, normalize_dimensions
 from app.modules.integrations.ai.config import mask_config, parse_config, serialize_config

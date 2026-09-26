@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
-from jose import JWTError, jwt
+from datetime import UTC, datetime, timedelta
 
 from app.core.config import Settings, get_settings
+from jose import JWTError, jwt
 
 
 def mint_download_token(
@@ -13,7 +12,7 @@ def mint_download_token(
     settings: Settings | None = None,
 ) -> tuple[str, datetime]:
     settings = settings or get_settings()
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=settings.download_token_ttl_seconds)
+    expires_at = datetime.now(UTC) + timedelta(seconds=settings.download_token_ttl_seconds)
     token = jwt.encode(
         {
             "sub": user_id,

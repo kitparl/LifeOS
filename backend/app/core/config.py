@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing_extensions import Self
+from typing import Self
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict

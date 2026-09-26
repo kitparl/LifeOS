@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +19,7 @@ class MoodService:
         return [MoodResponse.model_validate(e) for e in entries], total
 
     async def get_today(self, user_id: str) -> MoodResponse | None:
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         entry = await self.repo.get_by_date(user_id, today)
         return MoodResponse.model_validate(entry) if entry else None
 

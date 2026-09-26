@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, select
@@ -53,7 +53,7 @@ class OutboxRepository:
 
     async def mark_sent(self, row: PendingNotification) -> None:
         row.status = SENT
-        row.sent_at = datetime.now(timezone.utc)
+        row.sent_at = datetime.now(UTC)
         row.attempts += 1
         row.last_error = None
         await self.db.flush()

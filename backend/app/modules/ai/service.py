@@ -1,6 +1,5 @@
 import logging
-
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import BadRequestError, NotFoundError
@@ -22,6 +21,7 @@ from app.modules.ai.schemas import (
     UseCaseResponse,
 )
 from app.modules.ai.use_cases import USE_CASE_RAG_CHAT, USE_CASES, UseCase, get_use_case
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -279,14 +279,14 @@ class AiService:
         """
         import json
         import re
-        from datetime import date, datetime, time, timedelta, timezone
+        from datetime import date, datetime, time, timedelta
 
         from app.modules.tasks.schemas import TaskCreate
         from app.modules.tasks.service import TaskService
 
         title = natural_language.strip()[:200]
         due: datetime | None = datetime.combine(
-            date.today(), time(12, 0), tzinfo=timezone.utc
+            date.today(), time(12, 0), tzinfo=UTC
         )
 
         system = (
@@ -310,26 +310,22 @@ class AiService:
                     data = json.loads(m.group(0))
                     title = str(data.get("title") or title).strip()[:200]
                     due_token = data.get("due")
-                    if due_token in (None, "null", ""):
+                    if due_token in (None, "null", "") or str(due_token).lower() == "today":
                         due = datetime.combine(
-                            date.today(), time(12, 0), tzinfo=timezone.utc
-                        )
-                    elif str(due_token).lower() == "today":
-                        due = datetime.combine(
-                            date.today(), time(12, 0), tzinfo=timezone.utc
+                            date.today(), time(12, 0), tzinfo=UTC
                         )
                     elif str(due_token).lower() == "tomorrow":
                         due = datetime.combine(
                             date.today() + timedelta(days=1),
                             time(12, 0),
-                            tzinfo=timezone.utc,
+                            tzinfo=UTC,
                         )
                     else:
                         try:
                             due = datetime.combine(
                                 date.fromisoformat(str(due_token)[:10]),
                                 time(12, 0),
-                                tzinfo=timezone.utc,
+                                tzinfo=UTC,
                             )
                         except ValueError:
                             pass

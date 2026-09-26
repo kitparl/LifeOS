@@ -4,15 +4,12 @@ import hashlib
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 from urllib.parse import quote
 
-from fastapi import HTTPException, Request, UploadFile, status
-from fastapi.responses import Response, StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.config import Settings, get_settings
+from app.core.exceptions import AppError, BadRequestError, ConflictError, NotFoundError, UnauthorizedError, get_or_404
 from app.modules.files.backends import get_storage_backend, resolve_backend
 from app.modules.files.backends.base import StorageBackend
 from app.modules.files.download_tokens import mint_download_token, verify_download_token
@@ -25,7 +22,6 @@ from app.modules.files.schemas import (
     FileUsageResponse,
     PurgeResponse,
 )
-from app.core.exceptions import AppError, BadRequestError, ConflictError, NotFoundError, UnauthorizedError, get_or_404
 from app.modules.files.validation import (
     INLINE_SAFE_TYPES,
     NEVER_INLINE_TYPES,
@@ -33,6 +29,9 @@ from app.modules.files.validation import (
     sniff_content_type,
     validate_module,
 )
+from fastapi import HTTPException, Request, UploadFile, status
+from fastapi.responses import Response, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +184,7 @@ class FileService:
             checksum_sha256=checksum,
             extension=ext.lstrip(".") if ext else None,
             visibility="private",
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
         )
         try:
             saved = await self.repo.create(record)
@@ -273,7 +272,7 @@ class FileService:
         record = get_or_404(await self.repo.get(user_id, file_id), "File not found")
         old = record.visibility
         record.visibility = visibility
-        record.updated_at = datetime.now(timezone.utc)
+        record.updated_at = datetime.now(UTC)
         await self.db.flush()
         await self.db.refresh(record)
         logger.info(
@@ -298,7 +297,7 @@ class FileService:
 
     async def purge_soft_deleted(self, *, older_than_days: int | None = None) -> PurgeResponse:
         days = older_than_days if older_than_days is not None else self.settings.file_purge_after_days
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         candidates = await self.repo.list_purge_candidates(cutoff)
         purged = 0
         for record in candidates:

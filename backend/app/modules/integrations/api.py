@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
-from app.modules.integrations.scheduling.digest_service import DigestService
 from app.modules.integrations.ai.service import AiProviderIntegrationService
+from app.modules.integrations.github.sync_service import GitHubSyncService
+from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
+from app.modules.integrations.scheduling.digest_service import DigestService
 from app.modules.integrations.schemas import (
     AiModelAdd,
     AiModelRef,
@@ -20,13 +22,13 @@ from app.modules.integrations.schemas import (
     DetectChatIdResponse,
     DigestResponse,
     GitHubConfigStatus,
+    GitHubConfigUpdate,
+    GitHubSyncResponse,
+    GitHubTestResponse,
     GoogleCalendarConfigStatus,
     GoogleCalendarConfigUpdate,
     GoogleCalendarOAuthCallback,
     GoogleCalendarOAuthStartResponse,
-    GitHubConfigUpdate,
-    GitHubSyncResponse,
-    GitHubTestResponse,
     IntegrationCreate,
     IntegrationProviderInfo,
     IntegrationResponse,
@@ -44,8 +46,6 @@ from app.modules.integrations.schemas import (
     WordnikConfigUpdate,
     WordnikTestResponse,
 )
-from app.modules.integrations.github.sync_service import GitHubSyncService
-from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
 from app.modules.integrations.service import IntegrationService, list_integration_providers
 from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 from app.modules.integrations.wordnik.service import WordnikIntegrationService

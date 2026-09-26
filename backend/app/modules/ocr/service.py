@@ -1,10 +1,10 @@
-from fastapi import UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.core.exceptions import get_or_404
 from app.modules.files.service import FileService
 from app.modules.ocr.repository import OcrRepository
 from app.modules.ocr.schemas import OcrDocumentCreate, OcrDocumentResponse
-from app.core.exceptions import get_or_404
+from fastapi import UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 class OcrService:
     def __init__(self, db: AsyncSession):

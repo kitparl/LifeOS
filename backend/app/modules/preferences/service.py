@@ -1,9 +1,10 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import BadRequestError
 from app.modules.preferences.repository import PreferenceRepository
 from app.modules.preferences.schemas import PreferenceListItem, PreferenceResponse
-from app.core.exceptions import BadRequestError
+
 
 class PreferenceService:
     def __init__(self, db: AsyncSession):

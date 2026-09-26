@@ -2,10 +2,10 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.qa.models import SUGGESTED_QA_TYPES
 from app.modules.qa.repository import QARepository
 from app.modules.qa.schemas import QACreate, QAListItem, QAResponse, QAUpdate, QAVersionResponse
-from app.core.exceptions import BadRequestError, get_or_404
 
 QA_PURGE_AFTER_DAYS = 30
 

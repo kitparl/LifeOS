@@ -6,7 +6,7 @@ Business data comes from domain services; this module only formats.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -31,7 +31,7 @@ def _aware(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -198,8 +198,8 @@ async def build_night(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportBui
             Task.deleted_at.is_(None),
             Task.status == "completed",
             Task.completed_at.is_not(None),
-            Task.completed_at >= day_start.astimezone(timezone.utc),
-            Task.completed_at < day_end.astimezone(timezone.utc),
+            Task.completed_at >= day_start.astimezone(UTC),
+            Task.completed_at < day_end.astimezone(UTC),
         )
     )
     completed = list(result.scalars().all())

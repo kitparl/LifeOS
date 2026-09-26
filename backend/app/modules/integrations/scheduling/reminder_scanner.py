@@ -14,10 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.repository import CalendarRepository
 from app.modules.calendar.service import _expand_recurring_event
-from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.notifications.notifier import NotifierMessage
 from app.modules.integrations.notifications.notifier_registry import build_user_notifier
 from app.modules.integrations.reports.repository import ReportRunRepository
+from app.modules.integrations.telegram import templates as tpl
 from app.modules.integrations.telegram.config import parse_preferences
 from app.modules.routines.service import RoutineService
 

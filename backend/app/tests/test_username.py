@@ -1,9 +1,8 @@
 import pytest
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
-
 from app.core.migrations import ensure_columns
 from app.modules.auth.username_rules import derive_username_from_email, validate_username
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 
 @pytest.mark.parametrize(

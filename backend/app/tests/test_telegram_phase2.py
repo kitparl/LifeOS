@@ -5,24 +5,23 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from cryptography.fernet import Fernet
-
 from app.core import crypto
 from app.core.events import (
     TASK_CREATED,
     EntityCreated,
     event_bus,
 )
-from app.modules.integrations.telegram.command_handler import handle_command
 from app.modules.integrations.notifications.outbox_models import FAILED, PENDING, PendingNotification
 from app.modules.integrations.notifications.outbox_repository import OutboxRepository
-from app.modules.integrations.scheduling.scheduler import _cron_for_prefs
 from app.modules.integrations.notifications.subscriber import format_entity_message
+from app.modules.integrations.scheduling.scheduler import _cron_for_prefs
+from app.modules.integrations.telegram.command_handler import handle_command
 from app.modules.integrations.telegram.config import (
     TelegramPreferences,
     parse_preferences,
     serialize_config,
 )
+from cryptography.fernet import Fernet
 
 
 @pytest.fixture(autouse=True)

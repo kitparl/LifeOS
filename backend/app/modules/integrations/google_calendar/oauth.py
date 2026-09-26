@@ -7,7 +7,7 @@ this flow requests Calendar scopes and a refresh token. Never logs tokens or cod
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 import httpx
@@ -50,7 +50,7 @@ def create_state(user_id: str, direction: str) -> str:
         "sub": user_id,
         "purpose": STATE_PURPOSE,
         "mode": direction,
-        "exp": datetime.now(timezone.utc) + STATE_TTL,
+        "exp": datetime.now(UTC) + STATE_TTL,
     }
     return jwt.encode(payload, s.secret_key, algorithm=s.algorithm)
 

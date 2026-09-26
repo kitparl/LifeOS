@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import status
 from sqlalchemy import select
@@ -20,11 +20,11 @@ from app.core.events import (
     EntityCreated,
     event_bus,
 )
+from app.core.exceptions import AppError, ConflictError, ForbiddenError, NotFoundError, UnprocessableError, get_or_404
 from app.modules.auth.repository import UserRepository
 from app.modules.tasks.activity_service import ActivityService
 from app.modules.tasks.models import Task, TaskAssignment
 from app.modules.tasks.permissions import TaskPermissions
-from app.core.exceptions import AppError, ConflictError, ForbiddenError, NotFoundError, UnprocessableError, get_or_404
 
 # Simple in-process rate limit for assignment mutations (SECURITY-11)
 _assign_hits: dict[str, list[float]] = defaultdict(list)
@@ -77,8 +77,8 @@ class AssignmentService:
             assignee_user_id=actor_id,
             assigned_by_user_id=actor_id,
             status="accepted",
-            assigned_at=datetime.now(timezone.utc),
-            accepted_at=datetime.now(timezone.utc),
+            assigned_at=datetime.now(UTC),
+            accepted_at=datetime.now(UTC),
         )
         self.db.add(row)
         await self.db.flush()
@@ -106,7 +106,7 @@ class AssignmentService:
         # Self-assign → accepted, no notify
         is_self = assignee_user_id == actor_id
         new_status = "accepted" if is_self else "pending"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         old_active = await self._close_active(task.id, now, new_status="reassigned")
 
@@ -172,7 +172,7 @@ class AssignmentService:
         if row.status != "pending":
             raise ConflictError("Assignment is not pending")
         row.status = "accepted"
-        row.accepted_at = datetime.now(timezone.utc)
+        row.accepted_at = datetime.now(UTC)
         await self.db.flush()
         await self.activity.log(task.id, actor_id, "accept", field="assignment_status", old_value="pending", new_value="accepted")
         await event_bus.emit(
@@ -196,7 +196,7 @@ class AssignmentService:
             raise ForbiddenError("Permission denied")
         if row.status != "pending":
             raise ConflictError("Assignment is not pending")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row.status = "rejected"
         row.rejected_at = now
         row.reason = reason
@@ -245,7 +245,7 @@ class AssignmentService:
             raise ConflictError("Assignment is not active")
         previous_assignee = row.assignee_user_id
         row.status = "cancelled"
-        row.cancelled_at = datetime.now(timezone.utc)
+        row.cancelled_at = datetime.now(UTC)
         await self.db.flush()
         await self.activity.log(task.id, actor_id, "cancel", field="assignment_status", new_value="cancelled")
         # Ensure owner is active assignee
@@ -273,7 +273,7 @@ class AssignmentService:
                 TaskAssignment.status.in_(ACTIVE_STATUSES),
             )
         )
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for row in result.scalars().all():
             row.status = "completed"
             row.completed_at = now

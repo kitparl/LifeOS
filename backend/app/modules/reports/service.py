@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
-
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime
 
 from app.modules.ai.service import AiService
 from app.modules.ai.use_cases import USE_CASE_REPORTS
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class ReviewResponse(BaseModel):
@@ -28,6 +27,6 @@ class ReportsService:
         chat = await self.ai.chat(user_id, prompt, use_case=USE_CASE_REPORTS)
         return ReviewResponse(
             review_type=review_type,
-            generated_at=datetime.now(timezone.utc),
+            generated_at=datetime.now(UTC),
             content=chat.reply,
         )

@@ -1,15 +1,16 @@
 import json
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import RACE_ADDED, EntityCreated, event_bus
 from app.modules.calendar.sync_service import CalendarSyncService
-from app.modules.running.models import RaceEvent, SUGGESTED_SHOES
+from app.modules.running.models import SUGGESTED_SHOES, RaceEvent
 from app.modules.running.repository import RunningRepository
 
 # Source-module key used for the reusable Calendar scheduling linkage.
 RUNNING_SOURCE_MODULE = "running"
+from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.running.schemas import (
     ChartPoint,
     PersonalBest,
@@ -18,14 +19,13 @@ from app.modules.running.schemas import (
     RaceUpdate,
     RunCreate,
     RunListItem,
-    RunResponse,
-    RunUpdate,
     RunningSettingsResponse,
     RunningSettingsUpdate,
     RunningStatsResponse,
+    RunResponse,
+    RunUpdate,
     ShoeTotal,
 )
-from app.core.exceptions import BadRequestError, get_or_404
 from app.modules.running.stats import (
     _race_distance_km,
     compute_distance_over_time,
@@ -37,6 +37,7 @@ from app.modules.running.stats import (
     weekly_km,
 )
 
+
 class RunningService:
     def __init__(self, db: AsyncSession):
         self.repo = RunningRepository(db)
@@ -44,7 +45,7 @@ class RunningService:
 
     async def _sync_race_to_calendar(self, user_id: str, race: RaceEvent) -> None:
         """Mirror a race/competition into the shared Calendar (all-day event)."""
-        starts_at = datetime.combine(race.race_date, time.min, tzinfo=timezone.utc)
+        starts_at = datetime.combine(race.race_date, time.min, tzinfo=UTC)
         await self.calendar_sync.upsert_from_source(
             user_id=user_id,
             source_module=RUNNING_SOURCE_MODULE,

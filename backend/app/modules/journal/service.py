@@ -1,9 +1,10 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import get_or_404
 from app.modules.journal.repository import JournalRepository
 from app.modules.journal.schemas import JournalCreate, JournalListItem, JournalResponse, JournalUpdate
-from app.core.exceptions import get_or_404
+
 
 class JournalService:
     def __init__(self, db: AsyncSession):

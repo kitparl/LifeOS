@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +14,8 @@ from app.modules.integrations.reports.builders import BUILDERS, SKIP_IF_EMPTY
 from app.modules.integrations.reports.repository import ReportRunRepository
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import DigestResponse
-from app.modules.integrations.telegram.config import TelegramPreferences, parse_preferences
 from app.modules.integrations.telegram import templates as tpl
+from app.modules.integrations.telegram.config import TelegramPreferences, parse_preferences
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class ScheduledReportService:
                 return DigestResponse(sent=False, detail=result.detail, sections=built.sections)
 
         if job_type == "morning":
-            conn.last_digest_at = datetime.now(timezone.utc)
+            conn.last_digest_at = datetime.now(UTC)
             await self.db.flush()
 
         await self.runs.finish_run(

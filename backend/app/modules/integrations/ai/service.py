@@ -6,7 +6,7 @@ with ids the user added manually (kept across refreshes).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -153,7 +153,7 @@ class AiProviderIntegrationService:
             updated.status = "error" if refresh_error else "connected"
             if refresh_error is None and supports_model_listing(provider) and model_list_validates_key(provider):
                 # An authenticated model listing is a live key check, so it counts as a successful test.
-                updated.last_sync_at = datetime.now(timezone.utc)
+                updated.last_sync_at = datetime.now(UTC)
             await self.repo.db.flush()
         return await self.status(user_id, provider, models_refresh_error=refresh_error)
 
@@ -170,7 +170,7 @@ class AiProviderIntegrationService:
             await self.repo.db.flush()
             return AiProviderTestResponse(ok=False, detail=str(exc), model=model)
         conn.status = "connected"
-        conn.last_sync_at = datetime.now(timezone.utc)
+        conn.last_sync_at = datetime.now(UTC)
         await self.repo.db.flush()
         return AiProviderTestResponse(ok=True, detail=f"{provider_label(provider)} API key verified", model=model)
 

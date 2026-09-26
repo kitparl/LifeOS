@@ -1,9 +1,11 @@
+from datetime import UTC
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Pagination, paginate
 from app.modules.running.models import RaceEvent, Run, RunningSettings, RunningShoe
-from app.modules.running.schemas import RaceCreate, RaceUpdate, RunCreate, RunUpdate, RunningSettingsUpdate
+from app.modules.running.schemas import RaceCreate, RaceUpdate, RunCreate, RunningSettingsUpdate, RunUpdate
 from app.modules.running.stats import weekly_km
 
 
@@ -87,9 +89,9 @@ class RunningRepository:
     ) -> tuple[list[RaceEvent], int]:
         q = select(RaceEvent).where(RaceEvent.user_id == user_id)
         if upcoming_only:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            today = datetime.now(timezone.utc).date()
+            today = datetime.now(UTC).date()
             q = q.where(RaceEvent.race_date >= today)
         q = q.order_by(RaceEvent.race_date.desc())
         if limit is None:

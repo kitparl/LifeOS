@@ -6,7 +6,7 @@ admin gate email so a generically minted unlock cookie cannot be reused.
 No refresh — expires or is cleared.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
@@ -23,7 +23,7 @@ settings = get_settings()
 
 def create_unlock_token(email: str) -> str:
     """Mint an unlock JWT bound to the admin gate email."""
-    expire = datetime.now(timezone.utc) + timedelta(hours=_UNLOCK_TTL_HOURS)
+    expire = datetime.now(UTC) + timedelta(hours=_UNLOCK_TTL_HOURS)
     return jwt.encode(
         {
             "sub": email.strip().lower(),

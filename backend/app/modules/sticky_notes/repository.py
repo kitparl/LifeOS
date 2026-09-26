@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -115,7 +115,7 @@ class StickyNoteRepository:
         return note
 
     async def soft_delete(self, note: StickyNote) -> None:
-        note.deleted_at = datetime.now(timezone.utc)
+        note.deleted_at = datetime.now(UTC)
         await self.db.flush()
 
     async def restore(self, note: StickyNote) -> None:
@@ -123,7 +123,7 @@ class StickyNoteRepository:
         await self.db.flush()
 
     async def purge_expired(self, days: int) -> int:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         result = await self.db.execute(
             select(StickyNote).where(
                 StickyNote.deleted_at.is_not(None),

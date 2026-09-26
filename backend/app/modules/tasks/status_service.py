@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,13 +36,13 @@ class StatusService:
             to_status=normalized,
             changed_by_user_id=actor_user_id,
             reason=reason,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self.db.add(history)
         task.status = normalized
         task.version = (task.version or 1) + 1
         if normalized == "completed":
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = datetime.now(UTC)
         elif old == "completed":
             task.completed_at = None
         await self.activity.log(

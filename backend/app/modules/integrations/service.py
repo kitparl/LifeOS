@@ -1,9 +1,21 @@
-from datetime import datetime, timezone
 import logging
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import BadRequestError, ConflictError, get_or_404
 from app.modules.ai.adapters.registry import AI_PROVIDERS
+from app.modules.integrations.github.client import GitHubClient, GitHubClientError
+from app.modules.integrations.github.config import (
+    mask_config as mask_github_config,
+)
+from app.modules.integrations.github.config import (
+    parse_config as parse_github_config,
+)
+from app.modules.integrations.github.config import (
+    serialize_config as serialize_github_config,
+)
+from app.modules.integrations.google_calendar.config import parse_config as parse_google_calendar_config
 from app.modules.integrations.models import INTEGRATION_PROVIDERS
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import (
@@ -21,19 +33,17 @@ from app.modules.integrations.schemas import (
     TelegramConfigUpdate,
     TelegramTestResponse,
 )
-from app.modules.integrations.github.client import GitHubClient, GitHubClientError
-from app.modules.integrations.github.config import (
-    mask_config as mask_github_config,
-    parse_config as parse_github_config,
-    serialize_config as serialize_github_config,
-)
-from app.modules.integrations.google_calendar.config import parse_config as parse_google_calendar_config
 from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
-from app.core.exceptions import BadRequestError, ConflictError, get_or_404
 from app.modules.integrations.telegram.config import (
     mask_config as mask_telegram_config,
+)
+from app.modules.integrations.telegram.config import (
     parse_config as parse_telegram_config,
+)
+from app.modules.integrations.telegram.config import (
     parse_preferences,
+)
+from app.modules.integrations.telegram.config import (
     serialize_config as serialize_telegram_config,
 )
 
@@ -147,7 +157,7 @@ class IntegrationService:
             from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
 
             return await GoogleCalendarSyncService(self.repo.db).sync(user_id)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         conn.last_sync_at = now
         conn.status = "synced"
         await self.repo.update(conn, IntegrationUpdate())
@@ -333,7 +343,7 @@ class IntegrationService:
                 test_connection_message(),
                 parse_mode="HTML",
             )
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             conn.last_sync_at = now
             conn.status = "connected"
             await self.repo.db.flush()
@@ -481,7 +491,7 @@ class IntegrationService:
         client = GitHubClient.from_repo_slug(cfg.token, cfg.repo, branch=cfg.branch)
         try:
             info = await client.validate_access()
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             conn.last_sync_at = now
             conn.status = "connected"
             await self.repo.db.flush()

@@ -1,4 +1,4 @@
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -185,7 +185,7 @@ class TaskRepository:
         if status_val is not None:
             task.status = status_val
             if status_val == "completed":
-                task.completed_at = datetime.now(timezone.utc)
+                task.completed_at = datetime.now(UTC)
             elif status_val in ("pending", "in_progress", "hold", "delayed") and task.completed_at:
                 task.completed_at = None
         task.version = (task.version or 1) + 1
@@ -195,14 +195,14 @@ class TaskRepository:
 
     async def complete(self, task: Task) -> Task:
         task.status = "completed"
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = datetime.now(UTC)
         task.version = (task.version or 1) + 1
         await self.db.flush()
         await self.db.refresh(task, ["subtasks"])
         return task
 
     async def soft_delete(self, task: Task) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         task.deleted_at = now
         task.version = (task.version or 1) + 1
         # Cascade soft-delete subtasks
@@ -214,7 +214,7 @@ class TaskRepository:
         await self.db.flush()
 
     async def archive(self, task: Task) -> Task:
-        task.archived_at = datetime.now(timezone.utc)
+        task.archived_at = datetime.now(UTC)
         task.version = (task.version or 1) + 1
         await self.db.flush()
         await self.db.refresh(task, ["subtasks"])
@@ -228,9 +228,9 @@ class TaskRepository:
         return task
 
     def _today_bounds(self) -> tuple[datetime, datetime]:
-        now = datetime.now(timezone.utc)
-        start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
-        end = datetime.combine(now.date(), time.max, tzinfo=timezone.utc)
+        now = datetime.now(UTC)
+        start = datetime.combine(now.date(), time.min, tzinfo=UTC)
+        end = datetime.combine(now.date(), time.max, tzinfo=UTC)
         return start, end
 
     async def get_stats(self, user_id: str) -> tuple[int, int]:

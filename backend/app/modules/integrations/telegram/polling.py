@@ -15,9 +15,9 @@ from typing import Any
 
 from app.core.database import async_session_factory
 from app.modules.integrations.repository import IntegrationRepository
-from app.modules.integrations.telegram.update_router import route_update
 from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
 from app.modules.integrations.telegram.config import parse_config
+from app.modules.integrations.telegram.update_router import route_update
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from typing import TypeAlias
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,8 +71,8 @@ async def cmd_today(db: AsyncSession, user_id: str, args: str):
         from app.modules.tasks.service import TaskService as TS
 
         today = date.today()
-        start = datetime.combine(today, time.min, tzinfo=timezone.utc)
-        end = datetime.combine(today, time.max, tzinfo=timezone.utc)
+        start = datetime.combine(today, time.min, tzinfo=UTC)
+        end = datetime.combine(today, time.max, tzinfo=UTC)
 
         due_tasks, _ = await TS(db).list_tasks(user_id, due_today=True)
         task_lines = [f"[{t.id[:8]}] {t.title}" for t in due_tasks[:10]]
@@ -148,7 +148,7 @@ def _parse_add_task_args(raw: str) -> tuple[str, datetime, str | None]:
     today = date.today()
 
     def as_due(d: date) -> datetime:
-        return datetime.combine(d, time(12, 0), tzinfo=timezone.utc)
+        return datetime.combine(d, time(12, 0), tzinfo=UTC)
 
     # due YYYY-MM-DD | due today | due tomorrow
     m = re.search(
@@ -216,8 +216,8 @@ async def cmd_search(db: AsyncSession, user_id: str, args: str):
         from app.modules.integrations.telegram import conversation as conv
 
         await conv.begin(db, user_id, "search", "ask_query")
-        from app.modules.integrations.telegram.renderer import Screen
         from app.modules.integrations.telegram import keyboards as kb
+        from app.modules.integrations.telegram.renderer import Screen
 
         return Screen(
             text=tpl.join_blocks(tpl._header("Search"), "Send a keyword.\nOr /cancel."),

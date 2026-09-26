@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -42,8 +42,8 @@ class ReportRunRepository:
             skip_reason=skip_reason,
             dedupe_key=dedupe_key,
             scheduled_for=scheduled_for,
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc) if status != "started" else None,
+            started_at=datetime.now(UTC),
+            finished_at=datetime.now(UTC) if status != "started" else None,
         )
         self.db.add(run)
         await self.db.flush()
@@ -76,7 +76,7 @@ class ReportRunRepository:
                     status="started",
                     dedupe_key=dedupe_key,
                     scheduled_for=scheduled_for,
-                    started_at=datetime.now(timezone.utc),
+                    started_at=datetime.now(UTC),
                 )
                 self.db.add(run)
                 await self.db.flush()
@@ -101,7 +101,7 @@ class ReportRunRepository:
         if sections is not None:
             run.sections_json = json.dumps(sections)
         run.message_chars = message_chars
-        run.finished_at = datetime.now(timezone.utc)
+        run.finished_at = datetime.now(UTC)
         await self.db.flush()
         return run
 

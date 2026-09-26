@@ -1,6 +1,6 @@
 """News proxy endpoints and saved-article library (save, dedupe, expiry, cleanup, isolation, limits)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from app.core.config import get_settings
@@ -45,7 +45,7 @@ async def _expire(client, saved_id: str) -> None:
         await session.execute(
             update(NewsSavedArticle)
             .where(NewsSavedArticle.id == saved_id)
-            .values(expires_at=datetime.now(timezone.utc) - timedelta(minutes=1))
+            .values(expires_at=datetime.now(UTC) - timedelta(minutes=1))
         )
         await session.commit()
 
@@ -302,7 +302,7 @@ async def test_saved_filters_and_pagination(client):
         res = await client.post("/api/v1/news/saved", headers=headers, json=_snapshot(url=f"{URL}?n={i}"))
         ids.append(res.json()["id"])
     async with client.session_factory() as session:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await session.execute(
             update(NewsSavedArticle)
             .where(NewsSavedArticle.id == ids[0])

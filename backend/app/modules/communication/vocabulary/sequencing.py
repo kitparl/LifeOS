@@ -9,7 +9,7 @@ Revision, games, and bookmarks never call it (PRD §62 rules 11-13).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ DAILY_SET_SIZE = 10
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 async def allocate_next(db: AsyncSession, repo: VocabularyRepository, user: User, count: int) -> list[Vocabulary]:

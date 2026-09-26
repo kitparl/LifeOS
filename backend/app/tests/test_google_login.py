@@ -1,14 +1,13 @@
 import time
 
 import pytest
+from app.core.config import get_settings
+from app.modules.auth import google_auth
+from app.modules.auth.models import User
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jose import jwk, jwt
 from sqlalchemy import func, select
-
-from app.core.config import get_settings
-from app.modules.auth import google_auth
-from app.modules.auth.models import User
 
 CLIENT_ID = "test-client.apps.googleusercontent.com"
 NOT_FOUND_MSG = "User not found. Please contact your administrator to get access."

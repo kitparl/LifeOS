@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -160,7 +160,7 @@ class QARepository:
         return entry
 
     async def soft_delete(self, entry: QAEntry) -> None:
-        entry.deleted_at = datetime.now(timezone.utc)
+        entry.deleted_at = datetime.now(UTC)
         await self.db.flush()
 
     async def restore(self, entry: QAEntry) -> None:
@@ -168,7 +168,7 @@ class QARepository:
         await self.db.flush()
 
     async def purge_expired(self, days: int) -> int:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         result = await self.db.execute(
             select(QAEntry).where(
                 QAEntry.deleted_at.is_not(None),

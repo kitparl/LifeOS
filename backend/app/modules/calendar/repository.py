@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,7 +33,7 @@ class CalendarRepository:
         return list(result.scalars().all())
 
     async def get_upcoming(self, user_id: str, limit: int = 5) -> list[CalendarEvent]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await self.db.execute(
             select(CalendarEvent)
             .where(CalendarEvent.user_id == user_id, CalendarEvent.starts_at >= now)

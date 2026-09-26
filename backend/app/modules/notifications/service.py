@@ -1,8 +1,8 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.notifications.repository import NotificationRepository
 from app.core.exceptions import get_or_404
+from app.modules.notifications.repository import NotificationRepository
 from app.modules.notifications.schemas import (
     NotificationCreate,
     NotificationResponse,
@@ -10,6 +10,7 @@ from app.modules.notifications.schemas import (
     NotificationSettingsUpdate,
     TelegramSendResponse,
 )
+
 
 class NotificationService:
     def __init__(self, db: AsyncSession):

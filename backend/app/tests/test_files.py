@@ -1,5 +1,6 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta, timezone
 
 
 async def _auth_token(client, email="files@example.com"):
@@ -329,8 +330,8 @@ async def test_soft_delete_then_purge(client, tmp_path, monkeypatch):
     assert usage.status_code == 200
     assert usage.json()["file_count"] >= 1
 
-    from app.main import app
     from app.core.database import get_db
+    from app.main import app
 
     override = app.dependency_overrides.get(get_db)
     assert override is not None
@@ -345,7 +346,7 @@ async def test_soft_delete_then_purge(client, tmp_path, monkeypatch):
         rec = (
             await db.execute(select(FileRecord).where(FileRecord.id == file_id))
         ).scalar_one()
-        rec.deleted_at = datetime.now(timezone.utc) - timedelta(days=1)
+        rec.deleted_at = datetime.now(UTC) - timedelta(days=1)
         await db.commit()
     finally:
         await agen.aclose()

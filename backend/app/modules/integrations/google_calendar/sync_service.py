@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import time as _time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,7 +60,7 @@ class SyncThrottledError(AppError):
 
 
 def _utc(dt: datetime) -> datetime:
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 class GoogleCalendarSyncService:
@@ -189,7 +189,7 @@ class GoogleCalendarSyncService:
                 raise SyncThrottledError("Sync just ran. Try again in a few seconds.")
             _last_manual_sync[user_id] = now_mono
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         time_min, time_max = now - WINDOW_PAST, now + WINDOW_FUTURE
 
         # Phase 1 — fetch everything. No local writes until the listing is complete,

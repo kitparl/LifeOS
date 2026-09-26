@@ -8,14 +8,14 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.service import FileService
-from app.modules.integrations.telegram import templates as tpl
+from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.telegram import keyboards as kb
+from app.modules.integrations.telegram import templates as tpl
+from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
+from app.modules.integrations.telegram.config import parse_config
 from app.modules.integrations.telegram.navigation import back_home
 from app.modules.integrations.telegram.renderer import Screen
 from app.modules.integrations.telegram.state import get_conversation, start_conversation
-from app.modules.integrations.telegram.client import TelegramClient, TelegramClientError
-from app.modules.integrations.telegram.config import parse_config
-from app.modules.integrations.repository import IntegrationRepository
 
 logger = logging.getLogger(__name__)
 

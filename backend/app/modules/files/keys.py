@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def build_storage_key(
@@ -12,7 +12,7 @@ def build_storage_key(
     now: datetime | None = None,
 ) -> str:
     """Backend-relative key identical across local and S3/R2."""
-    ts = now or datetime.now(timezone.utc)
+    ts = now or datetime.now(UTC)
     mod = module or "_unassigned"
     ent = entity_id or "_unlinked"
     ext = extension if extension.startswith(".") or extension == "" else f".{extension}"

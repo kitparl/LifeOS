@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from app.modules.integrations.github.client import (
     AtomicCommitResult,
     GitHubClientError,
@@ -17,6 +16,13 @@ from app.modules.integrations.github.config import (
     serialize_config,
 )
 from app.modules.integrations.github.slug import slugify, strip_leading_number
+from app.modules.integrations.github.sync_models import (
+    SYNC_STATUS_FAILED,
+    SYNC_STATUS_SYNCED,
+    SYNC_STATUS_SYNCING,
+    SYNC_STATUS_UNCHANGED,
+    GitHubSyncState,
+)
 from app.modules.integrations.github.sync_planner import build_sync_plan
 from app.modules.integrations.github.sync_service import (
     _asset_filename,
@@ -29,7 +35,6 @@ from app.modules.integrations.github.sync_service import (
     format_number,
     rewrite_markdown,
 )
-from app.modules.integrations.github.sync_models import GitHubSyncState, SYNC_STATUS_FAILED, SYNC_STATUS_SYNCED, SYNC_STATUS_SYNCING, SYNC_STATUS_UNCHANGED
 from app.modules.knowledge_notes.models import KnowledgeChapter, KnowledgeSection, KnowledgeSubject
 
 
@@ -445,8 +450,8 @@ async def test_sync_section_recreates_when_remote_file_missing(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_apply_plan_atomic_creates_blobs_and_commit():
-    from app.modules.integrations.github.sync_service import GitHubSyncService
     from app.modules.integrations.github.sync_planner import PlannedFile, SyncPlan
+    from app.modules.integrations.github.sync_service import GitHubSyncService
 
     client = MagicMock()
     client.create_blob = AsyncMock(side_effect=["blob1", "blob2"])

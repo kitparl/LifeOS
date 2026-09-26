@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import ForbiddenError, NotFoundError, UnprocessableError, get_or_404
 from app.modules.auth.models import User
 from app.modules.auth.repository import UserRepository
 from app.modules.tasks.activity_service import ActivityService
 from app.modules.tasks.models import Task, TaskNote, TaskTag, TaskTagLink, TaskWatcher
 from app.modules.tasks.permissions import TaskPermissions
-from app.core.exceptions import ForbiddenError, NotFoundError, UnprocessableError, get_or_404
+
 
 class CollaborationService:
     def __init__(self, db: AsyncSession):
@@ -102,7 +103,7 @@ class CollaborationService:
         role = await self.perms.resolve_role(actor_id, task)
         if note.author_user_id != actor_id and role.value != "owner":
             raise ForbiddenError("Permission denied")
-        note.deleted_at = datetime.now(timezone.utc)
+        note.deleted_at = datetime.now(UTC)
         await self.db.flush()
         await self.activity.log(task.id, actor_id, "note_delete", field="note", old_value=note_id)
 

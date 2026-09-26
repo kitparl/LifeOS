@@ -1,10 +1,9 @@
 import uuid
-from datetime import datetime, timezone
-
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from datetime import UTC, datetime
 
 from app.core.database import Base
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class ContentEmbedding(Base):
@@ -19,9 +18,9 @@ class ContentEmbedding(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     route: Mapped[str] = mapped_column(String(200), nullable=False)
     embedding_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
 
@@ -37,7 +36,7 @@ class AIUseCaseModelSelection(Base):
     provider: Mapped[str] = mapped_column(String(32), nullable=False)
     model: Mapped[str] = mapped_column(String(80), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
 
@@ -80,7 +79,7 @@ class AIProviderModel(Base):
     # "fetched" rows are replaced on each refresh; "manual" rows (user-added ids) persist.
     source: Mapped[str] = mapped_column(String(16), nullable=False, default=MODEL_SOURCE_FETCHED)
     refreshed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
 
     @property

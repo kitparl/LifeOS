@@ -11,6 +11,14 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.security import create_access_token, create_refresh_token, decode_token, verify_token_type
 from app.modules.auth.models import User
+from app.modules.auth.registration_gate import (
+    REG_UNLOCK_COOKIE,
+    create_unlock_token,
+    is_registration_unlocked,
+    require_registration_unlock,
+    unlock_cookie_kwargs,
+    verify_gate_credentials,
+)
 from app.modules.auth.schemas import (
     ChangePasswordRequest,
     GoogleConfigResponse,
@@ -20,21 +28,13 @@ from app.modules.auth.schemas import (
     RegistrationGateLoginRequest,
     RegistrationGateStatusResponse,
     TokenResponse,
-    UserResponse,
-    UserUpdateRequest,
     UsernameAvailabilityResponse,
     UsernameChangeRequest,
     UsernameHistoryEntry,
+    UserResponse,
+    UserUpdateRequest,
 )
 from app.modules.auth.service import AuthService
-from app.modules.auth.registration_gate import (
-    REG_UNLOCK_COOKIE,
-    create_unlock_token,
-    is_registration_unlocked,
-    require_registration_unlock,
-    unlock_cookie_kwargs,
-    verify_gate_credentials,
-)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 REFRESH_COOKIE = "refresh_token"

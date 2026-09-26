@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.modules.tasks.models import Task, TaskAssignment, TaskWatcher
 
+
 class TaskRole(str, Enum):
     OWNER = "owner"
     ASSIGNEE = "assignee"

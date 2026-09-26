@@ -116,8 +116,8 @@ async def _run_user_digest(user_id: str) -> None:
 
 
 async def _run_reminder_poll() -> None:
-    from app.modules.integrations.scheduling.reminder_scanner import ReminderScanner
     from app.modules.integrations.repository import IntegrationRepository
+    from app.modules.integrations.scheduling.reminder_scanner import ReminderScanner
 
     async with async_session_factory() as session:
         try:

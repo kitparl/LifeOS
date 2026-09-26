@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,7 +48,7 @@ def format_digest(content: DigestContent, *, now: datetime | None = None) -> Not
     from app.modules.integrations.telegram import templates as tpl
 
     text = tpl.digest_message(
-        stamp=now or datetime.now(timezone.utc),
+        stamp=now or datetime.now(UTC),
         pending_tasks=content.pending_tasks,
         upcoming_events=content.upcoming_events,
         upcoming_races=content.upcoming_races,

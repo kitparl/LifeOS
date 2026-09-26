@@ -1,10 +1,10 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from app.modules.habits.models import Habit
 
 
 def _today() -> date:
-    return datetime.now(timezone.utc).date()
+    return datetime.now(UTC).date()
 
 
 def _week_start(d: date) -> date:
@@ -99,5 +99,5 @@ def count_missed_periods(habit: Habit, lookback_days: int = 30) -> int:
         completed = int(expected * rate / 100)
         return max(expected - completed, 0)
     if habit.frequency == "weekly":
-        return max(int((lookback_days / 7)) - int(rate / 100 * (lookback_days / 7)), 0)
+        return max(int(lookback_days / 7) - int(rate / 100 * (lookback_days / 7)), 0)
     return 0

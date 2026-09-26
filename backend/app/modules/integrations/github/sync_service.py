@@ -8,7 +8,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import status
 from sqlalchemy import select
@@ -378,7 +378,7 @@ class GitHubSyncService:
                     # Local hash matches, but file may have been deleted on GitHub.
                     remote = await client.get_file(md_path)
                     if remote is not None:
-                        now = datetime.now(timezone.utc)
+                        now = datetime.now(UTC)
                         conn.last_sync_at = now
                         await self.sync_repo.upsert(
                             user_id=user_id,
@@ -421,7 +421,7 @@ class GitHubSyncService:
                     )
 
                 md_sha = path_to_sha.get(md_path) or (state.md_sha if state else None)
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 await self.sync_repo.upsert(
                     user_id=user_id,
                     section_id=section_id,
