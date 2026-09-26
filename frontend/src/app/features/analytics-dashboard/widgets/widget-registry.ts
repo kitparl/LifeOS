@@ -41,15 +41,6 @@ export const ANALYTICS_WIDGET_REGISTRY: DashboardWidget[] = [
     component: 'DonutChart',
   },
   {
-    id: 'goal_progress',
-    title: 'Goal Progress',
-    icon: 'target',
-    type: 'chart',
-    endpoint: '/analytics/dashboard/goals',
-    refreshInterval: 120,
-    component: 'ProgressRing',
-  },
-  {
     id: 'habit_heatmap',
     title: 'Habit Heatmap',
     icon: 'flame',

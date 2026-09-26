@@ -5,7 +5,6 @@ import { TabHubComponent } from '../../shared/tab-hub/tab-hub.component';
 import { AnalyticsTab } from './models/analytics-dashboard.models';
 import { AnalyticsOverviewPageComponent } from './pages/analytics-overview-page.component';
 import { AnalyticsProductivityPageComponent } from './pages/analytics-productivity-page.component';
-import { AnalyticsGoalsPageComponent } from './pages/analytics-goals-page.component';
 import { AnalyticsHabitsPageComponent } from './pages/analytics-habits-page.component';
 import { AnalyticsJournalPageComponent } from './pages/analytics-journal-page.component';
 import { AnalyticsAiPageComponent } from './pages/analytics-ai-page.component';
@@ -17,7 +16,6 @@ import { AnalyticsAiPageComponent } from './pages/analytics-ai-page.component';
     TabHubComponent,
     AnalyticsOverviewPageComponent,
     AnalyticsProductivityPageComponent,
-    AnalyticsGoalsPageComponent,
     AnalyticsHabitsPageComponent,
     AnalyticsJournalPageComponent,
     AnalyticsAiPageComponent,
@@ -30,8 +28,6 @@ import { AnalyticsAiPageComponent } from './pages/analytics-ai-page.component';
         <app-analytics-overview-page />
       } @else if (tab() === 'productivity') {
         <app-analytics-productivity-page />
-      } @else if (tab() === 'goals') {
-        <app-analytics-goals-page />
       } @else if (tab() === 'habits') {
         <app-analytics-habits-page />
       } @else if (tab() === 'journal') {
@@ -51,7 +47,6 @@ export class AnalyticsDashboardHubComponent implements OnInit {
   readonly tabs = [
     { id: 'overview' as const, label: 'Dashboard' },
     { id: 'productivity' as const, label: 'Productivity' },
-    { id: 'goals' as const, label: 'Goals' },
     { id: 'habits' as const, label: 'Habits' },
     { id: 'journal' as const, label: 'Journal' },
     { id: 'ai' as const, label: 'AI Insights' },
@@ -60,7 +55,6 @@ export class AnalyticsDashboardHubComponent implements OnInit {
   private readonly valid = new Set<AnalyticsTab>([
     'overview',
     'productivity',
-    'goals',
     'habits',
     'journal',
     'ai',

@@ -10,7 +10,6 @@ interface QAWritePayload {
   type?: string | null;
   tags?: string[];
   is_deep_personal?: boolean;
-  linked_goal_id?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

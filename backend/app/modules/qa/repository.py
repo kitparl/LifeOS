@@ -125,7 +125,6 @@ class QARepository:
             current_answer=data.answer,
             type=(data.type or None),
             is_deep_personal=data.is_deep_personal,
-            linked_goal_id=data.linked_goal_id,
             linked_journal_id=data.linked_journal_id,
         )
         entry.tags = data.tags
@@ -150,8 +149,6 @@ class QARepository:
             entry.tags = data.tags
         if data.is_deep_personal is not None:
             entry.is_deep_personal = data.is_deep_personal
-        if data.linked_goal_id is not None:
-            entry.linked_goal_id = data.linked_goal_id
         if data.linked_journal_id is not None:
             entry.linked_journal_id = data.linked_journal_id
         if data.answer is not None and data.answer != entry.current_answer:

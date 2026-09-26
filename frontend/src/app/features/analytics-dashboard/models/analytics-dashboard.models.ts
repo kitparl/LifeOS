@@ -40,7 +40,6 @@ export interface AnalyticsOverview {
   life_score: number;
   todays_tasks: number;
   completed_tasks: number;
-  goal_progress: number;
   habit_score: number;
   focus_time_hours: number;
   focus_time_label: string;
@@ -63,27 +62,6 @@ export interface ProductivityAnalytics {
   focus_label: string;
   category_distribution: SeriesPoint[];
   calendar_heatmap: HeatmapCell[];
-  range_days: number;
-}
-
-export interface GoalItemAnalytics {
-  id: string;
-  title: string;
-  progress: number;
-  status: string;
-  remaining_tasks: number;
-  milestones_total: number;
-  milestones_done: number;
-  velocity: number;
-  burndown: SeriesPoint[];
-  completion_forecast: PlaceholderField;
-  risk_indicator: PlaceholderField;
-}
-
-export interface GoalAnalytics {
-  goals: GoalItemAnalytics[];
-  avg_progress: number;
-  avg_velocity: number;
   range_days: number;
 }
 
@@ -146,4 +124,4 @@ export interface WidgetDescriptor {
   component: string;
 }
 
-export type AnalyticsTab = 'overview' | 'productivity' | 'goals' | 'habits' | 'journal' | 'ai';
+export type AnalyticsTab = 'overview' | 'productivity' | 'habits' | 'journal' | 'ai';

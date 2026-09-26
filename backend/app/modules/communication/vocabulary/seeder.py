@@ -1,8 +1,7 @@
 """Idempotent master-vocabulary importer (PRD §6, §43).
 
-Modeled on ``app.modules.learning.seeder`` (upsert-by-stable-key, never touches fields
-that would break existing user state), but simpler: this import is global, not per-user,
-and reports an aggregate summary since it processes ~15,000 records at once rather than
+Upsert-by-stable-key; never touches fields that would break existing user state.
+The import is global, not per-user, and reports an aggregate summary since it processes ~15,000 records at once rather than
 one small per-user seed file.
 
 Usage (run from the backend/ directory, never at app startup):

@@ -24,7 +24,6 @@ export interface QAEntry {
   type: string | null;
   tags: string[];
   is_deep_personal: boolean;
-  linked_goal_id: string | null;
   linked_journal_id: string | null;
   ai_summary: string | null;
   created_at: string;

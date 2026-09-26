@@ -31,15 +31,6 @@ WIDGET_REGISTRY: list[WidgetDescriptor] = [
         component="DonutChart",
     ),
     WidgetDescriptor(
-        id="goal_progress",
-        title="Goal Progress",
-        icon="target",
-        type="chart",
-        endpoint="/analytics/dashboard/goals",
-        refresh_interval=120,
-        component="ProgressRing",
-    ),
-    WidgetDescriptor(
         id="habit_heatmap",
         title="Habit Heatmap",
         icon="flame",

@@ -10,9 +10,8 @@ def home_keyboard() -> dict:
     return kb.inline_keyboard(
         [
             kb.row(kb.button("📋 Tasks", "task:list:0"), kb.button("📅 Today", "cal:today")),
-            kb.row(kb.button("🔁 Habits", "habit:list"), kb.button("🎯 Goals", "goal:list")),
-            kb.row(kb.button("🗓 Calendar", "cal:week"), kb.button("⏱ Routines", "routine:list")),
-            kb.row(kb.button("📝 Notes", "note:menu"), kb.button("⚙️ Automations", "auto:list")),
+            kb.row(kb.button("🔁 Habits", "habit:list"), kb.button("🗓 Calendar", "cal:week")),
+            kb.row(kb.button("⏱ Routines", "routine:list"), kb.button("📝 Notes", "note:menu")),
             kb.row(kb.button("📊 Analytics", "analytics:card"), kb.button("🔍 Search", "search:start")),
             kb.row(kb.button("🤖 AI Briefing", "ai:briefing")),
         ]

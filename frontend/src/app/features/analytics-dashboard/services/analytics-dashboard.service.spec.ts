@@ -25,7 +25,6 @@ describe('AnalyticsDashboardService', () => {
       life_score: 50,
       todays_tasks: 0,
       completed_tasks: 0,
-      goal_progress: 50,
       habit_score: 50,
       focus_time_hours: 0,
       focus_time_label: 'planned',

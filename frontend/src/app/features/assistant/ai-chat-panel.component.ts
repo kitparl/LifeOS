@@ -1,8 +1,8 @@
 import { Component, ElementRef, OnInit, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { AiSourceItem } from '../../ai/models/ai.models';
-import { AiService } from '../../ai/services/ai.service';
+import { AiSourceItem } from '../ai/models/ai.models';
+import { AiService } from '../ai/services/ai.service';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -40,7 +40,7 @@ interface ChatMessage {
           <div class="empty-state" style="padding: 2rem 1rem">
             <div style="font-size: 1.5rem; opacity: 0.3">◇</div>
             <p class="empty-state__title">Ask LifeOS</p>
-            <p class="empty-state__desc">Goals, tasks, journal, runs, Q&A — powered by your data.</p>
+            <p class="empty-state__desc">Tasks, journal, runs, Q&A — powered by your data.</p>
           </div>
         }
         @for (m of messages; track $index) {

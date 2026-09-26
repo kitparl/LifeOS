@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.repository import CalendarRepository
-from app.modules.goals.service import GoalService
 from app.modules.habits.service import HabitService
 from app.modules.integrations.notifications.notifier import NotifierMessage
 from app.modules.integrations.schemas import DigestResponse
@@ -30,7 +29,6 @@ class DigestContent:
     upcoming_events: list[str] = field(default_factory=list)
     upcoming_races: list[str] = field(default_factory=list)
     habits_due: list[str] = field(default_factory=list)
-    active_goals: list[str] = field(default_factory=list)
 
     def section_counts(self) -> dict[str, int]:
         return {
@@ -38,7 +36,6 @@ class DigestContent:
             "calendar": len(self.upcoming_events),
             "running": len(self.upcoming_races),
             "habits": len(self.habits_due),
-            "goals": len(self.active_goals),
         }
 
     @property
@@ -56,7 +53,6 @@ def format_digest(content: DigestContent, *, now: datetime | None = None) -> Not
         upcoming_events=content.upcoming_events,
         upcoming_races=content.upcoming_races,
         habits_due=content.habits_due,
-        active_goals=content.active_goals,
     )
     keyboard = {
         "inline_keyboard": [
@@ -66,7 +62,6 @@ def format_digest(content: DigestContent, *, now: datetime | None = None) -> Not
             ],
             [
                 {"text": "🔁 Habits", "callback_data": "habit:list"},
-                {"text": "🎯 Goals", "callback_data": "goal:list"},
             ],
             [
                 {"text": "🏠 Home", "callback_data": "nav:home"},
@@ -103,11 +98,6 @@ class DigestService:
         for h in habits:
             if not h.completed_today:
                 content.habits_due.append(f"{h.name} ({h.frequency})")
-
-        goals, _ = await GoalService(self.db).list_goals(user_id, status="active", limit=100)
-        for g in goals[:10]:
-            target = g.target_date.date().isoformat() if g.target_date else "no target"
-            content.active_goals.append(f"{g.title} · {g.progress}% · {target}")
 
         return content
 

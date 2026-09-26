@@ -14,8 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import (
     CALENDAR_EVENT_CREATED,
-    GOAL_CREATED,
-    GOAL_MILESTONE_ADDED,
     HABIT_CREATED,
     RACE_ADDED,
     TASK_ASSIGNED,
@@ -81,11 +79,6 @@ def format_entity_message(event: EntityCreated) -> str:
     if event.event_type == HABIT_CREATED:
         freq = f" ({when})" if when else ""
         return f"New habit created: {title}{freq}"
-    if event.event_type == GOAL_CREATED:
-        target = f" (target {when})" if when else ""
-        return f"New goal created: {title}{target}"
-    if event.event_type == GOAL_MILESTONE_ADDED:
-        return f"Goal milestone added: {title}"
     return f"LifeOS update: {title}"
 
 

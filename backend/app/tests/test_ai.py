@@ -27,12 +27,12 @@ async def test_ai_index_and_chat_without_provider(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    goal = await client.post(
-        "/api/v1/goals",
+    task = await client.post(
+        "/api/v1/tasks",
         headers=headers,
-        json={"title": "Marathon 2026", "category": "running", "description": "Train for Berlin"},
+        json={"title": "Marathon 2026", "description": "Train for Berlin"},
     )
-    assert goal.status_code == 201
+    assert task.status_code == 201
 
     index = await client.post("/api/v1/ai/index", headers=headers)
     assert index.status_code == 200
@@ -41,7 +41,7 @@ async def test_ai_index_and_chat_without_provider(client):
     chat = await client.post(
         "/api/v1/ai/chat",
         headers=headers,
-        json={"message": "What are my running goals?"},
+        json={"message": "How is my Marathon training going?"},
     )
     assert chat.status_code == 200
     body = chat.json()

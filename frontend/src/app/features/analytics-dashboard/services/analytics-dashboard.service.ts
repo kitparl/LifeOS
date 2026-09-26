@@ -5,7 +5,6 @@ import { environment } from '../../../../environments/environment';
 import {
   AiInsightsResponse,
   AnalyticsOverview,
-  GoalAnalytics,
   HabitAnalytics,
   JournalAnalytics,
   ProductivityAnalytics,
@@ -30,10 +29,6 @@ export class AnalyticsDashboardService {
 
   productivity(rangeDays = 30): Observable<ProductivityAnalytics> {
     return this.get<ProductivityAnalytics>('/productivity', rangeDays, 'Failed to load productivity');
-  }
-
-  goals(rangeDays = 90): Observable<GoalAnalytics> {
-    return this.get<GoalAnalytics>('/goals', rangeDays, 'Failed to load goals');
   }
 
   habits(rangeDays = 90): Observable<HabitAnalytics> {

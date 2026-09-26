@@ -12,7 +12,7 @@ import { PwaService } from '../../core/services/pwa.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { AuthService } from '../../core/services/auth.service';
 import { SyncService } from '../../sync/sync.service';
-import { AiChatPanelComponent } from '../../features/dashboard/widgets/ai-chat-panel.component';
+import { AiChatPanelComponent } from '../../features/assistant/ai-chat-panel.component';
 import { CommandPaletteComponent } from '../command-palette/command-palette.component';
 import { CommandPaletteService } from '../command-palette/command-palette.service';
 import { NavPreferencesService } from '../../core/services/nav-preferences.service';

@@ -10,7 +10,6 @@ ALLOWED_MODULES = frozenset(
     {
         "tasks",
         "habits",
-        "goals",
         "journal",
         "routines",
         "knowledge_notes",
@@ -19,12 +18,9 @@ ALLOWED_MODULES = frozenset(
         "running",
         "finance",
         "wishlist",
-        "career",
-        "learning",
         "mood",
         "memory",
         "calendar",
-        "voice",
         "telegram",
         "general",
     }

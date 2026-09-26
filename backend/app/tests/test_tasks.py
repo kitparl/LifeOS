@@ -73,29 +73,6 @@ async def test_subtask(client):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_tasks_today(client):
-    token = await _auth_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    due = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
-    await client.post(
-        "/api/v1/tasks",
-        headers=headers,
-        json={"title": "Due today", "due_date": due.isoformat()},
-    )
-    await client.post(
-        "/api/v1/tasks",
-        headers=headers,
-        json={"title": "Future task", "due_date": (due + timedelta(days=3)).isoformat()},
-    )
-
-    summary = await client.get("/api/v1/dashboard/summary", headers=headers)
-    tasks = summary.json()["tasks_today"]
-    assert len(tasks) == 1
-    assert tasks[0]["title"] == "Due today"
-
-
-@pytest.mark.asyncio
 async def test_list_tasks_due_date_filters(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}

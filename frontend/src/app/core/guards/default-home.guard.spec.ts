@@ -26,7 +26,6 @@ describe('defaultHomeRedirect', () => {
           { path: 'tasks', component: BlankComponent },
           { path: 'journal', component: BlankComponent },
           { path: 'analytics/dashboard', component: BlankComponent },
-          { path: 'quick-action', component: BlankComponent },
         ]),
       ],
     });
@@ -42,9 +41,9 @@ describe('defaultHomeRedirect', () => {
     localStorage.clear();
   });
 
-  it('redirects / to quick action when no preference is set', async () => {
+  it('redirects / to tasks when no preference is set', async () => {
     await router.navigateByUrl('/');
-    expect(router.url).toBe('/quick-action');
+    expect(router.url).toBe('/tasks');
   });
 
   it('redirects / to the selected module', async () => {
@@ -56,7 +55,7 @@ describe('defaultHomeRedirect', () => {
     expect(router.url).toBe('/tasks');
   });
 
-  it('falls back to quick action when the stored module is unavailable', async () => {
+  it('falls back to tasks when the stored module is unavailable', async () => {
     localStorage.setItem('lifeos-home-prefs', JSON.stringify({ moduleId: 'mood' }));
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -66,7 +65,7 @@ describe('defaultHomeRedirect', () => {
         provideRouter([
           { path: '', pathMatch: 'full', redirectTo: defaultHomeRedirect },
           { path: 'analytics/dashboard', component: BlankComponent },
-          { path: 'quick-action', component: BlankComponent },
+          { path: 'tasks', component: BlankComponent },
         ]),
       ],
     });
@@ -75,6 +74,6 @@ describe('defaultHomeRedirect', () => {
     httpMock = TestBed.inject(HttpTestingController);
 
     await router.navigateByUrl('/');
-    expect(router.url).toBe('/quick-action');
+    expect(router.url).toBe('/tasks');
   });
 });

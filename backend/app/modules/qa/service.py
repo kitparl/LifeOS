@@ -35,7 +35,6 @@ class QAService:
             type=entry.type,
             tags=entry.tags,
             is_deep_personal=entry.is_deep_personal,
-            linked_goal_id=entry.linked_goal_id,
             linked_journal_id=entry.linked_journal_id,
             ai_summary=entry.ai_summary,
             created_at=entry.created_at,

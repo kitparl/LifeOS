@@ -27,8 +27,6 @@ TASK_COMPLETED = "task_completed"
 RACE_ADDED = "race_added"
 CALENDAR_EVENT_CREATED = "calendar_event_created"
 HABIT_CREATED = "habit_created"
-GOAL_CREATED = "goal_created"
-GOAL_MILESTONE_ADDED = "goal_milestone_added"
 
 ALL_EVENT_TYPES: tuple[str, ...] = (
     TASK_CREATED,
@@ -42,8 +40,6 @@ ALL_EVENT_TYPES: tuple[str, ...] = (
     RACE_ADDED,
     CALENDAR_EVENT_CREATED,
     HABIT_CREATED,
-    GOAL_CREATED,
-    GOAL_MILESTONE_ADDED,
 )
 
 DEFAULT_NOTIFY_ON: list[str] = list(ALL_EVENT_TYPES)

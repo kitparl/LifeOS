@@ -27,7 +27,6 @@ class Task(Base):
     tags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     parent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=True)
-    goal_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("goals.id"), nullable=True)
     recurrence: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)

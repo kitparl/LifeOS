@@ -182,17 +182,3 @@ async def completion_rate(db: AsyncSession, user_id: str, range_days: int) -> fl
     if total == 0:
         return 50.0
     return round(c / total * 100, 1)
-
-
-async def remaining_tasks_for_goal(db: AsyncSession, user_id: str, goal_id: str) -> int:
-    result = await db.execute(
-        select(func.count())
-        .select_from(Task)
-        .where(
-            Task.user_id == user_id,
-            _alive(),
-            Task.goal_id == goal_id,
-            Task.status.in_(OPEN_TASK_STATUSES),
-        )
-    )
-    return int(result.scalar() or 0)

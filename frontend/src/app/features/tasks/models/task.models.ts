@@ -50,7 +50,6 @@ export interface Task {
   tags: string[];
   due_date: string | null;
   parent_id: string | null;
-  goal_id: string | null;
   recurrence: TaskRecurrence;
   completed_at: string | null;
   created_at: string;
@@ -77,7 +76,6 @@ export interface TaskListItem {
   tags: string[];
   due_date: string | null;
   updated_at: string;
-  goal_id?: string | null;
   subtask_count: number;
   completed_subtasks: number;
   assigned_to?: string | null;
@@ -94,7 +92,6 @@ export interface TaskCreate {
   tags?: string[];
   due_date?: string | null;
   parent_id?: string | null;
-  goal_id?: string | null;
   recurrence?: TaskRecurrence;
   assignee_username?: string | null;
   assignee_user_id?: string | null;
@@ -108,7 +105,6 @@ export interface TaskUpdate {
   category?: string | null;
   tags?: string[];
   due_date?: string | null;
-  goal_id?: string | null;
   recurrence?: TaskRecurrence;
   version?: number;
   status_reason?: string | null;

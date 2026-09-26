@@ -29,7 +29,7 @@ async def test_analytics_dashboard_empty_overview(client: AsyncClient):
     data = res.json()
     assert "life_score" in data
     assert "kpis" in data
-    assert len(data["kpis"]) == 10
+    assert len(data["kpis"]) == 9
     assert data["todays_tasks"] == 0
     assert data["focus_time_label"] == "planned"
 
@@ -41,7 +41,6 @@ async def test_analytics_dashboard_all_endpoints(client: AsyncClient):
         "/api/v1/analytics/dashboard",
         "/api/v1/analytics/dashboard/summary",
         "/api/v1/analytics/dashboard/productivity",
-        "/api/v1/analytics/dashboard/goals",
         "/api/v1/analytics/dashboard/habits",
         "/api/v1/analytics/dashboard/journal",
         "/api/v1/analytics/dashboard/ai",
@@ -83,11 +82,3 @@ async def test_analytics_dashboard_with_seeded_task(client: AsyncClient):
     assert "daily_tasks" in data
     assert "calendar_heatmap" in data
     assert isinstance(data["overdue_tasks"], int)
-
-
-@pytest.mark.asyncio
-async def test_existing_analytics_untouched(client: AsyncClient):
-    headers = await _auth_headers(client, "legacy@example.com")
-    res = await client.get("/api/v1/analytics/summary", headers=headers)
-    assert res.status_code == 200
-    assert "tasks_completed" in res.json()

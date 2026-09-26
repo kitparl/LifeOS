@@ -74,7 +74,7 @@ async def on_start(ctx: CallbackContext) -> Screen:
     return Screen(
         text=tpl.join_blocks(
             tpl._header("Search"),
-            "Send a keyword to search tasks, goals, habits, calendar, and more.\nOr /cancel.",
+            "Send a keyword to search tasks, habits, calendar, and more.\nOr /cancel.",
         ),
         keyboard=kb.inline_keyboard([kb.row(kb.button("❌ Cancel", "nav:home"))]),
     )

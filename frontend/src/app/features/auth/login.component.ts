@@ -27,7 +27,7 @@ import { ThemeService } from '../../core/services/theme.service';
               <span class="login-feature__dot"></span>
               <div>
                 <strong>Unified Productivity Hub</strong>
-                <p>Tasks, goals, habits, journal, calendar — all in one place.</p>
+                <p>Tasks, habits, journal, calendar — all in one place.</p>
               </div>
             </li>
             <li class="login-feature">
@@ -47,8 +47,8 @@ import { ThemeService } from '../../core/services/theme.service';
             <li class="login-feature">
               <span class="login-feature__dot"></span>
               <div>
-                <strong>Finance & Career</strong>
-                <p>Income/expense tracking, career portfolio, job applications.</p>
+                <strong>Finance</strong>
+                <p>Income/expense tracking and loans.</p>
               </div>
             </li>
             <li class="login-feature">

@@ -1,8 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DashboardService } from '../../dashboard/services/dashboard.service';
-import { NotificationsWidgetComponent } from '../../dashboard/widgets/notifications-widget.component';
-import { RunningWidgetComponent } from '../../dashboard/widgets/running-widget.component';
-import { SyncWidgetComponent } from '../../dashboard/widgets/sync-widget.component';
 import { AnalyticsDashboardService } from '../services/analytics-dashboard.service';
 import { AnalyticsOverview } from '../models/analytics-dashboard.models';
 import { KpiCardComponent } from '../widgets/kpi-card.component';
@@ -11,31 +7,9 @@ import { WidgetFrameComponent } from '../widgets/widget-frame.component';
 @Component({
   selector: 'app-analytics-overview-page',
   standalone: true,
-  imports: [
-    RunningWidgetComponent,
-    SyncWidgetComponent,
-    NotificationsWidgetComponent,
-    KpiCardComponent,
-    WidgetFrameComponent,
-  ],
+  imports: [KpiCardComponent, WidgetFrameComponent],
   template: `
     <div class="space-y-6">
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <app-running-widget
-          [loading]="dashboard.loading()"
-          [progress]="dashboard.summary()?.running_progress ?? null"
-        />
-        <app-sync-widget
-          [loading]="dashboard.loading()"
-          [syncStatus]="dashboard.summary()?.sync_status ?? 'synced'"
-          [pendingCount]="dashboard.summary()?.pending_sync_count ?? 0"
-        />
-        <app-notifications-widget
-          [loading]="dashboard.loading()"
-          [notifications]="dashboard.summary()?.notifications ?? []"
-        />
-      </div>
-
       @if (loading()) {
         <p class="text-sm text-[var(--text-muted)]">Loading overview…</p>
       } @else if (error()) {
@@ -93,13 +67,11 @@ import { WidgetFrameComponent } from '../widgets/widget-frame.component';
 })
 export class AnalyticsOverviewPageComponent implements OnInit {
   private readonly api = inject(AnalyticsDashboardService);
-  readonly dashboard = inject(DashboardService);
   readonly data = signal<AnalyticsOverview | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
   ngOnInit(): void {
-    this.dashboard.getSummary().subscribe();
     this.api.overview().subscribe({
       next: (d) => {
         this.data.set(d);

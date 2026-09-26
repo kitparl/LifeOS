@@ -75,25 +75,3 @@ async def test_mood_upsert_and_stats(client):
     stats = await client.get("/api/v1/mood/stats", headers=headers)
     assert stats.status_code == 200
     assert stats.json()["avg_happiness"] == 4.0
-
-
-@pytest.mark.asyncio
-async def test_dashboard_calendar_preview(client):
-    token = await _auth_token(client, "dash7@example.com")
-    headers = {"Authorization": f"Bearer {token}"}
-    starts = datetime.now(timezone.utc) + timedelta(hours=2)
-
-    await client.post(
-        "/api/v1/calendar/events",
-        headers=headers,
-        json={"title": "Interview prep", "starts_at": starts.isoformat()},
-    )
-
-    summary = await client.get("/api/v1/dashboard/summary", headers=headers)
-    preview = summary.json()["calendar_preview"]
-    assert len(preview) == 1
-    assert preview[0]["title"] == "Interview prep"
-
-    actions = {a["id"]: a for a in summary.json()["quick_actions"]}
-    assert actions["add_event"]["enabled"] is True
-    assert actions["add_journal"]["route"] == "/journal/new"

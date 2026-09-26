@@ -21,14 +21,12 @@ class UseCase:
 
 USE_CASE_WRITING_FEEDBACK = "communication.writing_feedback"
 USE_CASE_RAG_CHAT = "ai.rag_chat"
-USE_CASE_COACHES = "coaches.chat"
 USE_CASE_REPORTS = "reports.ai_briefing"
 USE_CASE_ANALYTICS_INSIGHTS = "analytics.insights"
 
 _USE_CASES: tuple[UseCase, ...] = (
     UseCase(USE_CASE_WRITING_FEEDBACK, "Writing Feedback", CAPABILITY_CHAT),
     UseCase(USE_CASE_RAG_CHAT, "Dashboard AI Chat", CAPABILITY_CHAT),
-    UseCase(USE_CASE_COACHES, "Coaches", CAPABILITY_CHAT),
     UseCase(USE_CASE_REPORTS, "Reports & Briefings", CAPABILITY_CHAT),
     UseCase(USE_CASE_ANALYTICS_INSIGHTS, "Analytics Insights", CAPABILITY_CHAT),
 )

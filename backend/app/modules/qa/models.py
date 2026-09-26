@@ -32,7 +32,6 @@ class QAEntry(Base):
     current_answer: Mapped[str] = mapped_column(Text, nullable=False, default="")
     type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     tags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
-    linked_goal_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("goals.id"), nullable=True)
     linked_journal_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("journal_entries.id"), nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_deep_personal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

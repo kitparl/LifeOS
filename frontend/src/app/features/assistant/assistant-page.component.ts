@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { AiChatPanelComponent } from '../dashboard/widgets/ai-chat-panel.component';
+import { AiChatPanelComponent } from './ai-chat-panel.component';
 
 @Component({
   selector: 'app-assistant-page',

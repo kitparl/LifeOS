@@ -16,16 +16,16 @@ async def test_global_search(client):
     headers = {"Authorization": f"Bearer {token}"}
 
     await client.post(
-        "/api/v1/goals",
+        "/api/v1/tasks",
         headers=headers,
-        json={"title": "Marathon training uniquexyz", "category": "running"},
+        json={"title": "Marathon training uniquexyz"},
     )
 
     result = await client.get("/api/v1/search", headers=headers, params={"q": "uniquexyz"})
     assert result.status_code == 200
     data = result.json()
     assert data["total"] >= 1
-    assert data["results"][0]["module"] == "goals"
+    assert data["results"][0]["module"] == "tasks"
 
 
 @pytest.mark.asyncio
@@ -51,34 +51,16 @@ async def test_notifications_crud(client):
 
 
 @pytest.mark.asyncio
-async def test_export_goals_json(client):
+async def test_export_tasks_json(client):
     token = await _auth_token(client, "export@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
     await client.post(
-        "/api/v1/goals",
+        "/api/v1/tasks",
         headers=headers,
-        json={"title": "Export goal", "category": "personal"},
+        json={"title": "Export task"},
     )
 
-    resp = await client.get("/api/v1/export/goals", headers=headers, params={"format": "json"})
+    resp = await client.get("/api/v1/export/tasks", headers=headers, params={"format": "json"})
     assert resp.status_code == 200
-    assert "Export goal" in resp.text
-
-
-@pytest.mark.asyncio
-async def test_dashboard_notifications(client):
-    token = await _auth_token(client, "dash9@example.com")
-    headers = {"Authorization": f"Bearer {token}"}
-
-    await client.post(
-        "/api/v1/notifications",
-        headers=headers,
-        json={"message": "Welcome to LifeOS"},
-    )
-
-    summary = await client.get("/api/v1/dashboard/summary", headers=headers)
-    notifications = summary.json()["notifications"]
-    assert len(notifications) == 1
-    actions = {a["id"]: a for a in summary.json()["quick_actions"]}
-    assert actions["export_data"]["route"] == "/export"
+    assert "Export task" in resp.text

@@ -12,36 +12,8 @@ async def _auth(client, email="phase2@example.com"):
 
 
 @pytest.mark.asyncio
-async def test_learning_crud(client):
-    h = await _auth(client)
-    created = await client.post(
-        "/api/v1/learning/items",
-        headers=h,
-        json={"title": "Clean Code", "item_type": "book", "status": "in_progress", "progress": 10},
-    )
-    assert created.status_code == 201
-    body = created.json()
-    item_id = body["id"]
-    assert body.get("track_id") is None
-    listed = await client.get("/api/v1/learning/items", headers=h)
-    assert listed.status_code == 200
-    assert len(listed.json()) == 1
-    assert listed.json()[0].get("track_id") is None
-    got = await client.get(f"/api/v1/learning/items/{item_id}", headers=h)
-    assert got.status_code == 200
-    assert got.json()["track_id"] is None
-    assert got.json()["progress"] == 10
-
-
-@pytest.mark.asyncio
-async def test_career_and_finance(client):
+async def test_finance_transactions(client):
     h = await _auth(client, "p2b@example.com")
-    proj = await client.post(
-        "/api/v1/career/projects",
-        headers=h,
-        json={"name": "LifeOS", "tech_stack": "FastAPI, Angular"},
-    )
-    assert proj.status_code == 201
     txn = await client.post(
         "/api/v1/finance/transactions",
         headers=h,
@@ -53,18 +25,9 @@ async def test_career_and_finance(client):
 
 
 @pytest.mark.asyncio
-async def test_analytics_timeline_reports_search(client):
+async def test_semantic_search(client):
     h = await _auth(client, "p2c@example.com")
-    await client.post("/api/v1/goals", headers=h, json={"title": "Test goal", "category": "personal"})
-    analytics = await client.get("/api/v1/analytics/summary", headers=h)
-    assert analytics.status_code == 200
-    timeline = await client.get("/api/v1/timeline", headers=h)
-    assert timeline.status_code == 200
-    assert len(timeline.json()) >= 1
-    report = await client.get("/api/v1/reports/weekly", headers=h)
-    assert report.status_code == 200
-    review = await client.post("/api/v1/reports/reviews/daily", headers=h)
-    assert review.status_code == 200
+    await client.post("/api/v1/tasks", headers=h, json={"title": "Test task"})
     await client.post("/api/v1/ai/index", headers=h)
-    semantic = await client.get("/api/v1/search/semantic", headers=h, params={"q": "goal"})
+    semantic = await client.get("/api/v1/search/semantic", headers=h, params={"q": "task"})
     assert semantic.status_code == 200

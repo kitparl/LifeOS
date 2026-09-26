@@ -42,12 +42,6 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: defaultHomeRedirect },
       {
-        path: 'quick-action',
-        loadComponent: () =>
-          import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
-      },
-      { path: 'dashboard', pathMatch: 'full', redirectTo: 'quick-action' },
-      {
         path: 'profile',
         loadComponent: () =>
           import('./features/settings/settings-fragment-redirect.component').then(
@@ -70,26 +64,6 @@ export const routes: Routes = [
             (m) => m.SettingsFragmentRedirectComponent,
           ),
         data: { fragment: 'sidebar' },
-      },
-      {
-        path: 'goals',
-        loadComponent: () =>
-          import('./features/goals/goals-list.component').then((m) => m.GoalsListComponent),
-      },
-      {
-        path: 'goals/new',
-        loadComponent: () =>
-          import('./features/goals/goal-form.component').then((m) => m.GoalFormComponent),
-      },
-      {
-        path: 'goals/:id/edit',
-        loadComponent: () =>
-          import('./features/goals/goal-form.component').then((m) => m.GoalFormComponent),
-      },
-      {
-        path: 'goals/:id',
-        loadComponent: () =>
-          import('./features/goals/goal-detail.component').then((m) => m.GoalDetailComponent),
       },
       {
         path: 'tasks',
@@ -389,54 +363,9 @@ export const routes: Routes = [
           import('./features/documents/documents-hub.component').then((m) => m.DocumentsHubComponent),
       },
       {
-        path: 'learning',
-        loadComponent: () =>
-          import('./features/learning/learning-page.component').then((m) => m.LearningListComponent),
-      },
-      {
-        path: 'learning/tracks',
-        loadComponent: () =>
-          import('./features/learning/track-views.component').then((m) => m.LearningTracksComponent),
-      },
-      {
-        path: 'learning/tracks/:id',
-        loadComponent: () =>
-          import('./features/learning/track-views.component').then((m) => m.LearningTrackDetailComponent),
-      },
-      {
-        path: 'learning/today',
-        loadComponent: () =>
-          import('./features/learning/today-view.component').then((m) => m.LearningTodayComponent),
-      },
-      {
-        path: 'learning/concepts/:id',
-        loadComponent: () =>
-          import('./features/learning/concept-detail.component').then((m) => m.LearningConceptDetailComponent),
-      },
-      {
-        path: 'learning/new',
-        loadComponent: () =>
-          import('./features/learning/learning-page.component').then((m) => m.LearningFormComponent),
-      },
-      {
-        path: 'learning/:id/edit',
-        loadComponent: () =>
-          import('./features/learning/learning-page.component').then((m) => m.LearningFormComponent),
-      },
-      {
-        path: 'career',
-        loadComponent: () =>
-          import('./features/career/career-page.component').then((m) => m.CareerPageComponent),
-      },
-      {
         path: 'finance',
         loadComponent: () =>
           import('./features/finance/finance-page.component').then((m) => m.FinancePageComponent),
-      },
-      {
-        path: 'analytics',
-        redirectTo: 'insights',
-        pathMatch: 'full',
       },
       {
         path: 'analytics/dashboard',
@@ -446,29 +375,9 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'insights',
-        loadComponent: () =>
-          import('./features/insights/insights-hub.component').then((m) => m.InsightsHubComponent),
-      },
-      {
-        path: 'timeline',
-        loadComponent: () =>
-          import('./features/timeline/timeline-hub.component').then((m) => m.TimelineHubComponent),
-      },
-      {
-        path: 'reports',
-        redirectTo: 'insights?tab=reports',
-        pathMatch: 'full',
-      },
-      {
         path: 'memory',
         loadComponent: () =>
           import('./features/memory/memory-page.component').then((m) => m.MemoryPageComponent),
-      },
-      {
-        path: 'coaches',
-        loadComponent: () =>
-          import('./features/coaches/coaches-page.component').then((m) => m.CoachesPageComponent),
       },
       {
         path: 'ocr',
@@ -476,29 +385,9 @@ export const routes: Routes = [
         pathMatch: 'full',
       },
       {
-        path: 'voice',
-        loadComponent: () =>
-          import('./features/voice/voice-page.component').then((m) => m.VoicePageComponent),
-      },
-      {
         path: 'integrations',
         loadComponent: () =>
           import('./features/integrations/integrations-page.component').then((m) => m.IntegrationsPageComponent),
-      },
-      {
-        path: 'automations',
-        loadComponent: () =>
-          import('./features/automations/automations-page.component').then((m) => m.AutomationsPageComponent),
-      },
-      {
-        path: 'predictions',
-        redirectTo: 'insights?tab=predictions',
-        pathMatch: 'full',
-      },
-      {
-        path: 'life-timeline',
-        redirectTo: 'timeline?tab=milestones',
-        pathMatch: 'full',
       },
     ],
   },

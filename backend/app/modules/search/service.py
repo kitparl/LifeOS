@@ -5,10 +5,8 @@ from app.modules.ai.service import AiService
 from app.modules.calendar.models import CalendarEvent
 from app.modules.communication.models import SpeakingPractice, WritingPractice
 from app.modules.communication.vocabulary.models import UserVocabulary, Vocabulary
-from app.modules.goals.models import Goal
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
-from app.modules.learning.models import LearningConcept, LearningItem
 from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
 from app.modules.search.schemas import SearchResponse, SearchResultItem
@@ -28,25 +26,6 @@ class SearchService:
             return SearchResponse(query=q, total=0, results=[])
         pattern = f"%{q}%"
         results: list[SearchResultItem] = []
-
-        async def add_goal_rows():
-            rows = await self.db.execute(
-                select(Goal).where(
-                    Goal.user_id == user_id,
-                    or_(Goal.title.ilike(pattern), Goal.description.ilike(pattern)),
-                )
-            )
-            for g in rows.scalars().all():
-                results.append(
-                    SearchResultItem(
-                        module="goals",
-                        entity_type="goal",
-                        id=g.id,
-                        title=g.title,
-                        subtitle=g.category,
-                        route=f"/goals/{g.id}",
-                    )
-                )
 
         async def add_task_rows():
             rows = await self.db.execute(
@@ -244,43 +223,6 @@ class SearchService:
                     )
                 )
 
-        async def add_learning_rows():
-            items = await self.db.execute(
-                select(LearningItem).where(
-                    LearningItem.user_id == user_id,
-                    or_(LearningItem.title.ilike(pattern), LearningItem.notes.ilike(pattern)),
-                )
-            )
-            for item in items.scalars().all():
-                results.append(
-                    SearchResultItem(
-                        module="learning",
-                        entity_type="learning_item",
-                        id=item.id,
-                        title=item.title,
-                        subtitle=item.item_type,
-                        route=f"/learning/{item.id}/edit",
-                    )
-                )
-            concepts = await self.db.execute(
-                select(LearningConcept).where(
-                    LearningConcept.user_id == user_id,
-                    or_(LearningConcept.title.ilike(pattern), LearningConcept.summary.ilike(pattern)),
-                )
-            )
-            for c in concepts.scalars().all():
-                results.append(
-                    SearchResultItem(
-                        module="learning",
-                        entity_type="learning_concept",
-                        id=c.id,
-                        title=c.title,
-                        subtitle=c.summary[:80] if c.summary else None,
-                        route=f"/learning/concepts/{c.id}",
-                    )
-                )
-
-        await add_goal_rows()
         await add_task_rows()
         await add_habit_rows()
         await add_run_rows()
@@ -291,7 +233,6 @@ class SearchService:
         await add_speaking_rows()
         await add_qa_rows()
         await add_wishlist_rows()
-        await add_learning_rows()
 
         total = len(results)
         page = results[offset : offset + limit]

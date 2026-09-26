@@ -207,26 +207,6 @@ async def cmd_habits(db: AsyncSession, user_id: str, args: str):
         return tpl.habits_list(lines)
 
 
-async def cmd_goals(db: AsyncSession, user_id: str, args: str):
-    try:
-        from app.modules.integrations.telegram.screens.goals import goals_list_screen
-
-        return await goals_list_screen(db, user_id)
-    except Exception:
-        logger.exception("Interactive /goals failed; using text fallback")
-        from app.modules.goals.service import GoalService
-
-        goals, _ = await GoalService(db).list_goals(user_id, status="active", limit=100)
-        if not goals:
-            return tpl.goals_empty()
-        lines = [
-            f"{g.title} · {g.progress}% · "
-            f"{g.target_date.date().isoformat() if g.target_date else 'no target'}"
-            for g in goals
-        ]
-        return tpl.goals_list(lines)
-
-
 async def cmd_search(db: AsyncSession, user_id: str, args: str):
     from app.modules.integrations.telegram.screens.search import search_results_screen
 
@@ -255,7 +235,6 @@ COMMANDS: dict[str, CommandHandlerFn] = {
     "/today": cmd_today,
     "/done": cmd_done,
     "/habits": cmd_habits,
-    "/goals": cmd_goals,
     "/search": cmd_search,
 }
 

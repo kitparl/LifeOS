@@ -201,15 +201,6 @@ python -m app.modules.files.backfill --target s3
 
 ---
 
-## Learning-track seeder (ops)
-
-```bash
-cd ~/LifeOS/backend && source .venv/bin/activate
-python -m app.modules.learning.seeder ai-systems-engineering --email you@example.com
-```
-
----
-
 ## Git / recovery
 
 ```bash

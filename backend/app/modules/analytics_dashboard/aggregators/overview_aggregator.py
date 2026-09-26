@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.analytics_dashboard.aggregators.focus_aggregator import planned_focus_hours
-from app.modules.analytics_dashboard.aggregators.goals_aggregator import mean_active_progress
 from app.modules.analytics_dashboard.aggregators.habits_aggregator import habit_consistency_avg
 from app.modules.analytics_dashboard.aggregators.journal_aggregator import mood_score_avg, writing_streak
 from app.modules.analytics_dashboard.aggregators.tasks_aggregator import (
@@ -22,18 +21,16 @@ from app.modules.tasks.models import Task
 
 # Life Score weights (must sum to 1.0)
 LIFE_SCORE_WEIGHTS = {
-    "tasks": 0.25,
-    "habits": 0.25,
-    "goals": 0.20,
-    "journal": 0.15,
-    "mood": 0.15,
+    "tasks": 0.30,
+    "habits": 0.30,
+    "journal": 0.20,
+    "mood": 0.20,
 }
 
 
 def compute_life_score(
     task_rate: float,
     habit_rate: float,
-    goal_progress: float,
     journal_streak: int,
     mood: float | None,
 ) -> float:
@@ -42,7 +39,6 @@ def compute_life_score(
     score = (
         LIFE_SCORE_WEIGHTS["tasks"] * task_rate
         + LIFE_SCORE_WEIGHTS["habits"] * habit_rate
-        + LIFE_SCORE_WEIGHTS["goals"] * goal_progress
         + LIFE_SCORE_WEIGHTS["journal"] * journal_norm
         + LIFE_SCORE_WEIGHTS["mood"] * mood_norm
     )
@@ -97,10 +93,9 @@ async def recent_activity(db: AsyncSession, user_id: str, limit: int = 10) -> li
 async def build_overview(db: AsyncSession, user_id: str, range_days: int) -> AnalyticsOverview:
     task_rate = await completion_rate(db, user_id, range_days)
     habit_rate = await habit_consistency_avg(db, user_id, range_days)
-    goal_prog = await mean_active_progress(db, user_id)
     j_streak = await writing_streak(db, user_id)
     mood = await mood_score_avg(db, user_id, range_days)
-    life = compute_life_score(task_rate, habit_rate, goal_prog, j_streak, mood)
+    life = compute_life_score(task_rate, habit_rate, j_streak, mood)
 
     todays = await todays_open_tasks(db, user_id)
     completed = await completed_in_range(db, user_id, range_days)
@@ -112,7 +107,6 @@ async def build_overview(db: AsyncSession, user_id: str, range_days: int) -> Ana
         KpiCard(id="life_score", title="Life Score", value=life, unit="/100"),
         KpiCard(id="todays_tasks", title="Today's Tasks", value=todays),
         KpiCard(id="completed_tasks", title="Completed Tasks", value=completed, subtitle=f"Last {range_days}d"),
-        KpiCard(id="goal_progress", title="Goal Progress", value=goal_prog, unit="%"),
         KpiCard(id="habit_score", title="Habit Score", value=habit_rate, unit="%"),
         KpiCard(
             id="focus_time",
@@ -136,7 +130,6 @@ async def build_overview(db: AsyncSession, user_id: str, range_days: int) -> Ana
         life_score=life,
         todays_tasks=todays,
         completed_tasks=completed,
-        goal_progress=goal_prog,
         habit_score=habit_rate,
         focus_time_hours=focus,
         focus_time_label="planned",

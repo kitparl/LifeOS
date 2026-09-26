@@ -37,7 +37,7 @@ async def test_qa_versioning(client):
 
 
 @pytest.mark.asyncio
-async def test_wishlist_and_dashboard_actions(client):
+async def test_wishlist_create_and_list(client):
     token = await _auth_token(client, "wish@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -52,8 +52,3 @@ async def test_wishlist_and_dashboard_actions(client):
     assert listing.status_code == 200
     assert listing.json()[0]["title"] == "Visit Japan"
 
-    summary = await client.get("/api/v1/dashboard/summary", headers=headers)
-    actions = {a["id"]: a for a in summary.json()["quick_actions"]}
-    assert actions["add_word"]["route"] == "/communication/vocabulary"
-    assert actions["add_qa"]["route"] == "/qa/new"
-    assert actions["add_wishlist"]["route"] == "/wishlist/new"

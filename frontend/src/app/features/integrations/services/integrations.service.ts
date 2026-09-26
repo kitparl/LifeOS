@@ -310,8 +310,6 @@ export const TELEGRAM_EVENT_OPTIONS: { key: string; label: string }[] = [
   { key: 'race_added', label: 'New race' },
   { key: 'calendar_event_created', label: 'New calendar event' },
   { key: 'habit_created', label: 'New habit' },
-  { key: 'goal_created', label: 'New goal' },
-  { key: 'goal_milestone_added', label: 'Goal milestone' },
 ];
 
 export type ReportJobType = 'morning' | 'midday' | 'night' | 'weekly' | 'ai_briefing';

@@ -41,7 +41,6 @@ class AnalyticsOverview(BaseModel):
     life_score: float
     todays_tasks: int
     completed_tasks: int
-    goal_progress: float
     habit_score: float
     focus_time_hours: float
     focus_time_label: str = "planned"
@@ -65,27 +64,6 @@ class ProductivityAnalytics(BaseModel):
     category_distribution: list[SeriesPoint]
     calendar_heatmap: list[HeatmapCell]
     range_days: int = 30
-
-
-class GoalItemAnalytics(BaseModel):
-    id: str
-    title: str
-    progress: int
-    status: str
-    remaining_tasks: int
-    milestones_total: int
-    milestones_done: int
-    velocity: float
-    burndown: list[SeriesPoint] = Field(default_factory=list)
-    completion_forecast: PlaceholderField = Field(default_factory=PlaceholderField)
-    risk_indicator: PlaceholderField = Field(default_factory=PlaceholderField)
-
-
-class GoalAnalytics(BaseModel):
-    goals: list[GoalItemAnalytics] = Field(default_factory=list)
-    avg_progress: float = 0.0
-    avg_velocity: float = 0.0
-    range_days: int = 90
 
 
 class HabitItemAnalytics(BaseModel):

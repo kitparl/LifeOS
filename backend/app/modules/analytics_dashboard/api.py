@@ -8,7 +8,6 @@ from app.core.deps import get_current_user
 from app.modules.analytics_dashboard.schemas import (
     AiInsightsResponse,
     AnalyticsOverview,
-    GoalAnalytics,
     HabitAnalytics,
     JournalAnalytics,
     ProductivityAnalytics,
@@ -45,15 +44,6 @@ async def analytics_productivity(
     db: AsyncSession = Depends(get_db),
 ) -> ProductivityAnalytics:
     return await AnalyticsDashboardService(db).productivity(user.id, range_days)
-
-
-@router.get("/goals", response_model=GoalAnalytics)
-async def analytics_goals(
-    range_days: int = Query(90, ge=1, le=365),
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> GoalAnalytics:
-    return await AnalyticsDashboardService(db).goals(user.id, range_days)
 
 
 @router.get("/habits", response_model=HabitAnalytics)

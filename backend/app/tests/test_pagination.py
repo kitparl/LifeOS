@@ -18,32 +18,6 @@ async def _auth(client, username: str, email: str) -> dict[str, str]:
 
 
 @pytest.mark.asyncio
-async def test_goals_pagination(client):
-    headers = await _auth(client, "pagegoals", "pagegoals@example.com")
-    for i in range(30):
-        r = await client.post(
-            "/api/v1/goals",
-            headers=headers,
-            json={"title": f"Goal {i:02d}", "category": "health"},
-        )
-        assert r.status_code == 201
-
-    page1 = await client.get("/api/v1/goals", headers=headers, params={"limit": 25, "offset": 0})
-    assert page1.status_code == 200
-    assert len(page1.json()) == 25
-    assert page1.headers.get("X-Total-Count") == "30"
-
-    page2 = await client.get("/api/v1/goals", headers=headers, params={"limit": 25, "offset": 25})
-    assert page2.status_code == 200
-    assert len(page2.json()) == 5
-    assert page2.headers.get("X-Total-Count") == "30"
-
-    defaulted = await client.get("/api/v1/goals", headers=headers)
-    assert defaulted.status_code == 200
-    assert len(defaulted.json()) == 25
-
-
-@pytest.mark.asyncio
 async def test_journal_pagination(client):
     headers = await _auth(client, "pagejournal", "pagejournal@example.com")
     for i in range(28):

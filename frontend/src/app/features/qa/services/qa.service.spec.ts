@@ -77,7 +77,6 @@ describe('QAService', () => {
       type: null,
       tags: [],
       is_deep_personal: false,
-      linked_goal_id: null,
       linked_journal_id: null,
       ai_summary: null,
       created_at: '2026-08-01T00:00:00Z',

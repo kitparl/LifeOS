@@ -163,7 +163,6 @@ class TaskRepository:
             category=data.category,
             due_date=data.due_date,
             parent_id=data.parent_id,
-            goal_id=data.goal_id,
             recurrence=data.recurrence,
             version=1,
         )

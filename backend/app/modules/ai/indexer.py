@@ -4,12 +4,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.models import CalendarEvent
-from app.modules.career.models import CareerProject, JobApplication
 from app.modules.finance.models import FinanceTransaction
-from app.modules.goals.models import Goal
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
-from app.modules.learning.models import LearningConcept, LearningItem, StudySession
 from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
 from app.modules.tasks.models import Task
@@ -31,16 +28,6 @@ class AiIndexer:
 
     async def collect_documents(self, user_id: str) -> list[IndexDocument]:
         docs: list[IndexDocument] = []
-
-        goals = await self.db.execute(select(Goal).where(Goal.user_id == user_id))
-        for g in goals.scalars().all():
-            text = " ".join(
-                filter(
-                    None,
-                    [g.title, g.description, g.notes, g.category, g.status, getattr(g, "period", None)],
-                )
-            )
-            docs.append(IndexDocument("goal", g.id, g.title, text, f"/goals/{g.id}"))
 
         tasks = await self.db.execute(select(Task).where(Task.user_id == user_id, Task.deleted_at.is_(None)))
         for t in tasks.scalars().all():
@@ -86,51 +73,6 @@ class AiIndexer:
                 )
             )
             docs.append(IndexDocument("wishlist", w.id, w.title, text, f"/wishlist/{w.id}"))
-
-        learning = await self.db.execute(select(LearningItem).where(LearningItem.user_id == user_id))
-        for l in learning.scalars().all():
-            text = " ".join(filter(None, [l.title, l.provider, l.notes, l.item_type, l.status]))
-            docs.append(IndexDocument("learning", l.id, l.title, text, f"/learning/{l.id}"))
-
-        concepts = await self.db.execute(
-            select(LearningConcept).where(LearningConcept.user_id == user_id)
-        )
-        for c in concepts.scalars().all():
-            text = " ".join(
-                filter(
-                    None,
-                    [c.title, c.summary, c.slug, c.artifact_url, f"week {c.week_number}" if c.week_number else None],
-                )
-            )
-            docs.append(
-                IndexDocument("learning_concept", c.id, c.title, text, f"/learning/concepts/{c.id}")
-            )
-
-        sessions = await self.db.execute(select(StudySession).where(StudySession.user_id == user_id))
-        for s in sessions.scalars().all():
-            if not s.notes:
-                continue
-            title = f"Study session {s.session_date}"
-            docs.append(
-                IndexDocument(
-                    "study_session",
-                    s.id,
-                    title,
-                    s.notes,
-                    f"/learning/concepts/{s.concept_id}" if s.concept_id else "/learning/today",
-                )
-            )
-
-        projects = await self.db.execute(select(CareerProject).where(CareerProject.user_id == user_id))
-        for p in projects.scalars().all():
-            text = " ".join(filter(None, [p.name, p.description, p.tech_stack]))
-            docs.append(IndexDocument("career_project", p.id, p.name, text, "/career"))
-
-        apps = await self.db.execute(select(JobApplication).where(JobApplication.user_id == user_id))
-        for a in apps.scalars().all():
-            title = f"{a.company} — {a.role}"
-            text = " ".join(filter(None, [title, a.status, a.notes]))
-            docs.append(IndexDocument("job_application", a.id, title, text, "/career"))
 
         txns = await self.db.execute(select(FinanceTransaction).where(FinanceTransaction.user_id == user_id))
         for t in txns.scalars().all():

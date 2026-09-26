@@ -10,17 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.calendar.models import CalendarEvent
 from app.modules.communication.vocabulary.models import UserVocabulary, Vocabulary
-from app.modules.goals.models import Goal
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
-from app.modules.learning.models import LearningConcept, LearningItem
 from app.modules.qa.models import QAEntry
 from app.modules.running.models import Run
 from app.modules.tasks.models import Task
 from app.modules.wishlist.models import WishlistItem
 
 EXPORT_MODULES = (
-    "goals",
     "tasks",
     "habits",
     "runs",
@@ -29,7 +26,6 @@ EXPORT_MODULES = (
     "qa",
     "wishlist",
     "vocabulary",
-    "learning",
     "all",
 )
 
@@ -38,22 +34,6 @@ class ExportService:
         self.db = db
 
     async def _rows_for_module(self, user_id: str, module: str) -> list[dict[str, Any]]:
-        if module == "goals":
-            result = await self.db.execute(select(Goal).where(Goal.user_id == user_id))
-            return [
-                {
-                    "id": g.id,
-                    "title": g.title,
-                    "category": g.category,
-                    "status": g.status,
-                    "period": getattr(g, "period", None) or "yearly",
-                    "progress": g.progress,
-                    "target_date": str(g.target_date) if g.target_date else None,
-                    "period_start": str(g.period_start) if getattr(g, "period_start", None) else None,
-                    "period_end": str(g.period_end) if getattr(g, "period_end", None) else None,
-                }
-                for g in result.scalars().all()
-            ]
         if module == "tasks":
             result = await self.db.execute(select(Task).where(Task.user_id == user_id, Task.deleted_at.is_(None)))
             return [
@@ -148,27 +128,6 @@ class ExportService:
                     "mastery": uv.mastery_level,
                 }
                 for uv, v in result.all()
-            ]
-        if module == "learning":
-            concepts = await self.db.execute(
-                select(LearningConcept).where(LearningConcept.user_id == user_id)
-            )
-            items = await self.db.execute(select(LearningItem).where(LearningItem.user_id == user_id))
-            item_map = {i.id: i for i in items.scalars().all()}
-            return [
-                {
-                    "id": c.id,
-                    "item_id": c.item_id,
-                    "item_title": item_map[c.item_id].title if c.item_id in item_map else None,
-                    "track_id": item_map[c.item_id].track_id if c.item_id in item_map else None,
-                    "slug": c.slug,
-                    "title": c.title,
-                    "week_number": c.week_number,
-                    "can_explain": c.can_explain,
-                    "confidence": c.confidence,
-                    "artifact_url": c.artifact_url,
-                }
-                for c in concepts.scalars().all()
             ]
         raise NotFoundError("Unknown export module")
 

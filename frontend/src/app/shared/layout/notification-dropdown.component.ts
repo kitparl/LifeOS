@@ -23,14 +23,12 @@ interface ModuleStyle {
 const MODULE_STYLES: Record<string, ModuleStyle> = {
   tasks: { icon: 'list-todo', color: 'var(--primary)', soft: 'var(--primary-soft)' },
   habits: { icon: 'flame', color: 'var(--warning)', soft: 'var(--warning-soft)' },
-  goals: { icon: 'target', color: 'var(--success)', soft: 'var(--success-soft)' },
   finance: { icon: 'wallet', color: 'var(--success)', soft: 'var(--success-soft)' },
   calendar: { icon: 'calendar-days', color: 'var(--primary)', soft: 'var(--primary-soft)' },
   communication: { icon: 'message-square', color: 'var(--primary)', soft: 'var(--primary-soft)' },
   running: { icon: 'footprints', color: 'var(--success)', soft: 'var(--success-soft)' },
   journal: { icon: 'book-open', color: 'var(--text-muted)', soft: 'var(--surface-3)' },
   knowledge_notes: { icon: 'notebook-pen', color: 'var(--primary)', soft: 'var(--primary-soft)' },
-  automations: { icon: 'zap', color: 'var(--warning)', soft: 'var(--warning-soft)' },
   qa: { icon: 'circle-help', color: 'var(--text-muted)', soft: 'var(--surface-3)' },
 };
 

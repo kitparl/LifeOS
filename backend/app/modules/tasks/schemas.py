@@ -21,7 +21,6 @@ class TaskCreate(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=50)
     due_date: datetime | None = None
     parent_id: str | None = None
-    goal_id: str | None = None
     recurrence: TaskRecurrence = "none"
     assignee_username: str | None = Field(default=None, max_length=30)
     assignee_user_id: str | None = Field(default=None, max_length=36)
@@ -45,7 +44,6 @@ class TaskUpdate(BaseModel):
     category: str | None = Field(default=None, max_length=64)
     tags: list[str] | None = None
     due_date: datetime | None = None
-    goal_id: str | None = None
     recurrence: TaskRecurrence | None = None
     version: int | None = None
     status_reason: str | None = Field(default=None, max_length=500)
@@ -91,7 +89,6 @@ class TaskResponse(BaseModel):
     tags: list[str]
     due_date: datetime | None
     parent_id: str | None
-    goal_id: str | None
     recurrence: str
     completed_at: datetime | None
     created_at: datetime
@@ -131,7 +128,6 @@ class TaskResponse(BaseModel):
             tags=task.tags,
             due_date=task.due_date,
             parent_id=task.parent_id,
-            goal_id=task.goal_id,
             recurrence=task.recurrence,
             completed_at=task.completed_at,
             created_at=task.created_at,
@@ -161,7 +157,6 @@ class TaskListItem(BaseModel):
     tags: list[str]
     due_date: datetime | None
     updated_at: datetime
-    goal_id: str | None = None
     subtask_count: int = 0
     completed_subtasks: int = 0
     assigned_to: str | None = None

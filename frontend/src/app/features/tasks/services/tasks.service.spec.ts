@@ -34,7 +34,6 @@ describe('TasksService', () => {
       tags: [],
       due_date: null,
       parent_id: null,
-      goal_id: null,
       recurrence: 'none',
       completed_at: null,
       created_at: new Date().toISOString(),

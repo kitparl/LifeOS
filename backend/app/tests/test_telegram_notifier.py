@@ -79,13 +79,11 @@ def test_format_digest_empty_and_sections():
     content = DigestContent(
         pending_tasks=["Buy milk [pending, no due date]"],
         habits_due=["Meditate (daily)"],
-        active_goals=["Ship feature · 40% · no target"],
     )
     msg = format_digest(content, now=datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc))
     assert "Pending tasks" in msg.text
     assert "Buy milk" in msg.text
     assert "Habits due" in msg.text
-    assert "Active goals" in msg.text
     assert "<" in msg.text  # HTML tags
 
 

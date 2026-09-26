@@ -47,10 +47,6 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("integration_connections", "webhook_secret", "VARCHAR(64)"),
     # Integrations: actionable notification keyboards
     ("pending_notifications", "reply_markup_json", "TEXT"),
-    # Goals: period types + window
-    ("goals", "period", "VARCHAR(16) DEFAULT 'yearly'"),
-    ("goals", "period_start", "DATE"),
-    ("goals", "period_end", "DATE"),
     # Running: optional shoe name on runs and race events
     ("runs", "shoe", "VARCHAR(80)"),
     ("race_events", "shoe", "VARCHAR(80)"),
@@ -84,10 +80,6 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     # Knowledge notes: closed/completed chapters and sections
     ("knowledge_chapters", "closed_at", "TIMESTAMP"),
     ("knowledge_sections", "closed_at", "TIMESTAMP"),
-    # Learning: track membership + phase ordering (NULL track_id = standalone legacy item)
-    ("learning_items", "track_id", "VARCHAR(36)"),
-    ("learning_items", "slug", "VARCHAR(64)"),
-    ("learning_items", "sort_order", "INTEGER DEFAULT 0"),
     # GitHub notes sync v2 status fields
     ("github_sync_state", "remote_commit_sha", "VARCHAR(64)"),
     ("github_sync_state", "sync_status", "VARCHAR(16) DEFAULT 'never_synced'"),
@@ -130,15 +122,37 @@ _STRING_DEFAULTS_TO_BACKFILL: list[tuple[str, str, str]] = [
     ("vocabulary", "source", "dataset"),
 ]
 
-_INTEGER_DEFAULTS_TO_BACKFILL: list[tuple[str, str, int]] = [
-    ("learning_items", "sort_order", 0),
-]
+_INTEGER_DEFAULTS_TO_BACKFILL: list[tuple[str, str, int]] = []
 
 # Columns removed from the ORM but still present on older databases.
 # Must be dropped (or at least made nullable) or INSERTs omit them and fail NOT NULL.
 _COLUMNS_TO_DROP: list[tuple[str, str]] = [
     ("wishlist_items", "cost"),
     ("wishlist_items", "progress"),
+    # Goals module removed. SQLite cannot drop a column used in a foreign key, so there the
+    # column stays (unmapped, never written); Postgres drops it.
+    ("tasks", "goal_id"),
+    ("qa_entries", "linked_goal_id"),
+]
+
+# Tables of removed modules (Goals, Learning, Career, Voice, Automations, Life timeline).
+# Child tables first. Dropping is permanent: the data is deleted.
+_TABLES_TO_DROP: list[str] = [
+    "goal_milestones",
+    "goals",
+    "goal_categories",
+    "learning_concept_notes",
+    "study_sessions",
+    "learning_resources",
+    "learning_concepts",
+    "learning_items",
+    "learning_tracks",
+    "job_applications",
+    "career_projects",
+    "career_profiles",
+    "voice_notes",
+    "automation_rules",
+    "life_milestones",
 ]
 
 
@@ -198,6 +212,7 @@ async def ensure_columns(conn: AsyncConnection) -> None:
             logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
 
     await drop_obsolete_columns(conn, dialect)
+    await drop_obsolete_tables(conn, dialect)
     await widen_columns(conn, dialect)
     await backfill_telegram_timezone(conn)
     await backfill_usernames(conn)
@@ -250,6 +265,8 @@ async def drop_obsolete_columns(conn: AsyncConnection, dialect: str) -> None:
             msg = str(exc).lower()
             if "no such column" in msg or "does not exist" in msg:
                 logger.debug("Column %s.%s already absent — skipping", table, column)
+            elif "foreign key definition" in msg:
+                logger.debug("SQLite keeps FK column %s.%s (unmapped) — skipping", table, column)
             else:
                 # Fallback: at least clear NOT NULL so inserts that omit the column work
                 try:
@@ -273,6 +290,14 @@ async def drop_obsolete_columns(conn: AsyncConnection, dialect: str) -> None:
                     logger.warning(
                         "Could not relax obsolete column %s.%s: %s", table, column, inner
                     )
+
+
+async def drop_obsolete_tables(conn: AsyncConnection, dialect: str) -> None:
+    """Drop tables of removed modules (idempotent via IF EXISTS)."""
+    cascade = " CASCADE" if dialect == "postgresql" else ""
+    for table in _TABLES_TO_DROP:
+        await conn.execute(text(f"DROP TABLE IF EXISTS {table}{cascade}"))
+    logger.info("Dropped obsolete tables (if present): %s", ", ".join(_TABLES_TO_DROP))
 
 
 async def backfill_telegram_timezone(conn: AsyncConnection) -> None:

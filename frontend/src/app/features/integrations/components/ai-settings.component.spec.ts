@@ -10,8 +10,8 @@ const SETTINGS = { default_provider: null, timeout_seconds: 120, max_tokens: 120
 
 function useCase(current: AiUseCase['current']): AiUseCase {
   return {
-    use_case: 'coaches.chat',
-    display_name: 'Coaches',
+    use_case: 'reports.ai_briefing',
+    display_name: 'Reports & Briefings',
     capability: 'chat',
     options: [
       { provider: 'openai', model: 'gpt-4o-mini', display_name: 'OpenAI · gpt-4o-mini', available: true },
@@ -64,7 +64,7 @@ describe('AiSettingsComponent', () => {
   it('saves a model as soon as it is selected', () => {
     init(AUTO);
     component.onSelect(component.useCases()[0], component.modelValue('anthropic', 'claude-opus-5-5'));
-    const put = http.expectOne(`${api}/use-cases/coaches.chat/model`);
+    const put = http.expectOne(`${api}/use-cases/reports.ai_briefing/model`);
     expect(put.request.method).toBe('PUT');
     expect(put.request.body).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' });
     put.flush(useCase(PICKED));
@@ -75,7 +75,7 @@ describe('AiSettingsComponent', () => {
   it('returns to automatic by clearing the selection', () => {
     init(PICKED);
     component.onSelect(component.useCases()[0], '');
-    const del = http.expectOne(`${api}/use-cases/coaches.chat/model`);
+    const del = http.expectOne(`${api}/use-cases/reports.ai_briefing/model`);
     expect(del.request.method).toBe('DELETE');
     del.flush(useCase(AUTO));
     expect(component.valueFor(component.useCases()[0])).toBe('');

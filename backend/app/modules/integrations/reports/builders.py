@@ -13,7 +13,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.service import CalendarService
-from app.modules.goals.service import GoalService
 from app.modules.habits.service import HabitService
 from app.modules.integrations.telegram import templates as tpl
 from app.modules.routines.service import RoutineService
@@ -104,14 +103,6 @@ async def _habits_open_lines(db: AsyncSession, user_id: str) -> list[str]:
     return lines
 
 
-async def _goals_lines(db: AsyncSession, user_id: str, *, limit: int = 8) -> list[str]:
-    goals, _ = await GoalService(db).list_goals(user_id, status="active", limit=100)
-    lines: list[str] = []
-    for g in goals[:limit]:
-        lines.append(f"{g.title} · {g.progress}%")
-    return lines
-
-
 async def _routine_lines(db: AsyncSession, user_id: str, *, limit: int = 12) -> list[str]:
     preview = await RoutineService(db).today_preview(user_id, limit=limit)
     lines: list[str] = []
@@ -160,7 +151,6 @@ async def build_morning(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportB
     calendar = await _calendar_lines(db, user_id, start, end)
     habits = await _habits_open_lines(db, user_id)
     linked = await _linked_habit_lines_for_today(db, user_id)
-    goals = await _goals_lines(db, user_id)
 
     text = tpl.morning_report(
         stamp=datetime.now(tz),
@@ -171,7 +161,6 @@ async def build_morning(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportB
         calendar=calendar,
         habits=habits,
         linked_habits=linked,
-        goals=goals,
     )
     sections = {
         "routine": len(routine),
@@ -180,7 +169,6 @@ async def build_morning(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportB
         "later": len(later),
         "calendar": len(calendar),
         "habits": len(habits),
-        "goals": len(goals),
     }
     return ReportBuildResult(text=text, sections=sections, is_empty=sum(sections.values()) == 0)
 
@@ -260,7 +248,6 @@ async def build_weekly(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportBu
     start, _ = _day_bounds(today, tz)
     end = start + timedelta(days=8)
 
-    goals = await _goals_lines(db, user_id, limit=15)
     habits, _ = await HabitService(db).list_habits(user_id, active_only=True, limit=100)
     streak_lines: list[str] = []
     for h in habits:
@@ -272,11 +259,10 @@ async def build_weekly(db: AsyncSession, user_id: str, tz: ZoneInfo) -> ReportBu
     calendar = await _calendar_lines(db, user_id, start, end, limit=40)
     text = tpl.weekly_review(
         stamp=datetime.now(tz),
-        goals=goals,
         streaks=streak_lines,
         calendar=calendar,
     )
-    sections = {"goals": len(goals), "streaks": len(streak_lines), "calendar": len(calendar)}
+    sections = {"streaks": len(streak_lines), "calendar": len(calendar)}
     return ReportBuildResult(text=text, sections=sections, is_empty=False)
 
 

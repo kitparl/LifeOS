@@ -44,26 +44,6 @@ async def test_list_habits_with_stats(client):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_habits_today(client):
-    token = await _auth_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    create = await client.post(
-        "/api/v1/habits",
-        headers=headers,
-        json={"name": "Meditate", "frequency": "daily"},
-    )
-    habit_id = create.json()["id"]
-    await client.post(f"/api/v1/habits/{habit_id}/complete", headers=headers)
-
-    summary = await client.get("/api/v1/dashboard/summary", headers=headers)
-    habits = summary.json()["habits_today"]
-    assert len(habits) == 1
-    assert habits[0]["name"] == "Meditate"
-    assert habits[0]["completed"] is True
-
-
-@pytest.mark.asyncio
 async def test_delete_habit(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}

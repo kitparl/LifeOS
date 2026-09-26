@@ -52,7 +52,6 @@ def help_message() -> str:
             "<b>/today</b> — today's calendar\n"
             "<b>/done</b> <code>&lt;id&gt;</code> — complete a task\n"
             "<b>/habits</b> — habits with one-tap complete\n"
-            "<b>/goals</b> — active goals\n"
             "<b>/search</b> <code>&lt;query&gt;</code> — universal search\n"
             "<b>/help</b> — this message"
         ),
@@ -204,17 +203,6 @@ def habits_list(lines: list[str]) -> str:
     )
 
 
-def goals_empty() -> str:
-    return join_blocks(_header("Active goals"), "No active goals.")
-
-
-def goals_list(lines: list[str]) -> str:
-    return join_blocks(
-        _header("Active goals", f"{len(lines)} active"),
-        _bullets(lines, limit=15),
-    )
-
-
 # --- Digest template ---
 
 
@@ -225,7 +213,6 @@ def digest_message(
     upcoming_events: list[str],
     upcoming_races: list[str],
     habits_due: list[str],
-    active_goals: list[str],
 ) -> str:
     if isinstance(stamp, datetime):
         stamp_s = stamp.strftime("%Y-%m-%d %H:%M UTC")
@@ -237,7 +224,6 @@ def digest_message(
         ("Upcoming calendar", upcoming_events),
         ("Upcoming races", upcoming_races),
         ("Habits due", habits_due),
-        ("Active goals", active_goals),
     ]
     if not any(items for _, items in sections):
         return join_blocks(
@@ -299,7 +285,6 @@ def morning_report(
     calendar: list[str],
     habits: list[str],
     linked_habits: list[str] | None = None,
-    goals: list[str],
 ) -> str:
     stamp_s = stamp.strftime("%Y-%m-%d %H:%M %Z") if isinstance(stamp, datetime) else str(stamp)
     blocks = [_header("☀️ Morning report", stamp_s)]
@@ -325,7 +310,6 @@ def morning_report(
     if linked_habits:
         habit_body += "\n\n<i>Linked to routine:</i>\n" + _bullets(linked_habits, limit=10)
     blocks.append(_section("Habits open", habit_body))
-    blocks.append(_section("Goals", _bullets(goals, limit=8) or "No active goals."))
     blocks.append("<i>Open /dashboard for interactive screens.</i>")
     return join_blocks(*blocks)
 
@@ -376,13 +360,11 @@ def night_wrap(
 def weekly_review(
     *,
     stamp: datetime | str,
-    goals: list[str],
     streaks: list[str],
     calendar: list[str],
 ) -> str:
     stamp_s = stamp.strftime("%Y-%m-%d %H:%M %Z") if isinstance(stamp, datetime) else str(stamp)
     blocks = [_header("📊 Weekly review", stamp_s)]
-    blocks.append(_section("Goal progress", _bullets(goals, limit=15) or "No active goals."))
     blocks.append(_section("Habit streak highlights", _bullets(streaks, limit=15) or "No streaks yet."))
     blocks.append(_section("Next 7 days", _bullets(calendar, limit=30) or "Nothing scheduled."))
     return join_blocks(*blocks)

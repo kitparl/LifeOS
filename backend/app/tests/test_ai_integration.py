@@ -468,7 +468,6 @@ async def test_use_case_options_come_from_cached_catalogs(client, vendors):
     assert set(cases) == {
         "communication.writing_feedback",
         "ai.rag_chat",
-        "coaches.chat",
         "reports.ai_briefing",
         "analytics.insights",
     }
@@ -501,7 +500,7 @@ async def test_use_case_options_come_from_cached_catalogs(client, vendors):
 async def test_clearing_a_use_case_returns_to_automatic(client, vendors):
     headers = await _auth(client, "aiclear@example.com")
     await _connect(client, headers, "openai", "sk-clr-1", default_model="gpt-4o-mini")
-    url = f"{API}/ai/use-cases/coaches.chat/model"
+    url = f"{API}/ai/use-cases/reports.ai_briefing/model"
     await client.put(url, headers=headers, json={"provider": "openai", "model": "o3-mini"})
 
     cleared = await client.delete(url, headers=headers)
@@ -509,7 +508,7 @@ async def test_clearing_a_use_case_returns_to_automatic(client, vendors):
     current = cleared.json()["current"]
     assert current["model"] == "gpt-4o-mini" and current["updated_at"] is None  # automatic
 
-    history = (await client.get(f"{API}/ai/use-cases/coaches.chat/history", headers=headers)).json()
+    history = (await client.get(f"{API}/ai/use-cases/reports.ai_briefing/history", headers=headers)).json()
     assert history[0]["model"] == "o3-mini" and history[0]["effective_to"] is not None
     assert (await client.delete(f"{API}/ai/use-cases/nope.case/model", headers=headers)).status_code == 404
 
@@ -588,7 +587,7 @@ async def test_legacy_sarvam_user_keeps_default_model(client, vendors):
 
 
 # ---------------------------------------------------------------------------
-# Call sites: writing, RAG chat, coaches, reports, analytics insights
+# Call sites: writing, RAG chat, analytics insights
 # ---------------------------------------------------------------------------
 
 
@@ -646,7 +645,7 @@ async def test_writing_errors_map_to_codes(client, vendors):
     assert malformed.status_code == 502 and malformed.json()["detail"]["code"] == "malformed_response"
 
 
-async def test_rag_chat_coaches_and_reports_use_gateway(client, vendors):
+async def test_rag_chat_uses_gateway(client, vendors):
     headers = await _auth(client, "aicallsites@example.com")
     await _connect(client, headers, "anthropic", "sk-cs-1", default_model="claude-opus-5-5")
     vendors.chat_text = "Gateway says hi"
@@ -656,19 +655,12 @@ async def test_rag_chat_coaches_and_reports_use_gateway(client, vendors):
     status = (await client.get(f"{API}/ai/status", headers=headers)).json()
     assert status == {**status, "enabled": True, "provider": "anthropic"}
 
-    coach = await client.post(f"{API}/coaches/habits/chat", headers=headers, json={"message": "Help"})
-    assert coach.status_code == 200 and coach.json()["reply"] == "Gateway says hi"
-
-    review = await client.post(f"{API}/reports/reviews/daily", headers=headers)
-    assert review.status_code == 200 and review.json()["content"] == "Gateway says hi"
     # No embeddings without an OpenAI key, and no call ever reached another vendor.
     assert {r.url.host for r in vendors.requests} == {"api.anthropic.com"}
 
 
 async def test_offline_messages_without_provider(client):
     headers = await _auth(client, "aioffline@example.com")
-    coach = await client.post(f"{API}/coaches/habits/chat", headers=headers, json={"message": "Help"})
-    assert "Integrations → AI" in coach.json()["reply"]
     chat = await client.post(f"{API}/ai/chat", headers=headers, json={"message": "Anything"})
     assert "Integrations → AI" in chat.json()["reply"]
 
@@ -746,7 +738,7 @@ async def test_manual_model_ids_survive_refresh(client, vendors):
     # Added ids appear in use-case options and can be a default model without the custom flag.
     cases = {c["use_case"]: c for c in (await client.get(f"{API}/ai/use-cases", headers=headers)).json()}
     assert ("openrouter", "meta-llama/llama-4-maverick:free") in {
-        (o["provider"], o["model"]) for o in cases["coaches.chat"]["options"]
+        (o["provider"], o["model"]) for o in cases["reports.ai_briefing"]["options"]
     }
     default = await client.put(
         f"{API}/integrations/ai/openrouter/config",

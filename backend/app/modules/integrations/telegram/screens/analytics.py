@@ -18,7 +18,6 @@ async def on_card(ctx: CallbackContext) -> Screen:
         f"Life score: <b>{overview.life_score}</b>",
         f"Tasks today: <b>{overview.todays_tasks}</b>",
         f"Completed (range): <b>{overview.completed_tasks}</b>",
-        f"Goal progress: <b>{overview.goal_progress}%</b>",
         f"Habit score: <b>{overview.habit_score}</b>",
         f"Journal streak: <b>{overview.journal_streak}</b>",
         f"Overdue tasks: <b>{prod.overdue_tasks}</b>",

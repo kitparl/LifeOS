@@ -22,9 +22,9 @@ describe('HomePreferencesService', () => {
     localStorage.clear();
   });
 
-  it('defaults to the quick action home module', () => {
-    expect(service.moduleId()).toBe('dashboard');
-    expect(service.homeRoute()).toBe('/quick-action');
+  it('defaults to the tasks home module', () => {
+    expect(service.moduleId()).toBe('tasks');
+    expect(service.homeRoute()).toBe('/tasks');
   });
 
   it('keeps a saved analytics home even though analytics is hidden from the sidebar by default', () => {
@@ -42,20 +42,20 @@ describe('HomePreferencesService', () => {
 
     const req = httpMock.expectOne(`${environment.apiUrl}/preferences/home`);
     expect(req.request.method).toBe('GET');
-    req.flush({ key: 'home', value: { moduleId: 'tasks' } });
+    req.flush({ key: 'home', value: { moduleId: 'calendar' } });
 
-    expect(service.moduleId()).toBe('tasks');
-    expect(service.homeRoute()).toBe('/tasks');
+    expect(service.moduleId()).toBe('calendar');
+    expect(service.homeRoute()).toBe('/calendar');
   });
 
-  it('falls back to quick action for an unknown or unavailable module', () => {
+  it('falls back to tasks for an unknown or unavailable module', () => {
     service.init();
 
     const req = httpMock.expectOne(`${environment.apiUrl}/preferences/home`);
     req.flush({ key: 'home', value: { moduleId: 'mood' } });
 
-    expect(service.moduleId()).toBe('dashboard');
-    expect(service.homeRoute()).toBe('/quick-action');
+    expect(service.moduleId()).toBe('tasks');
+    expect(service.homeRoute()).toBe('/tasks');
   });
 
   it('keeps the local seed when the API has no preference', () => {
@@ -92,10 +92,10 @@ describe('HomePreferencesService', () => {
 
   it('ignores selecting an unavailable module and keeps the default', () => {
     service.setModuleId('does-not-exist');
-    expect(service.moduleId()).toBe('dashboard');
+    expect(service.moduleId()).toBe('tasks');
 
     const req = httpMock.expectOne(`${environment.apiUrl}/preferences/home`);
-    expect(req.request.body).toEqual({ value: { moduleId: 'dashboard' } });
-    req.flush({ key: 'home', value: { moduleId: 'dashboard' } });
+    expect(req.request.body).toEqual({ value: { moduleId: 'tasks' } });
+    req.flush({ key: 'home', value: { moduleId: 'tasks' } });
   });
 });

@@ -344,29 +344,6 @@ async def test_skipped_exclusive_with_attended(client):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_running_progress(client):
-    token = await _auth_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    await client.patch(
-        "/api/v1/running/settings",
-        headers=headers,
-        json={"weekly_goal_km": 50},
-    )
-    await client.post(
-        "/api/v1/running/runs",
-        headers=headers,
-        json={"run_date": str(date.today()), "distance_km": 8.0, "duration_seconds": 2880},
-    )
-
-    summary = await client.get("/api/v1/dashboard/summary", headers=headers)
-    progress = summary.json()["running_progress"]
-    assert progress is not None
-    assert progress["weekly_km"] == 8.0
-    assert progress["goal_km"] == 50.0
-
-
-@pytest.mark.asyncio
 async def test_personal_best_includes_faster_race(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}

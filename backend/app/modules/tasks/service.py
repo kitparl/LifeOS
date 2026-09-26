@@ -108,7 +108,6 @@ class TaskService:
                     tags=t.tags,
                     due_date=t.due_date,
                     updated_at=t.updated_at,
-                    goal_id=t.goal_id,
                     subtask_count=len(visible_subs),
                     completed_subtasks=sum(1 for s in visible_subs if s.status == "completed"),
                     assigned_to=active.assignee_user_id if active else None,
@@ -180,7 +179,7 @@ class TaskService:
             raise ConflictError("Version conflict")
 
         # Owner-only field edits
-        owner_fields = {"title", "description", "priority", "category", "tags", "due_date", "goal_id", "recurrence"}
+        owner_fields = {"title", "description", "priority", "category", "tags", "due_date", "recurrence"}
         if owner_fields & set(payload.keys()):
             await self.perms.require(user_id, task, "edit")
 

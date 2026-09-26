@@ -3,7 +3,6 @@ from unittest.mock import patch
 import app.modules.ai.models  # noqa: F401
 import app.modules.communication.models  # noqa: F401
 import app.modules.files.preview_models  # noqa: F401
-import app.modules.goals.models  # noqa: F401
 
 # Register Cycle 8 tables on Base before create_all (must run before importing FastAPI app,
 # because `import app.modules...` would rebind the name `app` if done after `from app.main import app`).

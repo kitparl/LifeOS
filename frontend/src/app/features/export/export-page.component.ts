@@ -47,7 +47,7 @@ export class ExportPageComponent implements OnInit {
   error = '';
 
   form = this.fb.nonNullable.group({
-    module: 'goals',
+    module: 'tasks',
     format: 'json' as 'json' | 'csv',
   });
 
