@@ -9,6 +9,7 @@ import { SettingsSidebarSectionComponent } from './settings-sidebar-section.comp
 import { SettingsHomeSectionComponent } from './settings-home-section.component';
 import { SettingsEditorSectionComponent } from './settings-editor-section.component';
 import { SettingsCurrencySectionComponent } from './settings-currency-section.component';
+import { SettingsNewsSectionComponent } from './settings-news-section.component';
 import { SettingsChangePasswordComponent } from './settings-change-password.component';
 import { groupSettingsSections, resolveSettingsSection } from './settings-sections';
 
@@ -25,6 +26,7 @@ import { groupSettingsSections, resolveSettingsSection } from './settings-sectio
     SettingsHomeSectionComponent,
     SettingsEditorSectionComponent,
     SettingsCurrencySectionComponent,
+    SettingsNewsSectionComponent,
     SettingsChangePasswordComponent,
     SettingsAppSectionComponent,
   ],
@@ -93,6 +95,7 @@ import { groupSettingsSections, resolveSettingsSection } from './settings-sectio
             @case ('sidebar') { <app-settings-sidebar-section /> }
             @case ('home') { <app-settings-home-section /> }
             @case ('editor') { <app-settings-editor-section /> }
+            @case ('news') { <app-settings-news-section /> }
             @case ('currency') { <app-settings-currency-section /> }
             @case ('app') { <app-settings-app-section /> }
           }

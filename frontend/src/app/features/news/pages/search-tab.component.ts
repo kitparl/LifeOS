@@ -1,7 +1,8 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { debounceTime, distinctUntilChanged, map } from 'rxjs';
+import { NewsPreferencesService } from '../../../core/services/news-preferences.service';
 import { NewsFeedComponent } from '../components/news-feed.component';
 import { NewsStateComponent } from '../components/news-state.component';
 import {
@@ -98,7 +99,7 @@ export const SEARCH_DEBOUNCE_MS = 400;
       }
 
       @if (query()) {
-        <app-news-feed [query]="query()" layout="rows" emptyTitle="No results" />
+        <app-news-feed [query]="query()" [layout]="prefs.layout()" emptyTitle="No results" />
       } @else {
         <app-news-state title="Search the latest news" message="Type a topic, person or place to begin." />
       }
@@ -106,6 +107,7 @@ export const SEARCH_DEBOUNCE_MS = 400;
   `,
 })
 export class NewsSearchTabComponent {
+  readonly prefs = inject(NewsPreferencesService);
   readonly countries = NEWS_COUNTRIES;
   readonly languages = NEWS_LANGUAGES;
   readonly dates = NEWS_DATE_OPTIONS;

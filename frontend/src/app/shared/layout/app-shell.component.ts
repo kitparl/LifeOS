@@ -25,7 +25,6 @@ import { NotificationDropdownComponent } from './notification-dropdown.component
 import { WordOfTheDayChipComponent } from './word-of-the-day-chip.component';
 import { NAV_CATEGORIES_ENABLED, resolvePageTitle } from './nav-registry';
 
-const STORAGE_AI_OPEN    = 'lifeos-ai-panel-open';
 const STORAGE_COLLAPSED  = 'lifeos-sidebar-collapsed';
 const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
 
@@ -422,7 +421,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   readonly navGroups = this.navPrefs.navGroups;
   readonly navCategoriesEnabled = NAV_CATEGORIES_ENABLED;
 
-  readonly aiPanelOpen = signal(this.readStorage(STORAGE_AI_OPEN, true));
+  readonly aiPanelOpen = signal(false);
   readonly drawerOpen = signal(false);
   readonly sidebarCollapsed = signal(this.readStorage(STORAGE_COLLAPSED, false));
   readonly sidebarHidden = signal(this.readStorage(STORAGE_HIDDEN, false));
@@ -534,9 +533,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   }
 
   toggleAiPanel(): void {
-    const next = !this.aiPanelOpen();
-    this.aiPanelOpen.set(next);
-    localStorage.setItem(STORAGE_AI_OPEN, String(next));
+    this.aiPanelOpen.update((open) => !open);
   }
 
   cycleTheme(): void {

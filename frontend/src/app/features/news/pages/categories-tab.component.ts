@@ -1,6 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, linkedSignal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, of } from 'rxjs';
+import { NewsPreferencesService } from '../../../core/services/news-preferences.service';
 import { NewsChipRowComponent } from '../components/news-chip-row.component';
 import { NewsFeedComponent } from '../components/news-feed.component';
 import { NewsSkeletonComponent } from '../components/news-skeleton.component';
@@ -19,7 +20,7 @@ import { NEWS_CATEGORY_KEY, readNewsPref, writeNewsPref } from '../utils/news-pr
       @if (categories(); as list) {
         @if (list.length) {
           <app-news-chip-row label="Category" [options]="list" [selected]="category()" (selectedChange)="setCategory($event)" />
-          <app-news-feed [query]="query()" emptyTitle="No news in this category right now" />
+          <app-news-feed [query]="query()" [layout]="prefs.layout()" emptyTitle="No news in this category right now" />
         } @else {
           <app-news-state title="Categories are unavailable." message="Please try again later." />
         }
@@ -31,12 +32,14 @@ import { NEWS_CATEGORY_KEY, readNewsPref, writeNewsPref } from '../utils/news-pr
 })
 export class NewsCategoriesTabComponent {
   private readonly news = inject(NewsService);
+  readonly prefs = inject(NewsPreferencesService);
 
   readonly categories = toSignal<NewsCategory[] | null>(
     this.news.categories().pipe(catchError(() => of([] as NewsCategory[]))),
     { initialValue: null },
   );
-  private readonly chosen = signal(readNewsPref(NEWS_CATEGORY_KEY) ?? 'ai');
+  /** The default-view category when one is set, else the last one picked on this device. */
+  private readonly chosen = linkedSignal(() => this.prefs.defaultCategory() ?? readNewsPref(NEWS_CATEGORY_KEY) ?? 'ai');
   /** The remembered category if it still exists, else the first one. */
   readonly category = computed(() => {
     const list = this.categories() ?? [];

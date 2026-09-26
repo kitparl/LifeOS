@@ -30,6 +30,8 @@ describe('NEWS_ROUTES', () => {
     harness = await RouterTestingHarness.create();
   });
 
+  afterEach(() => localStorage.clear());
+
   const el = (): HTMLElement => harness.routeNativeElement as HTMLElement;
   const href = (testId: string): string | null | undefined =>
     el().querySelector(`[data-testid="${testId}"]`)?.getAttribute('href');
@@ -63,5 +65,17 @@ describe('NEWS_ROUTES', () => {
     await harness.navigateByUrl('/explore/news/collections/c1');
     expect(TestBed.inject(Router).url).toBe('/explore/news?tab=collections');
     http.verify();
+  });
+
+  it('opens on the default category when no tab is given', async () => {
+    localStorage.setItem('lifeos-news-prefs', JSON.stringify({ layout: 'cards', defaultView: 'sports' }));
+    await harness.navigateByUrl('/news');
+    expect(el().querySelector('#news-categories-heading')).not.toBeNull();
+  });
+
+  it('an explicit tab wins over the default category', async () => {
+    localStorage.setItem('lifeos-news-prefs', JSON.stringify({ layout: 'cards', defaultView: 'sports' }));
+    await harness.navigateByUrl('/news?tab=latest');
+    expect(el().querySelector('#news-latest-heading')).not.toBeNull();
   });
 });

@@ -30,7 +30,7 @@ type ArticleState =
 
       @switch (state().kind) {
         @case ('loading') {
-          <app-news-skeleton layout="rows" [count]="1" />
+          <app-news-skeleton layout="list" [count]="1" />
         }
         @case ('error') {
           @if (errorState(); as e) {

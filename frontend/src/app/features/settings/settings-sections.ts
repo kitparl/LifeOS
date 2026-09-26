@@ -56,6 +56,12 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     category: 'Preferences',
     description: 'Keyboard behaviour for Knowledge Notes, Journal, Writing, and other editors.',
   },
+  {
+    id: 'news',
+    label: 'News',
+    category: 'Preferences',
+    description: 'Where News opens and how articles are laid out.',
+  },
   { id: 'currency', label: 'Currency', category: 'Preferences', description: 'How amounts are displayed across Finance.' },
   {
     id: 'app',

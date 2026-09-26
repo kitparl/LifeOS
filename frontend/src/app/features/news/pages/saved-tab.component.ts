@@ -44,7 +44,7 @@ const EMPTY_TITLES: Record<SavedFilter, string> = {
       <app-news-chip-row label="Saved filter" [options]="filters" [selected]="filter()" (selectedChange)="setFilter($event)" />
 
       @if (loading()) {
-        <app-news-skeleton layout="rows" [count]="4" />
+        <app-news-skeleton layout="list" [count]="4" />
       } @else if (error()) {
         <app-news-state title="We couldn't load your saved articles." [message]="message(error()!)" [retryable]="true" (retry)="load()" />
       } @else if (items().length === 0) {

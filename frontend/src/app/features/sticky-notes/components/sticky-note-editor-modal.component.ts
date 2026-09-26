@@ -70,46 +70,49 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
       </ng-container>
 
       <ng-container body>
-        <input
-          #titleInput
-          type="text"
-          class="mb-1 block w-full border-0 bg-transparent px-0 text-base font-medium text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
-          placeholder="Title"
-          [value]="title()"
-          (input)="onTitleInput($event)"
-        />
-        <textarea
-          #contentInput
-          rows="1"
-          class="block w-full resize-none overflow-hidden border-0 bg-transparent px-0 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
-          placeholder="Take a note…"
-          [value]="content()"
-          (input)="onContentInput($event)"
-        ></textarea>
-
-        <div class="mt-2 flex flex-wrap items-center gap-1.5">
-          @for (tag of tags(); track tag) {
-            <span class="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/70 px-2 py-0.5 text-xs text-[var(--text)]">
-              #{{ tag }}
-              <button
-                type="button"
-                class="leading-none text-[var(--text-faint)] hover:text-[var(--text)]"
-                [attr.aria-label]="'Remove tag ' + tag"
-                title="Remove tag"
-                (click)="removeTag(tag)"
-              >✕</button>
-            </span>
-          }
+        <!-- Column layout so tags stay pinned to the bottom of the body as the modal grows. -->
+        <div class="flex min-h-0 flex-1 flex-col">
           <input
-            #tagInput
+            #titleInput
             type="text"
-            class="min-w-[90px] flex-1 border-0 bg-transparent px-0 py-0.5 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
-            [placeholder]="tags().length ? '' : 'Add tag…'"
-            [value]="tagDraft"
-            (input)="onTagDraftInput($event)"
-            (keydown)="onTagKeydown($event)"
-            (blur)="onTagBlur()"
+            class="mb-1 block w-full shrink-0 border-0 bg-transparent px-0 text-base font-medium text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
+            placeholder="Title"
+            [value]="title()"
+            (input)="onTitleInput($event)"
           />
+          <textarea
+            #contentInput
+            rows="1"
+            class="block min-h-[96px] w-full flex-1 resize-none overflow-y-auto border-0 bg-transparent px-0 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
+            placeholder="Take a note…"
+            [value]="content()"
+            (input)="onContentInput($event)"
+          ></textarea>
+
+          <div class="mt-2 flex shrink-0 flex-wrap items-center gap-1.5">
+            @for (tag of tags(); track tag) {
+              <span class="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/70 px-2 py-0.5 text-xs text-[var(--text)]">
+                #{{ tag }}
+                <button
+                  type="button"
+                  class="leading-none text-[var(--text-faint)] hover:text-[var(--text)]"
+                  [attr.aria-label]="'Remove tag ' + tag"
+                  title="Remove tag"
+                  (click)="removeTag(tag)"
+                >✕</button>
+              </span>
+            }
+            <input
+              #tagInput
+              type="text"
+              class="min-w-[90px] flex-1 border-0 bg-transparent px-0 py-0.5 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
+              [placeholder]="tags().length ? '' : 'Add tag…'"
+              [value]="tagDraft"
+              (input)="onTagDraftInput($event)"
+              (keydown)="onTagKeydown($event)"
+              (blur)="onTagBlur()"
+            />
+          </div>
         </div>
       </ng-container>
 
@@ -260,16 +263,8 @@ export class StickyNoteEditorModalComponent implements AfterViewInit, OnChanges 
       this.focused = true;
       queueMicrotask(() => {
         this.contentInputRef?.nativeElement.focus();
-        this.autoGrow();
       });
     }
-  }
-
-  private autoGrow(): void {
-    const el = this.contentInputRef?.nativeElement;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.max(el.scrollHeight, 96)}px`;
   }
 
   saveStatusLabel(): string {
@@ -290,7 +285,6 @@ export class StickyNoteEditorModalComponent implements AfterViewInit, OnChanges 
 
   onContentInput(event: Event): void {
     this.content.set((event.target as HTMLTextAreaElement).value);
-    this.autoGrow();
     this.dirty$.next();
   }
 

@@ -35,7 +35,7 @@ import { NewsService } from '../services/news.service';
       }
 
       @if (loading()) {
-        <app-news-skeleton layout="rows" [count]="3" />
+        <app-news-skeleton layout="list" [count]="3" />
       } @else if (error()) {
         <app-news-state title="We couldn't load your collections." [message]="message(error()!)" [retryable]="true" (retry)="load()" />
       } @else if (collections().length === 0) {

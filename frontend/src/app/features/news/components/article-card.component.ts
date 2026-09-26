@@ -5,7 +5,7 @@ import { NEWS_ACCESS_MODE, newsRootPath } from '../news-access-mode';
 import { relativeTime } from '../utils/news-dates';
 import { NewsThumbComponent } from './news-thumb.component';
 
-/** Grid card for a live article. Actions (save, collection) are projected. */
+/** Card for a live article; `compact` drops badges and description for the dense grid layout. Actions are projected. */
 @Component({
   selector: 'app-article-card',
   standalone: true,
@@ -22,8 +22,8 @@ import { NewsThumbComponent } from './news-thumb.component';
       >
         <app-news-thumb class="aspect-video w-full" [src]="article().image" />
       </a>
-      <div class="flex flex-1 flex-col gap-1.5 p-3">
-        @if (article().category || article().country) {
+      <div class="flex flex-1 flex-col gap-1.5" [class]="compact() ? 'p-2' : 'p-3'">
+        @if (!compact() && (article().category || article().country)) {
           <div class="flex flex-wrap gap-1">
             @if (article().category) {
               <span class="badge badge--default">{{ article().category }}</span>
@@ -33,7 +33,7 @@ import { NewsThumbComponent } from './news-thumb.component';
             }
           </div>
         }
-        <h3 class="text-sm font-semibold leading-snug">
+        <h3 class="text-sm font-semibold leading-snug" [class.line-clamp-3]="compact()">
           <a
             class="link"
             [routerLink]="articleLink"
@@ -43,7 +43,7 @@ import { NewsThumbComponent } from './news-thumb.component';
             {{ article().title }}
           </a>
         </h3>
-        @if (article().description) {
+        @if (!compact() && article().description) {
           <p class="line-clamp-3 text-xs" style="color: var(--text-muted)">{{ article().description }}</p>
         }
         <div class="mt-auto flex items-center justify-between gap-2 pt-1">
@@ -58,6 +58,7 @@ import { NewsThumbComponent } from './news-thumb.component';
 })
 export class ArticleCardComponent {
   readonly article = input.required<ArticleView>();
+  readonly compact = input(false);
   /** Absolute: cards render on the hub and on collection pages (different route depths). */
   readonly articleLink = `${newsRootPath(inject(NEWS_ACCESS_MODE))}/article`;
   readonly attribution = computed(() => formatAttribution(this.article()));

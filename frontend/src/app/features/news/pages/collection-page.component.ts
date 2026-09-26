@@ -50,7 +50,7 @@ const PAGE_SIZE = 20;
         </header>
 
         @if (loading()) {
-          <app-news-skeleton layout="rows" [count]="4" />
+          <app-news-skeleton layout="list" [count]="4" />
         } @else if (error()) {
           <app-news-state title="We couldn't load this collection." [message]="message(error()!)" [retryable]="true" (retry)="load()" />
         } @else if (items().length === 0) {

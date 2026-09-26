@@ -1,13 +1,23 @@
 import { Component, computed, input } from '@angular/core';
+import { NewsLayout } from '../../../core/services/news-preferences.service';
+import { newsLayoutClass } from '../utils/news-layout';
 
 /** Placeholder cards/rows while news loads (no blank screens). */
 @Component({
   selector: 'app-news-skeleton',
   standalone: true,
   template: `
-    <div [class]="layout() === 'grid' ? 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3' : 'space-y-2'" aria-hidden="true">
+    <div [class]="containerClass()" aria-hidden="true">
       @for (i of slots(); track i) {
         @if (layout() === 'grid') {
+          <div class="panel--flat !p-0 overflow-hidden">
+            <div class="skeleton aspect-video w-full !rounded-none"></div>
+            <div class="space-y-2 p-2">
+              <div class="skeleton-text w-11/12"></div>
+              <div class="skeleton-text w-6/12"></div>
+            </div>
+          </div>
+        } @else if (layout() === 'cards') {
           <div class="panel--flat !p-0 overflow-hidden">
             <div class="skeleton aspect-video w-full !rounded-none"></div>
             <div class="space-y-2 p-3">
@@ -32,7 +42,8 @@ import { Component, computed, input } from '@angular/core';
   `,
 })
 export class NewsSkeletonComponent {
-  readonly layout = input<'grid' | 'rows'>('grid');
+  readonly layout = input<NewsLayout>('cards');
   readonly count = input(6);
+  readonly containerClass = computed(() => newsLayoutClass(this.layout()));
   readonly slots = computed(() => Array.from({ length: this.count() }, (_, i) => i));
 }

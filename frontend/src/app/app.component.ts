@@ -5,6 +5,7 @@ import { EditorPreferencesService } from './core/services/editor-preferences.ser
 import { CurrencyPreferencesService } from './core/services/currency-preferences.service';
 import { HomePreferencesService } from './core/services/home-preferences.service';
 import { NavPreferencesService } from './core/services/nav-preferences.service';
+import { NewsPreferencesService } from './core/services/news-preferences.service';
 import { PwaService } from './core/services/pwa.service';
 import { ThemeService } from './core/services/theme.service';
 import { SyncService } from './sync/sync.service';
@@ -32,6 +33,7 @@ export class AppComponent implements OnInit {
   private readonly editorPrefs = inject(EditorPreferencesService);
   private readonly currencyPrefs = inject(CurrencyPreferencesService);
   private readonly homePrefs = inject(HomePreferencesService);
+  private readonly newsPrefs = inject(NewsPreferencesService);
   private readonly auth = inject(AuthService);
 
   constructor() {
@@ -47,6 +49,7 @@ export class AppComponent implements OnInit {
     this.editorPrefs.init();
     this.currencyPrefs.init();
     this.homePrefs.init();
+    this.newsPrefs.init();
     this.pwa.init();
     void this.sync.init();
   }

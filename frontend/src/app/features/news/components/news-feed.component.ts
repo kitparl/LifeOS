@@ -1,4 +1,4 @@
-import { Component, DestroyRef, input, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, input, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { EMPTY, Observable, Subject, Subscription, catchError, distinctUntilChanged, merge, switchMap, tap } from 'rxjs';
 import {
@@ -10,7 +10,9 @@ import {
   newsErrorMessage,
   toArticleView,
 } from '../models/news.models';
+import { NewsLayout } from '../../../core/services/news-preferences.service';
 import { NewsService } from '../services/news.service';
+import { newsLayoutClass } from '../utils/news-layout';
 import { ArticleCardComponent } from './article-card.component';
 import { ArticleRowComponent } from './article-row.component';
 import { NewsSkeletonComponent } from './news-skeleton.component';
@@ -35,23 +37,19 @@ const PAGE_SIZE = 20;
     } @else if (query() && items().length === 0) {
       <app-news-state [title]="emptyTitle()" message="Try a different filter or search." />
     } @else {
-      @if (layout() === 'grid') {
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          @for (a of items(); track a.id) {
-            <app-article-card [article]="view(a)">
-              <app-news-save-button [article]="a" (savedChange)="onSaved(a, $event)" />
-            </app-article-card>
-          }
-        </div>
-      } @else {
-        <div class="space-y-2">
-          @for (a of items(); track a.id) {
+      <div [class]="containerClass()">
+        @for (a of items(); track a.id) {
+          @if (layout() === 'list') {
             <app-article-row [article]="view(a)">
               <app-news-save-button [article]="a" (savedChange)="onSaved(a, $event)" />
             </app-article-row>
+          } @else {
+            <app-article-card [article]="view(a)" [compact]="layout() === 'grid'">
+              <app-news-save-button [article]="a" (savedChange)="onSaved(a, $event)" />
+            </app-article-card>
           }
-        </div>
-      }
+        }
+      </div>
       @if (hasMore()) {
         <div class="flex justify-center pt-3">
           <button
@@ -77,7 +75,7 @@ export class NewsFeedComponent {
 
   /** `null` means "nothing to show yet" (e.g. an empty search box): no request is made. */
   readonly query = input.required<NewsQuery | null>();
-  readonly layout = input<'grid' | 'rows'>('grid');
+  readonly layout = input<NewsLayout>('cards');
   readonly emptyTitle = input('No news found');
 
   readonly items = signal<NewsArticle[]>([]);
@@ -91,6 +89,7 @@ export class NewsFeedComponent {
   private nextOffset = 0;
   private moreSub: Subscription | undefined;
 
+  readonly containerClass = computed(() => newsLayoutClass(this.layout()));
   readonly view = toArticleView;
   readonly message = newsErrorMessage;
 
