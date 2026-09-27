@@ -124,6 +124,18 @@ export interface SplitBalances {
   debts: SplitDebt[];
 }
 
+/** A signed-in user's kept group (Finance → Splits); outlives the link. */
+export interface SplitHistoryItem {
+  code: string;
+  name: string;
+  url_path: string;
+  expires_at: string;
+  ended_at: string | null;
+  is_open: boolean;
+  my_net_paise: number | null;
+  kept_at: string;
+}
+
 export type SplitRole = 'creator' | 'member';
 
 /** A row of the on-device list (`lifeos-split-groups`). Not an account — per browser only. */

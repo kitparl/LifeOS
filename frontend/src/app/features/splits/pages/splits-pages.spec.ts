@@ -1,8 +1,10 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/services/auth.service';
 import { DeviceSplitGroup, SplitBalances } from '../models/split.models';
 import { SPLIT_DEVICE_STORAGE_KEY } from '../services/split-device-store.service';
 import { groupView, member } from '../testing/split-fixtures';
@@ -32,13 +34,14 @@ function seed(rows: DeviceSplitGroup[]): void {
 describe('Split bills pages', () => {
   let http: HttpTestingController;
 
-  function configure(code = 'k7mq2p'): void {
+  function configure(code = 'k7mq2p', signedIn = false): void {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ code }) } } },
+        { provide: AuthService, useValue: { isAuthenticated: signal(signedIn) } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -239,6 +242,56 @@ describe('Split bills pages', () => {
       confirm.flush({});
       http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-b' }));
       flushBalances();
+    });
+
+    it('shows Keep in my history only to a signed-in seat holder whose history lacks the group', () => {
+      seed([{ code: 'k7mq2p', name: 'Dinner', seatSecret: 'secret-b', displayName: 'Bala', role: 'member' }]);
+      configure('k7mq2p', true);
+      const fixture = render();
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-b', in_history: false }));
+      flushBalances();
+      fixture.detectChanges();
+      byTestId(fixture, 'split-keep')[0].click();
+      const keep = http.expectOne({ method: 'POST', url: `${api}/groups/k7mq2p/keep` });
+      expect(keep.request.headers.get('X-Split-Seat')).toBe('secret-b');
+      keep.flush(null);
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-b', in_history: true }));
+      flushBalances();
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-keep').length).toBe(0);
+    });
+
+    it('hides Keep for guests', () => {
+      seed([{ code: 'k7mq2p', name: 'Dinner', seatSecret: 'secret-b', displayName: 'Bala', role: 'member' }]);
+      configure();
+      const fixture = render();
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-b', in_history: null }));
+      flushBalances();
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-keep').length).toBe(0);
+    });
+
+    it('lets the creator end an open link after confirming', () => {
+      seed([{ code: 'k7mq2p', name: 'Dinner', seatSecret: 'secret-a', displayName: 'Asha', role: 'creator' }]);
+      configure();
+      const fixture = render();
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-a', is_creator: true }));
+      flushBalances();
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-end').length).toBe(0);
+      byTestId(fixture, 'split-end-start')[0].click();
+      fixture.detectChanges();
+      byTestId(fixture, 'split-end')[0].click();
+      const end = http.expectOne({ method: 'POST', url: `${api}/groups/k7mq2p/end` });
+      expect(end.request.headers.get('X-Split-Seat')).toBe('secret-a');
+      end.flush(null);
+      const ended = groupView({ my_member_id: 'm-a', is_creator: true, is_open: false, ended_at: '2026-09-27T11:00:00Z' });
+      http.expectOne(`${api}/groups/k7mq2p`).flush(ended);
+      flushBalances();
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-end-start').length).toBe(0);
+      expect(byTestId(fixture, 'split-add').length).toBe(0);
+      expect(byTestId(fixture, 'split-link-status')[0].textContent).toContain('Link ended');
     });
 
     it('closed link: a visitor can read but not join', () => {

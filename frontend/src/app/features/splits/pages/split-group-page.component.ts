@@ -47,6 +47,26 @@ const CLOCK_TICK_MS = 60_000;
               <span class="chip text-xs" data-testid="split-link-status">{{ status() }}</span>
             </div>
             <app-split-share-actions [groupName]="g.name" [urlPath]="g.url_path" />
+            <div class="flex flex-wrap gap-2">
+              @if (canKeep()) {
+                <button type="button" class="btn-secondary text-xs" data-testid="split-keep" [disabled]="busy()" (click)="keep()">
+                  Keep in my history
+                </button>
+              }
+              @if (g.is_creator && g.is_open) {
+                @if (confirmEnd()) {
+                  <span class="text-xs">End the link? Nobody can join or add bills after this.</span>
+                  <button type="button" class="btn-danger text-xs" data-testid="split-end" [disabled]="busy()" (click)="end()">
+                    End now
+                  </button>
+                  <button type="button" class="btn-ghost text-xs" (click)="confirmEnd.set(false)">Cancel</button>
+                } @else {
+                  <button type="button" class="btn-ghost text-xs" data-testid="split-end-start" (click)="confirmEnd.set(true)">
+                    End session
+                  </button>
+                }
+              }
+            </div>
           </section>
 
           <section class="panel space-y-2">
@@ -166,6 +186,7 @@ export class SplitGroupPageComponent implements OnInit {
   readonly busy = signal(false);
   readonly joinName = signal('');
   readonly addOpen = signal(false);
+  readonly confirmEnd = signal(false);
   private readonly now = signal(Date.now());
 
   readonly code = this.route.snapshot.paramMap.get('code') ?? '';
@@ -175,6 +196,11 @@ export class SplitGroupPageComponent implements OnInit {
   readonly status = computed(() => {
     const g = this.group();
     return g ? linkStatusLabel(g, this.now()) : '';
+  });
+  /** Signed in, holding a seat here, and the group is not in this account's history yet. */
+  readonly canKeep = computed(() => {
+    const g = this.group();
+    return this.auth.isAuthenticated() && !!g?.my_member_id && g.in_history === false;
   });
   readonly homeLink = computed(() => (this.auth.isAuthenticated() ? '/splits' : '/explore/splits'));
   private readonly membersById = computed(
@@ -243,6 +269,18 @@ export class SplitGroupPageComponent implements OnInit {
     const seat = this.seat();
     if (!seat) return;
     this.run(this.api.updateMe(this.code, seat, { upi_vpa: upiVpa }), 'Could not save your UPI id.', () => undefined);
+  }
+
+  end(): void {
+    const seat = this.seat();
+    if (!seat) return;
+    this.run(this.api.endGroup(this.code, seat), 'Could not end the link.', () => this.confirmEnd.set(false));
+  }
+
+  keep(): void {
+    const seat = this.seat();
+    if (!seat) return;
+    this.run(this.api.keepInHistory(this.code, seat), 'Could not save to your history.', () => undefined);
   }
 
   inputValue(event: Event): string {

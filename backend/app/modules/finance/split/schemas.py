@@ -172,3 +172,14 @@ class BalancesOut(BaseModel):
 
 class UpiLinkOut(BaseModel):
     upi_uri: str
+
+
+class HistoryItemOut(BaseModel):
+    code: str
+    name: str
+    url_path: str
+    expires_at: datetime
+    ended_at: datetime | None
+    is_open: bool
+    my_net_paise: int | None  # null when this account has no seat linked in the group
+    kept_at: datetime

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Header, Path, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_optional_user
+from app.core.deps import get_current_user, get_optional_user
 from app.core.rate_limit import SlidingWindowLimiter, enforce_ip_limit
 from app.modules.auth.models import User
 from app.modules.finance.split.codes import SHORT_CODE_PATTERN
@@ -14,6 +14,7 @@ from app.modules.finance.split.schemas import (
     ExpenseOut,
     GroupCreate,
     GroupView,
+    HistoryItemOut,
     JoinRequest,
     MemberOut,
     MemberUpdate,
@@ -127,3 +128,23 @@ async def confirm_settlement(
     db: AsyncSession = Depends(get_db),
 ):
     return await SplitService(db).confirm(settlement_id, seat)
+
+
+@router.post("/groups/{code}/end", status_code=status.HTTP_204_NO_CONTENT)
+async def end_group(code: str = GroupCode, seat: str | None = SeatSecret, db: AsyncSession = Depends(get_db)):
+    await SplitService(db).end(code, seat)
+
+
+@router.post("/groups/{code}/keep", status_code=status.HTTP_204_NO_CONTENT)
+async def keep_group(
+    code: str = GroupCode,
+    seat: str | None = SeatSecret,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await SplitService(db).keep(code, seat, user)
+
+
+@router.get("/history", response_model=list[HistoryItemOut])
+async def list_history(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await SplitService(db).history(user)

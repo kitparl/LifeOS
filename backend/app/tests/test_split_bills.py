@@ -534,3 +534,75 @@ async def test_debt_has_upi_uri_only_when_the_payee_has_a_vpa(client):
         f"{BASE}/groups/{code}/upi-link", json={"payee_member_id": asha["member_id"], "amount_rupees": 300}
     )
     assert no_seat.status_code == 403
+
+
+# ======================================================================
+# S4 — Expiry and signed-in history
+# ======================================================================
+
+async def test_end_needs_the_creators_seat(client):
+    code, (asha, bala) = await _group_with(client, "Asha", "Bala")
+    assert (await client.post(f"{BASE}/groups/{code}/end")).status_code == 403
+    assert (await client.post(f"{BASE}/groups/{code}/end", headers=_seat(bala["seat_secret"]))).status_code == 403
+    assert (await client.post(f"{BASE}/groups/{code}/end", headers=_seat(asha["seat_secret"]))).status_code == 204
+    assert (await client.post(f"{BASE}/groups/{code}/end", headers=_seat(asha["seat_secret"]))).status_code == 409
+
+
+async def test_ended_link_rejects_join_and_bills_but_stays_readable_and_settleable(client):
+    code, (asha, bala) = await _group_with(client, "Asha", "Bala")
+    ids = [asha["member_id"], bala["member_id"]]
+    await _bill(client, code, asha["seat_secret"], asha["member_id"], ids, 100)
+    await client.post(f"{BASE}/groups/{code}/end", headers=_seat(asha["seat_secret"]))
+
+    assert (await client.post(f"{BASE}/groups/{code}/join", json={"display_name": "Late"})).status_code == 409
+    assert (await _bill(client, code, asha["seat_secret"], asha["member_id"], ids, 10)).status_code == 409
+    body = (await client.get(f"{BASE}/groups/{code}")).json()
+    assert body["is_open"] is False and body["ended_at"] is not None
+    assert len(body["expenses"]) == 1
+    # Paying up still works after the link closes.
+    paid = await _pay(client, code, bala["seat_secret"], asha["member_id"], 50, "cash")
+    assert paid.status_code == 201
+    assert (await _confirm(client, paid.json()["id"], asha["seat_secret"])).status_code == 200
+
+
+async def test_expired_group_still_appears_in_history_and_rejects_join(client):
+    headers = await _auth(client, "split.history@example.com")
+    created = await _create(client, name="Goa", headers=headers)
+    code = created["code"]
+    bala = await _join(client, code, "Bala")
+    await _bill(client, code, created["seat_secret"], created["member_id"], [created["member_id"], bala["member_id"]], 500)
+    await _shift_group(client, code, expires_at=utc_now() - timedelta(hours=1))
+
+    history = await client.get(f"{BASE}/history", headers=headers)
+    assert history.status_code == 200
+    [item] = history.json()
+    assert item["code"] == code and item["url_path"] == f"/s/{code}" and item["name"] == "Goa"
+    assert item["is_open"] is False
+    assert item["my_net_paise"] == 25000
+    assert (await client.post(f"{BASE}/groups/{code}/join", json={"display_name": "Late"})).status_code == 409
+
+
+async def test_keep_needs_login_and_a_seat_and_is_idempotent(client):
+    created = await _create(client)  # guest-created
+    code = created["code"]
+    url = f"{BASE}/groups/{code}/keep"
+    assert (await client.post(url, headers=_seat(created["seat_secret"]))).status_code == 401
+    headers = await _auth(client, "split.keeper@example.com")
+    assert (await client.post(url, headers=headers)).status_code == 403
+    both = {**headers, **_seat(created["seat_secret"])}
+    assert (await client.post(url, headers=both)).status_code == 204
+    assert (await client.post(url, headers=both)).status_code == 204
+    assert len(await _history_rows(client)) == 1
+    body = (await client.get(f"{BASE}/groups/{code}", headers=headers)).json()
+    assert body["in_history"] is True
+    [item] = (await client.get(f"{BASE}/history", headers=headers)).json()
+    assert item["my_net_paise"] == 0
+
+
+async def test_history_requires_login_and_is_per_user(client):
+    assert (await client.get(f"{BASE}/history")).status_code == 401
+    owner = await _auth(client, "split.one@example.com")
+    other = await _auth(client, "split.two@example.com")
+    await _create(client, headers=owner)
+    assert len((await client.get(f"{BASE}/history", headers=owner)).json()) == 1
+    assert (await client.get(f"{BASE}/history", headers=other)).json() == []

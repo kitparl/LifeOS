@@ -8,6 +8,7 @@ import {
   SplitExpensePayload,
   SplitGroupCreatePayload,
   SplitGroupView,
+  SplitHistoryItem,
   SplitJoinPayload,
   SplitMember,
   SplitMemberUpdatePayload,
@@ -65,5 +66,17 @@ export class SplitsApiService {
     return this.http.post<SplitSettlement>(`${this.base}/settlements/${settlementId}/confirm`, null, {
       headers: seatHeaders(seatSecret),
     });
+  }
+
+  endGroup(code: string, seatSecret: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/groups/${code}/end`, null, { headers: seatHeaders(seatSecret) });
+  }
+
+  keepInHistory(code: string, seatSecret: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/groups/${code}/keep`, null, { headers: seatHeaders(seatSecret) });
+  }
+
+  history(): Observable<SplitHistoryItem[]> {
+    return this.http.get<SplitHistoryItem[]>(`${this.base}/history`);
   }
 }

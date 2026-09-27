@@ -56,6 +56,7 @@ from app.modules.finance.split.schemas import (
     ExpenseOut,
     GroupCreate,
     GroupView,
+    HistoryItemOut,
     JoinRequest,
     MemberBalanceOut,
     MemberOut,
@@ -355,6 +356,53 @@ class SplitService:
             settlement.confirmed_at = utc_now()
             await self.repo.add(settlement)
         return _settlement_out(settlement)
+
+    # ------------------------------------------------------------------
+    # Expiry and history
+    # ------------------------------------------------------------------
+
+    async def end(self, code: str, seat_secret: str | None) -> None:
+        group = await self._group(code)
+        seat = await self._require_seat(group, seat_secret)
+        if not seat.is_creator:
+            raise ForbiddenError("Only the person who created the group can end it")
+        self._require_open(group)
+        group.ended_at = utc_now()
+        await self.repo.add(group)
+
+    async def keep(self, code: str, seat_secret: str | None, user: User) -> None:
+        """Save a group this account has a seat in to its history (idempotent)."""
+        group = await self._group(code)
+        seat = await self._require_seat(group, seat_secret)
+        if seat.user_id is None:
+            seat.user_id = user.id
+            await self.repo.add(seat)
+        if not await self.repo.has_history(user.id, group.id):
+            try:
+                await self.repo.add(SplitHistory(user_id=user.id, group_id=group.id))
+            except IntegrityError as exc:  # a concurrent keep already saved it
+                raise ConflictError("Already in your history") from exc
+
+    async def history(self, user: User) -> list[HistoryItemOut]:
+        """Every kept group, including expired ones. One ledger read per group: history lists are short."""
+        now = utc_now()
+        items: list[HistoryItemOut] = []
+        for kept, group in await self.repo.list_history(user.id):
+            seat = await self.repo.find_member_by_user(group.id, user.id)
+            net = (await self._ledger(group)).nets()[seat.id] if seat else None
+            items.append(
+                HistoryItemOut(
+                    code=group.code,
+                    name=group.name,
+                    url_path=url_path(group.code),
+                    expires_at=as_utc(group.expires_at),
+                    ended_at=as_utc(group.ended_at) if group.ended_at else None,
+                    is_open=group.is_open_at(now),
+                    my_net_paise=net,
+                    kept_at=as_utc(kept.created_at),
+                )
+            )
+        return items
 
     # ------------------------------------------------------------------
     # Helpers

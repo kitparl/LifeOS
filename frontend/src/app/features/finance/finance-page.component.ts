@@ -14,6 +14,7 @@ import { PartPaymentFormComponent } from './components/part-payment-form.compone
 import { PeriodFilterComponent } from './components/period-filter.component';
 import { RecurringFormComponent } from './components/recurring-form.component';
 import { RecurringTabComponent } from './components/recurring-tab.component';
+import { SplitsTabComponent } from './components/splits-tab.component';
 import {
   Expense,
   ExpenseBreakdown,
@@ -35,8 +36,10 @@ import {
 } from './models/finance.models';
 import { FinanceService } from './services/finance.service';
 import { defaultPeriod } from './utils/period';
+import { SplitHistoryItem } from '../splits/models/split.models';
+import { SplitsApiService } from '../splits/services/splits-api.service';
 
-type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
+type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans' | 'splits';
 
 /**
  * Finance shell. Opens on the current calendar month and stays there — it never
@@ -53,6 +56,7 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
     IncomeTabComponent,
     RecurringTabComponent,
     LoansTabComponent,
+    SplitsTabComponent,
     ExpenseFormComponent,
     IncomeFormComponent,
     RecurringFormComponent,
@@ -63,12 +67,14 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
   template: `
     <div class="space-y-3">
       <app-tab-hub [tabs]="tabs" [activeId]="activeTab()" [wrap]="true" (tabChange)="setTab($event)">
-        <div class="flex flex-wrap items-center gap-2 pb-1">
-          <app-finance-period-filter [period]="period()" (periodChange)="setPeriod($event)" />
-          @if (overview()) {
-            <p class="text-xs" style="color: var(--text-muted)">{{ overview()!.label }}</p>
-          }
-        </div>
+        @if (activeTab() !== 'splits') {
+          <div class="flex flex-wrap items-center gap-2 pb-1">
+            <app-finance-period-filter [period]="period()" (periodChange)="setPeriod($event)" />
+            @if (overview()) {
+              <p class="text-xs" style="color: var(--text-muted)">{{ overview()!.label }}</p>
+            }
+          </div>
+        }
       </app-tab-hub>
 
       @if (error()) {
@@ -137,6 +143,9 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
             (pay)="payEmi($event)"
           />
         }
+        @case ('splits') {
+          <app-finance-splits-tab [history]="splitHistory()" />
+        }
       }
 
       <app-expense-form
@@ -190,6 +199,7 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans';
 })
 export class FinancePageComponent implements OnInit {
   private readonly finance = inject(FinanceService);
+  private readonly splits = inject(SplitsApiService);
   private readonly confirm = inject(ConfirmService);
 
   readonly tabs: TabHubItem[] = [
@@ -198,6 +208,7 @@ export class FinancePageComponent implements OnInit {
     { id: 'expenses', label: 'Expenses' },
     { id: 'recurring', label: 'Recurring' },
     { id: 'loans', label: 'Loans' },
+    { id: 'splits', label: 'Splits' },
   ];
 
   readonly activeTab = signal<FinanceTab>('overview');
@@ -215,6 +226,7 @@ export class FinancePageComponent implements OnInit {
   readonly recurring = signal<RecurringExpense[]>([]);
   readonly loans = signal<Loan[]>([]);
   readonly emis = signal<LoanEMI[]>([]);
+  readonly splitHistory = signal<SplitHistoryItem[]>([]);
   readonly expandedLoanId = signal<string | null>(null);
 
   readonly expenseCategories = signal<string[]>([]);
@@ -302,9 +314,19 @@ export class FinancePageComponent implements OnInit {
       case 'loans':
         this.loadLoans();
         break;
+      case 'splits':
+        this.loadSplitHistory();
+        break;
       default:
         this.loadOverview();
     }
+  }
+
+  private loadSplitHistory(): void {
+    this.splits.history().subscribe({
+      next: (items) => this.splitHistory.set(items),
+      error: () => this.error.set('Could not load your split groups.'),
+    });
   }
 
   private loadOverview(): void {

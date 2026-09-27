@@ -92,3 +92,21 @@ class SplitRepository:
             select(SplitHistory.id).where(SplitHistory.user_id == user_id, SplitHistory.group_id == group_id)
         )
         return result.scalar_one_or_none() is not None
+
+    async def list_history(self, user_id: str) -> list[tuple[SplitHistory, SplitGroup]]:
+        result = await self.db.execute(
+            select(SplitHistory, SplitGroup)
+            .join(SplitGroup, SplitGroup.id == SplitHistory.group_id)
+            .where(SplitHistory.user_id == user_id)
+            .order_by(SplitHistory.created_at.desc())
+        )
+        return [(history, group) for history, group in result.all()]
+
+    async def find_member_by_user(self, group_id: str, user_id: str) -> SplitMember | None:
+        result = await self.db.execute(
+            select(SplitMember)
+            .where(SplitMember.group_id == group_id, SplitMember.user_id == user_id)
+            .order_by(SplitMember.seat_no)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
