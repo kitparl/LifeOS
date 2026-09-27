@@ -1,11 +1,11 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.modules.dsa.judge.verdict import Verdict
 from app.modules.dsa.progress import SOLVED, ProgressState, SubmissionFacts, apply_verdict, is_better
 from hypothesis import given
 from hypothesis import strategies as st
 
-T0 = datetime(2026, 9, 26, tzinfo=UTC)
+T0 = datetime(2026, 9, 26, tzinfo=timezone.utc)
 
 
 def _sub(i: int, verdict: Verdict, runtime: int | None = 10) -> SubmissionFacts:

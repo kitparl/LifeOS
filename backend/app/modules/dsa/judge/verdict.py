@@ -7,12 +7,12 @@ sandbox status explains it (TLE / MLE / crash). Anything unexplained fails close
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import Enum
 
 from app.modules.dsa.judge.compare import outputs_match
 
 
-class Verdict(StrEnum):
+class Verdict(str, Enum):  # not StrEnum: the backend must run on Python 3.10
     ACCEPTED = "Accepted"
     WRONG_ANSWER = "Wrong Answer"
     TIME_LIMIT = "Time Limit Exceeded"
@@ -20,6 +20,9 @@ class Verdict(StrEnum):
     RUNTIME_ERROR = "Runtime Error"
     COMPILE_ERROR = "Compilation Error"
     INTERNAL_ERROR = "Internal Error"
+
+    def __str__(self) -> str:
+        return self.value  # match StrEnum formatting on every Python version
 
 
 # go-judge Result.status values
