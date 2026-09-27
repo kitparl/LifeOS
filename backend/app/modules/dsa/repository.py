@@ -1,6 +1,6 @@
 """DSA queries.
 
-CatalogRepository reads/writes the global catalog. SubmissionRepository owns per-user data:
+CatalogRepository reads/writes the global catalog. SubmissionRepository and NoteRepository own per-user data:
 every user-facing method takes `user_id` and filters by it (a foreign id simply isn't found).
 The `*_for_judging` / `claim_unfinished` methods are for the judge worker only (system context).
 """
@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.pagination import Pagination, paginate
 from app.core.timezone import utc_now
 from app.modules.dsa.judge.verdict import JudgeOutcome
-from app.modules.dsa.models import DsaPattern, DsaProblem, DsaSubmission, DsaTestCase, DsaUserProgress
+from app.modules.dsa.models import DsaNote, DsaPattern, DsaProblem, DsaSubmission, DsaTestCase, DsaUserProgress
 from app.modules.dsa.progress import ProgressState
 
 UNFINISHED = ("pending", "running")
@@ -189,3 +189,36 @@ class SubmissionRepository:
         if ids:
             await self.db.execute(update(DsaSubmission).where(DsaSubmission.id.in_(ids)).values(status="pending"))
         return ids
+
+
+class NoteRepository:
+    """Per-user notes: every method takes `user_id`, so one user never sees another's note."""
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get(self, user_id: str, *, pattern_id: str | None = None, problem_id: str | None = None) -> DsaNote | None:
+        result = await self.db.execute(
+            select(DsaNote).where(
+                DsaNote.user_id == user_id, DsaNote.pattern_id == pattern_id, DsaNote.problem_id == problem_id
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def save(
+        self, user_id: str, content: str, *, pattern_id: str | None = None, problem_id: str | None = None
+    ) -> DsaNote | None:
+        """Create or update the note; empty content deletes it. Returns the stored note, if any."""
+        note = await self.get(user_id, pattern_id=pattern_id, problem_id=problem_id)
+        if not content.strip():
+            if note is not None:
+                await self.db.delete(note)
+                await self.db.flush()
+            return None
+        if note is None:
+            note = DsaNote(user_id=user_id, pattern_id=pattern_id, problem_id=problem_id)
+            self.db.add(note)
+        note.content = content
+        await self.db.flush()
+        await self.db.refresh(note)
+        return note

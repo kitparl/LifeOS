@@ -239,6 +239,18 @@ _RUNTIME = r"""
         }
         throw new RuntimeException("cannot encode result of type " + v.getClass().getName());
     }
+    // ListNode / TreeNode results: null is the empty list/tree, which the judge expects as [].
+    static void encNode(StringBuilder o, Object v) {
+        if (v == null) { o.append("[]"); return; }
+        if (v instanceof ListNode[]) {
+            ListNode[] lists = (ListNode[]) v;
+            o.append('[');
+            for (int i = 0; i < lists.length; i++) { if (i > 0) o.append(','); encNode(o, lists[i]); }
+            o.append(']');
+            return;
+        }
+        enc(o, v);
+    }
 
     // Link directives: build cycles, circular lists and shared tails before calling user code.
     static List<ListNode> nodesOf(ListNode head) {
@@ -413,6 +425,11 @@ def _link_lines(spec: Spec, index: dict[str, int]) -> list[str]:
     return lines
 
 
+def _encoder(type_: str) -> str:
+    """Name of the runtime encoder for a declared result type (node types map null to [])."""
+    return "encNode" if type_ in ("ListNode", "TreeNode", "ListNode[]") else "enc"
+
+
 def _function_body(spec: Spec) -> list[str]:
     index = {p["name"]: i for i, p in enumerate(spec["params"])}
     lines = [
@@ -430,13 +447,13 @@ def _function_body(spec: Spec) -> list[str]:
             f"Object r = {call};",
             "long t1 = System.nanoTime();",
             "res.append('[');",
-            "enc(res, r);",
+            f"{_encoder(returns)}(res, r);",
             "res.append(',');",
             f"enc(res, a{index[mutates]});",
             "res.append(']');",
         ]
     else:
-        encoder = "encCircular" if spec.get("circular_output") else "enc"
+        encoder = "encCircular" if spec.get("circular_output") else _encoder(returns)
         lines += [f"Object r = {call};", "long t1 = System.nanoTime();", f"{encoder}(res, r);"]
     lines.append("return (t1 - t0) / 1e6;")
     return lines
@@ -466,7 +483,7 @@ def _class_body(spec: Spec) -> list[str]:
         if method["returns"] == "void":
             lines += [f"            {call};", '            res.append("null");']
         else:
-            lines.append(f"            enc(res, {call});")
+            lines.append(f"            {_encoder(method['returns'])}(res, {call});")
         lines.append("            break;")
     lines += [
         '        default: throw new RuntimeException("unknown op: " + op);',

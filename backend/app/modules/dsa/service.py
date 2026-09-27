@@ -27,8 +27,8 @@ from app.modules.dsa.judge.queue import JudgeQueue, RunJob
 from app.modules.dsa.judge.runner import Limits, per_test_limit_ms
 from app.modules.dsa.judge.signature import SignatureError, parse_spec, validate_expected, validate_input
 from app.modules.dsa.judge.verdict import Grading
-from app.modules.dsa.models import DsaPattern, DsaProblem, DsaSubmission, DsaTestCase
-from app.modules.dsa.repository import CatalogRepository, SubmissionRepository
+from app.modules.dsa.models import DsaNote, DsaPattern, DsaProblem, DsaSubmission, DsaTestCase
+from app.modules.dsa.repository import CatalogRepository, NoteRepository, SubmissionRepository
 
 logger = logging.getLogger(__name__)
 
@@ -300,6 +300,46 @@ def _audit(actor: User, action: str, problem_slug: str, before: dict, after: dic
         brief(after),
         "signature" in after,
     )
+
+
+class DsaNoteService:
+    """A user's private notes on patterns and problems (drafts included: notes don't need content)."""
+
+    def __init__(self, db: AsyncSession):
+        self.catalog = CatalogRepository(db)
+        self.notes = NoteRepository(db)
+
+    async def pattern_note(self, user_id: str, slug: str) -> schemas.Note:
+        pattern = await self._pattern(slug)
+        return _to_note(await self.notes.get(user_id, pattern_id=pattern.id))
+
+    async def save_pattern_note(self, user_id: str, slug: str, body: schemas.NoteWrite) -> schemas.Note:
+        pattern = await self._pattern(slug)
+        return _to_note(await self.notes.save(user_id, body.content, pattern_id=pattern.id))
+
+    async def problem_note(self, user_id: str, slug: str) -> schemas.Note:
+        problem = await self._problem(slug)
+        return _to_note(await self.notes.get(user_id, problem_id=problem.id))
+
+    async def save_problem_note(self, user_id: str, slug: str, body: schemas.NoteWrite) -> schemas.Note:
+        problem = await self._problem(slug)
+        return _to_note(await self.notes.save(user_id, body.content, problem_id=problem.id))
+
+    async def _pattern(self, slug: str) -> DsaPattern:
+        pattern = await self.catalog.get_pattern(slug)
+        if pattern is None:
+            raise NotFoundError("Pattern not found")
+        return pattern
+
+    async def _problem(self, slug: str) -> DsaProblem:
+        problem = await self.catalog.get_problem(slug)
+        if problem is None:
+            raise NotFoundError("Problem not found")
+        return problem
+
+
+def _to_note(note: DsaNote | None) -> schemas.Note:
+    return schemas.Note(content=note.content, updated_at=note.updated_at) if note else schemas.Note(content="")
 
 
 class DsaJudgeService:

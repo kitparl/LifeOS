@@ -9,7 +9,7 @@ from app.core.pagination import Pagination, pagination_params
 from app.modules.auth.models import User
 from app.modules.dsa import schemas
 from app.modules.dsa.runtime import current_queue
-from app.modules.dsa.service import DsaCatalogService, DsaJudgeService
+from app.modules.dsa.service import DsaCatalogService, DsaJudgeService, DsaNoteService
 
 router = APIRouter(prefix="/dsa", tags=["dsa"])
 
@@ -42,6 +42,33 @@ async def get_pattern(slug: Slug, user: User = Depends(get_current_user), db: As
 @router.get("/problems/{slug}", response_model=schemas.ProblemDetail)
 async def get_problem(slug: Slug, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return await DsaCatalogService(db).problem(user.id, slug)
+
+
+# ------------------------------------------------------------------ notes (per user)
+
+
+@router.get("/patterns/{slug}/note", response_model=schemas.Note)
+async def get_pattern_note(slug: Slug, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await DsaNoteService(db).pattern_note(user.id, slug)
+
+
+@router.put("/patterns/{slug}/note", response_model=schemas.Note)
+async def save_pattern_note(
+    slug: Slug, body: schemas.NoteWrite, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    return await DsaNoteService(db).save_pattern_note(user.id, slug, body)
+
+
+@router.get("/problems/{slug}/note", response_model=schemas.Note)
+async def get_problem_note(slug: Slug, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await DsaNoteService(db).problem_note(user.id, slug)
+
+
+@router.put("/problems/{slug}/note", response_model=schemas.Note)
+async def save_problem_note(
+    slug: Slug, body: schemas.NoteWrite, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    return await DsaNoteService(db).save_problem_note(user.id, slug, body)
 
 
 # ------------------------------------------------------------------ run / submit

@@ -6,6 +6,7 @@ import { map } from 'rxjs';
 import { ChipOption, ChipRowComponent } from '../../../shared/chip-row/chip-row.component';
 import { DifficultyBadgeComponent } from '../components/difficulty-badge.component';
 import { DsaStateComponent } from '../components/dsa-state.component';
+import { DsaNoteEditorComponent } from '../components/dsa-note-editor.component';
 import { ProgressIconComponent } from '../components/progress-icon.component';
 import { PatternDetail, ProblemRow } from '../models/dsa.models';
 import { DsaService } from '../services/dsa.service';
@@ -26,7 +27,15 @@ const STATUS_FILTERS: ChipOption[] = [
 @Component({
   selector: 'app-dsa-pattern-problems-page',
   standalone: true,
-  imports: [RouterLink, LucideDynamicIcon, ChipRowComponent, DifficultyBadgeComponent, DsaStateComponent, ProgressIconComponent],
+  imports: [
+    RouterLink,
+    LucideDynamicIcon,
+    ChipRowComponent,
+    DifficultyBadgeComponent,
+    DsaStateComponent,
+    DsaNoteEditorComponent,
+    ProgressIconComponent,
+  ],
   template: `
     <div class="mx-auto max-w-4xl space-y-4">
       <a class="btn-ghost !min-h-8 !px-2 text-xs" routerLink="../.." data-testid="dsa-problems-back-link">
@@ -43,10 +52,25 @@ const STATUS_FILTERS: ChipOption[] = [
       } @else if (pattern()) {
         @let p = pattern()!;
         <header class="space-y-1">
-          <h1 class="text-xl font-semibold">{{ p.number }}. {{ p.name }}</h1>
+          <div class="flex items-start justify-between gap-3">
+            <h1 class="text-xl font-semibold">{{ p.number }}. {{ p.name }}</h1>
+            <button type="button" class="btn-secondary !min-h-8 shrink-0 !px-3 text-xs" data-testid="dsa-pattern-note-button"
+              [class.active]="noteOpen()" [attr.aria-expanded]="noteOpen()" aria-controls="dsa-pattern-note"
+              (click)="noteOpen.set(!noteOpen())">
+              <svg class="h-3.5 w-3.5" lucideIcon="notebook-pen" aria-hidden="true"></svg>
+              Note
+            </button>
+          </div>
           <p class="text-sm" style="color: var(--text-muted)">{{ p.description }}</p>
           <p class="text-xs" style="color: var(--text-muted)">{{ p.solved }}/{{ p.total }} solved</p>
         </header>
+
+        @if (noteOpen()) {
+          <section id="dsa-pattern-note" class="panel space-y-2" aria-label="Pattern note">
+            <h2 class="section-heading">Your note on {{ p.name }}</h2>
+            <app-dsa-note-editor scope="patterns" [slug]="p.slug" />
+          </section>
+        }
 
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <app-chip-row
@@ -121,6 +145,7 @@ export class PatternProblemsPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly notFound = signal(false);
+  readonly noteOpen = signal(false);
 
   private readonly query = toSignal(this.route.queryParamMap, { requireSync: true });
   readonly difficulty = computed(() => this.query().get('difficulty') ?? '');

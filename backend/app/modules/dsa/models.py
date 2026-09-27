@@ -6,7 +6,18 @@ are per user; every user-facing query on them filters by `user_id` (see reposito
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, new_id
@@ -125,3 +136,28 @@ class DsaUserProgress(Base):
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_attempted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     solved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DsaNote(Base):
+    """A user's private markdown note on exactly one pattern or one problem."""
+
+    __tablename__ = "dsa_notes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "pattern_id", name="uq_dsa_note_user_pattern"),
+        UniqueConstraint("user_id", "problem_id", name="uq_dsa_note_user_problem"),
+        CheckConstraint("(pattern_id IS NULL) <> (problem_id IS NULL)", name="ck_dsa_note_one_target"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    pattern_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("dsa_patterns.id", ondelete="CASCADE"), nullable=True
+    )
+    problem_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("dsa_problems.id", ondelete="CASCADE"), nullable=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

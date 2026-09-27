@@ -4,8 +4,8 @@ import { DsaStateComponent } from '../components/dsa-state.component';
 import { PatternSummary } from '../models/dsa.models';
 import { DsaService } from '../services/dsa.service';
 
-interface WeekGroup {
-  week: number;
+interface PhaseGroup {
+  phase: number;
   patterns: PatternSummary[];
 }
 
@@ -36,9 +36,9 @@ interface WeekGroup {
       } @else if (error()) {
         <app-dsa-state title="We couldn't load the patterns." [retryable]="true" (retry)="load()" />
       } @else {
-        @for (group of weeks(); track group.week) {
-          <section class="space-y-2" [attr.aria-label]="'Week ' + group.week">
-            <h2 class="section-heading">Week {{ group.week }}</h2>
+        @for (group of phases(); track group.phase) {
+          <section class="space-y-2" [attr.aria-label]="'Phase ' + group.phase">
+            <h2 class="section-heading">Phase {{ group.phase }}</h2>
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               @for (p of group.patterns; track p.slug) {
                 <a
@@ -77,12 +77,13 @@ export class DsaOverviewPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly error = signal(false);
 
-  readonly weeks = computed<WeekGroup[]>(() => {
-    const byWeek = new Map<number, PatternSummary[]>();
+  /** Patterns grouped into study phases (the API's `week` field is the phase number). */
+  readonly phases = computed<PhaseGroup[]>(() => {
+    const byPhase = new Map<number, PatternSummary[]>();
     for (const p of this.patterns()) {
-      byWeek.set(p.week, [...(byWeek.get(p.week) ?? []), p]);
+      byPhase.set(p.week, [...(byPhase.get(p.week) ?? []), p]);
     }
-    return [...byWeek.entries()].sort(([a], [b]) => a - b).map(([week, patterns]) => ({ week, patterns }));
+    return [...byPhase.entries()].sort(([a], [b]) => a - b).map(([phase, patterns]) => ({ phase, patterns }));
   });
 
   readonly totals = computed(() => {

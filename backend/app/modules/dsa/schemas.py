@@ -18,6 +18,7 @@ JobStatus = Literal["pending", "running", "done", "error"]
 TestKind = Literal["example", "edge", "random", "manual"]
 
 MAX_CODE_CHARS = 64 * 1024
+MAX_NOTE_CHARS = 100_000
 MAX_CUSTOM_INPUTS = 3
 MAX_CUSTOM_INPUT_BYTES = 16 * 1024
 MAX_STATEMENT_CHARS = 50_000
@@ -210,3 +211,14 @@ class CaseWrite(BaseModel):
         if _json_size(self.input) + _json_size(self.expected) > MAX_TEST_JSON_BYTES:
             raise ValueError(f"a test case must be at most {MAX_TEST_JSON_BYTES} bytes of JSON")
         return self
+
+
+class Note(BaseModel):
+    """A user's note on a pattern or problem; empty content and no `updated_at` when none was written."""
+
+    content: str
+    updated_at: datetime | None = None
+
+
+class NoteWrite(BaseModel):
+    content: str = Field(max_length=MAX_NOTE_CHARS)

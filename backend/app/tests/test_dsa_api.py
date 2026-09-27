@@ -353,3 +353,36 @@ async def test_admin_endpoints(client, dsa):
 
     publish_draft = await client.put(f"{BASE}/admin/problems/coming-later", json={"status": "published"}, headers=user)
     assert publish_draft.status_code == 400  # no signature / samples yet
+
+
+async def test_notes_per_pattern_and_problem(client, dsa):
+    alice = await _user(client, "nora")
+    bob = await _user(client, "otto")
+    empty = {"content": "", "updated_at": None}
+    for url in (f"{BASE}/patterns/two-pointers/note", f"{BASE}/problems/array-sum/note"):
+        assert (await client.get(url, headers=alice)).json() == empty
+
+    saved = await client.put(f"{BASE}/problems/array-sum/note", json={"content": "# Idea\nprefix sums"}, headers=alice)
+    assert saved.status_code == 200 and saved.json()["content"] == "# Idea\nprefix sums"
+    assert saved.json()["updated_at"] is not None
+    await client.put(f"{BASE}/patterns/two-pointers/note", json={"content": "move the smaller side"}, headers=alice)
+
+    # pattern and problem notes are separate, and private to their author
+    assert (await client.get(f"{BASE}/patterns/two-pointers/note", headers=alice)).json()["content"] == "move the smaller side"
+    assert (await client.get(f"{BASE}/problems/array-sum/note", headers=alice)).json()["content"] == "# Idea\nprefix sums"
+    assert (await client.get(f"{BASE}/problems/array-sum/note", headers=bob)).json() == empty
+
+    # updating replaces; saving blank clears
+    await client.put(f"{BASE}/problems/array-sum/note", json={"content": "v2"}, headers=alice)
+    assert (await client.get(f"{BASE}/problems/array-sum/note", headers=alice)).json()["content"] == "v2"
+    cleared = await client.put(f"{BASE}/problems/array-sum/note", json={"content": "  \n"}, headers=alice)
+    assert cleared.json() == empty
+    assert (await client.get(f"{BASE}/problems/array-sum/note", headers=alice)).json() == empty
+
+    # notes work on drafts too; unknown targets, oversized bodies and anonymous calls are rejected
+    assert (await client.put(f"{BASE}/problems/coming-later/note", json={"content": "later"}, headers=alice)).status_code == 200
+    assert (await client.get(f"{BASE}/problems/nope/note", headers=alice)).status_code == 404
+    assert (await client.put(f"{BASE}/patterns/nope/note", json={"content": "x"}, headers=alice)).status_code == 404
+    too_big = {"content": "x" * 100_001}
+    assert (await client.put(f"{BASE}/problems/array-sum/note", json=too_big, headers=alice)).status_code == 422
+    assert (await client.get(f"{BASE}/patterns/two-pointers/note")).status_code == 401

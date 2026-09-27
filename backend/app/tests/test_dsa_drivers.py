@@ -97,6 +97,12 @@ REMOVE_ELEMENT = {
     "mutates": "nums",
 }
 CUBE_SUM = {"kind": "function", "name": "cubeSum", "params": [{"name": "cube", "type": "int[][][]"}], "returns": "long"}
+TREE_BOX = {  # a design method returning a tree: an empty tree must encode as [] in every language
+    "kind": "class",
+    "name": "TreeBox",
+    "constructor": [],
+    "methods": [{"name": "echo", "params": [{"name": "root", "type": "TreeNode"}], "returns": "TreeNode"}],
+}
 
 SOLUTIONS: dict[str, dict[str, str]] = {
     "twoSum": {
@@ -185,6 +191,13 @@ SOLUTIONS: dict[str, dict[str, str]] = {
     },
 }
 
+SOLUTIONS["TreeBox"] = {
+    "python": "class TreeBox:\n    def echo(self, root):\n        return root\n",
+    "javascript": "class TreeBox {\n  echo(root) { return root; }\n}\n",
+    "cpp": "class TreeBox {\npublic:\n    TreeNode* echo(TreeNode* root) { return root; }\n};\n",
+    "java": "class TreeBox {\n    public TreeNode echo(TreeNode root) { return root; }\n}\n",
+}
+
 CASES = [
     (TWO_SUM, [[[2, 7, 11, 15], 9], [[3, 3], 6]], [[0, 1], [0, 1]]),
     (SORT_COLORS, [[[2, 0, 2, 1, 1, 0]], [[0]]], [[0, 0, 1, 1, 2, 2], [0]]),
@@ -203,6 +216,7 @@ CASES = [
     (SPLIT_CIRCULAR, [[[1, 5, 7]], [[2, 6, 1, 5]], [[9]]], [[[1, 5], [7]], [[2, 6], [1, 5]], [[9], []]]),
     (REMOVE_ELEMENT, [[[3, 2, 2, 3], 3], [[], 1]], [[2, [2, 2, 2, 3]], [0, []]]),
     (CUBE_SUM, [[[[[1, 2], [3]], [[4]]]], [[]]], [10, 0]),
+    (TREE_BOX, [{"ops": ["TreeBox", "echo", "echo"], "args": [[], [[]], [[1, None, 2]]]}], [[None, [], [1, None, 2]]]),
     (
         MIN_STACK,
         [
@@ -295,6 +309,14 @@ def test_java_hoists_imports_and_strips_public():
     assert source.index("import java.util.HashMap;") < source.index("class ListNode")
     assert "public class Solution" not in source
     assert source.count("public class Main") == 1
+
+
+@pytest.mark.parametrize("spec", [REVERSE_LIST, INVERT_TREE, MERGE_K, INTERSECT, TREE_BOX], ids=lambda s: s["name"])
+def test_java_encodes_node_results_with_encnode(spec):
+    """Regression: Java wrote a null ListNode/TreeNode result as null instead of []. Checkable without a JDK."""
+    source = drivers.program("java", spec, SOLUTIONS[spec["name"]]["java"])["Main.java"]
+    assert "encNode(res, " in source  # the generated call site, not the runtime helper
+    assert "enc(res, r);" not in source and "enc(res, obj." not in source
 
 
 def test_unknown_language():

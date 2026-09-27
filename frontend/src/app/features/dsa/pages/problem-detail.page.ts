@@ -10,6 +10,7 @@ import { MarkdownPreviewComponent } from '../../../shared/code-workspace/compone
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
 import { DifficultyBadgeComponent } from '../components/difficulty-badge.component';
 import { DsaStateComponent } from '../components/dsa-state.component';
+import { DsaNoteEditorComponent } from '../components/dsa-note-editor.component';
 import { ProgressIconComponent } from '../components/progress-icon.component';
 import { RunResultsComponent } from '../components/run-results.component';
 import { SubmissionHistoryComponent } from '../components/submission-history.component';
@@ -28,7 +29,7 @@ import {
 import { DsaDraftStore } from '../services/dsa-draft.store';
 import { DsaPollTimeoutError, DsaService } from '../services/dsa.service';
 
-type Tab = 'description' | 'submissions';
+type Tab = 'description' | 'submissions' | 'note';
 type Action = 'run' | 'submit';
 
 const DRAFT_SAVE_DELAY_MS = 1000;
@@ -56,6 +57,7 @@ export function actionErrorMessage(err: unknown): string {
     MarkdownPreviewComponent,
     DifficultyBadgeComponent,
     DsaStateComponent,
+    DsaNoteEditorComponent,
     ProgressIconComponent,
     RunResultsComponent,
     SubmissionHistoryComponent,
@@ -96,6 +98,10 @@ export function actionErrorMessage(err: unknown): string {
                 [attr.aria-selected]="tab() === 'submissions'" data-testid="dsa-detail-tab-submissions" (click)="tab.set('submissions')">
                 Submissions
               </button>
+              <button type="button" role="tab" class="tab-bar__btn" [class.active]="tab() === 'note'"
+                [attr.aria-selected]="tab() === 'note'" data-testid="dsa-detail-tab-note" (click)="tab.set('note')">
+                Note
+              </button>
             </div>
             <div class="min-h-0 flex-1 overflow-auto p-4">
               @if (tab() === 'description') {
@@ -134,6 +140,8 @@ export function actionErrorMessage(err: unknown): string {
                     </p>
                   }
                 </div>
+              } @else if (tab() === 'note') {
+                <app-dsa-note-editor scope="problems" [slug]="p.slug" />
               } @else {
                 <app-dsa-submission-history [slug]="p.slug" [refresh]="historyVersion()" [theme]="theme()" (loadCode)="loadIntoEditor($event)" />
               }

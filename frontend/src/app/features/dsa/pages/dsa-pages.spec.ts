@@ -7,6 +7,7 @@ import {
   LucideCircle,
   LucideCircleCheck,
   LucideCircleDot,
+  LucideNotebookPen,
   LucidePencil,
   LucidePlay,
   LucidePlus,
@@ -31,6 +32,7 @@ const icons = provideLucideIcons(
   LucideCircle,
   LucideCircleCheck,
   LucideCircleDot,
+  LucideNotebookPen,
   LucidePencil,
   LucidePlay,
   LucidePlus,
@@ -91,14 +93,14 @@ function setup(params: Record<string, string> = {}, query$ = new BehaviorSubject
 }
 
 describe('DsaOverviewPageComponent', () => {
-  it('groups patterns by week in order', () => {
+  it('groups patterns by phase in order', () => {
     const http = setup();
     const fixture = TestBed.createComponent(DsaOverviewPageComponent);
     fixture.detectChanges();
     http.expectOne(`${api}/patterns`).flush([summary('b', 2, 9), summary('a', 1, 1), summary('c', 1, 2)]);
     fixture.detectChanges();
     const headings = [...fixture.nativeElement.querySelectorAll('h2')].map((h: HTMLElement) => h.textContent?.trim());
-    expect(headings).toEqual(['Week 1', 'Week 2']);
+    expect(headings).toEqual(['Phase 1', 'Phase 2']);
     expect(fixture.nativeElement.querySelector('[data-testid="dsa-overview-pattern-a"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="dsa-overview-totals"]').textContent).toContain('3 solved');
     http.verify();
@@ -145,6 +147,28 @@ describe('PatternProblemsPageComponent', () => {
     expect(el.querySelector('[data-testid="dsa-problem-row-hard-draft"]')).toBeTruthy();
     http.verify();
   });
+
+  it('opens and closes the pattern note', () => {
+    const http = setup({ slug: 'two-pointers' });
+    const fixture: ComponentFixture<PatternProblemsPageComponent> = TestBed.createComponent(PatternProblemsPageComponent);
+    fixture.detectChanges();
+    http.expectOne(`${api}/patterns/two-pointers`).flush(detail);
+    fixture.detectChanges();
+    const button = fixture.nativeElement.querySelector('[data-testid="dsa-pattern-note-button"]') as HTMLButtonElement;
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+
+    button.click();
+    fixture.detectChanges();
+    http.expectOne(`${api}/patterns/two-pointers/note`).flush({ content: 'shrink from both ends', updated_at: null });
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.nativeElement.querySelector('[data-testid="dsa-note-editor"]')).toBeTruthy();
+
+    button.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="dsa-note-editor"]')).toBeNull();
+    http.verify();
+  });
 });
 
 describe('ProblemDetailPageComponent', () => {
@@ -172,6 +196,17 @@ describe('ProblemDetailPageComponent', () => {
     expect(el().querySelector('[data-testid="dsa-detail-example-0"]')?.textContent).toContain('2 + 7 = 9');
     expect(fixture.componentInstance.initialCode).toBe('class Solution: ...');
     expect(el().querySelector('[data-testid="dsa-detail-edit-link"]')).toBeNull();
+    http.verify();
+  });
+
+  it('shows the problem note in its own tab', () => {
+    create();
+    click('dsa-detail-tab-note');
+    fixture.detectChanges();
+    http.expectOne(`${api}/problems/two-sum/note`).flush({ content: '', updated_at: null });
+    fixture.detectChanges();
+    expect(el().querySelector('[data-testid="dsa-note-editor"]')).toBeTruthy();
+    expect(el().querySelector('[data-testid="dsa-note-status"]')?.textContent).toContain('Saved automatically');
     http.verify();
   });
 

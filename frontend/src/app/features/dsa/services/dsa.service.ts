@@ -7,6 +7,8 @@ import {
   AdminTestCase,
   CaseWrite,
   DsaMe,
+  DsaNote,
+  DsaNoteScope,
   JobAccepted,
   JobStatus,
   PatternDetail,
@@ -57,6 +59,15 @@ export class DsaService {
 
   pattern(slug: string): Observable<PatternDetail> {
     return this.http.get<PatternDetail>(`${this.api}/patterns/${encodeURIComponent(slug)}`);
+  }
+
+  note(scope: DsaNoteScope, slug: string): Observable<DsaNote> {
+    return this.http.get<DsaNote>(`${this.api}/${scope}/${encodeURIComponent(slug)}/note`);
+  }
+
+  /** Blank content deletes the note. */
+  saveNote(scope: DsaNoteScope, slug: string, content: string): Observable<DsaNote> {
+    return this.http.put<DsaNote>(`${this.api}/${scope}/${encodeURIComponent(slug)}/note`, { content });
   }
 
   problem(slug: string): Observable<ProblemDetail> {

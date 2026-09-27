@@ -26,6 +26,15 @@ export interface DsaMe {
   can_edit: boolean;
 }
 
+/** A user's private markdown note; `updated_at` is null when nothing has been written. */
+export interface DsaNote {
+  content: string;
+  updated_at: string | null;
+}
+
+/** What a note is attached to. */
+export type DsaNoteScope = 'patterns' | 'problems';
+
 export interface PatternSummary {
   slug: string;
   number: number;
