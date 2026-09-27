@@ -9,6 +9,7 @@ from app.core.rate_limit import SlidingWindowLimiter, enforce_ip_limit
 from app.modules.auth.models import User
 from app.modules.finance.split.codes import SHORT_CODE_PATTERN
 from app.modules.finance.split.schemas import (
+    BalancesOut,
     ExpenseCreate,
     ExpenseOut,
     GroupCreate,
@@ -17,12 +18,17 @@ from app.modules.finance.split.schemas import (
     MemberOut,
     MemberUpdate,
     SeatIssued,
+    SettlementCreate,
+    SettlementOut,
+    UpiLinkOut,
+    UpiLinkRequest,
 )
 from app.modules.finance.split.service import SplitService
 
 router = APIRouter(prefix="/splits", tags=["splits"])
 
 GroupCode = Path(pattern=SHORT_CODE_PATTERN)
+SettlementId = Path(max_length=36)
 SeatSecret = Header(default=None, alias="X-Split-Seat", max_length=64)
 
 # Per-client-IP sliding windows for the unauthenticated write endpoints.
@@ -87,3 +93,37 @@ async def add_expense(
     db: AsyncSession = Depends(get_db),
 ):
     return await SplitService(db).add_expense(code, seat, data)
+
+
+@router.get("/groups/{code}/balances", response_model=BalancesOut)
+async def get_balances(code: str = GroupCode, db: AsyncSession = Depends(get_db)):
+    return await SplitService(db).balances(code)
+
+
+@router.post("/groups/{code}/upi-link", response_model=UpiLinkOut)
+async def upi_link(
+    data: UpiLinkRequest,
+    code: str = GroupCode,
+    seat: str | None = SeatSecret,
+    db: AsyncSession = Depends(get_db),
+):
+    return await SplitService(db).upi_link(code, seat, data)
+
+
+@router.post("/groups/{code}/settlements", response_model=SettlementOut, status_code=status.HTTP_201_CREATED)
+async def mark_paid(
+    data: SettlementCreate,
+    code: str = GroupCode,
+    seat: str | None = SeatSecret,
+    db: AsyncSession = Depends(get_db),
+):
+    return await SplitService(db).mark_paid(code, seat, data)
+
+
+@router.post("/settlements/{settlement_id}/confirm", response_model=SettlementOut)
+async def confirm_settlement(
+    settlement_id: str = SettlementId,
+    seat: str | None = SeatSecret,
+    db: AsyncSession = Depends(get_db),
+):
+    return await SplitService(db).confirm(settlement_id, seat)

@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { environment } from '../../../../environments/environment';
-import { DeviceSplitGroup } from '../models/split.models';
+import { DeviceSplitGroup, SplitBalances } from '../models/split.models';
 import { SPLIT_DEVICE_STORAGE_KEY } from '../services/split-device-store.service';
 import { groupView, member } from '../testing/split-fixtures';
 import { SplitGroupPageComponent } from './split-group-page.component';
@@ -23,6 +23,8 @@ function saved(): DeviceSplitGroup[] {
   return JSON.parse(localStorage.getItem(SPLIT_DEVICE_STORAGE_KEY) ?? '[]') as DeviceSplitGroup[];
 }
 
+const settled: SplitBalances = { nets: [], debts: [] };
+
 function seed(rows: DeviceSplitGroup[]): void {
   localStorage.setItem(SPLIT_DEVICE_STORAGE_KEY, JSON.stringify(rows));
 }
@@ -40,6 +42,10 @@ describe('Split bills pages', () => {
       ],
     });
     http = TestBed.inject(HttpTestingController);
+  }
+
+  function flushBalances(balances: SplitBalances = settled): void {
+    http.expectOne(`${api}/groups/k7mq2p/balances`).flush(balances);
   }
 
   beforeEach(() => localStorage.removeItem(SPLIT_DEVICE_STORAGE_KEY));
@@ -131,6 +137,7 @@ describe('Split bills pages', () => {
       const req = http.expectOne(`${api}/groups/k7mq2p`);
       expect(req.request.headers.get('X-Split-Seat')).toBe('secret-a');
       req.flush(groupView({ my_member_id: 'm-a', is_creator: true }));
+      flushBalances();
       fixture.detectChanges();
 
       const url = `${location.origin}/s/k7mq2p`;
@@ -156,6 +163,7 @@ describe('Split bills pages', () => {
         shares: [{ member_id: 'm-a', amount_paise: 60000 }],
       };
       http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ expenses: [dinner] }));
+      flushBalances();
       fixture.detectChanges();
       expect(byTestId(fixture, 'split-add').length).toBe(0);
 
@@ -172,6 +180,7 @@ describe('Split bills pages', () => {
       const reload = http.expectOne(`${api}/groups/k7mq2p`);
       expect(reload.request.headers.get('X-Split-Seat')).toBe('secret-b');
       reload.flush(groupView({ members: [asha, member('m-b', 'Bala', 1)], expenses: [dinner], my_member_id: 'm-b' }));
+      flushBalances();
       fixture.detectChanges();
 
       expect(byTestId(fixture, 'split-bill-row')[0].textContent).toContain('Dinner by Asha');
@@ -184,6 +193,7 @@ describe('Split bills pages', () => {
       configure();
       const fixture = render();
       http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-a', is_creator: true }));
+      flushBalances();
       const expense = { title: 'Tea', amount_rupees: 10, paid_by: 'm-a', member_ids: ['m-a'] };
       fixture.componentInstance.addSplit({ expense, upiVpa: 'asha@okbank' });
 
@@ -195,12 +205,47 @@ describe('Split bills pages', () => {
       expect(post.request.body).toEqual(expense);
       post.flush({});
       http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-a', is_creator: true }));
+      flushBalances();
+    });
+
+    it('marks a debt paid for its price with my seat, then confirms as the payee', () => {
+      seed([{ code: 'k7mq2p', name: 'Dinner', seatSecret: 'secret-b', displayName: 'Bala', role: 'member' }]);
+      configure();
+      const fixture = render();
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-b' }));
+      flushBalances();
+      const debt = {
+        payer_member_id: 'm-b',
+        payer_name: 'Bala',
+        payee_member_id: 'm-a',
+        payee_name: 'Asha',
+        outstanding_paise: 3334,
+        pending_paise: 0,
+        amount_paise: 3334,
+        amount_rupees: '33.34',
+        upi_uri: null,
+      };
+      fixture.componentInstance.markPaid({ debt, method: 'cash' });
+      const post = http.expectOne({ method: 'POST', url: `${api}/groups/k7mq2p/settlements` });
+      expect(post.request.body).toEqual({ payee_member_id: 'm-a', amount_rupees: 33.34, method: 'cash' });
+      expect(post.request.headers.get('X-Split-Seat')).toBe('secret-b');
+      post.flush({});
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-b' }));
+      flushBalances();
+
+      fixture.componentInstance.confirmPayment('s-1');
+      const confirm = http.expectOne({ method: 'POST', url: `${api}/settlements/s-1/confirm` });
+      expect(confirm.request.headers.get('X-Split-Seat')).toBe('secret-b');
+      confirm.flush({});
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-b' }));
+      flushBalances();
     });
 
     it('closed link: a visitor can read but not join', () => {
       configure();
       const fixture = render();
       http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ is_open: false }));
+      flushBalances();
       fixture.detectChanges();
       expect(byTestId(fixture, 'split-join').length).toBe(0);
       expect(el(fixture).textContent).toContain('This link is closed. You can still read the group.');
@@ -212,6 +257,7 @@ describe('Split bills pages', () => {
       const req = http.expectOne(`${api}/groups/k7mq2p`);
       expect(req.request.headers.has('X-Split-Seat')).toBeFalse();
       req.flush(groupView());
+      flushBalances();
     });
   });
 });

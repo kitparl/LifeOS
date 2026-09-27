@@ -71,6 +71,12 @@ class SplitRepository:
         )
         return list(result.scalars().all())
 
+    async def get_settlement(self, settlement_id: str) -> SplitSettlement | None:
+        return await self.db.get(SplitSettlement, settlement_id)
+
+    async def get_group(self, group_id: str) -> SplitGroup | None:
+        return await self.db.get(SplitGroup, group_id)
+
     async def count_expenses(self, group_id: str) -> int:
         result = await self.db.execute(
             select(func.count()).select_from(SplitExpense).where(SplitExpense.group_id == group_id)

@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import {
+  SplitBalances,
   SplitExpense,
   SplitExpensePayload,
   SplitGroupCreatePayload,
@@ -11,6 +12,8 @@ import {
   SplitMember,
   SplitMemberUpdatePayload,
   SplitSeatIssued,
+  SplitSettlement,
+  SplitSettlementPayload,
 } from '../models/split.models';
 
 export const SPLIT_SEAT_HEADER = 'X-Split-Seat';
@@ -44,6 +47,22 @@ export class SplitsApiService {
 
   updateMe(code: string, seatSecret: string, payload: SplitMemberUpdatePayload): Observable<SplitMember> {
     return this.http.patch<SplitMember>(`${this.base}/groups/${code}/members/me`, payload, {
+      headers: seatHeaders(seatSecret),
+    });
+  }
+
+  getBalances(code: string): Observable<SplitBalances> {
+    return this.http.get<SplitBalances>(`${this.base}/groups/${code}/balances`);
+  }
+
+  markPaid(code: string, seatSecret: string, payload: SplitSettlementPayload): Observable<SplitSettlement> {
+    return this.http.post<SplitSettlement>(`${this.base}/groups/${code}/settlements`, payload, {
+      headers: seatHeaders(seatSecret),
+    });
+  }
+
+  confirmSettlement(settlementId: string, seatSecret: string): Observable<SplitSettlement> {
+    return this.http.post<SplitSettlement>(`${this.base}/settlements/${settlementId}/confirm`, null, {
       headers: seatHeaders(seatSecret),
     });
   }

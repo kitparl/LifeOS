@@ -1,12 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Observable, of, switchMap } from 'rxjs';
+import { Observable, forkJoin, of, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { AddSplitSubmit, SplitAddFormComponent } from '../components/add-split-form.component';
+import { MarkPaidRequest, SplitSettleListComponent } from '../components/settle-list.component';
 import { SplitShareActionsComponent } from '../components/share-actions.component';
-import { SplitGroupView, SplitMember } from '../models/split.models';
+import { SplitBalances, SplitGroupView, SplitMember } from '../models/split.models';
 import { SplitDeviceStoreService } from '../services/split-device-store.service';
 import { SplitsApiService } from '../services/splits-api.service';
 import { linkStatusLabel } from '../utils/link-status';
@@ -21,7 +22,7 @@ const CLOCK_TICK_MS = 60_000;
 @Component({
   selector: 'app-split-group-page',
   standalone: true,
-  imports: [DatePipe, RouterLink, SplitAddFormComponent, SplitShareActionsComponent],
+  imports: [DatePipe, RouterLink, SplitAddFormComponent, SplitSettleListComponent, SplitShareActionsComponent],
   template: `
     <div class="min-h-dvh" style="background: var(--page-bg); color: var(--text)">
       <header
@@ -128,6 +129,22 @@ const CLOCK_TICK_MS = 60_000;
               <p class="p-3 text-sm" style="color: var(--text-muted)">No bills yet.</p>
             }
           </section>
+
+          @if (balances(); as b) {
+            <section class="panel space-y-2">
+              <h2 class="text-sm font-semibold">Settle</h2>
+              <app-split-settle-list
+                [debts]="b.debts"
+                [members]="g.members"
+                [settlements]="g.settlements"
+                [myMemberId]="g.my_member_id"
+                [busy]="busy()"
+                (markPaid)="markPaid($event)"
+                (confirm)="confirmPayment($event)"
+                (saveUpi)="saveUpi($event)"
+              />
+            </section>
+          }
         } @else if (loading()) {
           <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
         }
@@ -143,6 +160,7 @@ export class SplitGroupPageComponent implements OnInit {
   protected readonly auth = inject(AuthService);
 
   readonly group = signal<SplitGroupView | null>(null);
+  readonly balances = signal<SplitBalances | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
@@ -170,9 +188,10 @@ export class SplitGroupPageComponent implements OnInit {
   }
 
   load(): void {
-    this.api.getGroup(this.code, this.seat()).subscribe({
-      next: (group) => {
+    forkJoin([this.api.getGroup(this.code, this.seat()), this.api.getBalances(this.code)]).subscribe({
+      next: ([group, balances]) => {
         this.group.set(group);
+        this.balances.set(balances);
         this.error.set(null);
         this.loading.set(false);
       },
@@ -205,6 +224,25 @@ export class SplitGroupPageComponent implements OnInit {
     const saveUpi: Observable<unknown> = upiVpa ? this.api.updateMe(this.code, seat, { upi_vpa: upiVpa }) : of(null);
     const request = saveUpi.pipe(switchMap(() => this.api.addExpense(this.code, seat, expense)));
     this.run(request, 'Could not save the bill.', () => this.addOpen.set(false));
+  }
+
+  markPaid({ debt, method }: MarkPaidRequest): void {
+    const seat = this.seat();
+    if (!seat) return;
+    const payload = { payee_member_id: debt.payee_member_id, amount_rupees: debt.amount_paise / 100, method };
+    this.run(this.api.markPaid(this.code, seat, payload), 'Could not mark as paid.', () => undefined);
+  }
+
+  confirmPayment(settlementId: string): void {
+    const seat = this.seat();
+    if (!seat) return;
+    this.run(this.api.confirmSettlement(settlementId, seat), 'Could not confirm.', () => undefined);
+  }
+
+  saveUpi(upiVpa: string | null): void {
+    const seat = this.seat();
+    if (!seat) return;
+    this.run(this.api.updateMe(this.code, seat, { upi_vpa: upiVpa }), 'Could not save your UPI id.', () => undefined);
   }
 
   inputValue(event: Event): string {

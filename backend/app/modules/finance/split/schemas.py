@@ -1,7 +1,7 @@
 import re
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
@@ -47,6 +47,20 @@ class ExpenseCreate(BaseModel):
         if len(set(value)) != len(value):
             raise ValueError("member_ids must be unique")
         return value
+
+
+SettlementMethod = Literal["upi", "cash"]
+
+
+class SettlementCreate(BaseModel):
+    payee_member_id: MemberId
+    amount_rupees: RupeeAmount
+    method: SettlementMethod
+
+
+class UpiLinkRequest(BaseModel):
+    payee_member_id: MemberId
+    amount_rupees: RupeeAmount
 
 
 class MemberUpdate(BaseModel):
@@ -129,3 +143,32 @@ class GroupView(BaseModel):
     my_member_id: str | None
     is_creator: bool
     in_history: bool | None
+
+
+class MemberBalanceOut(BaseModel):
+    member_id: str
+    display_name: str
+    net_paise: int
+
+
+class DebtOut(BaseModel):
+    """One outstanding payer -> payee debt. `amount_*` is the price still to pay now."""
+
+    payer_member_id: str
+    payer_name: str
+    payee_member_id: str
+    payee_name: str
+    outstanding_paise: int  # confirmed-only remainder
+    pending_paise: int  # marked paid, awaiting the payee's confirmation
+    amount_paise: int
+    amount_rupees: str
+    upi_uri: str | None  # null when the payee has no UPI id or nothing is left to pay
+
+
+class BalancesOut(BaseModel):
+    nets: list[MemberBalanceOut]
+    debts: list[DebtOut]
+
+
+class UpiLinkOut(BaseModel):
+    upi_uri: str

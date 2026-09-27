@@ -25,6 +25,12 @@ export interface SplitExpensePayload {
   member_ids: string[];
 }
 
+export interface SplitSettlementPayload {
+  payee_member_id: string;
+  amount_rupees: number;
+  method: SplitSettlementMethod;
+}
+
 export interface SplitMemberUpdatePayload {
   upi_vpa: string | null;
 }
@@ -91,6 +97,31 @@ export interface SplitGroupView {
   my_member_id: string | null;
   is_creator: boolean;
   in_history: boolean | null;
+}
+
+export interface SplitMemberBalance {
+  member_id: string;
+  display_name: string;
+  net_paise: number;
+}
+
+/** One payer -> payee debt. `amount_*` is the price still to pay now (pending payments set aside). */
+export interface SplitDebt {
+  payer_member_id: string;
+  payer_name: string;
+  payee_member_id: string;
+  payee_name: string;
+  outstanding_paise: number;
+  pending_paise: number;
+  amount_paise: number;
+  amount_rupees: string;
+  /** `upi://pay?...` for that price; null when the payee has no UPI id or nothing is left to pay. */
+  upi_uri: string | null;
+}
+
+export interface SplitBalances {
+  nets: SplitMemberBalance[];
+  debts: SplitDebt[];
 }
 
 export type SplitRole = 'creator' | 'member';
