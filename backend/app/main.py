@@ -35,6 +35,7 @@ from app.modules.running.api import router as running_router
 from app.modules.search.api import router as search_router
 from app.modules.sticky_notes.api import router as sticky_notes_router
 from app.modules.tasks.api import router as tasks_router
+from app.modules.travel.api import router as travel_router
 from app.modules.users.api import router as users_router
 from app.modules.wishlist.api import router as wishlist_router
 
@@ -129,6 +130,7 @@ app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(sticky_notes_router, prefix="/api/v1")
 app.include_router(news_router, prefix="/api/v1")
 app.include_router(dsa_router, prefix="/api/v1")
+app.include_router(travel_router, prefix="/api/v1")
 
 
 @app.get("/health")

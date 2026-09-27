@@ -5,6 +5,7 @@ import { GithubConfigComponent } from './components/github-config.component';
 import { GoogleCalendarConfigComponent } from './components/google-calendar-config.component';
 import { TelegramConfigComponent } from './components/telegram-config.component';
 import { WordnikConfigComponent } from './components/wordnik-config.component';
+import { GoogleMapsConfigComponent } from './components/google-maps-config.component';
 import {
   IntegrationConnection,
   IntegrationProvider,
@@ -21,6 +22,7 @@ import {
     AiProviderConfigComponent,
     AiSettingsComponent,
     WordnikConfigComponent,
+    GoogleMapsConfigComponent,
   ],
   template: `
     <div class="space-y-4">
@@ -46,6 +48,12 @@ import {
             />
           } @else if (p.provider === 'wordnik') {
             <app-wordnik-config
+              [displayName]="p.display_name"
+              [description]="p.description"
+              (connectionsChanged)="loadConnections()"
+            />
+          } @else if (p.provider === 'google_maps') {
+            <app-google-maps-config
               [displayName]="p.display_name"
               [description]="p.description"
               (connectionsChanged)="loadConnections()"

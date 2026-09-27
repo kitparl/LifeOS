@@ -16,7 +16,15 @@ import { ConfirmService } from './confirm.service';
       <div body class="text-sm">{{ confirm.message() }}</div>
       <div footer class="flex flex-wrap justify-end gap-2">
         <button type="button" class="btn-secondary text-xs" (click)="confirm.cancel()">Cancel</button>
-        <button type="button" class="btn-danger text-xs" (click)="confirm.accept()">Delete</button>
+        <button
+          type="button"
+          class="text-xs"
+          [class.btn-danger]="confirm.danger()"
+          [class.btn-primary]="!confirm.danger()"
+          (click)="confirm.accept()"
+        >
+          {{ confirm.acceptLabel() }}
+        </button>
       </div>
     </app-modal>
   `,

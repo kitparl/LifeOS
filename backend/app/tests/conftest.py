@@ -24,6 +24,8 @@ from app.modules.dsa.judge import client as dsa_judge_client
 from app.modules.integrations.wordnik import client as wordnik_client
 from app.modules.news import client as news_client
 from app.modules.news import service as news_service
+from app.modules.travel.maps import google as google_maps_client
+from app.tests.travel_support import google, isolated_uploads  # noqa: F401  (Travel fixtures)
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -44,7 +46,7 @@ def _offline_vendor(request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture(autouse=True)
 def _no_real_llm_vendor_calls():
-    """AI adapters, the Wordnik/news clients and the DSA judge never reach the network in tests; individual tests mock vendors on top of this."""
+    """AI adapters, the Wordnik/news/Google Maps clients and the DSA judge never reach the network in tests; individual tests mock vendors on top of this."""
     real_client = httpx.AsyncClient
 
     def offline_client(timeout: float) -> httpx.AsyncClient:
@@ -58,6 +60,7 @@ def _no_real_llm_vendor_calls():
         patch.object(wordnik_client, "_http_client", side_effect=offline_client),
         patch.object(news_client, "_http_client", side_effect=offline_client),
         patch.object(dsa_judge_client, "_http_client", side_effect=offline_judge_client),
+        patch.object(google_maps_client, "_http_client", side_effect=offline_client),
     ):
         yield
 

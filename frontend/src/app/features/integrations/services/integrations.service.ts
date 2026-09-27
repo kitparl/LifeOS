@@ -190,6 +190,23 @@ export interface WordnikTestResponse {
   detail: string;
 }
 
+export interface GoogleMapsConfigStatus {
+  connection_id: string;
+  enabled: boolean;
+  status: string;
+  configured: boolean;
+  api_key_masked: string | null;
+  last_tested_at: string | null;
+  last_test_ok: boolean | null;
+}
+
+export interface GoogleMapsConfigUpdate {
+  api_key?: string | null;
+  enabled?: boolean | null;
+}
+
+export type GoogleMapsTestResponse = WordnikTestResponse;
+
 export interface GitHubSyncResponse {
   status: string;
   message: string;
@@ -394,6 +411,18 @@ export class IntegrationsService {
 
   testWordnik(): Observable<WordnikTestResponse> {
     return this.http.post<WordnikTestResponse>(`${this.api}/wordnik/test`, {});
+  }
+
+  getGoogleMaps(): Observable<GoogleMapsConfigStatus> {
+    return this.http.get<GoogleMapsConfigStatus>(`${this.api}/google-maps`);
+  }
+
+  saveGoogleMapsConfig(body: GoogleMapsConfigUpdate): Observable<GoogleMapsConfigStatus> {
+    return this.http.put<GoogleMapsConfigStatus>(`${this.api}/google-maps/config`, body);
+  }
+
+  testGoogleMaps(): Observable<GoogleMapsTestResponse> {
+    return this.http.post<GoogleMapsTestResponse>(`${this.api}/google-maps/test`, {});
   }
 
   syncSectionToGitHub(sectionId: string): Observable<GitHubSyncResponse> {

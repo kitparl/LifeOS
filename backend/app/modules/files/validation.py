@@ -23,6 +23,7 @@ ALLOWED_MODULES = frozenset(
         "memory",
         "calendar",
         "telegram",
+        "travel",
         "general",
     }
 )

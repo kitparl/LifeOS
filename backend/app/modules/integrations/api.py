@@ -34,6 +34,9 @@ from app.modules.integrations.schemas import (
     GoogleCalendarConfigUpdate,
     GoogleCalendarOAuthCallback,
     GoogleCalendarOAuthStartResponse,
+    GoogleMapsConfigStatus,
+    GoogleMapsConfigUpdate,
+    GoogleMapsTestResponse,
     IntegrationCreate,
     IntegrationProviderInfo,
     IntegrationResponse,
@@ -55,6 +58,7 @@ from app.modules.integrations.service import IntegrationService, list_integratio
 from app.modules.integrations.telegram.config_service import TelegramConfigService
 from app.modules.integrations.telegram.webhook_service import TelegramWebhookService
 from app.modules.integrations.wordnik.service import WordnikIntegrationService
+from app.modules.travel.maps.integration_service import GoogleMapsIntegrationService
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 logger = logging.getLogger(__name__)
@@ -266,6 +270,31 @@ async def test_wordnik(
     db: AsyncSession = Depends(get_db),
 ):
     return await WordnikIntegrationService(db).test(user.id)
+
+
+@router.get("/google-maps", response_model=GoogleMapsConfigStatus)
+async def get_google_maps_config(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GoogleMapsIntegrationService(db).status(user.id)
+
+
+@router.put("/google-maps/config", response_model=GoogleMapsConfigStatus)
+async def save_google_maps_config(
+    data: GoogleMapsConfigUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GoogleMapsIntegrationService(db).save(user.id, data)
+
+
+@router.post("/google-maps/test", response_model=GoogleMapsTestResponse)
+async def test_google_maps(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GoogleMapsIntegrationService(db).test(user.id)
 
 
 @router.post("/github/sync/section/{section_id}", response_model=GitHubSyncResponse)

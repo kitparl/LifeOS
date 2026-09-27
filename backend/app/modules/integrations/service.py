@@ -39,10 +39,11 @@ PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
     IntegrationProviderInfo(provider="openrouter", display_name="OpenRouter", description="Many vendors' models through one key", oauth_required=False, group="ai"),
     IntegrationProviderInfo(provider="perplexity", display_name="Perplexity", description="Sonar models with web search", oauth_required=False, group="ai"),
     IntegrationProviderInfo(provider="wordnik", display_name="Wordnik", description="Dictionary, related words, and Word of the Day", oauth_required=False, group="language"),
+    IntegrationProviderInfo(provider="google_maps", display_name="Google Maps", description="Place names, search, routes and elevation for Travel (optional)", oauth_required=False),
 ]
 
 # Providers whose config_json holds encrypted secrets and is managed only by dedicated endpoints.
-_SECRET_CONFIG_PROVIDERS = frozenset({"telegram", "github", "google_calendar", "wordnik", *AI_PROVIDERS})
+_SECRET_CONFIG_PROVIDERS = frozenset({"telegram", "github", "google_calendar", "wordnik", "google_maps", *AI_PROVIDERS})
 
 def list_integration_providers() -> list[IntegrationProviderInfo]:
     return PROVIDER_CATALOG

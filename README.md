@@ -172,6 +172,8 @@ aidlc-docs/        AI-DLC planning artifacts and summaries (local only, gitignor
 |----------|-------------|
 | [runProject.md](runProject.md) | Local run commands + VPS operations cheatsheet |
 | [code-quality.md](code-quality.md) | Code conventions, shared helpers, and quality gates |
+| [setup/TRAVEL_SETUP.md](setup/TRAVEL_SETUP.md) | Travel: features, install, configuration, limits, troubleshooting |
+| [setup/GOOGLE_MAPS_SETUP.md](setup/GOOGLE_MAPS_SETUP.md) | Travel: optional Google Maps key, Google Cloud billing protection, usage and cost protection |
 
 ## Deploying (VPS)
 

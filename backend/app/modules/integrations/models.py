@@ -27,6 +27,7 @@ INTEGRATION_PROVIDERS = (
     "openrouter",
     "perplexity",
     "wordnik",
+    "google_maps",
 )
 
 

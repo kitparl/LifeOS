@@ -303,6 +303,30 @@ class WordnikTestResponse(BaseModel):
     detail: str
 
 
+class GoogleMapsConfigUpdate(BaseModel):
+    """Blank/omitted api_key keeps the stored key."""
+
+    api_key: str | None = Field(default=None, max_length=256)
+    enabled: bool | None = None
+
+
+class GoogleMapsConfigStatus(BaseModel):
+    """Public status: the API key is only ever returned masked."""
+
+    connection_id: str
+    enabled: bool
+    status: str
+    configured: bool
+    api_key_masked: str | None = None
+    last_tested_at: datetime | None = None
+    last_test_ok: bool | None = None
+
+
+class GoogleMapsTestResponse(BaseModel):
+    ok: bool
+    detail: str
+
+
 class AiModelItem(BaseModel):
     model_id: str
     display_name: str

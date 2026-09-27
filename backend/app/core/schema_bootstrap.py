@@ -68,6 +68,7 @@ def _import_models() -> None:
     import app.modules.running.models  # noqa: F401
     import app.modules.sticky_notes.models  # noqa: F401
     import app.modules.tasks.models  # noqa: F401
+    import app.modules.travel.models  # noqa: F401
     import app.modules.wishlist.models  # noqa: F401
 
 

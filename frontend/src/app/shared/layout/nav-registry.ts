@@ -30,6 +30,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'mood', label: 'Mood', route: '/mood', icon: 'smile', category: 'Health', hidden: true },
   { id: 'journal', label: 'Journal', route: '/journal', icon: 'book-open', category: 'Health' },
   { id: 'wishlist', label: 'Wishlist', route: '/wishlist', icon: 'star', category: 'Growth' },
+  { id: 'travel', label: 'Travel', route: '/travel', icon: 'map', category: 'Growth' },
   { id: 'sticky-notes', label: 'Quick Note', route: '/notes', icon: 'sticky-note', shortLabel: 'Note', category: 'Core' },
   { id: 'news', label: 'News', route: '/news', icon: 'newspaper', category: 'Knowledge' },
   { id: 'dsa', label: 'DSA Practice', route: '/dsa', icon: 'code', shortLabel: 'DSA', category: 'Knowledge' },

@@ -64,6 +64,8 @@ export class SyncService {
       url.includes('/auth/') ||
       // Split Bills needs the server's code / seat secret; never queue or fake it offline.
       url.includes('/splits/') ||
+      // Travel is online-only for now (offline deferred): saves need real server ids and map lookups are live.
+      url.includes('/travel/') ||
       url.includes('/files/upload') ||
       (url.includes('/files/') && url.includes('/content')) ||
       (url.includes('/files/') && url.includes('/download-token'))

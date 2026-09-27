@@ -305,6 +305,10 @@ export const routes: Routes = [
           import('./features/wishlist/wishlist-detail.component').then((m) => m.WishlistDetailComponent),
       },
       {
+        path: 'travel',
+        loadChildren: () => import('./features/travel/travel.routes').then((m) => m.TRAVEL_ROUTES),
+      },
+      {
         path: 'notes',
         loadComponent: () =>
           import('./features/sticky-notes/sticky-notes-page.component').then((m) => m.StickyNotesPageComponent),
