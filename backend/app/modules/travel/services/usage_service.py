@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import BadRequestError
 from app.core.timezone import as_utc, utc_now
 from app.modules.travel.maps.pricing_defaults import DEFAULT_FX_RATES, DEFAULT_PRICING
-from app.modules.travel.maps.types import ESSENTIAL_SKUS, SKU_API, Sku
+from app.modules.travel.maps.types import ESSENTIAL_SKUS, SKU_API, Feature, Sku
 from app.modules.travel.models import MapPricingConfiguration, MapsUsageEvent, TravelMapsSettings
 from app.modules.travel.repository.usage import UsageRepository
 from app.modules.travel.schemas.usage import (
@@ -194,7 +194,7 @@ class UsageService:
             essential=sku in ESSENTIAL_SKUS,
         )
 
-    async def record(self, user_id: str, sku: Sku, feature: str, outcome: str, units: int = 1) -> None:
+    async def record(self, user_id: str, sku: Sku, feature: Feature, outcome: str, units: int = 1) -> None:
         cost = Decimal(0)
         if outcome == "ok":
             await self.ensure_defaults(user_id)
@@ -210,7 +210,7 @@ class UsageService:
                 user_id=user_id,
                 api=SKU_API[sku],
                 sku=sku.value,
-                feature=str(feature),
+                feature=feature.value,
                 request_count=units,
                 estimated_cost_usd=cost,
                 outcome=outcome,

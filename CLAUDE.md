@@ -8,6 +8,11 @@ When the user invokes AI-DLC (e.g. "Using AI-DLC, ..."), read and follow
 Rule details live under `.aidlc/aidlc-rules/aws-aidlc-rule-details/`
 (also reachable via the `.aidlc-rule-details` symlink).
 
+## Server runtime (kitparl-server)
+
+- Python 3.10.12
+- Node v25.9.0
+
 ## Project layout
 
 - `backend/` — FastAPI app

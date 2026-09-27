@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 
 
-class Sku(StrEnum):
+class Sku(str, Enum):  # not StrEnum: the backend must run on Python 3.10
     """Billable operations. Values are the keys of `map_pricing_configurations.sku`."""
 
     GEOCODING = "geocoding"
@@ -28,7 +28,7 @@ SKU_API: dict[Sku, str] = {
 }
 
 
-class Feature(StrEnum):
+class Feature(str, Enum):
     """Which part of Travel generated a request (usage reporting)."""
 
     MAP_TAP = "map_tap"
@@ -39,7 +39,7 @@ class Feature(StrEnum):
     CONNECTION_TEST = "connection_test"
 
 
-class TravelMode(StrEnum):
+class TravelMode(str, Enum):
     DRIVING = "driving"
     WALKING = "walking"
     CYCLING = "cycling"
