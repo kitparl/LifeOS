@@ -142,6 +142,14 @@ async def _run_news_saved_purge() -> None:
         logger.info("Purged %s expired saved news articles", n)
 
 
+async def _run_split_upi_erase() -> None:
+    from app.modules.finance.split.service import SplitService
+
+    n = await _run_in_session("Split UPI erase", lambda session: SplitService(session).erase_closed_upi())
+    if n:
+        logger.info("Erased %s UPI ids from closed split groups", n)
+
+
 async def _run_google_calendar_sync() -> None:
     from app.modules.integrations.google_calendar.sync_service import sync_all_enabled
 
@@ -321,6 +329,14 @@ def start_scheduler() -> AsyncIOScheduler:
         misfire_grace_time=3600,
     )
     _scheduler.add_job(
+        _run_split_upi_erase,
+        trigger=IntervalTrigger(minutes=10),
+        id="split_upi_erase",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=600,
+    )
+    _scheduler.add_job(
         _run_google_calendar_sync,
         trigger=IntervalTrigger(minutes=30),
         id="google_calendar_sync",
@@ -332,7 +348,7 @@ def start_scheduler() -> AsyncIOScheduler:
     _install_after_commit_hook()
     logger.info(
         "APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST, "
-        "qa purge 00:05 IST, sticky notes purge 00:06 IST, news saved purge 00:07 IST, google calendar 30m)"
+        "qa purge 00:05 IST, sticky notes purge 00:06 IST, news saved purge 00:07 IST, split UPI erase 10m, google calendar 30m)"
     )
     return _scheduler
 

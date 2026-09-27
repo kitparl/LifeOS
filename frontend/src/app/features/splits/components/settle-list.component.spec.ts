@@ -103,6 +103,22 @@ describe('SplitSettleListComponent', () => {
     expect(confirmed).toBe('s-1');
   });
 
+  it('once the link closes, hides payment settings and explains why there is no pay link', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(SplitSettleListComponent);
+    fixture.componentRef.setInput('debts', [debt({ upi_uri: null })]);
+    fixture.componentRef.setInput('members', [member('m-a', 'Asha', 0), member('m-b', 'Bala', 1)]);
+    fixture.componentRef.setInput('settlements', []);
+    fixture.componentRef.setInput('myMemberId', 'm-b');
+    fixture.componentRef.setInput('linkOpen', false);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="split-payment-settings"]')).toBeNull();
+    expect(root.textContent).toContain('Link closed, so UPI ids are erased.');
+    expect(root.querySelector('[data-testid="split-mark-paid"]')!.textContent).toContain('Mark as cash');
+  });
+
   it('lets a member set their UPI id and rejects a malformed one', () => {
     const root = render([]);
     const input = root.querySelector<HTMLInputElement>('[data-testid="split-my-upi"]')!;

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { QrCodeComponent, buildQrMatrix } from './qr-code.component';
+import { QrCodeComponent, buildQrMatrix, qrPngBlob } from './qr-code.component';
 
 describe('QrCodeComponent', () => {
   it('builds a deterministic, non-empty module matrix with a quiet zone', () => {
@@ -17,5 +17,12 @@ describe('QrCodeComponent', () => {
     const svg = (fixture.nativeElement as HTMLElement).querySelector('svg')!;
     expect(svg.getAttribute('data-payload')).toBe('https://lifeos.example/s/k7mq2p');
     expect(svg.querySelector('path')!.getAttribute('d')).toMatch(/^M\d+ \d+h1v1h-1z/);
+  });
+
+  it('exports the same QR as a PNG image for sharing or saving', async () => {
+    const blob = await qrPngBlob('https://lifeos.example/s/k7mq2p', 4);
+    expect(blob.type).toBe('image/png');
+    const bitmap = await createImageBitmap(blob);
+    expect(bitmap.width).toBe(buildQrMatrix('https://lifeos.example/s/k7mq2p').size * 4);
   });
 });

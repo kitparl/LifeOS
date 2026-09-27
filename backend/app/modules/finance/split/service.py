@@ -6,6 +6,8 @@ Rules that shape this module:
    read a group. Every mutating member action needs that member's seat secret.
 2. **Money is integer paise**, and stored shares always sum to the bill.
 3. **Ledger rows are append-only.** Adding a bill never rewrites settlements.
+4. **UPI ids live only while the link is open.** They are hidden the moment it closes
+   and erased on End and by the periodic purge (`erase_closed_upi`).
 """
 
 from dataclasses import dataclass
@@ -76,13 +78,13 @@ SETTLEMENT_PAID = "paid"
 SETTLEMENT_CONFIRMED = "confirmed"
 
 
-def _member_out(member: SplitMember) -> MemberOut:
+def _member_out(member: SplitMember, link_open: bool) -> MemberOut:
     return MemberOut(
         id=member.id,
         display_name=member.display_name,
         seat_no=member.seat_no,
         is_creator=member.is_creator,
-        upi_vpa=member.upi_vpa,
+        upi_vpa=member.upi_vpa if link_open else None,
         joined_at=as_utc(member.joined_at),
     )
 
@@ -189,6 +191,7 @@ class SplitService:
         group = await self._group(code)
         me = await self._optional_seat(group, seat_secret)
         ledger = await self._ledger(group)
+        is_open = group.is_open_at(utc_now())
         return GroupView(
             code=group.code,
             name=group.name,
@@ -196,8 +199,8 @@ class SplitService:
             created_at=as_utc(group.created_at),
             expires_at=as_utc(group.expires_at),
             ended_at=as_utc(group.ended_at) if group.ended_at else None,
-            is_open=group.is_open_at(utc_now()),
-            members=[_member_out(m) for m in ledger.members],
+            is_open=is_open,
+            members=[_member_out(m, is_open) for m in ledger.members],
             expenses=[_expense_out(e, ledger.shares_by_expense.get(e.id, [])) for e in ledger.expenses],
             settlements=[_settlement_out(s) for s in ledger.settlements],
             my_member_id=me.id if me else None,
@@ -238,9 +241,12 @@ class SplitService:
     async def update_me(self, code: str, seat_secret: str | None, data: MemberUpdate) -> MemberOut:
         group = await self._group(code)
         me = await self._require_seat(group, seat_secret)
+        is_open = group.is_open_at(utc_now())
+        if data.upi_vpa and not is_open:
+            raise ConflictError("This link has closed, so UPI ids are no longer kept")
         me.upi_vpa = data.upi_vpa
         await self.repo.add(me)
-        return _member_out(me)
+        return _member_out(me, is_open)
 
     # ------------------------------------------------------------------
     # Bills
@@ -282,6 +288,7 @@ class SplitService:
     async def balances(self, code: str) -> BalancesOut:
         group = await self._group(code)
         ledger = await self._ledger(group)
+        is_open = group.is_open_at(utc_now())
         by_id = {m.id: m for m in ledger.members}
         nets = ledger.nets()
         pending = ledger.payments(SETTLEMENT_PAID)
@@ -300,7 +307,7 @@ class SplitService:
                     amount_paise=price,
                     amount_rupees=paise_to_rupees(price),
                     upi_uri=build_upi_uri(payee.upi_vpa, payee.display_name, price, group.name)
-                    if payee.upi_vpa and price > 0
+                    if is_open and payee.upi_vpa and price > 0
                     else None,
                 )
             )
@@ -313,6 +320,8 @@ class SplitService:
         group = await self._group(code)
         await self._require_seat(group, seat_secret)
         payee = await self._member(group, data.payee_member_id)
+        if not group.is_open_at(utc_now()):
+            raise BadRequestError("This link has closed, so UPI ids are no longer kept")
         if not payee.upi_vpa:
             raise BadRequestError("This person has not added a UPI id")
         uri = build_upi_uri(payee.upi_vpa, payee.display_name, rupees_to_paise(data.amount_rupees), group.name)
@@ -369,6 +378,11 @@ class SplitService:
         self._require_open(group)
         group.ended_at = utc_now()
         await self.repo.add(group)
+        await self.repo.clear_upi(group.id)
+
+    async def erase_closed_upi(self) -> int:
+        """Purge job: erase UPI ids of every group whose link has ended or expired."""
+        return await self.repo.clear_upi_of_closed_groups(utc_now())
 
     async def keep(self, code: str, seat_secret: str | None, user: User) -> None:
         """Save a group this account has a seat in to its history (idempotent)."""

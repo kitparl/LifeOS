@@ -6,7 +6,9 @@ describe('Split share links', () => {
 
   it('builds the absolute short URL and the join message', () => {
     expect(url).toBe('https://lifeos.example/s/k7mq2p');
-    expect(message).toBe('Join "Dinner" on LifeOS: https://lifeos.example/s/k7mq2p');
+    expect(message).toBe(
+      'Let\'s split the bills for "Dinner" on LifeOS. Add what you paid and see who owes whom: https://lifeos.example/s/k7mq2p',
+    );
   });
 
   it('defaults to the current origin', () => {
@@ -22,7 +24,7 @@ describe('Split share links', () => {
   it('Email href is a mailto with subject and the same URL in the body', () => {
     const href = mailtoHref('Dinner', message);
     expect(href.startsWith('mailto:')).toBeTrue();
-    expect(href).toContain(`subject=${encodeURIComponent('Join Dinner')}`);
+    expect(href).toContain(`subject=${encodeURIComponent('Split the bills for Dinner')}`);
     expect(href).toContain(encodeURIComponent(url));
   });
 });

@@ -83,7 +83,7 @@ export interface AddSplitSubmit {
             (input)="upi.set(value($event))"
           />
           <p class="mt-1 text-xs" style="color: var(--text-muted)">
-            People who owe you get a pay link and QR for it. You can add it later too.
+            People who owe you get a pay link and QR for it. It is erased when the link closes.
           </p>
         </div>
       }

@@ -70,7 +70,9 @@ export interface MarkPaidRequest {
                     </div>
                   </div>
                 } @else {
-                  <p class="text-xs" style="color: var(--text-muted)">Add a UPI id to get a pay link and QR.</p>
+                  <p class="text-xs" style="color: var(--text-muted)">
+                    {{ linkOpen() ? 'Add a UPI id to get a pay link and QR.' : 'Link closed, so UPI ids are erased. Pay in cash or any app, then mark it.' }}
+                  </p>
                   @if (debt.payer_member_id === myMemberId()) {
                     <button type="button" class="btn-secondary text-xs" data-testid="split-mark-paid" [disabled]="busy()" (click)="markPaid.emit({ debt, method: 'cash' })">
                       Mark as cash
@@ -99,24 +101,27 @@ export interface MarkPaidRequest {
         </div>
       }
 
-      @if (me(); as m) {
-        <form class="flex flex-wrap items-end gap-2" (submit)="$event.preventDefault(); submitUpi()">
-          <div class="min-w-0 flex-1">
-            <label class="mb-1 block text-xs" for="split-my-upi">Your UPI id</label>
-            <input
-              id="split-my-upi"
-              class="input-field"
-              placeholder="name@bank"
-              maxlength="129"
-              data-testid="split-my-upi"
-              [value]="upiDraft() ?? m.upi_vpa ?? ''"
-              (input)="upiDraft.set(inputValue($event))"
-            />
-          </div>
-          <button type="submit" class="btn-secondary text-xs" data-testid="split-upi-save" [disabled]="!upiValid() || busy()">
-            Save
-          </button>
-        </form>
+      @if (linkOpen() && me(); as m) {
+        <details class="text-xs" data-testid="split-payment-settings">
+          <summary class="cursor-pointer select-none">Payment settings (UPI){{ m.upi_vpa ? ' · ' + m.upi_vpa : '' }}</summary>
+          <form class="mt-2 flex flex-wrap items-end gap-2" (submit)="$event.preventDefault(); submitUpi()">
+            <div class="min-w-0 flex-1">
+              <label class="mb-1 block text-xs" for="split-my-upi">Your UPI id, so people who owe you get a pay link and QR</label>
+              <input
+                id="split-my-upi"
+                class="input-field"
+                placeholder="name@bank"
+                maxlength="129"
+                data-testid="split-my-upi"
+                [value]="upiDraft() ?? m.upi_vpa ?? ''"
+                (input)="upiDraft.set(inputValue($event))"
+              />
+            </div>
+            <button type="submit" class="btn-secondary text-xs" data-testid="split-upi-save" [disabled]="!upiValid() || busy()">
+              Save
+            </button>
+          </form>
+        </details>
       }
     </div>
   `,
@@ -128,6 +133,7 @@ export class SplitSettleListComponent {
   readonly members = input.required<SplitMember[]>();
   readonly settlements = input.required<SplitSettlement[]>();
   readonly myMemberId = input<string | null>(null);
+  readonly linkOpen = input(true);
   readonly busy = input(false);
 
   readonly markPaid = output<MarkPaidRequest>();

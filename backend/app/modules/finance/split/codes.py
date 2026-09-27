@@ -10,13 +10,17 @@ SHORT_CODE_ALPHABET = "23456789abcdefghijkmnopqrstuvwxyz"
 SHORT_CODE_LENGTH = 6
 SHORT_CODE_PATTERN = f"^[{SHORT_CODE_ALPHABET}]{{{SHORT_CODE_LENGTH}}}$"
 
-Expiry = Literal["session", "24h", "7d"]
+Expiry = Literal["session", "1h", "6h", "24h", "3d", "7d", "30d"]
 
 # `session` stays open until the creator ends it, capped at 12 hours.
 EXPIRY_DURATIONS: dict[str, timedelta] = {
     "session": timedelta(hours=12),
+    "1h": timedelta(hours=1),
+    "6h": timedelta(hours=6),
     "24h": timedelta(hours=24),
+    "3d": timedelta(days=3),
     "7d": timedelta(days=7),
+    "30d": timedelta(days=30),
 }
 
 

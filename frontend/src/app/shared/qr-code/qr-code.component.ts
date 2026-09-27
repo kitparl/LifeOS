@@ -10,11 +10,16 @@ export interface QrMatrix {
   path: string;
 }
 
-/** Encodes `payload` locally (no network) into an SVG path of dark modules. */
-export function buildQrMatrix(payload: string): QrMatrix {
+function encode(payload: string): ReturnType<typeof qrcode> {
   const qr = qrcode(0, 'M');
   qr.addData(payload);
   qr.make();
+  return qr;
+}
+
+/** Encodes `payload` locally (no network) into an SVG path of dark modules. */
+export function buildQrMatrix(payload: string): QrMatrix {
+  const qr = encode(payload);
   const count = qr.getModuleCount();
   const parts: string[] = [];
   for (let row = 0; row < count; row++) {
@@ -23,6 +28,29 @@ export function buildQrMatrix(payload: string): QrMatrix {
     }
   }
   return { size: count + QUIET_ZONE * 2, path: parts.join('') };
+}
+
+/** The same QR as a PNG image (for sharing or saving), drawn on a canvas in the browser. */
+export function qrPngBlob(payload: string, scale = 10): Promise<Blob> {
+  const qr = encode(payload);
+  const count = qr.getModuleCount();
+  const size = (count + QUIET_ZONE * 2) * scale;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return Promise.reject(new Error('Canvas is not available'));
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#000';
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) {
+      if (qr.isDark(row, col)) ctx.fillRect((col + QUIET_ZONE) * scale, (row + QUIET_ZONE) * scale, scale, scale);
+    }
+  }
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not draw the QR'))), 'image/png'),
+  );
 }
 
 /** A QR code drawn in the browser. `data-payload` exposes the encoded text for tests. */

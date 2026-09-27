@@ -68,7 +68,15 @@ describe('Split bills pages', () => {
       configure();
       const fixture = render();
       const labels = byTestId(fixture, 'split-expiry-option').map((i) => i.parentElement!.textContent!.trim());
-      expect(labels).toEqual(['This session', '24 hours', '7 days']);
+      expect(labels).toEqual([
+        'This session (up to 12 h)',
+        '1 hour',
+        '6 hours',
+        '24 hours',
+        '3 days',
+        '7 days',
+        '30 days',
+      ]);
       expect(el(fixture).textContent).toContain('Groups you create or join on this phone stay listed here.');
     });
 
@@ -146,8 +154,16 @@ describe('Split bills pages', () => {
       const url = `${location.origin}/s/k7mq2p`;
       const header = byTestId(fixture, 'split-group-header')[0];
       expect(header.textContent).toContain(url);
+      // The group QR sits behind "QR code" and can be shared or downloaded as an image.
+      expect(header.querySelector('[data-testid="split-group-qr"]')).toBeNull();
+      (header.querySelector('[data-testid="split-qr-toggle"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
       expect(header.querySelector('[data-testid="split-group-qr"] svg')!.getAttribute('data-payload')).toBe(url);
+      expect(header.querySelector('[data-testid="split-qr-download"]')).not.toBeNull();
       expect(el(fixture).textContent).toContain('Share the link. People join only if they want to.');
+      expect(byTestId(fixture, 'split-privacy-note')[0].textContent).toContain('erased when the link closes');
+      // The page scrolls itself (the app root clips overflow), so bottom content stays reachable.
+      expect(byTestId(fixture, 'split-page-scroll')[0].classList).toContain('overflow-y-auto');
     });
 
     it('after join in a second storage state, that list holds the code and the page shows the other bills', () => {

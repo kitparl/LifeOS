@@ -1,11 +1,15 @@
 /** Split Bills API shapes. Amounts are integer paise. */
 
-export type SplitExpiry = 'session' | '24h' | '7d';
+export type SplitExpiry = 'session' | '1h' | '6h' | '24h' | '3d' | '7d' | '30d';
 
 export const SPLIT_EXPIRY_OPTIONS: { value: SplitExpiry; label: string }[] = [
-  { value: 'session', label: 'This session' },
+  { value: 'session', label: 'This session (up to 12 h)' },
+  { value: '1h', label: '1 hour' },
+  { value: '6h', label: '6 hours' },
   { value: '24h', label: '24 hours' },
+  { value: '3d', label: '3 days' },
   { value: '7d', label: '7 days' },
+  { value: '30d', label: '30 days' },
 ];
 
 export interface SplitGroupCreatePayload {

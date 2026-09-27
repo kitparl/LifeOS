@@ -1,4 +1,6 @@
-from sqlalchemy import func, select
+from datetime import datetime
+
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.finance.split.models import (
@@ -42,6 +44,22 @@ class SplitRepository:
             select(SplitMember).where(SplitMember.group_id == group_id, SplitMember.secret_hash == secret_hash)
         )
         return result.scalar_one_or_none()
+
+    async def clear_upi(self, group_id: str) -> None:
+        await self.db.execute(
+            update(SplitMember)
+            .where(SplitMember.group_id == group_id, SplitMember.upi_vpa.is_not(None))
+            .values(upi_vpa=None)
+        )
+
+    async def clear_upi_of_closed_groups(self, now: datetime) -> int:
+        closed = select(SplitGroup.id).where(or_(SplitGroup.ended_at.is_not(None), SplitGroup.expires_at <= now))
+        result = await self.db.execute(
+            update(SplitMember)
+            .where(SplitMember.upi_vpa.is_not(None), SplitMember.group_id.in_(closed))
+            .values(upi_vpa=None)
+        )
+        return result.rowcount or 0
 
     # ------------------------------------------------------------------
     # Ledger

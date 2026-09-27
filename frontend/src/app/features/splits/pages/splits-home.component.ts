@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { SplitCreateComponent } from '../components/split-create.component';
 import { SplitDeviceGroupListComponent } from '../components/device-group-list.component';
+import { SplitPrivacyNoteComponent } from '../components/privacy-note.component';
 import { SplitShareActionsComponent } from '../components/share-actions.component';
 import { SplitGroupCreatePayload, SplitSeatIssued } from '../models/split.models';
 import { SplitDeviceStoreService } from '../services/split-device-store.service';
@@ -20,7 +21,13 @@ interface CreatedGroup {
 @Component({
   selector: 'app-splits-home',
   standalone: true,
-  imports: [RouterLink, SplitCreateComponent, SplitDeviceGroupListComponent, SplitShareActionsComponent],
+  imports: [
+    RouterLink,
+    SplitCreateComponent,
+    SplitDeviceGroupListComponent,
+    SplitPrivacyNoteComponent,
+    SplitShareActionsComponent,
+  ],
   template: `
     <div class="mx-auto max-w-3xl space-y-4">
       <section class="panel space-y-3">
@@ -30,7 +37,7 @@ interface CreatedGroup {
             <p class="text-sm">
               <span class="font-medium">{{ done.name }}</span> is ready. Share the link — people join only if they want to.
             </p>
-            <app-split-share-actions [groupName]="done.name" [urlPath]="done.seat.url_path" />
+            <app-split-share-actions [groupName]="done.name" [urlPath]="done.seat.url_path" qrMode="shown" />
             <div class="flex flex-wrap gap-2">
               <a class="btn-primary text-xs" data-testid="split-open-created" [routerLink]="['/s', done.seat.code]">
                 Open group
@@ -50,6 +57,8 @@ interface CreatedGroup {
         <h2 class="text-sm font-semibold">On this device</h2>
         <app-split-device-group-list [groups]="store.groups()" />
       </section>
+
+      <app-split-privacy-note />
     </div>
   `,
 })

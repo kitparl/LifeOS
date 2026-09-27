@@ -22,7 +22,8 @@ from app.modules.finance.split.balances import (
     payable,
 )
 from app.modules.finance.split.codes import SHORT_CODE_ALPHABET
-from app.modules.finance.split.models import SplitGroup, SplitHistory
+from app.modules.finance.split.models import SplitGroup, SplitHistory, SplitMember
+from app.modules.finance.split.service import SplitService
 from app.modules.finance.split.upi import build_upi_uri, paise_to_rupees, rupees_to_paise
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -113,7 +114,10 @@ async def test_create_returns_short_code_and_url_path(client):
     assert created["seat_secret"] and created["member_id"]
 
 
-@pytest.mark.parametrize(("expiry", "hours"), [("session", 12), ("24h", 24), ("7d", 24 * 7)])
+@pytest.mark.parametrize(
+    ("expiry", "hours"),
+    [("session", 12), ("1h", 1), ("6h", 6), ("24h", 24), ("3d", 72), ("7d", 24 * 7), ("30d", 24 * 30)],
+)
 async def test_expiry_presets(client, expiry, hours):
     created = await _create(client, expiry=expiry)
     group = (await client.get(f"{BASE}/groups/{created['code']}")).json()
@@ -160,7 +164,7 @@ async def test_create_validates_input(client):
         {"name": "  ", "creator_name": "A", "expiry": "24h"},
         {"name": "x" * 81, "creator_name": "A", "expiry": "24h"},
         {"name": "Trip", "creator_name": "A" * 41, "expiry": "24h"},
-        {"name": "Trip", "creator_name": "A", "expiry": "1h"},
+        {"name": "Trip", "creator_name": "A", "expiry": "2h"},
     ]
     for body in bad:
         assert (await client.post(f"{BASE}/groups", json=body)).status_code == 422
@@ -606,3 +610,64 @@ async def test_history_requires_login_and_is_per_user(client):
     await _create(client, headers=owner)
     assert len((await client.get(f"{BASE}/history", headers=owner)).json()) == 1
     assert (await client.get(f"{BASE}/history", headers=other)).json() == []
+
+
+# ======================================================================
+# UPI ids live only while the link is open
+# ======================================================================
+
+async def _stored_vpas(client) -> list[str | None]:
+    async with client.session_factory() as session:
+        return [m.upi_vpa for m in (await session.execute(select(SplitMember))).scalars().all()]
+
+
+async def _group_with_upi(client) -> tuple[str, dict, dict]:
+    code, (asha, bala) = await _group_with(client, "Asha", "Bala")
+    await client.patch(
+        f"{BASE}/groups/{code}/members/me", json={"upi_vpa": "asha@okbank"}, headers=_seat(asha["seat_secret"])
+    )
+    ids = [asha["member_id"], bala["member_id"]]
+    await _bill(client, code, asha["seat_secret"], asha["member_id"], ids, 600)
+    return code, asha, bala
+
+
+async def test_end_erases_upi_ids(client):
+    code, asha, _ = await _group_with_upi(client)
+    assert "asha@okbank" in await _stored_vpas(client)
+    await client.post(f"{BASE}/groups/{code}/end", headers=_seat(asha["seat_secret"]))
+    assert await _stored_vpas(client) == [None, None]
+    body = (await client.get(f"{BASE}/groups/{code}")).json()
+    assert [m["upi_vpa"] for m in body["members"]] == [None, None]
+    assert (await _balances(client, code))["debts"][0]["upi_uri"] is None
+
+
+async def test_expired_link_hides_upi_and_the_purge_erases_it(client):
+    code, asha, bala = await _group_with_upi(client)
+    open_code, _, _ = await _group_with_upi(client)
+    await _shift_group(client, code, expires_at=utc_now() - timedelta(minutes=1))
+
+    # Hidden immediately, before the purge runs.
+    body = (await client.get(f"{BASE}/groups/{code}")).json()
+    assert body["members"][0]["upi_vpa"] is None
+    assert (await _balances(client, code))["debts"][0]["upi_uri"] is None
+    link = await client.post(
+        f"{BASE}/groups/{code}/upi-link",
+        json={"payee_member_id": asha["member_id"], "amount_rupees": 300},
+        headers=_seat(bala["seat_secret"]),
+    )
+    assert link.status_code == 400
+
+    async with client.session_factory() as session:
+        assert await SplitService(session).erase_closed_upi() == 1
+        await session.commit()
+    assert sorted(v for v in await _stored_vpas(client) if v) == ["asha@okbank"]  # only the open group keeps it
+    assert (await _balances(client, open_code))["debts"][0]["upi_uri"] is not None
+
+
+async def test_upi_cannot_be_added_after_the_link_closes(client):
+    code, (asha,) = await _group_with(client, "Asha")
+    await _shift_group(client, code, ended_at=utc_now())
+    url = f"{BASE}/groups/{code}/members/me"
+    headers = _seat(asha["seat_secret"])
+    assert (await client.patch(url, json={"upi_vpa": "asha@okbank"}, headers=headers)).status_code == 409
+    assert (await client.patch(url, json={"upi_vpa": None}, headers=headers)).status_code == 200

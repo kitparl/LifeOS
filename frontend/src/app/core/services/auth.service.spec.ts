@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { environment } from '../../../environments/environment';
 
@@ -20,6 +21,24 @@ describe('AuthService', () => {
   afterEach(() => {
     httpMock.verify();
     sessionStorage.clear();
+  });
+
+  describe('clearSession', () => {
+    function clearAt(url: string): jasmine.Spy {
+      const router = TestBed.inject(Router);
+      spyOnProperty(router, 'url').and.returnValue(url);
+      const navigate = spyOn(router, 'navigate').and.resolveTo(true);
+      service.clearSession();
+      return navigate;
+    }
+
+    it('keeps a shared split link open instead of bouncing to login', () => {
+      expect(clearAt('/s/k7mq2p')).not.toHaveBeenCalled();
+    });
+
+    it('still sends private pages to login', () => {
+      expect(clearAt('/finance')).toHaveBeenCalledWith(['/login']);
+    });
   });
 
   it('should be created', () => {
