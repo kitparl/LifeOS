@@ -55,7 +55,7 @@ interface CreatedGroup {
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold">On this device</h2>
-        <app-split-device-group-list [groups]="store.groups()" />
+        <app-split-device-group-list [groups]="store.groups()" (remove)="store.remove($event)" />
       </section>
 
       <app-split-privacy-note />

@@ -2,6 +2,7 @@ import { Component, OnInit, computed, input, output, signal } from '@angular/cor
 import { SplitExpensePayload, SplitMember, UPI_VPA_PATTERN } from '../models/split.models';
 import { equalSplit } from '../utils/equal-split';
 import { formatInr, parseRupees, rupeesToPaise } from '../utils/money';
+import { SplitPersonComponent } from './person.component';
 
 export interface AddSplitSubmit {
   expense: SplitExpensePayload;
@@ -16,6 +17,7 @@ export interface AddSplitSubmit {
 @Component({
   selector: 'app-split-add-form',
   standalone: true,
+  imports: [SplitPersonComponent],
   template: `
     <form class="grid gap-3 text-sm" data-testid="split-add-form" (submit)="$event.preventDefault(); submit()">
       <div class="grid gap-3 sm:grid-cols-2">
@@ -61,7 +63,7 @@ export interface AddSplitSubmit {
           <label class="flex items-center justify-between gap-2" data-testid="split-member-option">
             <span class="flex items-center gap-2">
               <input type="checkbox" [checked]="included().has(m.id)" (change)="toggle(m.id)" />
-              {{ m.display_name }}
+              <app-split-person [name]="m.display_name" [you]="m.id === myMemberId()" />
             </span>
             <span class="text-xs" style="color: var(--text-muted)" data-testid="split-live-share">
               {{ shares().has(m.id) ? money(shares().get(m.id)!) : '—' }}

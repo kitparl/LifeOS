@@ -37,6 +37,16 @@ describe('SplitDeviceStoreService', () => {
     ]);
   });
 
+  it('removes one group from this device and persists the rest', () => {
+    const store = create();
+    store.save(dinner);
+    store.save({ ...dinner, code: 'abcdef', name: 'Trip' });
+    store.remove('k7mq2p');
+    expect(store.groups().map((g) => g.code)).toEqual(['abcdef']);
+    expect(store.find('k7mq2p')).toBeUndefined();
+    expect((JSON.parse(localStorage.getItem(SPLIT_DEVICE_STORAGE_KEY)!) as DeviceSplitGroup[]).length).toBe(1);
+  });
+
   it('ignores malformed storage and malformed rows', () => {
     localStorage.setItem(SPLIT_DEVICE_STORAGE_KEY, '{not json');
     expect(create().groups()).toEqual([]);

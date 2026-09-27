@@ -6,6 +6,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { AddSplitSubmit, SplitAddFormComponent } from '../components/add-split-form.component';
 import { MarkPaidRequest, SplitSettleListComponent } from '../components/settle-list.component';
+import { SplitPersonComponent } from '../components/person.component';
 import { SplitPrivacyNoteComponent } from '../components/privacy-note.component';
 import { SplitShareActionsComponent } from '../components/share-actions.component';
 import { SplitBalances, SplitGroupView, SplitMember } from '../models/split.models';
@@ -27,6 +28,7 @@ const CLOCK_TICK_MS = 60_000;
     DatePipe,
     RouterLink,
     SplitAddFormComponent,
+    SplitPersonComponent,
     SplitPrivacyNoteComponent,
     SplitSettleListComponent,
     SplitShareActionsComponent,
@@ -57,12 +59,18 @@ const CLOCK_TICK_MS = 60_000;
               <span class="chip text-xs" data-testid="split-link-status">{{ status() }}</span>
             </div>
             <app-split-share-actions [groupName]="g.name" [urlPath]="g.url_path" />
-            <p class="text-xs" style="color: var(--text-muted)" data-testid="split-members">
-              {{ g.members.length }} {{ g.members.length === 1 ? 'person' : 'people' }}:
-              @for (m of g.members; track m.id; let last = $last) {
-                {{ m.display_name }}{{ m.id === g.my_member_id ? ' (you)' : '' }}{{ last ? '' : ', ' }}
-              }
-            </p>
+            <div class="space-y-2 border-t border-[var(--xp-border)] pt-3">
+              <p class="text-xs font-medium" style="color: var(--text-muted)">
+                {{ g.members.length }} {{ g.members.length === 1 ? 'person' : 'people' }} in this split
+              </p>
+              <ul class="flex flex-wrap gap-2" data-testid="split-members">
+                @for (m of g.members; track m.id) {
+                  <li class="rounded-full border border-[var(--xp-border)] py-1 pl-1 pr-2 text-sm">
+                    <app-split-person [name]="m.display_name" [you]="m.id === g.my_member_id" size="md" />
+                  </li>
+                }
+              </ul>
+            </div>
             @if (canKeep() || (g.is_creator && g.is_open)) {
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 @if (canKeep()) {
@@ -137,11 +145,13 @@ const CLOCK_TICK_MS = 60_000;
                 @for (e of g.expenses; track e.id) {
                   <li class="py-2" data-testid="split-bill-row">
                     <div class="flex items-center justify-between gap-2">
-                      <p class="min-w-0 truncate">{{ e.title }}</p>
-                      <span class="font-medium">{{ money(e.amount_paise) }}</span>
+                      <p class="min-w-0 truncate font-medium">{{ e.title }}</p>
+                      <span class="font-semibold">{{ money(e.amount_paise) }}</span>
                     </div>
-                    <p class="text-xs" style="color: var(--text-muted)">
-                      Paid by {{ memberName(e.paid_by) }} · {{ e.expense_date | date: 'dd MMM' }} · split
+                    <p class="mt-1 flex flex-wrap items-center gap-1 text-xs" style="color: var(--text-muted)">
+                      Paid by
+                      <app-split-person [name]="memberName(e.paid_by)" [you]="e.paid_by === g.my_member_id" />
+                      · {{ e.expense_date | date: 'dd MMM' }} · split
                       {{ e.shares.length === 1 ? '1 way' : e.shares.length + ' ways' }}
                     </p>
                   </li>

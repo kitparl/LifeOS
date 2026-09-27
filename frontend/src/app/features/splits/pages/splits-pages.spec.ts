@@ -5,6 +5,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../core/services/auth.service';
+import { NAV_LUCIDE_ICON_PROVIDERS } from '../../../shared/layout/nav-lucide';
 import { DeviceSplitGroup, SplitBalances } from '../models/split.models';
 import { SPLIT_DEVICE_STORAGE_KEY } from '../services/split-device-store.service';
 import { groupView, member } from '../testing/split-fixtures';
@@ -42,6 +43,7 @@ describe('Split bills pages', () => {
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ code }) } } },
         { provide: AuthService, useValue: { isAuthenticated: signal(signedIn) } },
+        ...NAV_LUCIDE_ICON_PROVIDERS,
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -131,6 +133,23 @@ describe('Split bills pages', () => {
       const qr = byTestId(fixture, 'split-group-qr');
       expect(qr.length).toBe(1);
       expect(qr[0].querySelector('svg')!.getAttribute('data-payload')).toBe(`${location.origin}/s/abcdef`);
+    });
+
+    it('removes a group from this device only after confirming', () => {
+      seed([
+        { code: 'k7mq2p', name: 'Dinner', seatSecret: 's1', displayName: 'Asha', role: 'creator' },
+        { code: 'abcdef', name: 'Trip', seatSecret: 's2', displayName: 'Asha', role: 'member' },
+      ]);
+      configure();
+      const fixture = render();
+      byTestId(fixture, 'split-device-remove')[0].click();
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-device-remove-prompt')[0].textContent).toContain('stay for everyone else');
+      expect(saved().length).toBe(2); // nothing removed until confirmed
+      byTestId(fixture, 'split-device-remove-confirm')[0].click();
+      fixture.detectChanges();
+      expect(saved().map((g) => g.code)).toEqual(['abcdef']);
+      expect(byTestId(fixture, 'split-device-row').length).toBe(1);
     });
   });
 

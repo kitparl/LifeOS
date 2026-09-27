@@ -33,10 +33,18 @@ export class SplitDeviceStoreService {
 
   /** Newest first; a repeat code replaces its old row. */
   save(group: DeviceSplitGroup): void {
-    const next = [group, ...this.rows().filter((row) => row.code !== group.code)];
-    this.rows.set(next);
+    this.write([group, ...this.rows().filter((row) => row.code !== group.code)]);
+  }
+
+  /** Forget a group on this device only (drops its seat secret); the group stays on the server. */
+  remove(code: string): void {
+    this.write(this.rows().filter((row) => row.code !== code));
+  }
+
+  private write(rows: DeviceSplitGroup[]): void {
+    this.rows.set(rows);
     try {
-      localStorage.setItem(SPLIT_DEVICE_STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(SPLIT_DEVICE_STORAGE_KEY, JSON.stringify(rows));
     } catch {
       // Storage full or blocked — the in-memory list still works for this visit.
     }

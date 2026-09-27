@@ -1,6 +1,7 @@
 import { Component, HostListener, computed, inject, input, output, signal } from '@angular/core';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { QrCodeComponent } from '../../../shared/qr-code/qr-code.component';
+import { SplitPersonComponent } from './person.component';
 import {
   SplitDebt,
   SplitMember,
@@ -25,7 +26,7 @@ export interface MarkPaidRequest {
 @Component({
   selector: 'app-split-settle-list',
   standalone: true,
-  imports: [QrCodeComponent],
+  imports: [QrCodeComponent, SplitPersonComponent],
   template: `
     <div class="space-y-3 text-sm">
       @if (prompt(); as debt) {
@@ -42,10 +43,11 @@ export interface MarkPaidRequest {
         <ul class="divide-y divide-[var(--xp-border)]" data-testid="split-debts">
           @for (debt of debts(); track debt.payer_member_id + debt.payee_member_id) {
             <li class="space-y-2 py-2" data-testid="split-debt-row">
-              <p>
-                <span class="font-medium">{{ debt.payer_name }}</span> owes
-                <span class="font-medium">{{ debt.payee_name }}</span>
-                {{ money(debt.outstanding_paise) }}
+              <p class="flex flex-wrap items-center gap-1.5">
+                <app-split-person [name]="debt.payer_name" [you]="debt.payer_member_id === myMemberId()" />
+                <span style="color: var(--text-muted)">owes</span>
+                <app-split-person [name]="debt.payee_name" [you]="debt.payee_member_id === myMemberId()" />
+                <span class="font-semibold">{{ money(debt.outstanding_paise) }}</span>
               </p>
               @if (debt.pending_paise > 0) {
                 <p class="text-xs" style="color: var(--text-muted)">
@@ -92,7 +94,11 @@ export interface MarkPaidRequest {
           <h3 class="text-xs font-semibold">Waiting for you to confirm</h3>
           @for (s of toConfirm(); track s.id) {
             <div class="flex items-center justify-between gap-2">
-              <span>{{ nameOf(s.payer_member_id) }} paid you {{ money(s.amount_paise) }} ({{ s.method === 'upi' ? 'UPI' : 'cash' }})</span>
+              <span class="flex flex-wrap items-center gap-1.5">
+                <app-split-person [name]="nameOf(s.payer_member_id)" />
+                paid you <span class="font-semibold">{{ money(s.amount_paise) }}</span>
+                ({{ s.method === 'upi' ? 'UPI' : 'cash' }})
+              </span>
               <button type="button" class="btn-primary text-xs" data-testid="split-confirm" [disabled]="busy()" (click)="confirm.emit(s.id)">
                 Confirm
               </button>
