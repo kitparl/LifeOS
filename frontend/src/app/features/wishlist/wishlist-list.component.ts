@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import {
   WISHLIST_STATUS_FILTERS,
@@ -56,15 +56,31 @@ import { WishlistService } from './services/wishlist.service';
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           @for (item of items; track item.id) {
             <div
-              class="panel text-sm space-y-2 border-l-4"
+              class="panel text-sm space-y-2 border-l-4 cursor-pointer"
+              role="link"
+              tabindex="0"
               [style.border-left-color]="statusAccent(item.status)"
               [style.background]="cardBackground(item.status)"
+              (click)="open(item.id)"
+              (keydown.enter)="open(item.id)"
             >
               <div class="flex flex-wrap items-start justify-between gap-2">
-                <a [routerLink]="['/wishlist', item.id]" class="font-medium text-[var(--xp-blue)] underline">
+                <a
+                  [routerLink]="['/wishlist', item.id]"
+                  class="font-medium text-[var(--xp-blue)] underline"
+                  (click)="$event.stopPropagation()"
+                >
                   {{ item.title }}
                 </a>
-                <span [class]="statusBadge(item.status)">{{ statusLabel(item.status) }}</span>
+                <div class="flex items-center gap-2">
+                  <span [class]="statusBadge(item.status)">{{ statusLabel(item.status) }}</span>
+                  <a
+                    [routerLink]="['/wishlist', item.id, 'edit']"
+                    class="text-xs underline"
+                    (click)="$event.stopPropagation()"
+                    (keydown.enter)="$event.stopPropagation()"
+                  >Edit</a>
+                </div>
               </div>
               <p class="text-xs capitalize" style="color: var(--text-muted)">
                 {{ item.category }} · {{ priorityLabel(item.priority) }}
@@ -91,6 +107,7 @@ import { WishlistService } from './services/wishlist.service';
 export class WishlistListComponent implements OnInit {
   private readonly wishlistService = inject(WishlistService);
   private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
 
   readonly categories = signal<string[]>([]);
   readonly statusFilters = WISHLIST_STATUS_FILTERS;
@@ -146,6 +163,10 @@ export class WishlistListComponent implements OnInit {
 
   priorityLabel(priority: string): string {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
+  }
+
+  open(id: string): void {
+    this.router.navigate(['/wishlist', id]);
   }
 
   isStatusSelected(status: WishlistStatusFilter): boolean {
