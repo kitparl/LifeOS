@@ -2,7 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SimpleChange } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { By } from '@angular/platform-browser';
 import { environment } from '../../../../environments/environment';
+import { CodeWorkspaceComponent } from '../../../shared/code-workspace';
 import { DsaNoteEditorComponent } from './dsa-note-editor.component';
 
 const api = `${environment.apiUrl}/dsa`;
@@ -44,6 +46,19 @@ describe('DsaNoteEditorComponent', () => {
     put.flush({ content: '# two pointers after sorting', updated_at: '2026-09-27T10:05:00Z' });
     expect(component.saveState()).toBe('saved');
     expect(component.savedAt()).toBe('2026-09-27T10:05:00Z');
+  });
+
+  it('opens a written note in Preview and an empty one in Write', () => {
+    const viewMode = () => fixture.debugElement.query(By.directive(CodeWorkspaceComponent)).componentInstance.defaultViewMode;
+    open('problems', 'three-sum');
+    http.expectOne(`${api}/problems/three-sum/note`).flush({ content: 'sort, then two pointers', updated_at: null });
+    fixture.detectChanges();
+    expect(viewMode()).toBe('preview');
+
+    open('problems', 'empty', 'three-sum');
+    http.expectOne(`${api}/problems/empty/note`).flush({ content: '', updated_at: null });
+    fixture.detectChanges();
+    expect(viewMode()).toBe('write');
   });
 
   it('saves unsaved text to the previous note when switching to another one', () => {

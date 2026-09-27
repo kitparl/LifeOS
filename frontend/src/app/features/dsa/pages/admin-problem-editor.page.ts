@@ -285,7 +285,7 @@ export class AdminProblemEditorPageComponent implements OnInit {
   readonly saving = signal(false);
   readonly saved = signal(false);
   readonly saveError = signal<string | null>(null);
-  readonly preview = signal(false);
+  readonly preview = signal(true); // open in Preview; the toggle switches to Edit
   readonly caseForm = signal<CaseForm | null>(null);
   readonly caseError = signal<string | null>(null);
   form!: ProblemForm;

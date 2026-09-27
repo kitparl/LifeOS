@@ -10,7 +10,8 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 /**
  * A user's private markdown note on a pattern or problem, in the same editor as journal and
- * knowledge notes. Autosaves after a pause in typing, and once more when the editor is closed.
+ * knowledge notes. Opens in Preview when there is text (Write when empty). Autosaves after a pause
+ * in typing, and once more when the editor is closed.
  */
 @Component({
   selector: 'app-dsa-note-editor',
@@ -43,7 +44,7 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
             [showLanguageSelector]="false"
             [showOutput]="false"
             [enableAutosave]="true"
-            defaultViewMode="write"
+            [defaultViewMode]="initialContent ? 'preview' : 'write'"
             (contentChange)="onContentChange($event)"
             (save)="persist()"
           />
