@@ -5,8 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.core.exceptions import TooManyRequestsError
-from app.core.rate_limit import SlidingWindowLimiter
+from app.core.rate_limit import SlidingWindowLimiter, enforce_ip_limit
 from app.core.security import (
     cookie_kwargs,
     create_access_token,
@@ -59,12 +58,6 @@ def _clear_cookie(response: Response, name: str) -> None:
     response.delete_cookie(name, secure=settings.cookie_secure, samesite="lax")
 
 
-def _enforce_ip_limit(limiter: SlidingWindowLimiter, request: Request, detail: str) -> None:
-    ip = request.client.host if request.client else "unknown"
-    if not limiter.hit(ip):
-        raise TooManyRequestsError(detail)
-
-
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     data: RegisterRequest,
@@ -96,7 +89,7 @@ async def registration_gate_login(
     request: Request,
     response: Response,
 ):
-    _enforce_ip_limit(_gate_login_limiter, request, "Too many gate login attempts. Try again shortly.")
+    enforce_ip_limit(_gate_login_limiter, request, "Too many gate login attempts. Try again shortly.")
     if not verify_gate_credentials(data.email, data.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = create_unlock_token(data.email)
@@ -170,7 +163,7 @@ async def username_available(
     username: str = Query(min_length=1, max_length=30),
     db: AsyncSession = Depends(get_db),
 ):
-    _enforce_ip_limit(_availability_limiter, request, "Too many availability checks. Try again shortly.")
+    enforce_ip_limit(_availability_limiter, request, "Too many availability checks. Try again shortly.")
     service = AuthService(db)
     normalized, available, reason = await service.check_username_availability(username)
     return UsernameAvailabilityResponse(username=normalized, available=available, reason=reason)

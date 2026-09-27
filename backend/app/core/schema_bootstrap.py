@@ -49,6 +49,7 @@ def _import_models() -> None:
     import app.modules.files.models  # noqa: F401
     import app.modules.files.preview_models  # noqa: F401
     import app.modules.finance.models  # noqa: F401
+    import app.modules.finance.split.models  # noqa: F401
     import app.modules.habits.models  # noqa: F401
     import app.modules.integrations.github.sync_models  # noqa: F401
     import app.modules.integrations.models  # noqa: F401

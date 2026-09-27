@@ -62,6 +62,8 @@ export class SyncService {
   shouldBypass(url: string): boolean {
     return (
       url.includes('/auth/') ||
+      // Split Bills needs the server's code / seat secret; never queue or fake it offline.
+      url.includes('/splits/') ||
       url.includes('/files/upload') ||
       (url.includes('/files/') && url.includes('/content')) ||
       (url.includes('/files/') && url.includes('/download-token'))

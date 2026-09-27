@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { copyText } from './clipboard.util';
+import { copyText } from '../../../core/utils/clipboard';
 
 @Component({
   selector: 'app-copy-button',

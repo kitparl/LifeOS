@@ -44,7 +44,16 @@ export const EXPLORE_TOOLS: ExploreTool[] = [
     authRoute: '/developer',
     providers: DEVELOPER_GUEST_PROVIDERS,
     loadChildren: () => import('../developer/developer.routes').then((m) => m.DEVELOPER_ROUTES),
-  }
+  },
+  {
+    id: 'splits',
+    label: 'Split bills',
+    description: 'Share a short link, add bills, split equally and settle over UPI. No account needed.',
+    icon: 'receipt',
+    path: 'splits',
+    authRoute: '/splits',
+    loadChildren: () => import('../splits/splits.routes').then((m) => m.SPLITS_ROUTES),
+  },
 ];
 
 export function exploreToolRoute(tool: ExploreTool): string {

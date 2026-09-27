@@ -6,6 +6,10 @@ import time
 from collections import deque
 from collections.abc import Callable
 
+from fastapi import Request
+
+from app.core.exceptions import TooManyRequestsError
+
 
 class SlidingWindowLimiter:
     def __init__(self, limit: int, window_seconds: float, clock: Callable[[], float] = time.monotonic):
@@ -27,3 +31,10 @@ class SlidingWindowLimiter:
 
     def reset(self) -> None:
         self._hits.clear()
+
+
+def enforce_ip_limit(limiter: SlidingWindowLimiter, request: Request, detail: str) -> None:
+    """Count a request against the caller's IP; 429 when over the limit."""
+    ip = request.client.host if request.client else "unknown"
+    if not limiter.hit(ip):
+        raise TooManyRequestsError(detail)

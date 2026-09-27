@@ -35,6 +35,12 @@ export const routes: Routes = [
     loadChildren: () => import('./features/explore/explore.routes').then((m) => m.EXPLORE_ROUTES),
   },
   {
+    // Public Split Bills group page: same URL for guests and signed-in users (no authGuard, no exploreGuard).
+    path: 's/:code',
+    loadComponent: () =>
+      import('./features/splits/pages/split-group-page.component').then((m) => m.SplitGroupPageComponent),
+  },
+  {
     path: '',
     loadComponent: () =>
       import('./shared/layout/app-shell.component').then((m) => m.AppShellComponent),
@@ -360,6 +366,10 @@ export const routes: Routes = [
         path: 'finance',
         loadComponent: () =>
           import('./features/finance/finance-page.component').then((m) => m.FinancePageComponent),
+      },
+      {
+        path: 'splits',
+        loadChildren: () => import('./features/splits/splits.routes').then((m) => m.SPLITS_ROUTES),
       },
       {
         path: 'analytics/dashboard',

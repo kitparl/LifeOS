@@ -16,6 +16,14 @@ describe('Explore Tools registry', () => {
     expect(news!.icon).toBe('newspaper');
   });
 
+  it('registers Split bills as a free tool mapped to the authenticated /splits route', () => {
+    const splits = EXPLORE_TOOLS.find((t) => t.id === 'splits');
+    expect(splits).toBeDefined();
+    expect(splits!.label).toBe('Split bills');
+    expect(exploreToolRoute(splits!)).toBe('/explore/splits');
+    expect(splits!.authRoute).toBe('/splits');
+  });
+
   it('has unique ids and paths', () => {
     expect(new Set(EXPLORE_TOOLS.map((t) => t.id)).size).toBe(EXPLORE_TOOLS.length);
     expect(new Set(EXPLORE_TOOLS.map((t) => t.path)).size).toBe(EXPLORE_TOOLS.length);

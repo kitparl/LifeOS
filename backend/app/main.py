@@ -18,6 +18,7 @@ from app.modules.dsa.api import router as dsa_router
 from app.modules.export.api import router as export_router
 from app.modules.files.api import router as files_router
 from app.modules.finance.api import router as finance_router
+from app.modules.finance.split.api import router as split_router
 from app.modules.habits.api import router as habits_router
 from app.modules.integrations.api import router as integrations_router
 from app.modules.journal.api import router as journal_router
@@ -120,6 +121,7 @@ app.include_router(export_router, prefix="/api/v1")
 app.include_router(files_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
+app.include_router(split_router, prefix="/api/v1")
 app.include_router(analytics_dashboard_router, prefix="/api/v1")
 app.include_router(memory_router, prefix="/api/v1")
 app.include_router(ocr_router, prefix="/api/v1")
