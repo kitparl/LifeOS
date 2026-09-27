@@ -25,6 +25,9 @@ services:
     image: lifeos-judge:go-judge-1.12.3
     container_name: lifeos-judge
     privileged: true
+    # cgroup v2 hosts give containers a private cgroup namespace by default; go-judge then sees
+    # no cgroup path ("cgroup path is empty") and can't build its sandbox. Use the host's view.
+    cgroup: host
     shm_size: 256m
     environment:
       ES_AUTH_TOKEN: ${DSA_JUDGE_TOKEN:-}
