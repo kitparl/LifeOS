@@ -20,7 +20,7 @@ import {
   bracketMatching,
   foldKeymap,
 } from '@codemirror/language';
-import { defaultKeymap, history, historyKeymap, redo, undo } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from '@codemirror/commands';
 import { openSearchPanel, search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete';
 import { lintKeymap } from '@codemirror/lint';
@@ -65,6 +65,7 @@ export class EditorService {
       ...foldKeymap,
       ...completionKeymap,
       ...lintKeymap,
+      indentWithTab,
     ];
     return keymap.of(bindings);
   }

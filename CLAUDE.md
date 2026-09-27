@@ -76,3 +76,6 @@ design system (Ubuntu-style theme where present). See `.claude/rules/ui-style.md
 ## 8. Communication
 - If a requirement is ambiguous, ask rather than assume and build the wrong thing.
 - If an existing pattern is clearly bad/outdated, flag it and suggest an alternative — don't silently deviate from it.
+
+## 9. Do not commit and push
+- Once development is done after test do not commit any code

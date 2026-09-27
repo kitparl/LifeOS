@@ -164,7 +164,7 @@ type NotesView = 'period' | 'all' | 'deleted';
             </p>
             <div cdkDropList [cdkDropListData]="pinnedNotes()" (cdkDropListDropped)="onDrop('pinned', $event)" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               @for (note of pinnedNotes(); track note.id) {
-                <div cdkDrag [cdkDragData]="note">
+                <div cdkDrag [cdkDragData]="note" class="h-full">
                   <app-sticky-note-card [note]="note" (open)="openNote(note)" (togglePin)="togglePin(note)" (colorChange)="changeColor(note, $event)" (deleteNote)="deleteNote(note)" />
                 </div>
               }
@@ -184,7 +184,7 @@ type NotesView = 'period' | 'all' | 'deleted';
           } @else {
             <div cdkDropList [cdkDropListData]="unpinnedNotes()" (cdkDropListDropped)="onDrop('notes', $event)" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               @for (note of unpinnedNotes(); track note.id) {
-                <div cdkDrag [cdkDragData]="note">
+                <div cdkDrag [cdkDragData]="note" class="h-full">
                   <app-sticky-note-card [note]="note" (open)="openNote(note)" (togglePin)="togglePin(note)" (colorChange)="changeColor(note, $event)" (deleteNote)="deleteNote(note)" />
                 </div>
               }
