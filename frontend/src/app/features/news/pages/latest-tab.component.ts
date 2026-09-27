@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { NewsPreferencesService } from '../../../core/services/news-preferences.service';
-import { NewsChipRowComponent } from '../components/news-chip-row.component';
+import { ChipRowComponent } from '../../../shared/chip-row/chip-row.component';
 import { NewsFeedComponent } from '../components/news-feed.component';
 import { NEWS_COUNTRIES, NewsQuery } from '../models/news.models';
 import { NEWS_COUNTRY_KEY, readNewsPref, writeNewsPref } from '../utils/news-prefs';
@@ -8,11 +8,11 @@ import { NEWS_COUNTRY_KEY, readNewsPref, writeNewsPref } from '../utils/news-pre
 @Component({
   selector: 'app-news-latest-tab',
   standalone: true,
-  imports: [NewsChipRowComponent, NewsFeedComponent],
+  imports: [ChipRowComponent, NewsFeedComponent],
   template: `
     <section class="space-y-3" aria-labelledby="news-latest-heading">
       <h2 id="news-latest-heading" class="section-heading">Latest News</h2>
-      <app-news-chip-row label="Country" [options]="countries" [selected]="country()" (selectedChange)="setCountry($event)" />
+      <app-chip-row testIdPrefix="news-chip" label="Country" [options]="countries" [selected]="country()" (selectedChange)="setCountry($event)" />
       <app-news-feed [query]="query()" [layout]="prefs.layout()" />
     </section>
   `,

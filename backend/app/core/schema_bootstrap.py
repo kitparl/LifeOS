@@ -45,6 +45,7 @@ def _import_models() -> None:
     import app.modules.calendar.models  # noqa: F401
     import app.modules.communication.models  # noqa: F401
     import app.modules.communication.vocabulary.models  # noqa: F401
+    import app.modules.dsa.models  # noqa: F401
     import app.modules.files.models  # noqa: F401
     import app.modules.files.preview_models  # noqa: F401
     import app.modules.finance.models  # noqa: F401

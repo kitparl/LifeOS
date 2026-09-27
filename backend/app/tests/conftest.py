@@ -20,6 +20,7 @@ from app.core.database import Base, get_db
 from app.main import app
 from app.modules.ai.adapters import base as ai_adapter_base
 from app.modules.auth.registration_gate import require_registration_unlock
+from app.modules.dsa.judge import client as dsa_judge_client
 from app.modules.integrations.wordnik import client as wordnik_client
 from app.modules.news import client as news_client
 from app.modules.news import service as news_service
@@ -43,16 +44,20 @@ def _offline_vendor(request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture(autouse=True)
 def _no_real_llm_vendor_calls():
-    """AI adapters and the Wordnik/news clients never reach the internet in tests; individual tests mock vendors on top of this."""
+    """AI adapters, the Wordnik/news clients and the DSA judge never reach the network in tests; individual tests mock vendors on top of this."""
     real_client = httpx.AsyncClient
 
     def offline_client(timeout: float) -> httpx.AsyncClient:
         return real_client(timeout=timeout, transport=httpx.MockTransport(_offline_vendor))
 
+    def offline_judge_client(base_url: str, token: str, timeout: float) -> httpx.AsyncClient:
+        return real_client(base_url=base_url, timeout=timeout, transport=httpx.MockTransport(_offline_vendor))
+
     with (
         patch.object(ai_adapter_base, "_http_client", side_effect=offline_client),
         patch.object(wordnik_client, "_http_client", side_effect=offline_client),
         patch.object(news_client, "_http_client", side_effect=offline_client),
+        patch.object(dsa_judge_client, "_http_client", side_effect=offline_judge_client),
     ):
         yield
 

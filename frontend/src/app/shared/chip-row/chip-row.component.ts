@@ -1,9 +1,13 @@
 import { Component, input, output } from '@angular/core';
-import { NewsOption } from '../models/news.models';
 
-/** Single-select chip row (countries, categories, saved filters). */
+export interface ChipOption<T extends string = string> {
+  id: T;
+  label: string;
+}
+
+/** Single-select chip row (filters such as countries, categories, difficulty). */
 @Component({
-  selector: 'app-news-chip-row',
+  selector: 'app-chip-row',
   standalone: true,
   template: `
     <div class="flex gap-1.5 overflow-x-auto pb-1" role="group" [attr.aria-label]="label()">
@@ -15,7 +19,7 @@ import { NewsOption } from '../models/news.models';
           [style.border-color]="o.id === selected() ? 'var(--primary)' : null"
           [style.color]="o.id === selected() ? 'var(--primary-hover)' : null"
           [attr.aria-pressed]="o.id === selected()"
-          [attr.data-testid]="'news-chip-' + (o.id || 'all')"
+          [attr.data-testid]="testIdPrefix() + '-' + (o.id || 'all')"
           (click)="selectedChange.emit(o.id)"
         >
           {{ o.label }}
@@ -24,9 +28,11 @@ import { NewsOption } from '../models/news.models';
     </div>
   `,
 })
-export class NewsChipRowComponent {
+export class ChipRowComponent {
   readonly label = input.required<string>();
-  readonly options = input.required<readonly NewsOption[]>();
+  readonly options = input.required<readonly ChipOption[]>();
   readonly selected = input.required<string>();
+  /** data-testid prefix per chip: `<prefix>-<option id>` (`-all` for the empty id). */
+  readonly testIdPrefix = input('chip');
   readonly selectedChange = output<string>();
 }

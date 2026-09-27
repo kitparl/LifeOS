@@ -308,6 +308,10 @@ export const routes: Routes = [
         loadChildren: () => import('./features/news/news.routes').then((m) => m.NEWS_ROUTES),
       },
       {
+        path: 'dsa',
+        loadChildren: () => import('./features/dsa/dsa.routes').then((m) => m.DSA_ROUTES),
+      },
+      {
         path: 'search',
         loadComponent: () =>
           import('./features/search/search-page.component').then((m) => m.SearchPageComponent),

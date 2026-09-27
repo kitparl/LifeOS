@@ -14,6 +14,7 @@ from app.modules.analytics_dashboard.api import router as analytics_dashboard_ro
 from app.modules.auth.api import router as auth_router
 from app.modules.calendar.api import router as calendar_router
 from app.modules.communication.api import router as communication_router
+from app.modules.dsa.api import router as dsa_router
 from app.modules.export.api import router as export_router
 from app.modules.files.api import router as files_router
 from app.modules.finance.api import router as finance_router
@@ -58,6 +59,10 @@ async def lifespan(app: FastAPI):
     start_scheduler()
     await load_all_scheduled_jobs()
 
+    from app.modules.dsa.runtime import start_judge, stop_judge
+
+    await start_judge(settings)
+
     polling_started = False
     if settings.telegram_polling_enabled:
         from app.modules.integrations.telegram.polling import start_polling, stop_polling
@@ -69,6 +74,7 @@ async def lifespan(app: FastAPI):
 
     if polling_started:
         await stop_polling()
+    await stop_judge()
     await shutdown_scheduler()
 
 
@@ -120,6 +126,7 @@ app.include_router(ocr_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(sticky_notes_router, prefix="/api/v1")
 app.include_router(news_router, prefix="/api/v1")
+app.include_router(dsa_router, prefix="/api/v1")
 
 
 @app.get("/health")

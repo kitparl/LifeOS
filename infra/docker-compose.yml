@@ -17,5 +17,21 @@ services:
     ports:
       - "6379:6379"
 
+  # DSA practice judge: go-judge sandbox, reachable only from this host (backend DSA_JUDGE_URL).
+  # Opt-in:  DSA_JUDGE_TOKEN=<secret> docker compose --profile judge up -d --build judge
+  judge:
+    profiles: ["judge"]
+    build: ./judge
+    image: lifeos-judge:go-judge-1.12.3
+    container_name: lifeos-judge
+    privileged: true
+    shm_size: 256m
+    environment:
+      ES_AUTH_TOKEN: ${DSA_JUDGE_TOKEN:-}
+    command: ["-http-addr=0.0.0.0:5050", "-parallelism=2", "-file-timeout=30m", "-no-fallback"]
+    ports:
+      - "127.0.0.1:5050:5050"
+    restart: unless-stopped
+
 volumes:
   lifeos_pg_data:

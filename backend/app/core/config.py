@@ -83,6 +83,13 @@ class Settings(BaseSettings):
     article_retention_days: int = Field(default=30, ge=1, validation_alias="ARTICLE_RETENTION_DAYS")
     news_proxy_per_minute: int = Field(default=60, ge=1, validation_alias="NEWS_PROXY_PER_MINUTE")
     news_writes_per_hour: int = Field(default=300, ge=1, validation_alias="NEWS_WRITES_PER_HOUR")
+    # --- DSA practice (go-judge sandbox, internal only; empty URL disables judging) ---
+    dsa_judge_url: str = Field(default="", validation_alias="DSA_JUDGE_URL")
+    dsa_judge_token: str = Field(default="", validation_alias="DSA_JUDGE_TOKEN")
+    dsa_judge_concurrency: int = Field(default=2, ge=1, le=4, validation_alias="DSA_JUDGE_CONCURRENCY")
+    dsa_judge_timeout_seconds: int = Field(default=30, ge=5, le=120, validation_alias="DSA_JUDGE_TIMEOUT_SECONDS")
+    dsa_run_per_minute: int = Field(default=20, ge=1, validation_alias="DSA_RUN_PER_MINUTE")
+    dsa_submit_per_minute: int = Field(default=10, ge=1, validation_alias="DSA_SUBMIT_PER_MINUTE")
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -99,6 +106,8 @@ class Settings(BaseSettings):
     def apply_env_defaults(self) -> Self:
         if self.cookie_secure is None:
             self.cookie_secure = self.is_production
+        if self.dsa_judge_url.strip() and not self.dsa_judge_token.strip():
+            raise ValueError("DSA_JUDGE_TOKEN must be set when DSA_JUDGE_URL is set")
         if self.is_production:
             if self.secret_key == _DEFAULT_SECRET_KEY:
                 raise ValueError(

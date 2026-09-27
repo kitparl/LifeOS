@@ -4,7 +4,7 @@ import { ListPaginatorComponent } from '../../../shared/pagination/list-paginato
 import { PaginatedListState } from '../../../shared/pagination/paginated-list.state';
 import { ArticleRowComponent } from '../components/article-row.component';
 import { CollectionMenuComponent } from '../components/collection-menu.component';
-import { NewsChipRowComponent } from '../components/news-chip-row.component';
+import { ChipRowComponent } from '../../../shared/chip-row/chip-row.component';
 import { NewsSkeletonComponent } from '../components/news-skeleton.component';
 import { NewsStateComponent } from '../components/news-state.component';
 import {
@@ -34,14 +34,14 @@ const EMPTY_TITLES: Record<SavedFilter, string> = {
     ArticleRowComponent,
     CollectionMenuComponent,
     ListPaginatorComponent,
-    NewsChipRowComponent,
+    ChipRowComponent,
     NewsSkeletonComponent,
     NewsStateComponent,
   ],
   template: `
     <section class="space-y-3" aria-labelledby="news-saved-heading">
       <h2 id="news-saved-heading" class="section-heading">Saved Articles</h2>
-      <app-news-chip-row label="Saved filter" [options]="filters" [selected]="filter()" (selectedChange)="setFilter($event)" />
+      <app-chip-row testIdPrefix="news-chip" label="Saved filter" [options]="filters" [selected]="filter()" (selectedChange)="setFilter($event)" />
 
       @if (loading()) {
         <app-news-skeleton layout="list" [count]="4" />
