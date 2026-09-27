@@ -1,8 +1,10 @@
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Observable, of, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { apiErrorMessage } from '../../../core/utils/http';
+import { AddSplitSubmit, SplitAddFormComponent } from '../components/add-split-form.component';
 import { SplitShareActionsComponent } from '../components/share-actions.component';
 import { SplitGroupView, SplitMember } from '../models/split.models';
 import { SplitDeviceStoreService } from '../services/split-device-store.service';
@@ -19,7 +21,7 @@ const CLOCK_TICK_MS = 60_000;
 @Component({
   selector: 'app-split-group-page',
   standalone: true,
-  imports: [DatePipe, RouterLink, SplitShareActionsComponent],
+  imports: [DatePipe, RouterLink, SplitAddFormComponent, SplitShareActionsComponent],
   template: `
     <div class="min-h-dvh" style="background: var(--page-bg); color: var(--text)">
       <header
@@ -58,7 +60,50 @@ const CLOCK_TICK_MS = 60_000;
             @if (g.members.length === 1) {
               <p class="text-xs" style="color: var(--text-muted)">Share the link. People join only if they want to.</p>
             }
+            @if (!g.my_member_id) {
+              @if (g.is_open) {
+                <form class="flex flex-wrap items-end gap-2 text-sm" (submit)="$event.preventDefault(); join()">
+                  <div class="min-w-0 flex-1">
+                    <label class="mb-1 block text-xs" for="split-join-name">Your name</label>
+                    <input
+                      id="split-join-name"
+                      class="input-field"
+                      maxlength="40"
+                      data-testid="split-join-name"
+                      [value]="joinName()"
+                      (input)="joinName.set(inputValue($event))"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    class="btn-primary text-xs"
+                    data-testid="split-join"
+                    [disabled]="!joinName().trim() || busy()"
+                  >Join</button>
+                </form>
+              } @else {
+                <p class="text-xs" style="color: var(--text-muted)">This link is closed. You can still read the group.</p>
+              }
+            }
           </section>
+
+          @if (g.my_member_id && g.is_open) {
+            <section class="panel space-y-3">
+              @if (addOpen()) {
+                <app-split-add-form
+                  [members]="g.members"
+                  [myMemberId]="g.my_member_id"
+                  [busy]="busy()"
+                  (save)="addSplit($event)"
+                  (closed)="addOpen.set(false)"
+                />
+              } @else {
+                <button type="button" class="btn-primary text-xs" data-testid="split-add" (click)="addOpen.set(true)">
+                  Add split
+                </button>
+              }
+            </section>
+          }
 
           <section class="panel !p-0 overflow-hidden">
             <h2 class="px-3 pt-3 text-sm font-semibold">Bills</h2>
@@ -100,9 +145,14 @@ export class SplitGroupPageComponent implements OnInit {
   readonly group = signal<SplitGroupView | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly busy = signal(false);
+  readonly joinName = signal('');
+  readonly addOpen = signal(false);
   private readonly now = signal(Date.now());
 
   readonly code = this.route.snapshot.paramMap.get('code') ?? '';
+  /** This device's seat for the group, if it created or joined it. */
+  private readonly seat = signal<string | null>(this.store.find(this.code)?.seatSecret ?? null);
 
   readonly status = computed(() => {
     const g = this.group();
@@ -120,7 +170,7 @@ export class SplitGroupPageComponent implements OnInit {
   }
 
   load(): void {
-    this.api.getGroup(this.code, this.store.find(this.code)?.seatSecret).subscribe({
+    this.api.getGroup(this.code, this.seat()).subscribe({
       next: (group) => {
         this.group.set(group);
         this.error.set(null);
@@ -129,6 +179,50 @@ export class SplitGroupPageComponent implements OnInit {
       error: (err: unknown) => {
         this.error.set(apiErrorMessage(err, 'Could not load this group.'));
         this.loading.set(false);
+      },
+    });
+  }
+
+  join(): void {
+    const group = this.group();
+    const displayName = this.joinName().trim();
+    if (!group || !displayName) return;
+    this.run(this.api.joinGroup(this.code, { display_name: displayName }), 'Could not join.', (seat) => {
+      this.store.save({
+        code: this.code,
+        name: group.name,
+        seatSecret: seat.seat_secret,
+        displayName,
+        role: 'member',
+      });
+      this.seat.set(seat.seat_secret);
+    });
+  }
+
+  addSplit({ expense, upiVpa }: AddSplitSubmit): void {
+    const seat = this.seat();
+    if (!seat) return;
+    const saveUpi: Observable<unknown> = upiVpa ? this.api.updateMe(this.code, seat, { upi_vpa: upiVpa }) : of(null);
+    const request = saveUpi.pipe(switchMap(() => this.api.addExpense(this.code, seat, expense)));
+    this.run(request, 'Could not save the bill.', () => this.addOpen.set(false));
+  }
+
+  inputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
+  }
+
+  /** Runs a mutation, then reloads the group from the server (the source of truth). */
+  private run<T>(request: Observable<T>, failure: string, onSuccess: (result: T) => void): void {
+    this.busy.set(true);
+    request.subscribe({
+      next: (result) => {
+        onSuccess(result);
+        this.busy.set(false);
+        this.load();
+      },
+      error: (err: unknown) => {
+        this.error.set(apiErrorMessage(err, failure));
+        this.busy.set(false);
       },
     });
   }

@@ -14,6 +14,21 @@ export interface SplitGroupCreatePayload {
   expiry: SplitExpiry;
 }
 
+export interface SplitJoinPayload {
+  display_name: string;
+}
+
+export interface SplitExpensePayload {
+  title: string;
+  amount_rupees: number;
+  paid_by: string;
+  member_ids: string[];
+}
+
+export interface SplitMemberUpdatePayload {
+  upi_vpa: string | null;
+}
+
 /** One-time create/join response; the only place the raw seat secret appears. */
 export interface SplitSeatIssued {
   code: string;
@@ -88,3 +103,6 @@ export interface DeviceSplitGroup {
   displayName: string;
   role: SplitRole;
 }
+
+/** Mirrors the server's `name@bank` check (the server lower-cases before validating). */
+export const UPI_VPA_PATTERN = /^[a-z0-9._-]{2,64}@[a-z0-9.-]{2,64}$/i;

@@ -20,3 +20,14 @@ export function formatInr(paise: number): string {
 export function rupeesToPaise(rupees: number): number {
   return Math.round(rupees * 100);
 }
+
+const MAX_RUPEES = 10_000_000;
+const RUPEES_TEXT = /^\d+(\.\d{1,2})?$/;
+
+/** A bill amount as the server accepts it (> 0, ≤ ₹1 crore, ≤ 2 decimals), else null. */
+export function parseRupees(text: string): number | null {
+  const trimmed = text.trim();
+  if (!RUPEES_TEXT.test(trimmed)) return null;
+  const rupees = Number(trimmed);
+  return rupees > 0 && rupees <= MAX_RUPEES ? rupees : null;
+}

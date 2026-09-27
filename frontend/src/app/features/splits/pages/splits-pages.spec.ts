@@ -5,7 +5,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { environment } from '../../../../environments/environment';
 import { DeviceSplitGroup } from '../models/split.models';
 import { SPLIT_DEVICE_STORAGE_KEY } from '../services/split-device-store.service';
-import { groupView } from '../testing/split-fixtures';
+import { groupView, member } from '../testing/split-fixtures';
 import { SplitGroupPageComponent } from './split-group-page.component';
 import { SplitsHomeComponent } from './splits-home.component';
 
@@ -138,6 +138,72 @@ describe('Split bills pages', () => {
       expect(header.textContent).toContain(url);
       expect(header.querySelector('[data-testid="split-group-qr"] svg')!.getAttribute('data-payload')).toBe(url);
       expect(el(fixture).textContent).toContain('Share the link. People join only if they want to.');
+    });
+
+    it('after join in a second storage state, that list holds the code and the page shows the other bills', () => {
+      // Browser B has never seen the group (its own empty storage state).
+      configure();
+      const fixture = render();
+      const asha = member('m-a', 'Asha', 0);
+      const dinner = {
+        id: 'e-1',
+        title: 'Dinner by Asha',
+        amount_paise: 60000,
+        paid_by: 'm-a',
+        created_by: 'm-a',
+        expense_date: '2026-09-27',
+        created_at: '2026-09-27T10:05:00Z',
+        shares: [{ member_id: 'm-a', amount_paise: 60000 }],
+      };
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ expenses: [dinner] }));
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-add').length).toBe(0);
+
+      fixture.componentInstance.joinName.set('Bala');
+      fixture.detectChanges();
+      byTestId(fixture, 'split-join')[0].click();
+      const join = http.expectOne({ method: 'POST', url: `${api}/groups/k7mq2p/join` });
+      expect(join.request.body).toEqual({ display_name: 'Bala' });
+      join.flush({ code: 'k7mq2p', url_path: '/s/k7mq2p', member_id: 'm-b', seat_secret: 'secret-b', expires_at: '' });
+
+      expect(saved()).toEqual([
+        { code: 'k7mq2p', name: 'Dinner', seatSecret: 'secret-b', displayName: 'Bala', role: 'member' },
+      ]);
+      const reload = http.expectOne(`${api}/groups/k7mq2p`);
+      expect(reload.request.headers.get('X-Split-Seat')).toBe('secret-b');
+      reload.flush(groupView({ members: [asha, member('m-b', 'Bala', 1)], expenses: [dinner], my_member_id: 'm-b' }));
+      fixture.detectChanges();
+
+      expect(byTestId(fixture, 'split-bill-row')[0].textContent).toContain('Dinner by Asha');
+      expect(byTestId(fixture, 'split-join').length).toBe(0);
+      expect(byTestId(fixture, 'split-add').length).toBe(1);
+    });
+
+    it('saves my UPI id before the bill when the add-split form carries one', () => {
+      seed([{ code: 'k7mq2p', name: 'Dinner', seatSecret: 'secret-a', displayName: 'Asha', role: 'creator' }]);
+      configure();
+      const fixture = render();
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-a', is_creator: true }));
+      const expense = { title: 'Tea', amount_rupees: 10, paid_by: 'm-a', member_ids: ['m-a'] };
+      fixture.componentInstance.addSplit({ expense, upiVpa: 'asha@okbank' });
+
+      const patch = http.expectOne({ method: 'PATCH', url: `${api}/groups/k7mq2p/members/me` });
+      expect(patch.request.body).toEqual({ upi_vpa: 'asha@okbank' });
+      expect(patch.request.headers.get('X-Split-Seat')).toBe('secret-a');
+      patch.flush(member('m-a', 'Asha', 0, 'asha@okbank'));
+      const post = http.expectOne({ method: 'POST', url: `${api}/groups/k7mq2p/expenses` });
+      expect(post.request.body).toEqual(expense);
+      post.flush({});
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ my_member_id: 'm-a', is_creator: true }));
+    });
+
+    it('closed link: a visitor can read but not join', () => {
+      configure();
+      const fixture = render();
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ is_open: false }));
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-join').length).toBe(0);
+      expect(el(fixture).textContent).toContain('This link is closed. You can still read the group.');
     });
 
     it('opens without a seat for a visitor', () => {

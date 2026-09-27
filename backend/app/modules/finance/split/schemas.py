@@ -1,12 +1,24 @@
+import re
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 from app.modules.finance.split.codes import Expiry
 
 GroupName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 DisplayName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
+BillTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+MemberId = Annotated[str, StringConstraints(min_length=1, max_length=36)]
+# Rupees with at most 2 decimals; stored as integer paise.
+RupeeAmount = Annotated[Decimal, Field(gt=0, le=10_000_000, decimal_places=2)]
+
+MAX_MEMBERS = 50
+MAX_EXPENSES = 100
+
+# `name@bank`: a UPI virtual payment address.
+UPI_VPA_PATTERN = r"^[a-z0-9._-]{2,64}@[a-z0-9.-]{2,64}$"
 
 
 # --------------------------------------------------------------------------
@@ -17,6 +29,39 @@ class GroupCreate(BaseModel):
     name: GroupName
     creator_name: DisplayName
     expiry: Expiry
+
+
+class JoinRequest(BaseModel):
+    display_name: DisplayName
+
+
+class ExpenseCreate(BaseModel):
+    title: BillTitle
+    amount_rupees: RupeeAmount
+    paid_by: MemberId
+    member_ids: list[MemberId] = Field(min_length=1, max_length=MAX_MEMBERS)
+
+    @field_validator("member_ids")
+    @classmethod
+    def _unique(cls, value: list[str]) -> list[str]:
+        if len(set(value)) != len(value):
+            raise ValueError("member_ids must be unique")
+        return value
+
+
+class MemberUpdate(BaseModel):
+    """`upi_vpa` null or blank clears it."""
+
+    upi_vpa: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, max_length=129)] | None = None
+
+    @field_validator("upi_vpa")
+    @classmethod
+    def _vpa_shape(cls, value: str | None) -> str | None:
+        if not value:
+            return None
+        if not re.fullmatch(UPI_VPA_PATTERN, value):
+            raise ValueError("Enter a UPI id like name@bank")
+        return value
 
 
 # --------------------------------------------------------------------------

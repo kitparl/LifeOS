@@ -8,11 +8,19 @@ Rules that shape this module:
 3. **Ledger rows are append-only.** Adding a bill never rewrites settlements.
 """
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ForbiddenError, NotFoundError, ServiceUnavailableError
-from app.core.timezone import as_utc, utc_now
+from app.core.exceptions import (
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ServiceUnavailableError,
+)
+from app.core.timezone import as_utc, ist_now, utc_now
 from app.modules.auth.models import User
+from app.modules.finance.split.balances import equal_split
 from app.modules.finance.split.codes import (
     expires_at_for,
     generate_code,
@@ -30,14 +38,20 @@ from app.modules.finance.split.models import (
 )
 from app.modules.finance.split.repository import SplitRepository
 from app.modules.finance.split.schemas import (
+    MAX_EXPENSES,
+    MAX_MEMBERS,
+    ExpenseCreate,
     ExpenseOut,
     GroupCreate,
     GroupView,
+    JoinRequest,
     MemberOut,
+    MemberUpdate,
     SeatIssued,
     SettlementOut,
     ShareOut,
 )
+from app.modules.finance.split.upi import rupees_to_paise
 
 _CODE_ATTEMPTS = 5
 
@@ -147,8 +161,85 @@ class SplitService:
         )
 
     # ------------------------------------------------------------------
+    # Seats
+    # ------------------------------------------------------------------
+
+    async def join(self, code: str, data: JoinRequest, user: User | None) -> SeatIssued:
+        group = await self._group(code)
+        self._require_open(group)
+        members = await self.repo.list_members(group.id)
+        if len(members) >= MAX_MEMBERS:
+            raise ConflictError(f"This group is full ({MAX_MEMBERS} people)")
+        secret = new_seat_secret()
+        member = SplitMember(
+            group_id=group.id,
+            seat_no=members[-1].seat_no + 1,
+            display_name=data.display_name,
+            user_id=user.id if user else None,
+            secret_hash=hash_secret(secret),
+        )
+        try:
+            await self.repo.add(member)
+        except IntegrityError as exc:  # two joins raced for the same seat number
+            raise ConflictError("Someone joined at the same moment, try again") from exc
+        return SeatIssued(
+            code=group.code,
+            url_path=url_path(group.code),
+            member_id=member.id,
+            seat_secret=secret,
+            expires_at=as_utc(group.expires_at),
+        )
+
+    async def update_me(self, code: str, seat_secret: str | None, data: MemberUpdate) -> MemberOut:
+        group = await self._group(code)
+        me = await self._require_seat(group, seat_secret)
+        me.upi_vpa = data.upi_vpa
+        await self.repo.add(me)
+        return _member_out(me)
+
+    # ------------------------------------------------------------------
+    # Bills
+    # ------------------------------------------------------------------
+
+    async def add_expense(self, code: str, seat_secret: str | None, data: ExpenseCreate) -> ExpenseOut:
+        group = await self._group(code)
+        me = await self._require_seat(group, seat_secret)
+        self._require_open(group)
+        if await self.repo.count_expenses(group.id) >= MAX_EXPENSES:
+            raise ConflictError(f"This group has reached {MAX_EXPENSES} bills")
+        seat_order = {m.id: m.seat_no for m in await self.repo.list_members(group.id)}
+        if any(member_id not in seat_order for member_id in data.member_ids):
+            raise BadRequestError("Every person on a bill must have joined the group")
+        if data.paid_by not in data.member_ids:
+            raise BadRequestError("Whoever paid must be included on the bill")
+        amount_paise = rupees_to_paise(data.amount_rupees)
+        included = sorted(data.member_ids, key=seat_order.__getitem__)
+        expense = SplitExpense(
+            group_id=group.id,
+            paid_by=data.paid_by,
+            title=data.title,
+            amount_paise=amount_paise,
+            expense_date=ist_now().date(),
+            created_by=me.id,
+        )
+        await self.repo.add(expense)
+        shares = [
+            SplitShare(expense_id=expense.id, member_id=member_id, amount_paise=share)
+            for member_id, share in equal_split(amount_paise, included)
+        ]
+        await self.repo.add(*shares)
+        return _expense_out(expense, shares)
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _require_open(group: SplitGroup) -> None:
+        if group.ended_at is not None:
+            raise ConflictError("This link has ended")
+        if not group.is_open_at(utc_now()):
+            raise ConflictError("This link has expired")
 
     async def _unused_code(self) -> str:
         for _ in range(_CODE_ATTEMPTS):
