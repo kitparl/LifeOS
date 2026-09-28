@@ -246,11 +246,21 @@ async def delete_recurring(
 
 @router.post("/recurring/generate", response_model=GenerationResult)
 async def generate_due(
+    preset: str | None = Query(default=None, pattern="^(this_month|last_month|this_year|custom)$"),
+    start: date | None = Query(default=None),
+    end: date | None = Query(default=None),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Run the idempotent generation pass explicitly. Safe to call repeatedly."""
-    return await FinanceService(db).run_generation(user.id)
+    """Run the idempotent generation pass explicitly. Safe to call repeatedly.
+
+    With a period, recurring expenses are also generated up to that period's
+    end, so a future month can be filled in ahead of time.
+    """
+    service = FinanceService(db)
+    if preset is None:
+        return await service.run_generation(user.id)
+    return await service.sync_recurring(user.id, preset, start, end)
 
 
 # ----------------------------------------------------------------------

@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import case, delete, func, select
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -247,6 +247,29 @@ class FinanceRepository:
             )
         )
         return {row[0] for row in rows.all()}
+
+    async def has_recurring_expense(self, recurring_id: str, start: date, end: date) -> bool:
+        """Whether a definition already has an expense dated inside [start, end]."""
+        row = await self.db.execute(
+            select(FinanceTransaction.id)
+            .where(
+                FinanceTransaction.recurring_id == recurring_id,
+                FinanceTransaction.txn_date >= start,
+                FinanceTransaction.txn_date <= end,
+            )
+            .limit(1)
+        )
+        return row.first() is not None
+
+    async def relink_run(self, recurring_id: str, period: str, expense_id: str) -> None:
+        await self.db.execute(
+            update(FinanceRecurringRun)
+            .where(
+                FinanceRecurringRun.recurring_id == recurring_id,
+                FinanceRecurringRun.period == period,
+            )
+            .values(expense_id=expense_id)
+        )
 
     async def record_run(self, recurring_id: str, period: str, expense_id: str | None) -> None:
         self.db.add(

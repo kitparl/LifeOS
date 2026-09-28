@@ -8,6 +8,7 @@ from datetime import date
 
 import pytest
 from app.modules.finance.generation import (
+    add_months,
     clamp_day,
     continue_schedule,
     emi_schedule,
@@ -205,6 +206,82 @@ async def test_deleted_generated_expense_is_not_resurrected(client):
 
     # The (definition, month) slot stays consumed — no silent recreation.
     assert len((await client.get("/api/v1/finance/expenses", headers=h)).json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_sync_generates_recurring_for_selected_future_month(client):
+    h = await _auth(client, "fin_future_sync@example.com")
+    today = date.today()
+    year, month = add_months(today.year, today.month, 2)
+    future = {
+        "preset": "custom",
+        "start": date(year, month, 1).isoformat(),
+        "end": clamp_day(year, month, 31).isoformat(),
+    }
+
+    await client.post(
+        "/api/v1/finance/recurring",
+        headers=h,
+        json={
+            "title": "Insurance",
+            "amount": 900,
+            "expense_kind": "hard",
+            "category": "Insurance",
+            "start_date": today.replace(day=1).isoformat(),
+            "day_of_month": 15,
+        },
+    )
+    # Reads alone never generate ahead of today.
+    assert (await client.get("/api/v1/finance/expenses", headers=h, params=future)).json() == []
+
+    synced = await client.post("/api/v1/finance/recurring/generate", headers=h, params=future)
+    assert synced.status_code == 200
+    assert synced.json()["recurring_expenses_created"] >= 1
+
+    rows = (await client.get("/api/v1/finance/expenses", headers=h, params=future)).json()
+    assert [row["txn_date"] for row in rows] == [date(year, month, 15).isoformat()]
+
+    # Syncing again is idempotent.
+    again = await client.post("/api/v1/finance/recurring/generate", headers=h, params=future)
+    assert again.json()["recurring_expenses_created"] == 0
+    assert len((await client.get("/api/v1/finance/expenses", headers=h, params=future)).json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_sync_restores_deleted_recurring_expense_once(client):
+    h = await _auth(client, "fin_restore_sync@example.com")
+    today = date.today()
+    this_month = {"preset": "this_month"}
+
+    await client.post(
+        "/api/v1/finance/recurring",
+        headers=h,
+        json={
+            "title": "Gym",
+            "amount": 2000,
+            "expense_kind": "hard",
+            "category": "Health",
+            "start_date": today.replace(day=1).isoformat(),
+            "day_of_month": 1,
+        },
+    )
+    expense_id = (await client.get("/api/v1/finance/expenses", headers=h)).json()[0]["id"]
+    await client.delete(f"/api/v1/finance/expenses/{expense_id}", headers=h)
+
+    # Plain generation / reads still never resurrect it.
+    await client.post("/api/v1/finance/recurring/generate", headers=h)
+    assert (await client.get("/api/v1/finance/expenses", headers=h)).json() == []
+
+    # An explicit period sync restores the missing month...
+    synced = await client.post("/api/v1/finance/recurring/generate", headers=h, params=this_month)
+    assert synced.json()["recurring_expenses_restored"] == 1
+    rows = (await client.get("/api/v1/finance/expenses", headers=h)).json()
+    assert [row["title"] for row in rows] == ["Gym"]
+
+    # ...exactly once: a month that already has the expense is left alone.
+    again = await client.post("/api/v1/finance/recurring/generate", headers=h, params=this_month)
+    assert again.json()["recurring_expenses_restored"] == 0
+    assert len((await client.get("/api/v1/finance/expenses", headers=h)).json()) == 1
 
 
 # ======================================================================

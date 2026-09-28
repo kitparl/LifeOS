@@ -20,6 +20,7 @@ from app.modules.finance.generation import (
     clamp_day,
     continue_schedule,
     emi_schedule,
+    month_bounds,
     period_bounds,
     period_key,
     recurring_due_dates,
@@ -129,6 +130,68 @@ class FinanceService:
             emi_expenses_created=emi_created,
         )
 
+    async def sync_recurring(
+        self,
+        user_id: str,
+        preset: str,
+        start: date | None = None,
+        end: date | None = None,
+    ) -> GenerationResult:
+        """Explicit sync for the selected period.
+
+        On top of the usual pass through today, it:
+        - generates recurring expenses due up to the period's end, which may be
+          a future month (EMI expenses stay bounded by today);
+        - restores generated recurring expenses the user deleted inside the
+          period. This is the only path that recreates a deleted row, and it
+          skips any month that already has an expense from the definition, so
+          a month never gets a second copy.
+        """
+        today = self._today()
+        period_start, period_end = period_bounds(preset, today, start, end)
+        result = await self.run_generation(user_id, today)
+        if period_end > today:
+            result.recurring_expenses_created += await self._generate_recurring(user_id, period_end)
+        result.recurring_expenses_restored = await self._restore_recurring(
+            user_id, period_start, period_end
+        )
+        return result
+
+    async def _restore_recurring(self, user_id: str, start: date, end: date) -> int:
+        restored = 0
+        for definition in await self.repo.list_recurring(user_id, active_only=True):
+            claimed = await self.repo.claimed_periods(definition.id)
+            for due in recurring_due_dates(
+                definition.start_date, definition.end_date, definition.day_of_month, end
+            ):
+                slot = period_key(due)
+                if due < start or slot not in claimed:
+                    continue
+                if await self.repo.has_recurring_expense(definition.id, *month_bounds(due)):
+                    continue
+                expense = await self._materialise_recurring(user_id, definition, due)
+                await self.repo.relink_run(definition.id, slot, expense.id)
+                restored += 1
+        return restored
+
+    async def _materialise_recurring(
+        self, user_id: str, definition: FinanceRecurring, due: date
+    ) -> FinanceTransaction:
+        return await self.repo.add_transaction(
+            FinanceTransaction(
+                user_id=user_id,
+                txn_type="expense",
+                amount=definition.amount,
+                category=definition.category,
+                description=definition.title,
+                txn_date=due,
+                is_recurring=True,
+                notes=definition.notes,
+                expense_kind=definition.expense_kind,
+                recurring_id=definition.id,
+            )
+        )
+
     async def _generate_recurring(self, user_id: str, through: date) -> int:
         created = 0
         for definition in await self.repo.list_recurring(user_id, active_only=True):
@@ -140,20 +203,7 @@ class FinanceService:
                 slot = period_key(due)
                 if slot in claimed:
                     continue
-                expense = await self.repo.add_transaction(
-                    FinanceTransaction(
-                        user_id=user_id,
-                        txn_type="expense",
-                        amount=definition.amount,
-                        category=definition.category,
-                        description=definition.title,
-                        txn_date=due,
-                        is_recurring=True,
-                        notes=definition.notes,
-                        expense_kind=definition.expense_kind,
-                        recurring_id=definition.id,
-                    )
-                )
+                expense = await self._materialise_recurring(user_id, definition, due)
                 await self.repo.record_run(definition.id, slot, expense.id)
                 claimed.add(slot)
                 created += 1

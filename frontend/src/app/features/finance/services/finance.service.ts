@@ -10,6 +10,7 @@ import {
   ExpensePayload,
   FinanceListResult,
   FinanceOverview,
+  GenerationResult,
   Income,
   IncomePayload,
   Loan,
@@ -137,6 +138,13 @@ export class FinanceService {
 
   deleteRecurring(id: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/recurring/${id}`);
+  }
+
+  /** Generate recurring expenses due up to the end of `period`, future months included. */
+  syncRecurring(period: PeriodSelection): Observable<GenerationResult> {
+    return this.http.post<GenerationResult>(`${this.api}/recurring/generate`, null, {
+      params: periodParams(period),
+    });
   }
 
   // ---- Loans ----------------------------------------------------------

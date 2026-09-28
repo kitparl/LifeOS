@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { LucideDynamicIcon, LucideRefreshCw, provideLucideIcons } from '@lucide/angular';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { PaginatedListState } from '../../shared/pagination/paginated-list.state';
 import { TabHubComponent, TabHubItem } from '../../shared/tab-hub/tab-hub.component';
@@ -63,13 +64,31 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans' | '
     LoanFormComponent,
     PartPaymentFormComponent,
     ForecloseFormComponent,
+    LucideDynamicIcon,
   ],
+  providers: [provideLucideIcons(LucideRefreshCw)],
   template: `
     <div class="space-y-3">
       <app-tab-hub [tabs]="tabs" [activeId]="activeTab()" [wrap]="true" (tabChange)="setTab($event)">
         @if (activeTab() !== 'splits') {
           <div class="flex flex-wrap items-center gap-2 pb-1">
             <app-finance-period-filter [period]="period()" (periodChange)="setPeriod($event)" />
+            <button
+              type="button"
+              class="btn-ghost !min-h-auto !px-1 !py-0.5"
+              data-testid="finance-sync-recurring"
+              title="Sync recurring expenses for the selected period (adds due and restores deleted ones)"
+              aria-label="Sync recurring expenses for the selected period"
+              [disabled]="syncing()"
+              (click)="syncRecurring()"
+            >
+              <svg
+                class="h-4 w-4 pointer-events-none"
+                [class.animate-spin]="syncing()"
+                lucideIcon="refresh-cw"
+                aria-hidden="true"
+              ></svg>
+            </button>
             @if (overview()) {
               <p class="text-xs" style="color: var(--text-muted)">{{ overview()!.label }}</p>
             }
@@ -214,6 +233,7 @@ export class FinancePageComponent implements OnInit {
   readonly activeTab = signal<FinanceTab>('overview');
   readonly period = signal<PeriodSelection>(defaultPeriod());
   readonly error = signal<string | null>(null);
+  readonly syncing = signal(false);
 
   readonly overview = signal<FinanceOverview | null>(null);
   readonly breakdown = signal<ExpenseBreakdown | null>(null);
@@ -269,6 +289,22 @@ export class FinancePageComponent implements OnInit {
     this.expensePaging.setPage(1);
     this.incomePaging.setPage(1);
     this.loadAll();
+  }
+
+  /** Materialise recurring expenses due through the selected period's end —
+   * reads only generate up to today, so this is how future months get filled. */
+  syncRecurring(): void {
+    this.syncing.set(true);
+    this.finance.syncRecurring(this.period()).subscribe({
+      next: () => {
+        this.syncing.set(false);
+        this.loadAll();
+      },
+      error: () => {
+        this.syncing.set(false);
+        this.error.set('Could not sync recurring expenses.');
+      },
+    });
   }
 
   setKindFilter(kind: ExpenseKind | null): void {

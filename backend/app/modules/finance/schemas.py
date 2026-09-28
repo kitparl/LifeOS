@@ -148,6 +148,8 @@ class GenerationResult(BaseModel):
 
     recurring_expenses_created: int
     emi_expenses_created: int
+    # Deleted generated expenses recreated by an explicit period sync.
+    recurring_expenses_restored: int = 0
 
 
 # --------------------------------------------------------------------------

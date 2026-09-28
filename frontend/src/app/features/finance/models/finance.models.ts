@@ -192,6 +192,13 @@ export interface ExpenseBreakdown {
   hard_total: number;
 }
 
+/** What an explicit recurring sync created or restored. */
+export interface GenerationResult {
+  recurring_expenses_created: number;
+  emi_expenses_created: number;
+  recurring_expenses_restored: number;
+}
+
 export interface UpcomingItem {
   due_date: string;
   title: string;
