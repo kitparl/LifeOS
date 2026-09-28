@@ -119,6 +119,7 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans' | '
             [kind]="kindFilter()"
             [category]="categoryFilter()"
             [paging]="expensePaging"
+            [totalAmount]="expenseTotal()"
             (add)="openExpenseForm(null)"
             (edit)="openExpenseForm($event)"
             (remove)="confirmDeleteExpense($event)"
@@ -131,6 +132,7 @@ type FinanceTab = 'overview' | 'income' | 'expenses' | 'recurring' | 'loans' | '
           <app-finance-income-tab
             [income]="income()"
             [paging]="incomePaging"
+            [totalAmount]="incomeTotal()"
             (add)="openIncomeForm(null)"
             (edit)="openIncomeForm($event)"
             (remove)="confirmDeleteIncome($event)"
@@ -242,7 +244,9 @@ export class FinancePageComponent implements OnInit {
   readonly loanSummary = signal<LoanSummary | null>(null);
 
   readonly expenses = signal<Expense[]>([]);
+  readonly expenseTotal = signal(0);
   readonly income = signal<Income[]>([]);
+  readonly incomeTotal = signal(0);
   readonly recurring = signal<RecurringExpense[]>([]);
   readonly loans = signal<Loan[]>([]);
   readonly emis = signal<LoanEMI[]>([]);
@@ -391,6 +395,7 @@ export class FinancePageComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.expenses.set(result.items);
+          this.expenseTotal.set(result.totalAmount);
           this.expensePaging.total = result.total;
         },
         error: () => this.error.set('Could not load expenses.'),
@@ -406,6 +411,7 @@ export class FinancePageComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.income.set(result.items);
+          this.incomeTotal.set(result.totalAmount);
           this.incomePaging.total = result.total;
         },
         error: () => this.error.set('Could not load income.'),

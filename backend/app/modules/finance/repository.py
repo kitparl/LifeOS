@@ -66,21 +66,52 @@ class FinanceRepository:
         offset: int = 0,
     ) -> tuple[list[FinanceTransaction], int]:
         q = select(FinanceTransaction).where(
-            FinanceTransaction.user_id == user_id,
-            FinanceTransaction.txn_type == txn_type,
-            FinanceTransaction.txn_date >= start,
-            FinanceTransaction.txn_date <= end,
+            *self._period_filters(user_id, txn_type, start, end, expense_kind, category)
         )
-        if expense_kind:
-            q = q.where(FinanceTransaction.expense_kind == expense_kind)
-        if category:
-            q = q.where(FinanceTransaction.category == category)
         q = q.order_by(FinanceTransaction.txn_date.desc(), FinanceTransaction.created_at.desc())
         if limit is None:
             result = await self.db.execute(q)
             rows = list(result.scalars().all())
             return rows, len(rows)
         return await paginate(self.db, q, Pagination(limit=limit, offset=offset))
+
+    async def sum_in_period(
+        self,
+        user_id: str,
+        txn_type: str,
+        start: date,
+        end: date,
+        expense_kind: str | None = None,
+        category: str | None = None,
+    ) -> float:
+        """Total amount across every row `list_in_period` matches, not just one page."""
+        total = await self.db.scalar(
+            select(func.coalesce(func.sum(FinanceTransaction.amount), 0.0)).where(
+                *self._period_filters(user_id, txn_type, start, end, expense_kind, category)
+            )
+        )
+        return float(total or 0.0)
+
+    @staticmethod
+    def _period_filters(
+        user_id: str,
+        txn_type: str,
+        start: date,
+        end: date,
+        expense_kind: str | None,
+        category: str | None,
+    ) -> list[ColumnElement[bool]]:
+        filters: list[ColumnElement[bool]] = [
+            FinanceTransaction.user_id == user_id,
+            FinanceTransaction.txn_type == txn_type,
+            FinanceTransaction.txn_date >= start,
+            FinanceTransaction.txn_date <= end,
+        ]
+        if expense_kind:
+            filters.append(FinanceTransaction.expense_kind == expense_kind)
+        if category:
+            filters.append(FinanceTransaction.category == category)
+        return filters
 
     async def get_transaction(self, user_id: str, txn_id: str) -> FinanceTransaction | None:
         result = await self.db.execute(

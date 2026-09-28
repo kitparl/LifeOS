@@ -214,4 +214,7 @@ export interface CategoryOptions {
   income: string[];
 }
 
-export type FinanceListResult<T> = Page<T>;
+/** A finance list page plus the amount total of every matching row (all pages). */
+export interface FinanceListResult<T> extends Page<T> {
+  totalAmount: number;
+}

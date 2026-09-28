@@ -98,10 +98,11 @@ async def list_expenses(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    items, total = await FinanceService(db).list_expenses(
+    items, total, total_amount = await FinanceService(db).list_expenses(
         user.id, preset, start, end, expense_kind, category, limit=limit, offset=offset
     )
     response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Total-Amount"] = f"{total_amount:.2f}"
     return items
 
 
@@ -148,10 +149,11 @@ async def list_income(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    items, total = await FinanceService(db).list_income(
+    items, total, total_amount = await FinanceService(db).list_income(
         user.id, preset, start, end, limit=limit, offset=offset
     )
     response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Total-Amount"] = f"{total_amount:.2f}"
     return items
 
 

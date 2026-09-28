@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../../environments/environment';
@@ -27,6 +27,11 @@ import {
   UpcomingItem,
 } from '../models/finance.models';
 import { toPage } from '../../../core/utils/http';
+
+/** Page + `X-Total-Amount` header, the sum across every matching row. */
+function toFinancePage<T>(response: HttpResponse<T[]>): FinanceListResult<T> {
+  return { ...toPage(response), totalAmount: Number(response.headers.get('X-Total-Amount') ?? 0) };
+}
 
 function periodParams(period: PeriodSelection): HttpParams {
   let params = new HttpParams().set('preset', period.preset);
@@ -71,7 +76,7 @@ export class FinanceService {
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http
       .get<Expense[]>(`${this.api}/expenses`, { params, observe: 'response' })
-      .pipe(map(toPage));
+      .pipe(map(toFinancePage));
   }
 
   createExpense(data: ExpensePayload): Observable<Expense> {
@@ -97,7 +102,7 @@ export class FinanceService {
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     return this.http
       .get<Income[]>(`${this.api}/income`, { params, observe: 'response' })
-      .pipe(map(toPage));
+      .pipe(map(toFinancePage));
   }
 
   createIncome(data: IncomePayload): Observable<Income> {

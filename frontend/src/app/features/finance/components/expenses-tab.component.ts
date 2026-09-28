@@ -46,7 +46,11 @@ import { Expense, ExpenseKind } from '../models/finance.models';
           }
         </select>
 
-        <button type="button" class="btn-primary text-xs sm:ml-auto" (click)="add.emit()">
+        <p class="text-xs sm:ml-auto" style="color: var(--text-muted)" data-testid="finance-expenses-total">
+          Total: <span class="font-medium">{{ money(totalAmount) }}</span>
+        </p>
+
+        <button type="button" class="btn-primary text-xs" (click)="add.emit()">
           + Add Expense
         </button>
       </div>
@@ -105,6 +109,8 @@ export class ExpensesTabComponent {
   @Input() categories: string[] = [];
   @Input() kind: ExpenseKind | null = null;
   @Input() category: string | null = null;
+  /** Sum of every expense matching the period and filters, across all pages. */
+  @Input() totalAmount = 0;
   @Input({ required: true }) paging!: PaginatedListState;
 
   @Output() readonly add = new EventEmitter<void>();

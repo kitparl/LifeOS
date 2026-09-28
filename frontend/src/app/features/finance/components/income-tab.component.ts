@@ -12,7 +12,10 @@ import { Income } from '../models/finance.models';
   imports: [DatePipe, ListPaginatorComponent],
   template: `
     <div class="space-y-3">
-      <div class="flex justify-end">
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <p class="text-xs" style="color: var(--text-muted)" data-testid="finance-income-total">
+          Total: <span class="font-medium">{{ money(totalAmount) }}</span>
+        </p>
         <button type="button" class="btn-primary text-xs" (click)="add.emit()">+ Add Income</button>
       </div>
 
@@ -62,6 +65,8 @@ export class IncomeTabComponent {
   private readonly currency = inject(CurrencyPreferencesService);
 
   @Input() income: Income[] = [];
+  /** Sum of every income record in the period, across all pages. */
+  @Input() totalAmount = 0;
   @Input({ required: true }) paging!: PaginatedListState;
 
   @Output() readonly add = new EventEmitter<void>();

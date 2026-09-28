@@ -333,7 +333,8 @@ class FinanceService:
         category: str | None = None,
         limit: int = 25,
         offset: int = 0,
-    ) -> tuple[list[ExpenseResponse], int]:
+    ) -> tuple[list[ExpenseResponse], int, float]:
+        """One page of expenses, the matching row count, and the matching amount total."""
         period_start, period_end = period_bounds(preset, self._today(), start, end)
         await self.run_generation(user_id)
         rows, total = await self.repo.list_in_period(
@@ -346,7 +347,10 @@ class FinanceService:
             limit=limit,
             offset=offset,
         )
-        return [_expense_response(row) for row in rows], total
+        total_amount = await self.repo.sum_in_period(
+            user_id, "expense", period_start, period_end, expense_kind, category
+        )
+        return [_expense_response(row) for row in rows], total, total_amount
 
     async def create_expense(self, user_id: str, data: ExpenseCreate) -> ExpenseResponse:
         await self._remember_category(user_id, "expense", data.category)
@@ -405,12 +409,14 @@ class FinanceService:
         end: date | None = None,
         limit: int = 25,
         offset: int = 0,
-    ) -> tuple[list[IncomeResponse], int]:
+    ) -> tuple[list[IncomeResponse], int, float]:
+        """One page of income, the matching row count, and the matching amount total."""
         period_start, period_end = period_bounds(preset, self._today(), start, end)
         rows, total = await self.repo.list_in_period(
             user_id, "income", period_start, period_end, limit=limit, offset=offset
         )
-        return [_income_response(row) for row in rows], total
+        total_amount = await self.repo.sum_in_period(user_id, "income", period_start, period_end)
+        return [_income_response(row) for row in rows], total, total_amount
 
     async def create_income(self, user_id: str, data: IncomeCreate) -> IncomeResponse:
         await self._remember_category(user_id, "income", data.category)

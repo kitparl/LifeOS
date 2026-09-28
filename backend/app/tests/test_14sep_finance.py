@@ -817,3 +817,43 @@ async def test_legacy_summary_has_no_net_field(client):
     summary = (await client.get("/api/v1/finance/summary", headers=h)).json()
     assert summary["total_expenses"] == 50
     assert "net" not in summary
+
+
+@pytest.mark.asyncio
+async def test_expense_list_reports_filtered_total_across_pages(client):
+    h = await _auth(client, "fin_total_amount@example.com")
+    today = date.today().isoformat()
+    for title, amount, kind in [("Coffee", 150.5, "soft"), ("Rent", 20000, "hard"), ("Movie", 400, "soft")]:
+        created = await client.post(
+            "/api/v1/finance/expenses",
+            headers=h,
+            json={"title": title, "amount": amount, "txn_date": today, "expense_kind": kind},
+        )
+        assert created.status_code == 201
+
+    # The total covers every matching row, not just the returned page.
+    page = await client.get("/api/v1/finance/expenses", headers=h, params={"limit": 1})
+    assert len(page.json()) == 1
+    assert page.headers["X-Total-Count"] == "3"
+    assert page.headers["X-Total-Amount"] == "20550.50"
+
+    soft = await client.get("/api/v1/finance/expenses", headers=h, params={"expense_kind": "soft"})
+    assert soft.headers["X-Total-Amount"] == "550.50"
+
+
+@pytest.mark.asyncio
+async def test_income_list_reports_total_across_pages(client):
+    h = await _auth(client, "fin_income_total@example.com")
+    today = date.today().isoformat()
+    for title, amount in [("Salary", 90000), ("Freelance", 12500.25)]:
+        created = await client.post(
+            "/api/v1/finance/income",
+            headers=h,
+            json={"title": title, "amount": amount, "txn_date": today},
+        )
+        assert created.status_code == 201
+
+    page = await client.get("/api/v1/finance/income", headers=h, params={"limit": 1})
+    assert len(page.json()) == 1
+    assert page.headers["X-Total-Count"] == "2"
+    assert page.headers["X-Total-Amount"] == "102500.25"

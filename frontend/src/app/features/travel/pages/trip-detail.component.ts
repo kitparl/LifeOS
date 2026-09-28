@@ -2,6 +2,7 @@ import { Component, OnInit, ViewChild, computed, inject, signal } from '@angular
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
+import { readJsonLocalStorage, writeJsonLocalStorage } from '../../../core/services/preferences-sync';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
 import { ItemPatch, ItineraryEditorComponent, NewItem } from '../components/itinerary-editor.component';
@@ -28,6 +29,9 @@ import { stopDayLabels } from '../utils/itinerary';
 import { directionsUrl } from '../utils/google-links';
 
 type MobileTab = 'map' | 'itinerary';
+
+/** Per-browser choice for drawing route lines on the trip map. */
+const SHOW_ROUTE_KEY = 'lifeos-travel-trip-show-route';
 
 /** One road leg of the current route, labelled with its stops and the day it arrives on. */
 interface LegRow {
@@ -122,7 +126,7 @@ interface LegRow {
                 }
               </div>
             }
-            <app-travel-map #map class="h-[55vh]" [markers]="markers()" [lines]="lines()" [pin]="searchPin()" [fitKey]="fitKey()" (markerSelect)="openPlace($event.id)" />
+            <app-travel-map #map class="h-[55vh]" [markers]="markers()" [lines]="showRoute() ? lines() : []" [pin]="searchPin()" [fitKey]="fitKey()" (markerSelect)="openPlace($event.id)" />
             <div class="panel space-y-2 text-sm">
               <div class="flex flex-wrap items-center gap-2">
                 <select class="input-field !w-auto text-xs" aria-label="Travel mode" [(ngModel)]="mode">
@@ -133,6 +137,10 @@ interface LegRow {
                 <button type="button" class="btn-secondary text-xs" [disabled]="busy() || d.stops.length < 2" (click)="route()">
                   {{ d.route ? 'Recalculate route' : 'Get route' }}
                 </button>
+                <label class="flex cursor-pointer items-center gap-1 text-xs">
+                  <input type="checkbox" class="h-4 w-4" [checked]="showRoute()" (change)="setShowRoute($any($event.target).checked)" />
+                  Show route on map
+                </label>
                 @if (directions(); as url) {
                   <a class="text-xs underline" [href]="url" target="_blank" rel="noopener noreferrer">Get directions in Google Maps</a>
                 }
@@ -244,6 +252,8 @@ export class TripDetailComponent implements OnInit {
   readonly saveState = signal('');
   readonly tab = signal<MobileTab>('map');
   readonly selectedDay = signal<string | null>(null);
+  /** Route lines stay off the map until the user asks for them; the choice is remembered. */
+  readonly showRoute = signal(readJsonLocalStorage<boolean>(SHOW_ROUTE_KEY, false));
   private readonly filterClicks = signal(0);
   readonly searchPin = signal<LatLng | null>(null);
   readonly searchLookup = signal<GeoLookup | null>(null);
@@ -457,6 +467,11 @@ export class TripDetailComponent implements OnInit {
     if (d) this.run(this.api.updateItem(d.trip.id, event.id, event.patch));
   }
 
+  setShowRoute(on: boolean): void {
+    this.showRoute.set(on);
+    writeJsonLocalStorage(SHOW_ROUTE_KEY, on);
+  }
+
   route(): void {
     const d = this.detail();
     if (!d) return;
@@ -465,6 +480,7 @@ export class TripDetailComponent implements OnInit {
       next: (r) => {
         this.busy.set(false);
         this.detail.set({ ...d, route: { ...r, is_stale: false } });
+        this.setShowRoute(true);
       },
       error: (err) => this.fail(err),
     });
