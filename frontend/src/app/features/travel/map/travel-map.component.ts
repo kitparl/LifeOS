@@ -73,6 +73,8 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
    * for moments like "a GPX was just imported" where the new line must come into view.
    */
   readonly fitKey = input<string | null>(null);
+  /** Keep every marker's label open instead of only on hover (for small maps like one trip's stops). */
+  readonly permanentLabels = input(false);
   /** Crosshair cursor while a tool (drop pin, draw route) is active. */
   readonly toolActive = input(false);
 
@@ -96,8 +98,9 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
       const markers = this.markers();
       const lines = this.lines();
       const fitKey = this.fitKey();
+      const permanent = this.permanentLabels();
       if (!this.ready()) return;
-      this.render(markers, lines);
+      this.render(markers, lines, permanent);
       if (fitKey && fitKey !== this.lastFitKey) {
         this.lastFitKey = fitKey;
         this.fitTo(markers, lines, 14);
@@ -167,7 +170,7 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
     this.map?.invalidateSize();
   }
 
-  private render(markers: readonly MapMarker[], lines: readonly MapLine[]): void {
+  private render(markers: readonly MapMarker[], lines: readonly MapLine[], permanentLabels: boolean): void {
     const L = this.L;
     if (!L || !this.markerLayer || !this.lineLayer || !this.map) return;
     this.markerLayer.clearLayers();
@@ -191,7 +194,7 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
         fillColor: color,
         fillOpacity: m.faded ? 0.35 : 0.95,
       })
-        .bindTooltip(escapeHtml(m.label), { direction: 'top', offset: [0, -6] })
+        .bindTooltip(escapeHtml(m.label), { direction: 'top', offset: [0, -6], permanent: permanentLabels })
         .on('click', (e: Leaflet.LeafletMouseEvent) => {
           L.DomEvent.stopPropagation(e);
           this.markerSelect.emit(m);

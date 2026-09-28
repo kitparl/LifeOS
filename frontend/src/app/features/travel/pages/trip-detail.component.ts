@@ -122,7 +122,7 @@ interface LegRow {
                 }
               </div>
             }
-            <app-travel-map #map class="h-[55vh]" [markers]="markers()" [lines]="lines()" [pin]="searchPin()" [fitKey]="fitKey()" (markerSelect)="openPlace($event.id)" />
+            <app-travel-map #map class="h-[55vh]" [markers]="markers()" [lines]="lines()" [pin]="searchPin()" [fitKey]="fitKey()" [permanentLabels]="showLabels" (markerSelect)="openPlace($event.id)" />
             <div class="panel space-y-2 text-sm">
               <div class="flex flex-wrap items-center gap-2">
                 <select class="input-field !w-auto text-xs" aria-label="Travel mode" [(ngModel)]="mode">
@@ -133,6 +133,10 @@ interface LegRow {
                 <button type="button" class="btn-secondary text-xs" [disabled]="busy() || d.stops.length < 2" (click)="route()">
                   {{ d.route ? 'Recalculate route' : 'Get route' }}
                 </button>
+                <label class="flex items-center gap-1 text-xs">
+                  <input type="checkbox" [(ngModel)]="showLabels" />
+                  Show names on map
+                </label>
                 @if (directions(); as url) {
                   <a class="text-xs underline" [href]="url" target="_blank" rel="noopener noreferrer">Get directions in Google Maps</a>
                 }
@@ -249,6 +253,7 @@ export class TripDetailComponent implements OnInit {
   readonly searchLookup = signal<GeoLookup | null>(null);
   readonly mapCenter = (): LatLng | null => this.map?.center() ?? null;
   mode: RouteMode = 'driving';
+  showLabels = true;
   placeToAdd = '';
   /** Day that searched and saved places are added to ('' = linked to the trip, not on a day). Defaults to Day 1. */
   addDayId = '';
