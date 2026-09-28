@@ -24,6 +24,7 @@ import {
 } from '../models/travel.models';
 import { TravelApiService } from '../services/travel-api.service';
 import { decodePolyline } from '../utils/geo';
+import { stopDayLabels } from '../utils/itinerary';
 import { directionsUrl } from '../utils/google-links';
 
 type MobileTab = 'map' | 'itinerary';
@@ -281,10 +282,11 @@ export class TripDetailComponent implements OnInit {
     if (!d) return [];
     const day = this.dayFilter();
     const onDay = day ? this.placesByDay().get(day) : null;
+    const dayLabels = stopDayLabels(d.days, d.stops);
     const stops: MapMarker[] = d.stops.flatMap((s, i) =>
       onDay && !onDay.has(s.place_id)
         ? []
-        : [{ id: s.place_id, kind: 'place', lat: s.lat, lng: s.lng, label: `${i + 1}. ${s.name}`, color: this.dayColorOf(s.day_id) }],
+        : [{ id: s.place_id, kind: 'place', lat: s.lat, lng: s.lng, label: stopLabel(i, s.name, dayLabels.get(i)), color: this.dayColorOf(s.day_id) }],
     );
     if (day) return stops;
     const scheduled = new Set([...this.placesByDay().values()].flatMap((ids) => [...ids]));
@@ -512,6 +514,12 @@ export class TripDetailComponent implements OnInit {
     this.saveState.set('');
     this.error.set(apiErrorMessage(err, 'Could not save that change'));
   }
+}
+
+/** "3. Tosh" or, for a day's first/last stop, "3. Tosh · Day 2 end". */
+function stopLabel(index: number, name: string, dayLabels: string[] | undefined): string {
+  const base = `${index + 1}. ${name}`;
+  return dayLabels?.length ? `${base} · ${dayLabels.join(' · ')}` : base;
 }
 
 /** Consecutive stop pairs (the dashed preview drawn before a route exists). */

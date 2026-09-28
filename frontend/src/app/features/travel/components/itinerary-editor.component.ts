@@ -1,9 +1,9 @@
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
 import { DatePipe } from '@angular/common';
-import { Component, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ItemUpdate, ItineraryDay, ItineraryItem, TripPlace } from '../models/travel.models';
-import { moveItem } from '../utils/itinerary';
+import { dayEndpoints, moveItem } from '../utils/itinerary';
 
 export interface ItemPatch {
   id: string;
@@ -69,6 +69,9 @@ export interface NewItem {
                       <span class="font-medium">{{ item.title }}</span>
                       @if (placeName(item); as p) {
                         <span class="text-xs" style="color: var(--text-muted)"> · 📍 {{ p }}</span>
+                      }
+                      @if (endpoints().get(item.id); as label) {
+                        <span class="chip ml-1 text-xs">{{ label }}</span>
                       }
                     </button>
                     @if (open() === item.id) {
@@ -150,6 +153,18 @@ export class ItineraryEditorComponent {
   readonly dayTitle = output<{ id: string; title: string }>();
 
   readonly open = signal<string | null>(null);
+
+  /** "Day start" / "Day end" tags on each day's first and last stop with a place. */
+  readonly endpoints = computed(() => {
+    const labels = new Map<string, string>();
+    for (const day of this.days()) {
+      const ends = dayEndpoints(day);
+      if (!ends) continue;
+      labels.set(ends.start.id, 'Day start');
+      labels.set(ends.end.id, 'Day end');
+    }
+    return labels;
+  });
   drafts: Record<string, string> = {};
   draftPlaces: Record<string, string> = {};
 
