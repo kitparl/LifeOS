@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import type * as Leaflet from 'leaflet';
 import { environment } from '../../../../environments/environment';
+import { readJsonLocalStorage, writeJsonLocalStorage } from '../../../core/services/preferences-sync';
 import { loadLeaflet } from './leaflet-loader';
 
 export interface LatLng {
@@ -39,6 +40,8 @@ export interface MapLine {
 
 const DEFAULT_CENTER: LatLng = { lat: 22.5, lng: 79 };
 const DEFAULT_ZOOM = 4;
+/** Per-browser choice for marker names (always open vs hover only), shared by every Travel map. */
+const LABELS_KEY = 'lifeos-travel-map-labels';
 
 /**
  * The single Leaflet wrapper reused by every Travel tab.
@@ -50,13 +53,26 @@ const DEFAULT_ZOOM = 4;
   standalone: true,
   template: `
     <div #host class="travel-map h-full w-full" [attr.aria-label]="ariaLabel()" role="application"></div>
+    @if (markers().length) {
+      <button type="button" class="chip labels-toggle cursor-pointer text-xs" [attr.aria-pressed]="showLabels()" (click)="toggleLabels()">
+        {{ showLabels() ? '☑' : '☐' }} Names
+      </button>
+    }
     @if (failed()) {
       <p class="p-3 text-xs" style="color: var(--danger)">The map could not be loaded. Your saved places are still in the lists.</p>
     }
   `,
   styles: [
     `:host { display: block; position: relative; min-height: 16rem; }
-     .travel-map { min-height: inherit; border: 1px solid var(--border); border-radius: var(--radius-md); z-index: 0; }`,
+     .travel-map { min-height: inherit; border: 1px solid var(--border); border-radius: var(--radius-md); z-index: 0; }
+     .labels-toggle { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1000; background: var(--surface); }
+     /* ::ng-deep is required: Leaflet creates tooltip nodes itself, outside Angular's template, so they never
+        get the scoping attribute. Compact theme-coloured labels keep a map full of always-open names readable. */
+     :host ::ng-deep .travel-map-label {
+       padding: 1px 6px; font-size: 11px; line-height: 1.4;
+       background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: none;
+     }
+     :host ::ng-deep .travel-map-label.leaflet-tooltip-top::before { border-top-color: var(--border); }`,
   ],
 })
 export class TravelMapComponent implements AfterViewInit, OnDestroy {
@@ -73,8 +89,6 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
    * for moments like "a GPX was just imported" where the new line must come into view.
    */
   readonly fitKey = input<string | null>(null);
-  /** Keep every marker's label open instead of only on hover (for small maps like one trip's stops). */
-  readonly permanentLabels = input(false);
   /** Crosshair cursor while a tool (drop pin, draw route) is active. */
   readonly toolActive = input(false);
 
@@ -82,6 +96,8 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
   readonly markerSelect = output<MapMarker>();
 
   readonly failed = signal(false);
+  /** Marker names stay open by default; the user can switch to hover-only and it is remembered. */
+  readonly showLabels = signal(readJsonLocalStorage<boolean>(LABELS_KEY, true));
   private readonly ready = signal(false);
 
   private L: typeof Leaflet | null = null;
@@ -98,7 +114,7 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
       const markers = this.markers();
       const lines = this.lines();
       const fitKey = this.fitKey();
-      const permanent = this.permanentLabels();
+      const permanent = this.showLabels();
       if (!this.ready()) return;
       this.render(markers, lines, permanent);
       if (fitKey && fitKey !== this.lastFitKey) {
@@ -154,6 +170,11 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
     this.map = null;
   }
 
+  toggleLabels(): void {
+    this.showLabels.update((on) => !on);
+    writeJsonLocalStorage(LABELS_KEY, this.showLabels());
+  }
+
   /** Current view centre (used to bias search results); null until the map is ready. */
   center(): LatLng | null {
     const c = this.map?.getCenter();
@@ -194,7 +215,12 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
         fillColor: color,
         fillOpacity: m.faded ? 0.35 : 0.95,
       })
-        .bindTooltip(escapeHtml(m.label), { direction: 'top', offset: [0, -6], permanent: permanentLabels })
+        .bindTooltip(escapeHtml(m.label), {
+          direction: 'top',
+          offset: [0, -6],
+          permanent: permanentLabels,
+          className: 'travel-map-label',
+        })
         .on('click', (e: Leaflet.LeafletMouseEvent) => {
           L.DomEvent.stopPropagation(e);
           this.markerSelect.emit(m);
