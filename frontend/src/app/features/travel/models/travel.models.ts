@@ -264,6 +264,8 @@ export interface TripPlace {
 
 export interface Stop {
   place_id: string;
+  /** The day this stop is first visited on (drives per-day pin colours and the day filter). */
+  day_id: string;
   name: string;
   lat: number;
   lng: number;
@@ -282,7 +284,15 @@ export interface Route {
   fallback_reason: string | null;
   trip_id: string | null;
   adventure_id: string | null;
+  /** Google road legs; `legs[i]` runs from stop i to stop i + 1. Null for fallbacks and drawn/GPX routes. */
+  legs: RouteLeg[] | null;
   is_stale: boolean;
+}
+
+export interface RouteLeg {
+  distance_m: number;
+  duration_s: number | null;
+  polyline: string;
 }
 
 export interface RouteDetail extends Route {
@@ -307,6 +317,13 @@ export interface TripCreate {
 export type TripUpdate = Partial<Pick<TripSummary, 'name' | 'description' | 'start_date' | 'end_date' | 'dates_tentative' | 'notes'>>;
 
 export type ItemUpdate = Partial<Omit<ItineraryItem, 'id' | 'day_id' | 'position'>>;
+
+/** Per-day pin/route colours on a trip map (CSS tokens); cycles for trips longer than the palette. */
+const DAY_COLORS: readonly string[] = ['--primary', '--info', '--success', '--accent', '--warning', '--favorite'];
+
+export function dayColor(dayIndex: number): string {
+  return DAY_COLORS[dayIndex % DAY_COLORS.length];
+}
 
 export function formatDistance(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(meters >= 100_000 ? 0 : 1)} km` : `${Math.round(meters)} m`;

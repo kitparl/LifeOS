@@ -21,7 +21,7 @@ from app.modules.travel.maps.errors import (
     MapsTimeout,
     MapsUnavailable,
 )
-from app.modules.travel.maps.types import GeoResult, RouteResult, Suggestion, TravelMode
+from app.modules.travel.maps.types import GeoResult, RouteLeg, RouteResult, Suggestion, TravelMode
 
 TIMEOUT_SECONDS = 10.0
 GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -31,7 +31,10 @@ PLACE_URL = "https://places.googleapis.com/v1/places/"
 ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 
 PLACE_FIELDS = "id,displayName,formattedAddress,location,addressComponents"
-ROUTE_FIELDS = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline"
+ROUTE_FIELDS = (
+    "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,"
+    "routes.legs.distanceMeters,routes.legs.duration,routes.legs.polyline.encodedPolyline"
+)
 AUTOCOMPLETE_BIAS_RADIUS_M = 50_000.0
 
 _ROUTE_MODES = {
@@ -87,6 +90,12 @@ def _geocode_to_result(item: dict[str, Any], lat: float, lng: float) -> GeoResul
         lng=lng,
         external_place_id=item.get("place_id"),
     )
+
+
+def _seconds(duration: Any) -> int | None:
+    """Routes API durations are strings like "7200s"."""
+    raw = str(duration or "").rstrip("s")
+    return int(float(raw)) if raw else None
 
 
 def _legacy_status_error(status: str) -> MapsError:
@@ -194,11 +203,18 @@ class GoogleMapsProvider:
         if not routes:
             raise MapsUnavailable("Google found no route for these stops.")
         route = routes[0]
-        duration = str(route.get("duration", "")).rstrip("s")
         return RouteResult(
             distance_m=float(route.get("distanceMeters", 0)),
-            duration_s=int(float(duration)) if duration else None,
+            duration_s=_seconds(route.get("duration")),
             polyline=(route.get("polyline") or {}).get("encodedPolyline", ""),
+            legs=tuple(
+                RouteLeg(
+                    distance_m=float(leg.get("distanceMeters", 0)),
+                    duration_s=_seconds(leg.get("duration")),
+                    polyline=(leg.get("polyline") or {}).get("encodedPolyline", ""),
+                )
+                for leg in route.get("legs") or []
+            ),
         )
 
     async def elevation(self, path: Sequence[Point], samples: int) -> list[float]:

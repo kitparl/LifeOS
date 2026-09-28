@@ -77,7 +77,17 @@ PLACE_BODY = {
     "addressComponents": [{"longText": "India", "types": ["country"]}],
 }
 ROUTES_BODY = {
-    "routes": [{"distanceMeters": 123456, "duration": "7200s", "polyline": {"encodedPolyline": "_p~iF~ps|U"}}]
+    "routes": [
+        {
+            "distanceMeters": 123456,
+            "duration": "7200s",
+            "polyline": {"encodedPolyline": "_p~iF~ps|U"},
+            "legs": [
+                {"distanceMeters": 50000, "duration": "3000s", "polyline": {"encodedPolyline": "_p~iF~ps|U"}},
+                {"distanceMeters": 73456, "duration": "4200s", "polyline": {"encodedPolyline": "_p~iF~ps|U"}},
+            ],
+        }
+    ]
 }
 
 

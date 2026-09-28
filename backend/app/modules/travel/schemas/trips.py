@@ -160,6 +160,7 @@ class TripPlaceOut(BaseModel):
 
 class StopOut(BaseModel):
     place_id: str
+    day_id: str
     name: str
     lat: float
     lng: float

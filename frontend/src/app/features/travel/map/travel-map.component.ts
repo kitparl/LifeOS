@@ -25,6 +25,8 @@ export interface MapMarker extends LatLng {
   /** CSS custom property name (e.g. `--success`) or a literal colour. */
   color: string;
   radius?: number;
+  /** Drawn semi-transparent, e.g. a trip place that is not on any day yet. */
+  faded?: boolean;
 }
 
 export interface MapLine {
@@ -185,8 +187,9 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
         radius: m.radius ?? 7,
         color: '#fff',
         weight: 2,
+        opacity: m.faded ? 0.5 : 1,
         fillColor: color,
-        fillOpacity: 0.95,
+        fillOpacity: m.faded ? 0.35 : 0.95,
       })
         .bindTooltip(escapeHtml(m.label), { direction: 'top', offset: [0, -6] })
         .on('click', (e: Leaflet.LeafletMouseEvent) => {

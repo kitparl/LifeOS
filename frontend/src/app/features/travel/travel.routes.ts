@@ -18,10 +18,8 @@ export const TRAVEL_ROUTES: Routes = [
         path: 'trips/:id',
         loadComponent: () => import('./pages/trip-detail.component').then((m) => m.TripDetailComponent),
       },
-      {
-        path: 'adventures',
-        loadComponent: () => import('./pages/adventures-page.component').then((m) => m.AdventuresPageComponent),
-      },
+      // Adventures are listed with trips; keep old links working.
+      { path: 'adventures', pathMatch: 'full', redirectTo: 'trips' },
       {
         path: 'adventures/:id',
         loadComponent: () => import('./pages/adventure-detail.component').then((m) => m.AdventureDetailComponent),

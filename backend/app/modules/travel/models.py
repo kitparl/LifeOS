@@ -208,6 +208,8 @@ class TravelRoute(Base):
     elevation_loss_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     # Encoded elevation profile (GPX samples or Google lookup); JSON list of metres, capped.
     elevation_profile: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Google road legs, one per consecutive stop pair: [{distance_m, duration_s, polyline}]. Null for fallbacks.
+    legs: Mapped[list | None] = mapped_column(JSON, nullable=True)
     stops_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     fallback_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
     gpx_file_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

@@ -66,7 +66,17 @@ class Suggestion:
 
 
 @dataclass(frozen=True)
+class RouteLeg:
+    """One stop-to-stop section of a route (leg i runs from stop i to stop i + 1)."""
+
+    distance_m: float
+    duration_s: int | None
+    polyline: str
+
+
+@dataclass(frozen=True)
 class RouteResult:
     distance_m: float
     duration_s: int | None
     polyline: str
+    legs: tuple[RouteLeg, ...] = ()

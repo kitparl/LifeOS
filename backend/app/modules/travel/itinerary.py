@@ -23,6 +23,7 @@ class ItemRef:
 @dataclass(frozen=True)
 class Stop:
     place_id: str
+    day_id: str
     name: str
     lat: float
     lng: float
@@ -66,7 +67,7 @@ def stop_sequence(
         if place_id is None or (stops and stops[-1].place_id == place_id):
             continue
         name, lat, lng = places[place_id]
-        stops.append(Stop(place_id=place_id, name=name, lat=lat, lng=lng))
+        stops.append(Stop(place_id=place_id, day_id=item.day_id, name=name, lat=lat, lng=lng))
     return stops
 
 

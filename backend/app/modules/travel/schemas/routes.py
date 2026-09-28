@@ -12,6 +12,14 @@ MAX_DRAWN_POINTS = 5_000
 LatLngPair = Annotated[tuple[Lat, Lng], Field(description="[lat, lng]")]
 
 
+class RouteLegOut(BaseModel):
+    """Road distance/time from stop i to stop i + 1 of the route."""
+
+    distance_m: float
+    duration_s: int | None
+    polyline: str
+
+
 class RouteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -27,6 +35,7 @@ class RouteOut(BaseModel):
     fallback_reason: str | None
     trip_id: str | None
     adventure_id: str | None
+    legs: list[RouteLegOut] | None = None
     is_stale: bool = False
 
 

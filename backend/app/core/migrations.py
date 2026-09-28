@@ -103,6 +103,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("vocabulary", "source", "VARCHAR(16)"),
     ("vocabulary", "exclude_from_daily", "BOOLEAN DEFAULT FALSE"),
     ("vocabulary", "wotd_for_date", "DATE"),
+    # Travel: per-leg road distances of a Google trip route (JSON list; NULL for older/fallback routes).
+    ("travel_routes", "legs", "JSON"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [

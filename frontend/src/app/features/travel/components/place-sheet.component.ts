@@ -74,14 +74,18 @@ export interface PlaceSheetSubmit {
       <ng-container footer>
         <div class="flex flex-wrap justify-end gap-2">
           <button type="button" class="btn-secondary text-xs" (click)="closed.emit()">Cancel</button>
-          @if (allowWaypoint()) {
-            <button type="button" class="btn-secondary text-xs" [disabled]="!canSubmit()" (click)="submit('waypoint')">📍 Create Waypoint</button>
+          @if (tripOnly()) {
+            <button type="button" class="btn-primary text-xs" [disabled]="!canSubmit()" (click)="submit('trip')">🧳 Add to trip</button>
+          } @else {
+            @if (allowWaypoint()) {
+              <button type="button" class="btn-secondary text-xs" [disabled]="!canSubmit()" (click)="submit('waypoint')">📍 Create Waypoint</button>
+            }
+            @if (allowTrip()) {
+              <button type="button" class="btn-secondary text-xs" [disabled]="!canSubmit()" (click)="submit('trip')">🧳 Add to Trip</button>
+            }
+            <button type="button" class="btn-secondary text-xs" [disabled]="!canSubmit()" (click)="submit('wishlist')">❤️ Add to Travel Wishlist</button>
+            <button type="button" class="btn-primary text-xs" [disabled]="!canSubmit()" (click)="submit('save')">Save Place</button>
           }
-          @if (allowTrip()) {
-            <button type="button" class="btn-secondary text-xs" [disabled]="!canSubmit()" (click)="submit('trip')">🧳 Add to Trip</button>
-          }
-          <button type="button" class="btn-secondary text-xs" [disabled]="!canSubmit()" (click)="submit('wishlist')">❤️ Add to Travel Wishlist</button>
-          <button type="button" class="btn-primary text-xs" [disabled]="!canSubmit()" (click)="submit('save')">Save Place</button>
         </div>
       </ng-container>
     </app-modal>
@@ -96,6 +100,8 @@ export class PlaceSheetComponent {
   readonly error = input<string | null>(null);
   readonly allowTrip = input(false);
   readonly allowWaypoint = input(false);
+  /** Opened from a trip: the only action is saving the place straight into that trip. */
+  readonly tripOnly = input(false);
 
   readonly submitted = output<PlaceSheetSubmit>();
   readonly closed = output<void>();

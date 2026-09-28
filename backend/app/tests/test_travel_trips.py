@@ -100,6 +100,7 @@ def test_stop_sequence_orders_by_day_then_position_and_collapses_repeats():
     }
     stops = stop_sequence(["d1", "d2"], items, places)
     assert [s.place_id for s in stops] == ["manali", "hampta", "chandratal"]
+    assert [s.day_id for s in stops] == ["d1", "d1", "d2"]
     assert stops_fingerprint(stops, "driving") != stops_fingerprint(stops[::-1], "driving")
     assert stops_fingerprint(stops, "driving") != stops_fingerprint(stops, "walking")
 
@@ -170,6 +171,7 @@ async def test_itinerary_map_route_and_lifecycle(client):
     # Route without a Google key: straight line, clearly labelled, nothing tracked.
     route = (await client.post(f"{BASE}/trips/{tid}/route", json={"mode": "driving"}, headers=h)).json()
     assert route["source"] == "straight_line" and route["fallback_reason"] == "missing_credential"
+    assert route["legs"] is None
     assert route["distance_m"] > 40_000 and route["duration_s"] is None
     assert (await client.get(f"{BASE}/trips/{tid}", headers=h)).json()["route"]["is_stale"] is False
     assert await _rows(client, MapsUsageEvent) == []
@@ -265,6 +267,10 @@ async def test_google_route_is_tracked(client, google):
     await _dated_itinerary(client, h, places, tid)
     route = (await client.post(f"{BASE}/trips/{tid}/route", json={"mode": "driving"}, headers=h)).json()
     assert route["source"] == "google" and route["distance_m"] == 123456 and route["duration_s"] == 7200
+    assert [(leg["distance_m"], leg["duration_s"]) for leg in route["legs"]] == [(50000, 3000), (73456, 4200)]
+    detail = (await client.get(f"{BASE}/trips/{tid}", headers=h)).json()
+    assert len(detail["route"]["legs"]) == len(detail["stops"]) - 1
+    assert all(s["day_id"] for s in detail["stops"])
     (body,) = google.bodies("directions/v2:computeRoutes")
     assert body["travelMode"] == "DRIVE" and len(body["intermediates"]) == 1
     events = [(e.sku, e.feature, e.outcome) for e in await _rows(client, MapsUsageEvent)]

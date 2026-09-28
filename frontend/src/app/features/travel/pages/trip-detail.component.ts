@@ -5,14 +5,19 @@ import { Observable } from 'rxjs';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
 import { ItemPatch, ItineraryEditorComponent, NewItem } from '../components/itinerary-editor.component';
-import { MapLine, MapMarker, TravelMapComponent } from '../map/travel-map.component';
+import { PlaceSearchComponent } from '../components/place-search.component';
+import { PlaceSheetComponent, PlaceSheetSubmit } from '../components/place-sheet.component';
+import { LatLng, MapLine, MapMarker, TravelMapComponent } from '../map/travel-map.component';
 import {
-  PLACE_STATUS_COLORS,
+  GeoLookup,
   Place,
   ROUTE_MODES,
+  RouteLeg,
   RouteMode,
+  Stop,
   TRIP_STATUS_LABELS,
   TripDetail,
+  dayColor,
   fallbackMessage,
   formatDistance,
   formatDuration,
@@ -23,6 +28,14 @@ import { directionsUrl } from '../utils/google-links';
 
 type MobileTab = 'map' | 'itinerary';
 
+/** One road leg of the current route, labelled with its stops and the day it arrives on. */
+interface LegRow {
+  from: string;
+  to: string;
+  dayId: string;
+  leg: RouteLeg;
+}
+
 /**
  * One trip: map + itinerary side by side on desktop, tabs on mobile (spec §12, §33, §34).
  * Both panes render the same `TripDetail`, so stops, order and route can never disagree.
@@ -31,7 +44,7 @@ type MobileTab = 'map' | 'itinerary';
 @Component({
   selector: 'app-travel-trip-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, TravelMapComponent, ItineraryEditorComponent],
+  imports: [FormsModule, RouterLink, TravelMapComponent, ItineraryEditorComponent, PlaceSearchComponent, PlaceSheetComponent],
   template: `
     @if (detail(); as d) {
       <div class="space-y-3">
@@ -92,7 +105,23 @@ type MobileTab = 'map' | 'itinerary';
 
         <div class="grid gap-3 lg:grid-cols-2">
           <div class="space-y-2 lg:block" [class.hidden]="tab() !== 'map'">
-            <app-travel-map #map class="h-[55vh]" [markers]="markers()" [lines]="lines()" (markerSelect)="openPlace($event.id)" />
+            @if (d.days.length) {
+              <div class="flex flex-wrap gap-1.5" role="group" aria-label="Show day on map">
+                <button type="button" class="chip cursor-pointer" [attr.aria-pressed]="!dayFilter()" [style.border-color]="!dayFilter() ? 'var(--primary)' : null" (click)="showDay(null)">All days</button>
+                @for (day of d.days; track day.id; let i = $index) {
+                  <button
+                    type="button"
+                    class="chip cursor-pointer"
+                    [attr.aria-pressed]="dayFilter() === day.id"
+                    [style.border-color]="dayFilter() === day.id ? 'var(--primary)' : null"
+                    (click)="showDay(day.id)"
+                  >
+                    <span [style.color]="'var(' + color(i) + ')'">●</span> Day {{ day.day_index + 1 }}
+                  </button>
+                }
+              </div>
+            }
+            <app-travel-map #map class="h-[55vh]" [markers]="markers()" [lines]="lines()" [pin]="searchPin()" [fitKey]="fitKey()" (markerSelect)="openPlace($event.id)" />
             <div class="panel space-y-2 text-sm">
               <div class="flex flex-wrap items-center gap-2">
                 <select class="input-field !w-auto text-xs" aria-label="Travel mode" [(ngModel)]="mode">
@@ -119,23 +148,49 @@ type MobileTab = 'map' | 'itinerary';
                 @if (routeNote(r.fallback_reason); as note) {
                   <p class="text-xs" style="color: var(--text-muted)">{{ note }}</p>
                 }
+                @if (legRows().length) {
+                  <ul class="space-y-1 text-xs" aria-label="Road distance between stops">
+                    @for (row of legRows(); track $index) {
+                      <li class="flex flex-wrap items-center gap-1">
+                        <span [style.color]="'var(' + dayColorOf(row.dayId) + ')'">●</span>
+                        <span>{{ row.from }} → {{ row.to }}</span>
+                        <span style="color: var(--text-muted)">· {{ distance(row.leg.distance_m) }}@if (duration(row.leg.duration_s); as t) { · {{ t }}}</span>
+                      </li>
+                    }
+                  </ul>
+                } @else if (r.source === 'google' && !r.is_stale && !r.legs) {
+                  <p class="text-xs" style="color: var(--text-muted)">Recalculate to see the road distance between each stop.</p>
+                }
               } @else if (d.stops.length < 2) {
                 <p class="text-xs" style="color: var(--text-muted)">Add at least two stops with places to draw a route.</p>
+              } @else {
+                <p class="text-xs" style="color: var(--text-muted)">Get route to see the road distance between each stop.</p>
               }
             </div>
           </div>
 
           <div class="space-y-2 lg:block" [class.hidden]="tab() !== 'itinerary'">
-            <div class="panel flex flex-wrap items-end gap-2 text-sm">
-              <label class="flex-1 text-xs">Add a saved place
-                <select class="input-field text-xs" [(ngModel)]="placeToAdd" aria-label="Saved place">
-                  <option value="">Choose…</option>
-                  @for (p of savedPlaces(); track p.id) {
-                    <option [value]="p.id">{{ p.name }}</option>
+            <div class="panel space-y-2 text-sm">
+              <div class="flex flex-wrap items-start gap-2">
+                <app-place-search class="min-w-[12rem] flex-1" placeholder="Search a new place to add" [bias]="mapCenter" (picked)="pickSearch($event)" />
+                <select class="input-field !w-auto text-xs" aria-label="Add places to day" [(ngModel)]="addDayId" (ngModelChange)="addDayChosen = true">
+                  <option value="">Not on a day yet</option>
+                  @for (day of d.days; track day.id) {
+                    <option [value]="day.id">Add to Day {{ day.day_index + 1 }}</option>
                   }
                 </select>
-              </label>
-              <button type="button" class="btn-secondary text-xs" [disabled]="!placeToAdd || busy()" (click)="addPlace()">Add to trip</button>
+              </div>
+              <div class="flex flex-wrap items-end gap-2">
+                <label class="flex-1 text-xs">Add a saved place
+                  <select class="input-field text-xs" [(ngModel)]="placeToAdd" aria-label="Saved place">
+                    <option value="">Choose…</option>
+                    @for (p of savedPlaces(); track p.id) {
+                      <option [value]="p.id">{{ p.name }}</option>
+                    }
+                  </select>
+                </label>
+                <button type="button" class="btn-secondary text-xs" [disabled]="!placeToAdd || busy()" (click)="addPlace()">Add to trip</button>
+              </div>
             </div>
             <app-itinerary-editor
               [days]="d.days"
@@ -154,6 +209,16 @@ type MobileTab = 'map' | 'itinerary';
           </div>
         </div>
       </div>
+      <app-place-sheet
+        [open]="!!searchPin()"
+        [point]="searchPin()"
+        [lookup]="searchLookup()"
+        [busy]="busy()"
+        [error]="error()"
+        [tripOnly]="true"
+        (submitted)="addSearched($event)"
+        (closed)="closeSearch()"
+      />
     } @else if (notFound()) {
       <p class="text-sm">This trip does not exist. <a routerLink="/travel/trips" class="underline">All trips</a></p>
     } @else {
@@ -177,35 +242,91 @@ export class TripDetailComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly saveState = signal('');
   readonly tab = signal<MobileTab>('map');
+  readonly selectedDay = signal<string | null>(null);
+  private readonly filterClicks = signal(0);
+  readonly searchPin = signal<LatLng | null>(null);
+  readonly searchLookup = signal<GeoLookup | null>(null);
+  readonly mapCenter = (): LatLng | null => this.map?.center() ?? null;
   mode: RouteMode = 'driving';
   placeToAdd = '';
+  /** Day that searched and saved places are added to ('' = linked to the trip, not on a day). Defaults to Day 1. */
+  addDayId = '';
+  addDayChosen = false;
 
   readonly isDraft = computed(() => this.detail()?.trip.status === 'draft');
   readonly canComplete = computed(() => ['planning', 'booked', 'active'].includes(this.detail()?.trip.status ?? ''));
 
+  /** Selected day on the map (null = all days); falls back to all when that day is removed. */
+  readonly dayFilter = computed(() => {
+    const id = this.selectedDay();
+    return id && this.detail()?.days.some((day) => day.id === id) ? id : null;
+  });
+
+  /** Changes on every day-chip click so the map re-fits to what is now shown. */
+  readonly fitKey = computed(() => (this.filterClicks() ? `${this.filterClicks()}:${this.dayFilter() ?? 'all'}` : null));
+
+  private readonly dayIndexById = computed(() => new Map((this.detail()?.days ?? []).map((day, i) => [day.id, i])));
+
+  /** Place ids on each day, so a place visited on several days shows under each of them. */
+  private readonly placesByDay = computed(() => {
+    const byDay = new Map<string, Set<string>>();
+    for (const day of this.detail()?.days ?? []) {
+      byDay.set(day.id, new Set(day.items.flatMap((item) => (item.place_id ? [item.place_id] : []))));
+    }
+    return byDay;
+  });
+
   readonly markers = computed<MapMarker[]>(() => {
     const d = this.detail();
     if (!d) return [];
-    const statusById = new Map(d.places.map((p) => [p.id, p.status]));
-    return d.stops.map((s, i) => ({
-      id: s.place_id,
-      kind: 'place',
-      lat: s.lat,
-      lng: s.lng,
-      label: `${i + 1}. ${s.name}`,
-      color: PLACE_STATUS_COLORS[statusById.get(s.place_id) ?? 'wishlist'],
-    }));
+    const day = this.dayFilter();
+    const onDay = day ? this.placesByDay().get(day) : null;
+    const stops: MapMarker[] = d.stops.flatMap((s, i) =>
+      onDay && !onDay.has(s.place_id)
+        ? []
+        : [{ id: s.place_id, kind: 'place', lat: s.lat, lng: s.lng, label: `${i + 1}. ${s.name}`, color: this.dayColorOf(s.day_id) }],
+    );
+    if (day) return stops;
+    const scheduled = new Set([...this.placesByDay().values()].flatMap((ids) => [...ids]));
+    const unscheduled: MapMarker[] = d.places
+      .filter((p) => !scheduled.has(p.id))
+      .map((p) => ({ id: p.id, kind: 'place', lat: p.lat, lng: p.lng, label: `${p.name} (not on a day yet)`, color: '--text-muted', faded: true }));
+    return [...stops, ...unscheduled];
   });
 
-  /** The stored route when current; otherwise a dashed connector through the stops (no API call). */
+  /** Road legs of the current route, in stop order. Empty when there is no current Google route. */
+  private readonly legs = computed<LegRow[]>(() => {
+    const d = this.detail();
+    const legs = d?.route && !d.route.is_stale ? d.route.legs : null;
+    if (!d || !legs || legs.length !== d.stops.length - 1) return [];
+    return legs.map((leg, i) => ({ from: d.stops[i].name, to: d.stops[i + 1].name, dayId: d.stops[i + 1].day_id, leg }));
+  });
+
+  /** A leg belongs to the day of the stop it arrives at. */
+  readonly legRows = computed(() => {
+    const day = this.dayFilter();
+    return day ? this.legs().filter((row) => row.dayId === day) : this.legs();
+  });
+
+  /**
+   * Per-day coloured road legs when the route has them; the stored route as one line otherwise;
+   * dashed per-day connectors through the stops when there is no current route (no API call).
+   */
   readonly lines = computed<MapLine[]>(() => {
     const d = this.detail();
     if (!d) return [];
     const r = d.route;
-    if (r && !r.is_stale && r.polyline) {
-      return [{ id: r.id, points: decodePolyline(r.polyline), color: '--primary', dashed: this.isDraft() || r.source === 'straight_line' }];
+    const dashed = this.isDraft() || r?.source === 'straight_line';
+    if (this.legs().length) {
+      return this.legRows().map((row, i) => ({ id: `leg-${i}`, points: decodePolyline(row.leg.polyline), color: this.dayColorOf(row.dayId), dashed }));
     }
-    return [{ id: 'stops', points: d.stops.map((s) => [s.lat, s.lng] as [number, number]), color: '--text-muted', dashed: true }];
+    if (r && !r.is_stale && r.polyline) {
+      return [{ id: r.id, points: decodePolyline(r.polyline), color: '--primary', dashed }];
+    }
+    const day = this.dayFilter();
+    return connectors(d.stops)
+      .filter((c) => !day || c.to.day_id === day)
+      .map((c, i) => ({ id: `stop-${i}`, points: [[c.from.lat, c.from.lng], [c.to.lat, c.to.lng]], color: this.dayColorOf(c.to.day_id), dashed: true }));
   });
 
   readonly directions = computed(() => {
@@ -264,12 +385,64 @@ export class TripDetailComponent implements OnInit {
     this.api.deleteTrip(d.trip.id).subscribe({ next: () => void this.router.navigate(['/travel/trips']) });
   }
 
+  color(dayIndex: number): string {
+    return dayColor(dayIndex);
+  }
+
+  dayColorOf(dayId: string): string {
+    return dayColor(this.dayIndexById().get(dayId) ?? 0);
+  }
+
+  showDay(dayId: string | null): void {
+    this.selectedDay.set(dayId);
+    this.filterClicks.update((n) => n + 1);
+    if (dayId) {
+      this.addDayId = dayId;
+      this.addDayChosen = true;
+    }
+  }
+
   addPlace(): void {
     const d = this.detail();
     if (!d || !this.placeToAdd) return;
-    const firstDay = d.days[0]?.id ?? null;
-    this.run(this.api.addPlaceToTrip(d.trip.id, this.placeToAdd, firstDay));
+    this.run(this.api.addPlaceToTrip(d.trip.id, this.placeToAdd, this.addDayId || null));
     this.placeToAdd = '';
+  }
+
+  pickSearch(res: GeoLookup): void {
+    if (!res.result) return;
+    const point = { lat: res.result.lat, lng: res.result.lng };
+    this.error.set(null);
+    this.searchLookup.set(res);
+    this.searchPin.set(point);
+    this.map?.flyTo(point);
+  }
+
+  closeSearch(): void {
+    this.searchPin.set(null);
+    this.searchLookup.set(null);
+  }
+
+  /** Save the searched spot as a Place (or reuse the one already saved there), then put it on the chosen day. */
+  addSearched(event: PlaceSheetSubmit): void {
+    const d = this.detail();
+    if (!d) return;
+    const dayId = this.addDayId || null;
+    this.busy.set(true);
+    this.error.set(null);
+    this.api.createPlace(event.place).subscribe({
+      next: (place) => this.addSearchedToTrip(d.trip.id, place.id, dayId),
+      error: (err) => {
+        const existing = (err?.error?.detail as { place_id?: string } | undefined)?.place_id;
+        if (existing) this.addSearchedToTrip(d.trip.id, existing, dayId);
+        else this.fail(err);
+      },
+    });
+  }
+
+  private addSearchedToTrip(tripId: string, placeId: string, dayId: string | null): void {
+    this.closeSearch();
+    this.run(this.api.addPlaceToTrip(tripId, placeId, dayId));
   }
 
   addItem(item: NewItem): void {
@@ -331,6 +504,7 @@ export class TripDetailComponent implements OnInit {
   private apply(d: TripDetail): void {
     this.detail.set(d);
     if (d.route) this.mode = d.route.mode;
+    if (!this.addDayChosen || !d.days.some((day) => day.id === this.addDayId)) this.addDayId = d.days[0]?.id ?? '';
   }
 
   private fail(err: unknown): void {
@@ -338,4 +512,9 @@ export class TripDetailComponent implements OnInit {
     this.saveState.set('');
     this.error.set(apiErrorMessage(err, 'Could not save that change'));
   }
+}
+
+/** Consecutive stop pairs (the dashed preview drawn before a route exists). */
+function connectors(stops: readonly Stop[]): { from: Stop; to: Stop }[] {
+  return stops.slice(1).map((to, i) => ({ from: stops[i], to }));
 }

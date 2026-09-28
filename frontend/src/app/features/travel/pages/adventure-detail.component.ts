@@ -144,7 +144,7 @@ const SOURCE_LABELS: Record<string, string> = {
             </div>
             <div class="flex gap-2">
               <button type="button" class="text-xs" style="color: var(--danger)" (click)="remove()">Delete adventure</button>
-              <a routerLink="/travel/adventures" class="text-xs underline">All adventures</a>
+              <a routerLink="/travel/trips" class="text-xs underline">All trips &amp; adventures</a>
             </div>
           </div>
         </div>
@@ -153,7 +153,7 @@ const SOURCE_LABELS: Record<string, string> = {
         }
       </div>
     } @else if (notFound()) {
-      <p class="text-sm">This adventure does not exist. <a routerLink="/travel/adventures" class="underline">All adventures</a></p>
+      <p class="text-sm">This adventure does not exist. <a routerLink="/travel/trips" class="underline">All trips &amp; adventures</a></p>
     } @else {
       <p class="text-sm" style="color: var(--text-muted)">Loading…</p>
     }
@@ -406,7 +406,7 @@ export class AdventureDetailComponent implements OnInit {
   async remove(): Promise<void> {
     const d = this.detail();
     if (!d || !(await this.confirm.confirm('Its drawn and imported routes are deleted too.', `Delete ${d.adventure.name}?`))) return;
-    this.api.deleteAdventure(d.adventure.id).subscribe({ next: () => void this.router.navigate(['/travel/adventures']) });
+    this.api.deleteAdventure(d.adventure.id).subscribe({ next: () => void this.router.navigate(['/travel/trips']) });
   }
 
   /**

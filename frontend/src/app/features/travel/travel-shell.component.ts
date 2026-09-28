@@ -9,8 +9,7 @@ import { MapsApiService } from './services/maps-api.service';
 const TABS: TabHubItem[] = [
   { id: 'map', label: 'Map' },
   { id: 'wishlist', label: 'Travel Wishlist' },
-  { id: 'trips', label: 'Trips' },
-  { id: 'adventures', label: 'Adventures' },
+  { id: 'trips', label: 'Trips & Adventures' },
   { id: 'memories', label: 'Memories' },
   { id: 'world', label: 'My World' },
 ];
@@ -68,7 +67,7 @@ export class TravelShellComponent implements OnInit {
 
   private syncActive(url: string): void {
     const segment = url.split('?')[0].split('/')[2] ?? 'map';
-    const byRoute: Record<string, string> = { places: 'wishlist', settings: '' };
+    const byRoute: Record<string, string> = { places: 'wishlist', adventures: 'trips', settings: '' };
     this.active.set(byRoute[segment] ?? segment);
   }
 }

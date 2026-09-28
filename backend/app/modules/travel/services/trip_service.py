@@ -372,7 +372,7 @@ class TripService:
                 )
                 for _, p in await self.repo.trip_places(trip.id)
             ],
-            stops=[StopOut(place_id=s.place_id, name=s.name, lat=s.lat, lng=s.lng) for s in stops],
+            stops=[StopOut(place_id=s.place_id, day_id=s.day_id, name=s.name, lat=s.lat, lng=s.lng) for s in stops],
             route=route_out,
         )
 

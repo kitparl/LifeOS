@@ -1,9 +1,7 @@
-import { Component, DestroyRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
+import { Component, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { Subject } from 'rxjs';
 import { apiErrorMessage } from '../../../core/utils/http';
+import { PlaceSearchComponent } from '../components/place-search.component';
 import { PlaceSheetComponent, PlaceSheetSubmit } from '../components/place-sheet.component';
 import { TripPickerComponent } from '../components/trip-picker.component';
 import { LatLng, MapMarker, TravelMapComponent } from '../map/travel-map.component';
@@ -12,9 +10,7 @@ import {
   MAP_LAYERS,
   MapLayer,
   Marker,
-  Suggestion,
   TripDetail,
-  fallbackMessage,
   markerColor,
   markerLayer,
 } from '../models/travel.models';
@@ -28,37 +24,16 @@ import { TravelApiService } from '../services/travel-api.service';
 @Component({
   selector: 'app-travel-map-page',
   standalone: true,
-  imports: [FormsModule, RouterLink, TravelMapComponent, PlaceSheetComponent, TripPickerComponent],
+  imports: [RouterLink, TravelMapComponent, PlaceSearchComponent, PlaceSheetComponent, TripPickerComponent],
   template: `
     <div class="space-y-2">
       <div class="flex flex-wrap items-start gap-2">
-        <div class="relative min-w-[14rem] flex-1">
-          <input
-            class="input-field"
-            type="search"
-            placeholder="Search places (or just tap the map)"
-            aria-label="Search places"
-            [ngModel]="query()"
-            (ngModelChange)="onQuery($event)"
-          />
-          @if (suggestions().length) {
-            <ul class="panel absolute z-[1000] mt-1 w-full p-0 text-sm" role="listbox">
-              @for (s of suggestions(); track s.external_place_id) {
-                <li>
-                  <button type="button" class="w-full px-3 py-2 text-left" (click)="pick(s)">
-                    <span class="font-medium">{{ s.primary }}</span>
-                    @if (s.secondary) {
-                      <span class="text-xs" style="color: var(--text-muted)"> · {{ s.secondary }}</span>
-                    }
-                  </button>
-                </li>
-              }
-            </ul>
-          }
-          @if (searchNotice(); as n) {
-            <p class="mt-1 text-xs" style="color: var(--text-muted)">{{ n }}</p>
-          }
-        </div>
+        <app-place-search
+          class="min-w-[14rem] flex-1"
+          placeholder="Search places (or just tap the map)"
+          [bias]="mapCenter"
+          (picked)="pick($event)"
+        />
       </div>
 
       <div class="flex flex-wrap gap-1.5" role="group" aria-label="Map layers">
@@ -123,8 +98,6 @@ export class MapPageComponent implements OnInit {
   private readonly api = inject(TravelApiService);
   private readonly maps = inject(MapsApiService);
   private readonly router = inject(Router);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly query$ = new Subject<string>();
 
   readonly layers = MAP_LAYERS;
   readonly markers = signal<Marker[]>([]);
@@ -136,10 +109,8 @@ export class MapPageComponent implements OnInit {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly message = signal<{ text: string; placeId?: string } | null>(null);
-  readonly query = signal('');
-  readonly suggestions = signal<Suggestion[]>([]);
-  readonly searchNotice = signal<string | null>(null);
   readonly tripPick = signal<{ id: string; name: string } | null>(null);
+  readonly mapCenter = (): LatLng | null => this.map?.center() ?? null;
 
   readonly mapMarkers = computed<MapMarker[]>(() =>
     this.markers()
@@ -149,22 +120,6 @@ export class MapPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadMarkers();
-    this.maps
-      .searchSuggestions(this.query$, () => this.map?.center() ?? null)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (res) => {
-          this.suggestions.set(res.suggestions);
-          this.searchNotice.set(res.fallback_reason ? searchFallback(res.fallback_reason) : null);
-        },
-        error: () => this.searchNotice.set('Search is unavailable right now. Tap the map to save a place.'),
-      });
-  }
-
-  onQuery(value: string): void {
-    this.query.set(value);
-    if (value.trim().length < 3) this.suggestions.set([]);
-    this.query$.next(value);
   }
 
   toggleLayer(id: MapLayer): void {
@@ -186,24 +141,14 @@ export class MapPageComponent implements OnInit {
     });
   }
 
-  pick(s: Suggestion): void {
-    this.suggestions.set([]);
-    this.query.set(s.primary);
-    this.maps.placeDetails(s.external_place_id).subscribe({
-      next: (res) => {
-        if (!res.result) {
-          this.searchNotice.set(fallbackMessage(res.fallback_reason));
-          return;
-        }
-        const point = { lat: res.result.lat, lng: res.result.lng };
-        this.map?.flyTo(point);
-        this.pin.set(point);
-        this.error.set(null);
-        this.finishLookup(res);
-        this.sheetOpen.set(true);
-      },
-      error: () => this.searchNotice.set('Search is unavailable right now. Tap the map to save a place.'),
-    });
+  pick(res: GeoLookup): void {
+    if (!res.result) return;
+    const point = { lat: res.result.lat, lng: res.result.lng };
+    this.map?.flyTo(point);
+    this.pin.set(point);
+    this.error.set(null);
+    this.finishLookup(res);
+    this.sheetOpen.set(true);
   }
 
   onMarker(marker: MapMarker): void {
@@ -264,10 +209,4 @@ export class MapPageComponent implements OnInit {
   private loadMarkers(): void {
     this.api.markers().subscribe({ next: (m) => this.markers.set(m) });
   }
-}
-
-function searchFallback(reason: string): string {
-  if (reason === 'missing_credential') return 'Place search needs a Google Maps key. Tap the map to save any spot.';
-  if (reason === 'cost_protection') return 'Search is paused by maps cost protection. Tap the map to save any spot.';
-  return 'Search is unavailable right now. Tap the map to save a place.';
 }

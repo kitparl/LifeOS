@@ -61,6 +61,16 @@ describe('PlaceSheetComponent', () => {
     expect(emitted[0].place.region).toBe('Himachal Pradesh');
   });
 
+  it('offers only "Add to trip" when opened from a trip', () => {
+    fixture.componentRef.setInput('tripOnly', true);
+    fixture.componentRef.setInput('lookup', { result: null, fallback_reason: null });
+    fixture.detectChanges();
+    const labels = Array.from(document.querySelectorAll('button')).map((b) => b.textContent?.trim() ?? '');
+    expect(labels).toContain('🧳 Add to trip');
+    expect(labels).not.toContain('Save Place');
+    expect(labels).not.toContain('❤️ Add to Travel Wishlist');
+  });
+
   it('does not submit while the lookup is still running', () => {
     fixture.componentRef.setInput('loading', true);
     component.name = 'Anything';

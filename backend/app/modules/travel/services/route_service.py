@@ -72,6 +72,7 @@ class RouteService:
         route.duration_s = result.duration_s
         route.polyline = result.polyline
         route.fallback_reason = fallback_reason
+        route.legs = _road_legs(result, len(stops)) if fallback_reason is None else None
         route.stops_fingerprint = stops_fingerprint(stops, travel_mode.value)
         await self.repo.replace_waypoints(
             route.id,
@@ -149,6 +150,15 @@ class RouteService:
 
     async def delete(self, user_id: str, route_id: str) -> None:
         await self.repo.delete(get_or_404(await self.repo.get(user_id, route_id), NOT_FOUND))
+
+
+def _road_legs(result: RouteResult, stop_count: int) -> list[dict] | None:
+    """Keep legs only when they line up one-to-one with the stops, so leg i is always stop i -> i + 1."""
+    if len(result.legs) != stop_count - 1:
+        return None
+    return [
+        {"distance_m": leg.distance_m, "duration_s": leg.duration_s, "polyline": leg.polyline} for leg in result.legs
+    ]
 
 
 def route_detail(route: TravelRoute) -> RouteDetail:
