@@ -22,7 +22,7 @@ import { apiErrorMessage } from '../../core/utils/http';
           <div>
             <label class="mb-1 block">Answer</label>
             @if (editorReady) {
-              <div class="journal-editor-frame">
+              <div class="qa-editor-frame">
                 <app-code-workspace
                   [content]="editorContent"
                   mode="markdown"

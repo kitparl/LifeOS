@@ -1562,6 +1562,32 @@ summary::-webkit-details-marker {
   border-radius: var(--radius-sm);
 }
 
+.qa-editor-frame {
+  min-height: 360px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* Grow with content instead of scrolling: undo the fixed-height chain. */
+.qa-editor-frame app-code-workspace,
+.qa-editor-frame app-code-workspace .code-workspace-container,
+.qa-editor-frame app-code-workspace .workspace-content,
+.qa-editor-frame app-code-workspace .editor-panel,
+.qa-editor-frame app-markdown-editor,
+.qa-editor-frame app-markdown-editor .editor-container {
+  height: auto;
+  min-height: 360px;
+  overflow: visible;
+}
+
+.qa-editor-frame .cm-editor {
+  height: auto;
+}
+
+.qa-editor-frame .cm-scroller {
+  overflow: visible;
+}
+
 .journal-reader {
   max-width: 42rem;
 }
