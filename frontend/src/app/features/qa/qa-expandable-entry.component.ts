@@ -1,13 +1,14 @@
 import { DatePipe } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { QAListItem, qaDaysUntilPurge } from './models/qa.models';
 import { yearMonthKey } from '../../core/utils/date';
 
 @Component({
   selector: 'app-qa-expandable-entry',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, MarkdownPipe],
   template: `
     <article class="panel space-y-2">
       <button type="button" class="w-full text-left" (click)="toggled.emit(entry.id)">
@@ -42,7 +43,11 @@ import { yearMonthKey } from '../../core/utils/date';
           @if (loadingAnswer) {
             <p class="text-xs" style="color: var(--text-muted)">Loading answer…</p>
           } @else {
-            <p class="whitespace-pre-wrap">{{ answer || 'No answer yet.' }}</p>
+            @if (answer) {
+              <div class="markdown-body" [innerHTML]="answer | markdown"></div>
+            } @else {
+              <p>No answer yet.</p>
+            }
           }
           <p class="mt-2 text-xs" style="color: var(--text-muted)">
             Tags: {{ entry.tags.join(', ') || '—' }}

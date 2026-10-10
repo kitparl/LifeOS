@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { CodeWorkspaceComponent } from '../../shared/code-workspace';
 import { TypeSelectComponent } from '../../shared/type-select/type-select.component';
 import { QAService } from './services/qa.service';
 import { apiErrorMessage } from '../../core/utils/http';
@@ -8,9 +9,9 @@ import { apiErrorMessage } from '../../core/utils/http';
 @Component({
   selector: 'app-qa-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, TypeSelectComponent],
+  imports: [ReactiveFormsModule, RouterLink, TypeSelectComponent, CodeWorkspaceComponent],
   template: `
-    <div class="max-w-lg">
+    <div class="max-w-3xl">
       <div class="panel !p-0 overflow-hidden">
         <div class="title-bar rounded-none border-x-0 border-t-0">{{ isEdit ? 'Edit Q&A' : 'New Q&A' }}</div>
         <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
@@ -20,7 +21,22 @@ import { apiErrorMessage } from '../../core/utils/http';
           </div>
           <div>
             <label class="mb-1 block">Answer</label>
-            <textarea class="input-field min-h-[120px]" formControlName="answer"></textarea>
+            @if (editorReady) {
+              <div class="journal-editor-frame">
+                <app-code-workspace
+                  [content]="editorContent"
+                  mode="markdown"
+                  language="markdown"
+                  [showPreview]="true"
+                  [showToolbar]="true"
+                  [showRunButton]="false"
+                  [showLanguageSelector]="false"
+                  [showOutput]="false"
+                  defaultViewMode="write"
+                  (contentChange)="onAnswerChange($event)"
+                />
+              </div>
+            }
           </div>
           <div>
             <label class="mb-1 block">Type</label>
@@ -61,6 +77,8 @@ export class QAFormComponent implements OnInit {
   entryId: string | null = null;
   saving = false;
   error = '';
+  editorReady = false;
+  editorContent = '';
   readonly types = signal<string[]>([]);
 
   form = this.fb.nonNullable.group({
@@ -80,16 +98,26 @@ export class QAFormComponent implements OnInit {
       this.isEdit = true;
       this.entryId = id;
       this.qaService.get(id).subscribe({
-        next: (e) =>
+        next: (e) => {
           this.form.patchValue({
             question: e.question,
             answer: e.current_answer,
             type: e.type ?? '',
             tags: e.tags.join(', '),
             is_deep_personal: e.is_deep_personal,
-          }),
+          });
+          this.editorContent = e.current_answer;
+          this.editorReady = true;
+        },
       });
+    } else {
+      this.editorReady = true;
     }
+  }
+
+  onAnswerChange(answer: string): void {
+    this.editorContent = answer;
+    this.form.controls.answer.setValue(answer, { emitEvent: false });
   }
 
   onTypeCreated(name: string): void {
