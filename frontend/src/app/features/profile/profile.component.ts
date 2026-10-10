@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { UsernameService } from '../../core/services/username.service';
@@ -9,6 +9,25 @@ import {
   usernameFormatValidator,
 } from '../../core/validators/username.validator';
 import { apiErrorMessage } from '../../core/utils/http';
+
+const COMMON_TIMEZONES: { value: string; label: string }[] = [
+  { value: 'UTC', label: 'UTC' },
+  { value: 'Asia/Kolkata', label: 'IST — India (Asia/Kolkata)' },
+  { value: 'America/New_York', label: 'US Eastern (America/New_York)' },
+  { value: 'America/Los_Angeles', label: 'US Pacific (America/Los_Angeles)' },
+  { value: 'Europe/London', label: 'UK (Europe/London)' },
+  { value: 'Europe/Berlin', label: 'Central Europe (Europe/Berlin)' },
+  { value: 'Asia/Dubai', label: 'Gulf (Asia/Dubai)' },
+  { value: 'Asia/Singapore', label: 'Singapore (Asia/Singapore)' },
+  { value: 'Asia/Tokyo', label: 'Japan (Asia/Tokyo)' },
+  { value: 'Australia/Sydney', label: 'Sydney (Australia/Sydney)' },
+];
+
+function allTimezones(): string[] {
+  const supported = (Intl as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
+  const zones = supported ? supported('timeZone') : [];
+  return zones.length ? zones : COMMON_TIMEZONES.map((tz) => tz.value);
+}
 
 @Component({
   selector: 'app-profile',
@@ -29,7 +48,18 @@ import { apiErrorMessage } from '../../core/utils/http';
             </label>
             <label class="text-sm font-medium">
               Timezone
-              <input class="input-field mt-1" type="text" formControlName="timezone" placeholder="UTC" />
+              <select class="input-field mt-1" formControlName="timezone">
+                <optgroup label="Common">
+                  @for (tz of commonTimezones; track tz.value) {
+                    <option [value]="tz.value">{{ tz.label }}</option>
+                  }
+                </optgroup>
+                <optgroup label="All timezones">
+                  @for (tz of timezoneOptions(); track tz) {
+                    <option [value]="tz">{{ tz }}</option>
+                  }
+                </optgroup>
+              </select>
             </label>
             @if (message()) {
               <p class="text-sm text-green-800">{{ message() }}</p>
@@ -132,6 +162,15 @@ export class ProfileComponent {
   readonly usernameError = signal<string | null>(null);
   readonly confirmOpen = signal(false);
   readonly pendingUsername = signal('');
+
+  readonly commonTimezones = COMMON_TIMEZONES;
+
+  /** Every IANA zone the browser knows, plus the saved one if it is not in that list. */
+  readonly timezoneOptions = computed(() => {
+    const saved = this.auth.user()?.timezone;
+    const all = allTimezones();
+    return saved && !all.includes(saved) ? [saved, ...all] : all;
+  });
 
   readonly form = this.fb.nonNullable.group({
     display_name: ['', Validators.required],

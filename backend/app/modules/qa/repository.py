@@ -60,6 +60,7 @@ class QARepository:
         created_from: datetime | None = None,
         created_to: datetime | None = None,
         sort_by: str = "updated_at",
+        sort_dir: str = "desc",
         limit: int | None = None,
         offset: int = 0,
         deleted: bool = False,
@@ -86,7 +87,7 @@ class QARepository:
             order_col = QAEntry.created_at
         else:
             order_col = QAEntry.updated_at
-        q = q.order_by(order_col.desc())
+        q = q.order_by(order_col.asc() if sort_dir == "asc" else order_col.desc())
         if offset:
             q = q.offset(offset)
         if limit is not None:

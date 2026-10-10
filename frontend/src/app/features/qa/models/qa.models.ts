@@ -39,6 +39,7 @@ export type QAListResult = Page<QAListItem>;
 export const QA_PURGE_AFTER_DAYS = 30;
 export type QAViewMode = 'all' | 'month' | 'deep' | 'deleted';
 export type QASortBy = 'created_at' | 'updated_at';
+export type QASortDir = 'asc' | 'desc';
 
 export interface QAListOptions {
   search?: string;
@@ -47,6 +48,7 @@ export interface QAListOptions {
   deep_personal?: boolean;
   deleted?: boolean;
   sort_by?: QASortBy;
+  sort_dir?: QASortDir;
   limit?: number;
   offset?: number;
   include_answer?: boolean;

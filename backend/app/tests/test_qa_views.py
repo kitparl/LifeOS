@@ -107,6 +107,20 @@ async def test_qa_sort_by_created_at(client):
 
 
 @pytest.mark.asyncio
+async def test_qa_sort_dir_toggles_order(client):
+    token = await _auth_token(client, "qasortdir@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    await _create_entry(client, headers, question="First?")
+    await _create_entry(client, headers, question="Second?")
+
+    desc = await client.get("/api/v1/qa/entries?sort_by=created_at", headers=headers)
+    asc = await client.get("/api/v1/qa/entries?sort_by=created_at&sort_dir=asc", headers=headers)
+    assert [i["question"] for i in desc.json()] == ["Second?", "First?"]
+    assert [i["question"] for i in asc.json()] == ["First?", "Second?"]
+
+
+@pytest.mark.asyncio
 async def test_qa_create_update_is_deep_personal(client):
     token = await _auth_token(client, "qadeep2@example.com")
     headers = {"Authorization": f"Bearer {token}"}

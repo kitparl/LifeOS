@@ -9,7 +9,7 @@ import {
   QAExpandableEntryComponent,
   groupEntriesByMonth,
 } from './qa-expandable-entry.component';
-import { QAListItem, QAViewMode, QA_PURGE_AFTER_DAYS } from './models/qa.models';
+import { QAListItem, QASortBy, QASortDir, QAViewMode, QA_PURGE_AFTER_DAYS } from './models/qa.models';
 import { QAService } from './services/qa.service';
 import { QAReferenceLinksComponent } from './qa-reference-links.component';
 
@@ -90,7 +90,16 @@ interface ViewTab {
                 <th class="px-3 py-2">Question</th>
                 <th class="px-3 py-2">Type</th>
                 <th class="px-3 py-2">Tags</th>
-                <th class="px-3 py-2">Updated</th>
+                <th class="px-3 py-2" [attr.aria-sort]="ariaSort('created_at')">
+                  <button type="button" class="font-semibold" (click)="setSort('created_at')">
+                    Created{{ sortIndicator('created_at') }}
+                  </button>
+                </th>
+                <th class="px-3 py-2" [attr.aria-sort]="ariaSort('updated_at')">
+                  <button type="button" class="font-semibold" (click)="setSort('updated_at')">
+                    Updated{{ sortIndicator('updated_at') }}
+                  </button>
+                </th>
                 <th class="px-3 py-2"></th>
               </tr>
             </thead>
@@ -111,12 +120,13 @@ interface ViewTab {
                   <td class="px-3 py-2 text-xs" style="color: var(--text-muted)">
                     {{ entry.tags.join(', ') || '—' }}
                   </td>
+                  <td class="px-3 py-2 text-xs">{{ entry.created_at | date: 'mediumDate' }}</td>
                   <td class="px-3 py-2 text-xs">{{ entry.updated_at | date: 'mediumDate' }}</td>
                   <td class="px-3 py-2 text-xs">{{ isExpanded(entry.id) ? '▲' : '▼' }}</td>
                 </tr>
                 @if (isExpanded(entry.id)) {
                   <tr class="border-b border-[var(--xp-border)] bg-[var(--primary-soft)]">
-                    <td colspan="5" class="px-3 py-3 text-sm">
+                    <td colspan="6" class="px-3 py-3 text-sm">
                       @if (isLoadingAnswer(entry.id)) {
                         <p class="text-xs" style="color: var(--text-muted)">Loading answer…</p>
                       } @else {
@@ -219,6 +229,8 @@ export class QAListComponent implements OnInit {
   ];
 
   view: QAViewMode = 'all';
+  sortBy: QASortBy = 'created_at';
+  sortDir: QASortDir = 'desc';
   entries: QAListItem[] = [];
   total = 0;
   loading = false;
@@ -272,6 +284,28 @@ export class QAListComponent implements OnInit {
     });
   }
 
+  setSort(column: QASortBy): void {
+    if (this.sortBy === column) {
+      this.sortDir = this.sortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+      this.sortBy = column;
+      this.sortDir = 'desc';
+    }
+    this.currentPage = 1;
+    this.expandedIds.clear();
+    this.load();
+  }
+
+  sortIndicator(column: QASortBy): string {
+    if (this.sortBy !== column) return '';
+    return this.sortDir === 'desc' ? ' ↓' : ' ↑';
+  }
+
+  ariaSort(column: QASortBy): 'ascending' | 'descending' | 'none' {
+    if (this.sortBy !== column) return 'none';
+    return this.sortDir === 'desc' ? 'descending' : 'ascending';
+  }
+
   applyFilters(): void {
     this.currentPage = 1;
     this.expandedIds.clear();
@@ -295,7 +329,8 @@ export class QAListComponent implements OnInit {
         tag: tag || undefined,
         deep_personal: this.view === 'deep' ? true : undefined,
         deleted: this.view === 'deleted' ? true : undefined,
-        sort_by: this.view === 'all' || this.view === 'deleted' ? 'updated_at' : 'created_at',
+        sort_by: this.view === 'month' || this.view === 'deep' ? 'created_at' : this.sortBy,
+        sort_dir: this.sortDir,
         limit: this.pageSize,
         offset,
         include_answer: this.view === 'deleted',

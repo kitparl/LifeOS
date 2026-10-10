@@ -28,6 +28,7 @@ export class QAService {
     if (opts?.deep_personal === true) params = params.set('deep_personal', 'true');
     if (opts?.deep_personal === false) params = params.set('deep_personal', 'false');
     if (opts?.sort_by) params = params.set('sort_by', opts.sort_by);
+    if (opts?.sort_dir) params = params.set('sort_dir', opts.sort_dir);
     if (opts?.limit != null) params = params.set('limit', String(opts.limit));
     if (opts?.offset != null) params = params.set('offset', String(opts.offset));
     if (opts?.include_answer === false) params = params.set('include_answer', 'false');
