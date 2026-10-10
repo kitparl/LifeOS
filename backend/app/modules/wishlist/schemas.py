@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 WishlistStatus = Literal["in_progress", "completed", "delayed"]
 WishlistPriority = Literal["high", "medium", "low"]
@@ -90,6 +90,12 @@ class WishlistResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("photos", mode="before")
+    @classmethod
+    def photos_none_to_empty(cls, value: list[str] | None) -> list[str]:
+        # Legacy rows created before the photos column have NULL.
+        return value or []
 
     @model_validator(mode="after")
     def normalize_photos(self):
