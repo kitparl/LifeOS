@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
+import { MarkdownPipe } from '../../shared/markdown/markdown.pipe';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { QAEntry, QA_PURGE_AFTER_DAYS } from './models/qa.models';
 import { QAService } from './services/qa.service';
@@ -10,7 +11,7 @@ import { QAReferenceLinksComponent } from './qa-reference-links.component';
 @Component({
   selector: 'app-qa-detail',
   standalone: true,
-  imports: [RouterLink, DatePipe, QAReferenceLinksComponent],
+  imports: [RouterLink, DatePipe, QAReferenceLinksComponent, MarkdownPipe],
   template: `
     @if (entry; as e) {
       <div class="space-y-3">
@@ -33,7 +34,7 @@ import { QAReferenceLinksComponent } from './qa-reference-links.component';
 
         <div class="panel text-sm">
           <p class="font-medium mb-1">Current Answer</p>
-          <p class="whitespace-pre-wrap" style="color: var(--text)">{{ e.current_answer }}</p>
+          <div class="markdown-body" [innerHTML]="e.current_answer | markdown"></div>
           <app-qa-reference-links [links]="e.links" />
         </div>
 
@@ -44,7 +45,7 @@ import { QAReferenceLinksComponent } from './qa-reference-links.component';
               @for (v of e.versions; track v.id) {
                 <li class="px-3 py-2">
                   <p class="text-xs mb-1" style="color: var(--text-muted)">v{{ v.version_number }} · {{ v.created_at | date: 'medium' }}</p>
-                  <p class="whitespace-pre-wrap" style="color: var(--text)">{{ v.answer }}</p>
+                  <div class="markdown-body" [innerHTML]="v.answer | markdown"></div>
                 </li>
               }
             </ul>
