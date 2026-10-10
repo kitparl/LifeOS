@@ -13,6 +13,10 @@ describe('sticky-note.models', () => {
       expect(stickyNoteDisplayTitle({ title: 'Groceries', content: 'eggs\nmilk' })).toBe('Groceries');
     });
 
+    it('strips Markdown emphasis from the fallback title', () => {
+      expect(stickyNoteDisplayTitle({ title: null, content: 'Use **indexes** on *FKs*\nmore' })).toBe('Use indexes on FKs');
+    });
+
     it('falls back to the first non-blank content line', () => {
       expect(stickyNoteDisplayTitle({ title: null, content: '\n  \nBuy milk\nmore text' })).toBe('Buy milk');
     });

@@ -41,6 +41,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("qa_entries", "type", "VARCHAR(64)"),
     ("qa_entries", "is_deep_personal", "BOOLEAN DEFAULT FALSE"),
     ("qa_entries", "deleted_at", "TIMESTAMP"),
+    # Q&A: optional reference links (JSON list of URLs stored as TEXT)
+    ("qa_entries", "links_json", "TEXT DEFAULT '[]'"),
     # Integrations: digest bookkeeping for Telegram (and future schedulers)
     ("integration_connections", "last_digest_at", "TIMESTAMP"),
     # Integrations: per-connection Telegram webhook path secret

@@ -22,6 +22,7 @@ import { WorkspaceTabsComponent, WorkspaceTab } from '../workspace-tabs/workspac
 import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.component';
 import { MarkdownPreviewComponent } from '../markdown-preview/markdown-preview.component';
 import { CodeOutputComponent } from '../code-output/code-output.component';
+import { SplitBounds, SplitDividerComponent } from '../../../split-divider/split-divider.component';
 import { LanguageSelectorComponent } from '../language-selector/language-selector.component';
 
 import { EditorService } from '../../services/editor.service';
@@ -65,6 +66,7 @@ import { filesFromClipboard, filesFromDataTransfer } from '../../../file-upload/
     MarkdownPreviewComponent,
     CodeOutputComponent,
     LanguageSelectorComponent,
+    SplitDividerComponent,
   ],
   templateUrl: './code-workspace.component.html',
   styleUrls: ['./code-workspace.component.css'],
@@ -142,8 +144,8 @@ export class CodeWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   @ViewChild('workspaceContent') workspaceContent?: ElementRef<HTMLElement>;
   @ViewChild(MarkdownEditorComponent) markdownEditor?: MarkdownEditorComponent;
 
-  private readonly splitMin = 0.2;
-  private readonly splitMax = 0.8;
+  readonly splitMin = 0.2;
+  readonly splitMax = 0.8;
 
   constructor(
     private breakpointObserver: BreakpointObserver,
@@ -336,73 +338,27 @@ export class CodeWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
     return `minmax(0, ${this.splitRatio}fr) auto minmax(0, ${1 - this.splitRatio}fr) auto`;
   }
 
-  get splitPercent(): number {
-    return Math.round(this.splitRatio * 100);
-  }
-
   resetSplitRatio(): void {
     this.resizing = false;
     this.splitRatio = 0.5;
     this.cdr.markForCheck();
   }
 
-  updateSplitFromPointer(clientPos: number, start: number, end: number): void {
-    const total = end - start;
-    if (total <= 0) return;
-    this.splitRatio = Math.min(this.splitMax, Math.max(this.splitMin, (clientPos - start) / total));
+  onSplitChange(ratio: number): void {
+    this.splitRatio = ratio;
     this.cdr.markForCheck();
   }
 
-  onResizePointerDown(event: PointerEvent): void {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    event.preventDefault();
-    this.resizing = true;
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    this.cdr.markForCheck();
-  }
-
-  onResizePointerMove(event: PointerEvent): void {
-    if (!this.resizing) return;
+  /** Extent of the editor and preview panes along the split axis, read while dragging. */
+  readonly splitBounds = (): SplitBounds | null => {
     const root = this.workspaceContent?.nativeElement;
-    const editor = root?.querySelector('.editor-panel') as HTMLElement | null;
-    const preview = root?.querySelector('.preview-panel') as HTMLElement | null;
-    if (!editor || !preview) return;
-    const editorRect = editor.getBoundingClientRect();
-    const previewRect = preview.getBoundingClientRect();
-    if (this.splitOrientation === 'horizontal') {
-      this.updateSplitFromPointer(event.clientX, editorRect.left, previewRect.right);
-    } else {
-      this.updateSplitFromPointer(event.clientY, editorRect.top, previewRect.bottom);
-    }
-  }
-
-  onResizePointerUp(event: PointerEvent): void {
-    if (!this.resizing) return;
-    this.resizing = false;
-    const target = event.currentTarget as HTMLElement;
-    if (target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId);
-    }
-    this.cdr.markForCheck();
-  }
-
-  onResizeKeydown(event: KeyboardEvent): void {
-    const step = 0.05;
-    if (event.key === 'Home') {
-      event.preventDefault();
-      this.resetSplitRatio();
-      return;
-    }
-    const shrink = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
-    const grow = event.key === 'ArrowRight' || event.key === 'ArrowDown';
-    if (!shrink && !grow) return;
-    event.preventDefault();
-    this.splitRatio = Math.min(
-      this.splitMax,
-      Math.max(this.splitMin, this.splitRatio + (grow ? step : -step))
-    );
-    this.cdr.markForCheck();
-  }
+    const editor = root?.querySelector('.editor-panel')?.getBoundingClientRect();
+    const preview = root?.querySelector('.preview-panel')?.getBoundingClientRect();
+    if (!editor || !preview) return null;
+    return this.splitOrientation === 'horizontal'
+      ? { start: editor.left, end: preview.right }
+      : { start: editor.top, end: preview.bottom };
+  };
 
   toggleFullscreen(): void {
     this.fullscreen = !this.fullscreen;

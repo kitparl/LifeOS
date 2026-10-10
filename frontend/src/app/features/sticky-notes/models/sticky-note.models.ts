@@ -36,7 +36,8 @@ export const STICKY_NOTE_COLORS: { value: StickyNoteColor; label: string }[] = [
 export function stickyNoteDisplayTitle(note: Pick<StickyNote, 'title' | 'content'>): string {
   if (note.title?.trim()) return note.title.trim();
   const firstLine = (note.content ?? '').split('\n').find((line) => line.trim().length > 0);
-  return firstLine?.trim() ?? 'New note';
+  // Strip Markdown emphasis markers (`**bold**`, `*italic*`) so the fallback title reads as plain text.
+  return firstLine?.trim().replace(/(\*{1,3})(\S(?:.*?\S)?)\1/g, '$2') ?? 'New note';
 }
 
 export function stickyNoteMonthLabel(month: string): string {

@@ -2,12 +2,13 @@ import { DatePipe } from '@angular/common';
 import { CdkDragHandle } from '@angular/cdk/drag-drop';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { LucideDynamicIcon } from '@lucide/angular';
+import { MarkdownPipe } from '../../../shared/markdown/markdown.pipe';
 import { STICKY_NOTE_COLORS, StickyNote, daysUntilPurge, stickyNoteDisplayTitle } from '../models/sticky-note.models';
 
 @Component({
   selector: 'app-sticky-note-card',
   standalone: true,
-  imports: [DatePipe, CdkDragHandle, LucideDynamicIcon],
+  imports: [DatePipe, CdkDragHandle, LucideDynamicIcon, MarkdownPipe],
   host: { class: 'block h-full' },
   template: `
     <div
@@ -32,11 +33,14 @@ import { STICKY_NOTE_COLORS, StickyNote, daysUntilPurge, stickyNoteDisplayTitle 
       </div>
 
       @if (deletedMode) {
-        <p class="whitespace-pre-line text-xs text-[var(--text-muted)] line-clamp-6">{{ note.content }}</p>
+        <div class="note-card__content text-xs text-[var(--text-muted)] line-clamp-6" [innerHTML]="note.content | markdown"></div>
       } @else {
-        <button type="button" class="cursor-text text-left text-xs whitespace-pre-line text-[var(--text-muted)] line-clamp-6" (click)="open.emit()">
-          {{ note.content }}
-        </button>
+        <button
+          type="button"
+          class="note-card__content cursor-text text-left text-xs text-[var(--text-muted)] line-clamp-6"
+          (click)="open.emit()"
+          [innerHTML]="note.content | markdown"
+        ></button>
       }
 
       <!-- mt-auto keeps tags + footer pinned to the card bottom regardless of content length -->

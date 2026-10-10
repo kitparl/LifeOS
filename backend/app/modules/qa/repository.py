@@ -118,6 +118,7 @@ class QARepository:
             linked_journal_id=data.linked_journal_id,
         )
         entry.tags = data.tags
+        entry.links = data.links
         self.db.add(entry)
         await self.db.flush()
         if data.type:
@@ -137,6 +138,8 @@ class QARepository:
                 await self.ensure_type(entry.user_id, data.type)
         if data.tags is not None:
             entry.tags = data.tags
+        if data.links is not None:
+            entry.links = data.links
         if data.is_deep_personal is not None:
             entry.is_deep_personal = data.is_deep_personal
         if data.linked_journal_id is not None:

@@ -210,3 +210,54 @@ async def test_qa_purge_job_registered():
         assert sched_mod.get_scheduler().get_job("qa_purge") is not None
     finally:
         await sched_mod.shutdown_scheduler()
+
+
+@pytest.mark.asyncio
+async def test_qa_reference_links_optional_and_editable(client):
+    token = await _auth_token(client, "qalinks@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    no_links = await _create_entry(client, headers, question="What is a join?")
+    assert no_links.status_code in (200, 201)
+    assert no_links.json()["links"] == []
+
+    created = await client.post(
+        "/api/v1/qa/entries",
+        headers=headers,
+        json={
+            "question": "What is normalisation in SQL?",
+            "answer": "Organising tables to reduce redundancy.",
+            "links": ["  https://en.wikipedia.org/wiki/Database_normalization ", "", "https://example.com/nf"],
+        },
+    )
+    assert created.status_code in (200, 201)
+    entry_id = created.json()["id"]
+    assert created.json()["links"] == [
+        "https://en.wikipedia.org/wiki/Database_normalization",
+        "https://example.com/nf",
+    ]
+
+    listed = await client.get("/api/v1/qa/entries?search=normalisation", headers=headers)
+    assert listed.json()[0]["links"] == created.json()["links"]
+
+    updated = await client.patch(
+        f"/api/v1/qa/entries/{entry_id}", headers=headers, json={"links": ["https://example.com/3nf"]}
+    )
+    assert updated.status_code == 200
+    assert updated.json()["links"] == ["https://example.com/3nf"]
+
+    untouched = await client.patch(f"/api/v1/qa/entries/{entry_id}", headers=headers, json={"question": "Normal forms?"})
+    assert untouched.json()["links"] == ["https://example.com/3nf"]
+
+
+@pytest.mark.asyncio
+async def test_qa_reference_links_reject_non_http(client):
+    token = await _auth_token(client, "qabadlink@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    res = await client.post(
+        "/api/v1/qa/entries",
+        headers=headers,
+        json={"question": "Q?", "answer": "A", "links": ["javascript:alert(1)"]},
+    )
+    assert res.status_code == 422

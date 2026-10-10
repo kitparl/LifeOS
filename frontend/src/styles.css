@@ -1247,6 +1247,14 @@ summary::-webkit-details-marker {
   margin-top: 0;
 }
 
+/* Quick Note cards: compact Markdown preview (bold/italic, paragraphs, lists, links). */
+.note-card__content p + p,
+.note-card__content ul,
+.note-card__content ol { margin-top: 0.5em; }
+.note-card__content ul { list-style: disc outside; padding-left: 1.25rem; }
+.note-card__content ol { list-style: decimal outside; padding-left: 1.25rem; }
+.note-card__content a { color: var(--primary); text-decoration: underline; }
+
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,

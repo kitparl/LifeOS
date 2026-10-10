@@ -10,6 +10,7 @@ interface QAWritePayload {
   answer?: string;
   type?: string | null;
   tags?: string[];
+  links?: string[];
   is_deep_personal?: boolean;
 }
 

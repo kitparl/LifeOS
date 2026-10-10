@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.core.text import clean_text
+from app.core.text import clean_text, is_http_url
 
 NewsDatePreset = Literal["today", "yesterday", "24h", "48h", "7d", "30d"]
 NewsSort = Literal["date", "relevance"]
@@ -15,11 +15,6 @@ HOST_MAX = 253
 COUNTRY_PATTERN = r"^[A-Z]{2}$"
 LANG_PATTERN = r"^[a-z]{2,3}$"
 HOST_PATTERN = r"^([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"
-
-
-def is_http_url(value: str) -> bool:
-    lowered = value.lower()
-    return lowered.startswith("https://") or lowered.startswith("http://")
 
 
 # --------------------------------------------------------------------------

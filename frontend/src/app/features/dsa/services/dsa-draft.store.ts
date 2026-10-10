@@ -3,6 +3,7 @@ import { DsaLanguage } from '../models/dsa.models';
 
 const PREFIX = 'dsa:draft:';
 const LANGUAGE_KEY = 'dsa:language';
+const SPLIT_KEY = 'dsa:split';
 
 /**
  * Per-browser code drafts (per problem and language) and the last language used.
@@ -36,6 +37,16 @@ export class DsaDraftStore {
 
   rememberLanguage(language: DsaLanguage): void {
     this.write(LANGUAGE_KEY, language);
+  }
+
+  /** Description column's share of the problem page split (0–1), or null if unset/invalid. */
+  splitRatio(): number | null {
+    const value = Number(this.read(SPLIT_KEY));
+    return Number.isFinite(value) && value > 0 && value < 1 ? value : null;
+  }
+
+  rememberSplitRatio(ratio: number): void {
+    this.write(SPLIT_KEY, String(ratio));
   }
 
   private read(key: string): string | null {

@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
@@ -7,6 +7,7 @@ import { Subscription } from 'rxjs';
 import { ThemeService } from '../../../core/services/theme.service';
 import { MarkdownEditorComponent } from '../../../shared/code-workspace/components/markdown-editor/markdown-editor.component';
 import { MarkdownPreviewComponent } from '../../../shared/code-workspace/components/markdown-preview/markdown-preview.component';
+import { SplitBounds, SplitDividerComponent } from '../../../shared/split-divider/split-divider.component';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
 import { DifficultyBadgeComponent } from '../components/difficulty-badge.component';
 import { DsaStateComponent } from '../components/dsa-state.component';
@@ -55,6 +56,7 @@ export function actionErrorMessage(err: unknown): string {
     LucideDynamicIcon,
     MarkdownEditorComponent,
     MarkdownPreviewComponent,
+    SplitDividerComponent,
     DifficultyBadgeComponent,
     DsaStateComponent,
     DsaNoteEditorComponent,
@@ -86,7 +88,7 @@ export function actionErrorMessage(err: unknown): string {
           }
         </div>
 
-        <div class="grid gap-3 lg:grid-cols-2">
+        <div class="grid gap-3 lg:gap-0 lg:[grid-template-columns:var(--dsa-cols)]" [style.--dsa-cols]="splitColumns()" #splitGrid>
           <!-- Left: description / submissions -->
           <section class="panel !p-0 flex min-h-0 flex-col lg:h-[calc(100vh-10rem)]">
             <div class="tab-bar px-2" role="tablist">
@@ -147,6 +149,13 @@ export function actionErrorMessage(err: unknown): string {
               }
             </div>
           </section>
+
+          <!-- Resizable divider (desktop only) -->
+          <app-split-divider
+            class="relative mx-1 hidden w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--primary)] focus-visible:bg-[var(--primary)] data-[resizing=true]:bg-[var(--primary)] lg:block"
+            [value]="splitRatio()" [min]="splitMin" [max]="splitMax" [bounds]="splitBounds"
+            label="Resize description and editor" data-testid="dsa-detail-divider"
+            (valueChange)="setSplit($event)" />
 
           <!-- Right: editor + results -->
           <section class="flex min-h-0 flex-col gap-3 lg:h-[calc(100vh-10rem)]">
@@ -241,6 +250,7 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
   private readonly themeService = inject(ThemeService);
 
   @ViewChild('editor') editor?: MarkdownEditorComponent;
+  @ViewChild('splitGrid') splitGrid?: ElementRef<HTMLElement>;
 
   readonly labels = LANGUAGE_LABELS;
   readonly maxCustom = MAX_CUSTOM_INPUTS;
@@ -260,6 +270,11 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
   readonly actionError = signal<string | null>(null);
   readonly customInputs = signal<string[]>([]);
   readonly historyVersion = signal(0);
+  readonly splitMin = 0.25;
+  readonly splitMax = 0.75;
+  /** Description column's share of the desktop split. */
+  readonly splitRatio = signal(this.clampSplit(this.drafts.splitRatio()));
+  readonly splitColumns = computed(() => `minmax(0,${this.splitRatio()}fr) auto minmax(0,${1 - this.splitRatio()}fr)`);
   readonly placeholder = computed(() => formatJson(this.problem()?.samples[0]?.input));
 
   /** Content the editor is created with; later changes go through the editor API. */
@@ -270,6 +285,21 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
 
   constructor() {
     effect(() => this.editor?.setTheme(this.theme()));
+  }
+
+  setSplit(ratio: number): void {
+    this.splitRatio.set(ratio);
+    this.drafts.rememberSplitRatio(ratio);
+  }
+
+  /** Extent of the whole two-column grid, read while dragging the divider. */
+  readonly splitBounds = (): SplitBounds | null => {
+    const rect = this.splitGrid?.nativeElement.getBoundingClientRect();
+    return rect ? { start: rect.left, end: rect.right } : null;
+  };
+
+  private clampSplit(ratio: number | null): number {
+    return Math.min(this.splitMax, Math.max(this.splitMin, ratio ?? 0.5));
   }
 
   private get slug(): string {

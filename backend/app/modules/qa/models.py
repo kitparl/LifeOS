@@ -32,6 +32,7 @@ class QAEntry(Base):
     current_answer: Mapped[str] = mapped_column(Text, nullable=False, default="")
     type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     tags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    links_json: Mapped[str | None] = mapped_column(Text, nullable=True, default="[]")
     linked_journal_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("journal_entries.id"), nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_deep_personal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -55,6 +56,17 @@ class QAEntry(Base):
     @tags.setter
     def tags(self, value: list[str]) -> None:
         self.tags_json = json.dumps(value)
+
+    @property
+    def links(self) -> list[str]:
+        try:
+            return json.loads(self.links_json or "[]")
+        except json.JSONDecodeError:
+            return []
+
+    @links.setter
+    def links(self, value: list[str]) -> None:
+        self.links_json = json.dumps(value)
 
 
 class QAVersion(Base):

@@ -16,3 +16,8 @@ def clean_text(value: Any) -> str:
         return ""
     text = html.unescape(_TAG_RE.sub("", str(value)))
     return _WS_RE.sub(" ", text).strip()
+
+
+def is_http_url(value: str) -> bool:
+    lowered = value.lower()
+    return lowered.startswith("https://") or lowered.startswith("http://")

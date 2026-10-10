@@ -11,6 +11,7 @@ import {
 } from './qa-expandable-entry.component';
 import { QAListItem, QAViewMode, QA_PURGE_AFTER_DAYS } from './models/qa.models';
 import { QAService } from './services/qa.service';
+import { QAReferenceLinksComponent } from './qa-reference-links.component';
 
 interface ViewTab {
   id: QAViewMode;
@@ -26,6 +27,7 @@ interface ViewTab {
     DatePipe,
     ListPaginatorComponent,
     QAExpandableEntryComponent,
+    QAReferenceLinksComponent,
   ],
   template: `
     <div class="space-y-3">
@@ -120,6 +122,7 @@ interface ViewTab {
                       } @else {
                         <p class="whitespace-pre-wrap">{{ getAnswer(entry) }}</p>
                       }
+                      <app-qa-reference-links [links]="entry.links" />
                       <a
                         [routerLink]="['/qa', entry.id, 'edit']"
                         class="mt-2 inline-block text-xs underline"

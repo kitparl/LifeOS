@@ -12,6 +12,7 @@ export interface QAListItem {
   current_answer: string | null;
   type: string | null;
   tags: string[];
+  links: string[];
   is_deep_personal: boolean;
   created_at: string;
   updated_at: string;
@@ -24,6 +25,7 @@ export interface QAEntry {
   current_answer: string;
   type: string | null;
   tags: string[];
+  links: string[];
   is_deep_personal: boolean;
   linked_journal_id: string | null;
   ai_summary: string | null;

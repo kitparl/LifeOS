@@ -5,11 +5,12 @@ import { ActivatedRoute } from '@angular/router';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
 import { QAEntry, QA_PURGE_AFTER_DAYS } from './models/qa.models';
 import { QAService } from './services/qa.service';
+import { QAReferenceLinksComponent } from './qa-reference-links.component';
 
 @Component({
   selector: 'app-qa-detail',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, QAReferenceLinksComponent],
   template: `
     @if (entry; as e) {
       <div class="space-y-3">
@@ -33,6 +34,7 @@ import { QAService } from './services/qa.service';
         <div class="panel text-sm">
           <p class="font-medium mb-1">Current Answer</p>
           <p class="whitespace-pre-wrap" style="color: var(--text)">{{ e.current_answer }}</p>
+          <app-qa-reference-links [links]="e.links" />
         </div>
 
         @if (e.versions.length > 1) {

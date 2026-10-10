@@ -35,6 +35,10 @@ import { apiErrorMessage } from '../../core/utils/http';
             <label class="mb-1 block">Tags (comma-separated)</label>
             <input class="input-field" formControlName="tags" />
           </div>
+          <div>
+            <label class="mb-1 block">Reference links (optional, one per line)</label>
+            <textarea class="input-field min-h-[60px]" formControlName="links" placeholder="https://…"></textarea>
+          </div>
           <label class="flex items-center gap-2 text-sm">
             <input type="checkbox" formControlName="is_deep_personal" />
             Deep Personal
@@ -68,6 +72,7 @@ export class QAFormComponent implements OnInit {
     answer: ['', Validators.required],
     type: [''],
     tags: [''],
+    links: [''],
     is_deep_personal: [false],
   });
 
@@ -86,6 +91,7 @@ export class QAFormComponent implements OnInit {
             answer: e.current_answer,
             type: e.type ?? '',
             tags: e.tags.join(', '),
+            links: e.links.join('\n'),
             is_deep_personal: e.is_deep_personal,
           }),
       });
@@ -106,11 +112,16 @@ export class QAFormComponent implements OnInit {
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
+    const links = raw.links
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
     const payload = {
       question: raw.question,
       answer: raw.answer,
       type: raw.type || null,
       tags,
+      links,
       is_deep_personal: raw.is_deep_personal,
     };
     const req =

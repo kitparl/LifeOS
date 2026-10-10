@@ -17,6 +17,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { Subject, debounceTime } from 'rxjs';
 import { ModalComponent } from '../../../shared/modal/modal.component';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
+import { MarkdownEmphasis, toggleMarkdownEmphasis } from '../../../shared/markdown/markdown-emphasis';
 import {
   STICKY_NOTES_PURGE_AFTER_DAYS,
   STICKY_NOTE_COLORS,
@@ -87,6 +88,7 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
             placeholder="Take a note…"
             [value]="content()"
             (input)="onContentInput($event)"
+            (keydown)="onContentKeydown($event)"
           ></textarea>
 
           <div class="mt-2 flex shrink-0 flex-wrap items-center gap-1.5">
@@ -285,6 +287,21 @@ export class StickyNoteEditorModalComponent implements AfterViewInit, OnChanges 
 
   onContentInput(event: Event): void {
     this.content.set((event.target as HTMLTextAreaElement).value);
+    this.dirty$.next();
+  }
+
+  /** Cmd+B / Cmd+I (macOS) and Ctrl+B / Ctrl+I (Windows/Linux) toggle Markdown bold/italic. */
+  onContentKeydown(event: KeyboardEvent): void {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+    const key = event.key.toLowerCase();
+    const emphasis: MarkdownEmphasis | null = key === 'b' ? 'bold' : key === 'i' ? 'italic' : null;
+    if (!emphasis) return;
+    event.preventDefault();
+    const textarea = event.target as HTMLTextAreaElement;
+    const edit = toggleMarkdownEmphasis(textarea.value, textarea.selectionStart, textarea.selectionEnd, emphasis);
+    textarea.value = edit.value;
+    textarea.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+    this.content.set(edit.value);
     this.dirty$.next();
   }
 

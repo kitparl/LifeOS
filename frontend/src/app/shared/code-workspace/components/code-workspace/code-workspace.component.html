@@ -119,24 +119,18 @@
     </div>
 
     <!-- Resizable Divider (Desktop only) -->
-    <div
+    <app-split-divider
       class="resize-divider"
       *ngIf="shouldShowSplitView()"
-      role="separator"
-      tabindex="0"
-      [attr.aria-orientation]="splitOrientation === 'horizontal' ? 'vertical' : 'horizontal'"
-      [attr.aria-valuenow]="splitPercent"
-      aria-valuemin="20"
-      aria-valuemax="80"
-      aria-label="Resize editor and preview"
-      title="Drag to resize. Double-click to reset to 50/50."
-      (pointerdown)="onResizePointerDown($event)"
-      (pointermove)="onResizePointerMove($event)"
-      (pointerup)="onResizePointerUp($event)"
-      (pointercancel)="onResizePointerUp($event)"
-      (dblclick)="resetSplitRatio()"
-      (keydown)="onResizeKeydown($event)"
-    ></div>
+      [orientation]="splitOrientation"
+      [value]="splitRatio"
+      [min]="splitMin"
+      [max]="splitMax"
+      [bounds]="splitBounds"
+      label="Resize editor and preview"
+      (valueChange)="onSplitChange($event)"
+      (draggingChange)="resizing = $event"
+    ></app-split-divider>
 
     <!-- Preview Panel -->
     <div class="preview-panel" *ngIf="shouldShowPreview()">

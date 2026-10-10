@@ -32,6 +32,14 @@ describe('DsaDraftStore', () => {
     expect(store.lastLanguage()).toBe('cpp');
   });
 
+  it('remembers the split ratio and ignores invalid values', () => {
+    expect(store.splitRatio()).toBeNull();
+    store.rememberSplitRatio(0.4);
+    expect(store.splitRatio()).toBe(0.4);
+    store.storage().setItem('dsa:split', 'abc');
+    expect(store.splitRatio()).toBeNull();
+  });
+
   it('degrades silently when storage throws', () => {
     store.storage = () => {
       throw new Error('blocked');
@@ -40,5 +48,6 @@ describe('DsaDraftStore', () => {
     expect(() => store.clear('a', 'python')).not.toThrow();
     expect(store.load('a', 'python')).toBeNull();
     expect(store.lastLanguage()).toBeNull();
+    expect(store.splitRatio()).toBeNull();
   });
 });

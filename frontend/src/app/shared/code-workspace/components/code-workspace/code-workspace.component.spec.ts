@@ -153,26 +153,13 @@ describe('CodeWorkspaceComponent', () => {
     expect(component.shouldShowEditor()).toBeFalse();
   });
 
-  it('defaults the editor/preview split to 50/50 and lets it be resized', () => {
+  it('defaults the editor/preview split to 50/50 and follows the divider', () => {
     expect(component.splitRatio).toBe(0.5);
-    expect(component.splitPercent).toBe(50);
 
-    component.updateSplitFromPointer(300, 0, 400);
+    component.onSplitChange(0.75);
     expect(component.splitRatio).toBe(0.75);
 
-    component.updateSplitFromPointer(10, 0, 400);
-    expect(component.splitRatio).toBe(0.2);
-
-    component.updateSplitFromPointer(390, 0, 400);
-    expect(component.splitRatio).toBe(0.8);
-
     component.resetSplitRatio();
-    expect(component.splitRatio).toBe(0.5);
-
-    component.splitRatio = 0.5;
-    component.onResizeKeydown(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
-    expect(component.splitRatio).toBeCloseTo(0.55);
-    component.onResizeKeydown(new KeyboardEvent('keydown', { key: 'Home' }));
     expect(component.splitRatio).toBe(0.5);
   });
 
