@@ -104,6 +104,11 @@ export class TravelApiService {
     return this.http.get<TripDetail>(`${this.base}/trips/${id}`);
   }
 
+  /** Shareable PDF guide; fetched through HttpClient so the auth header is sent (a plain link would not carry it). */
+  exportGuide(kind: 'trips' | 'adventures', id: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${kind}/${id}/export`, { responseType: 'blob' });
+  }
+
   updateTrip(id: string, body: TripUpdate): Observable<TripDetail> {
     return this.http.patch<TripDetail>(`${this.base}/trips/${id}`, body);
   }

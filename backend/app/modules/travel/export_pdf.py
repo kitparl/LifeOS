@@ -1,0 +1,704 @@
+"""Shareable PDF guides for a trip or an adventure.
+
+Written for friends who have never seen LifeOS: plain words, every stat explained, every map point a
+tappable Google Maps link. A missing value is never printed as "None" — it always becomes a friendly line
+such as "Not decided yet". Pure rendering: callers load the data (see `services/export_service.py`).
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Sequence
+from datetime import date, time
+from io import BytesIO
+from urllib.parse import urlencode
+from xml.sax.saxutils import escape
+
+from reportlab.graphics.shapes import Drawing, Line, PolyLine, String
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.pdfgen.canvas import Canvas
+from reportlab.platypus import (
+    BaseDocTemplate,
+    Flowable,
+    Frame,
+    KeepTogether,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
+from app.modules.travel.models import TravelPlace
+from app.modules.travel.schemas.adventures import AdventureDetail, AdventureOut
+from app.modules.travel.schemas.routes import RouteOut
+from app.modules.travel.schemas.trips import DayOut, ItemOut, TripDetail
+
+PRIMARY = colors.HexColor("#0f6b8f")
+PRIMARY_SOFT = colors.HexColor("#e6f2f7")
+INK = colors.HexColor("#1f2933")
+MUTED = colors.HexColor("#5f6c7b")
+LINE = colors.HexColor("#d3dce4")
+LINK = "#0b5cad"
+
+PAGE_W, PAGE_H = A4
+MARGIN = 16 * mm
+CONTENT_W = PAGE_W - 2 * MARGIN
+
+STATUS_HELP = {
+    "draft": "Draft - still an idea. Dates and plans may change.",
+    "planning": "Planning - the trip is happening, details are being worked out.",
+    "booked": "Booked - tickets / stays are arranged.",
+    "active": "On now - the trip is happening right now.",
+    "completed": "Completed - the trip is over.",
+}
+KIND_HELP = {
+    "trek": "Trek - a long walk, usually in the mountains, that can take several days.",
+    "hike": "Hike - a walk on trails, usually finished in one day.",
+    "road_trip": "Road trip - a journey by road with stops on the way.",
+    "camping": "Camping - sleeping outdoors in a tent.",
+    "cycling": "Cycling - a ride on a bicycle.",
+    "expedition": "Expedition - a big, well-planned outdoor journey.",
+}
+DIFFICULTY_HELP = {
+    "easy": "Easy - gentle ground, fine for beginners and kids.",
+    "moderate": "Moderate - some steep parts; you should be reasonably fit.",
+    "hard": "Hard - long or steep; good fitness and some experience needed.",
+    "expert": "Expert - very demanding; only for experienced people with proper gear.",
+}
+WAYPOINT_HELP = {
+    "start": "Start point",
+    "camp": "Camp site (sleep here)",
+    "summit": "Top of the climb",
+    "water": "Drinking water",
+    "viewpoint": "Nice view",
+    "end": "End point",
+    "other": "Stop",
+}
+MODE_HELP = {
+    "driving": "by car",
+    "walking": "on foot",
+    "cycling": "by bicycle",
+    "transit": "by public transport",
+}
+SOURCE_HELP = {
+    "google": "Planned with Google Maps",
+    "user_drawn": "Drawn by hand on the map",
+    "gpx": "Imported from a GPS track file",
+    "straight_line": "Straight lines between stops (not real roads)",
+}
+
+# Built-in PDF fonts only cover Latin-1; map common typography first, then drop what cannot be printed.
+_TYPOGRAPHY = str.maketrans(
+    {"‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-", "•": "-", "…": "...", "→": "->", " ": " ", "₹": "Rs "}
+)
+_WS = re.compile(r"[ \t]+")
+
+
+def plain(value: object, fallback: str = "") -> str:
+    """Printable text; `fallback` when there is nothing to show (so 'None' is never printed)."""
+    raw = "" if value is None else str(value)
+    raw = raw.translate(_TYPOGRAPHY).encode("latin-1", "ignore").decode("latin-1")
+    lines = [_WS.sub(" ", ln).strip() for ln in raw.splitlines()]
+    return "\n".join(ln for ln in lines if ln) or fallback
+
+
+def text(value: object, fallback: str = "") -> str:
+    """`plain` text made safe to put inside Paragraph markup."""
+    return escape(plain(value, fallback)).replace("\n", "<br/>")
+
+
+def link(url: str, label: str) -> str:
+    return f'<a href="{escape(url, {chr(34): "&quot;"})}" color="{LINK}"><u>{text(label)}</u></a>'
+
+
+def maps_url(lat: float, lng: float, place_id: str | None = None) -> str:
+    params = {"api": "1", "query": f"{lat:.6f},{lng:.6f}"}
+    if place_id:
+        params["query_place_id"] = place_id
+    return f"https://www.google.com/maps/search/?{urlencode(params)}"
+
+
+def directions_url(points: Sequence[tuple[float, float]], mode: str) -> str | None:
+    if len(points) < 2:
+        return None
+    fmt = lambda p: f"{p[0]:.6f},{p[1]:.6f}"  # noqa: E731
+    params = {
+        "api": "1",
+        "origin": fmt(points[0]),
+        "destination": fmt(points[-1]),
+        "travelmode": "bicycling" if mode == "cycling" else mode,
+    }
+    via = points[1:-1][:9]
+    if via:
+        params["waypoints"] = "|".join(fmt(p) for p in via)
+    return f"https://www.google.com/maps/dir/?{urlencode(params)}"
+
+
+def fmt_date(value: date | None, fallback: str = "Date not decided yet") -> str:
+    return value.strftime("%a, %d %b %Y") if value else fallback
+
+
+def fmt_time(value: time | None) -> str:
+    if value is None:
+        return "Any time"
+    return value.strftime("%I:%M %p").lstrip("0")
+
+
+def fmt_distance(meters: float | None, fallback: str = "Not planned yet") -> str:
+    if not meters:
+        return fallback
+    return f"{meters / 1000:.1f} km" if meters >= 1000 else f"{round(meters)} m"
+
+
+def fmt_duration(seconds: int | None, fallback: str = "Not known") -> str:
+    if not seconds:
+        return fallback
+    total = round(seconds / 60)
+    hours, minutes = divmod(total, 60)
+    return f"{hours} h {minutes} min" if hours else f"{minutes} min"
+
+
+def fmt_height(meters: float | None, fallback: str = "Not measured") -> str:
+    return f"{round(meters)} m" if meters is not None else fallback
+
+
+# ---- layout pieces ---------------------------------------------------------------------------------
+
+
+def _styles() -> dict[str, ParagraphStyle]:
+    base = getSampleStyleSheet()["Normal"]
+    body = ParagraphStyle("body", parent=base, fontName="Helvetica", fontSize=9.5, leading=13.5, textColor=INK)
+    return {
+        "body": body,
+        "small": ParagraphStyle("small", parent=body, fontSize=8.5, leading=12, textColor=MUTED),
+        "muted": ParagraphStyle("muted", parent=body, textColor=MUTED),
+        "title": ParagraphStyle(
+            "title", parent=body, fontName="Helvetica-Bold", fontSize=26, leading=30, textColor=colors.white
+        ),
+        "subtitle": ParagraphStyle("subtitle", parent=body, fontSize=11, leading=15, textColor=colors.white),
+        "h1": ParagraphStyle(
+            "h1",
+            parent=body,
+            fontName="Helvetica-Bold",
+            fontSize=15,
+            leading=19,
+            textColor=PRIMARY,
+            spaceBefore=14,
+            spaceAfter=6,
+        ),
+        "day": ParagraphStyle(
+            "day", parent=body, fontName="Helvetica-Bold", fontSize=11.5, leading=15, textColor=colors.white
+        ),
+        "tile_value": ParagraphStyle(
+            "tile_value",
+            parent=body,
+            fontName="Helvetica-Bold",
+            fontSize=14,
+            leading=17,
+            textColor=PRIMARY,
+            alignment=TA_CENTER,
+        ),
+        "tile_label": ParagraphStyle(
+            "tile_label", parent=body, fontSize=8, leading=10, textColor=MUTED, alignment=TA_CENTER
+        ),
+        "cell_head": ParagraphStyle(
+            "cell_head", parent=body, fontName="Helvetica-Bold", fontSize=8.5, leading=11, textColor=MUTED
+        ),
+    }
+
+
+def _outline(flowable: Flowable, label: str, key: str, level: int) -> Flowable:
+    """Mark a top-level flowable as a PDF bookmarks-panel entry (see `GuideDoc.afterFlowable`)."""
+    flowable.outline = (f"outline-{key}", plain(label, "Section"), level)  # type: ignore[attr-defined]
+    return flowable
+
+
+class Heading(Paragraph):
+    """A section heading that is also a bookmark entry and an internal link target."""
+
+    def __init__(self, label: str, style: ParagraphStyle, key: str, level: int = 0):
+        super().__init__(f'<a name="{key}"/>{text(label)}', style)
+        _outline(self, label, key, level)
+
+
+class GuideDoc(BaseDocTemplate):
+    def __init__(self, buffer: BytesIO, title: str, footer: str):
+        super().__init__(
+            buffer,
+            pagesize=A4,
+            leftMargin=MARGIN,
+            rightMargin=MARGIN,
+            topMargin=MARGIN,
+            bottomMargin=18 * mm,
+            title=title,
+            author="LifeOS",
+            subject=footer,
+        )
+        self.footer = footer
+        self.addPageTemplates(
+            PageTemplate(
+                "main",
+                [
+                    Frame(
+                        MARGIN,
+                        18 * mm,
+                        CONTENT_W,
+                        PAGE_H - MARGIN - 18 * mm,
+                        id="body",
+                        leftPadding=0,
+                        rightPadding=0,
+                        topPadding=0,
+                        bottomPadding=0,
+                    )
+                ],
+            )
+        )
+
+    def afterFlowable(self, flowable: Flowable) -> None:
+        outline = getattr(flowable, "outline", None)
+        if outline:
+            key, title, level = outline
+            self.canv.bookmarkPage(key)
+            self.canv.addOutlineEntry(title, key, level=level, closed=False)
+
+
+class _NumberedCanvas(Canvas):
+    """Two-pass canvas so each footer can say "Page 2 of 5"."""
+
+    footer = ""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved: list[dict] = []
+
+    def showPage(self) -> None:
+        self._saved.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self) -> None:
+        total = len(self._saved)
+        for state in self._saved:
+            self.__dict__.update(state)
+            self.setFont("Helvetica", 8)
+            self.setFillColor(MUTED)
+            self.setStrokeColor(LINE)
+            self.line(MARGIN, 14 * mm, PAGE_W - MARGIN, 14 * mm)
+            self.drawString(MARGIN, 9.5 * mm, self.footer)
+            self.drawRightString(PAGE_W - MARGIN, 9.5 * mm, f"Page {self._pageNumber} of {total}")
+            super().showPage()
+        super().save()
+
+
+def _build(title: str, footer: str, story: list[Flowable]) -> bytes:
+    buffer = BytesIO()
+    canvas_cls = type("FooterCanvas", (_NumberedCanvas,), {"footer": footer})
+    GuideDoc(buffer, title, footer).build(story, canvasmaker=canvas_cls)
+    return buffer.getvalue()
+
+
+def _banner(title: str, lines: list[str], st: dict[str, ParagraphStyle]) -> Table:
+    cells = [[Paragraph(text(title, "Untitled"), st["title"])]]
+    cells += [[Paragraph(text(ln), st["subtitle"])] for ln in lines if ln]
+    table = Table(cells, colWidths=[CONTENT_W])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), PRIMARY),
+                ("LEFTPADDING", (0, 0), (-1, -1), 14),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+                ("TOPPADDING", (0, 0), (0, 0), 16),
+                ("BOTTOMPADDING", (0, -1), (-1, -1), 16),
+                ("TOPPADDING", (0, 1), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -2), 2),
+            ]
+        )
+    )
+    return table
+
+
+def _tiles(items: list[tuple[str, str]], st: dict[str, ParagraphStyle]) -> Table:
+    width = CONTENT_W / len(items)
+    table = Table(
+        [
+            [Paragraph(text(v), st["tile_value"]) for v, _ in items],
+            [Paragraph(text(lb), st["tile_label"]) for _, lb in items],
+        ],
+        colWidths=[width] * len(items),
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), PRIMARY_SOFT),
+                ("LINEAFTER", (0, 0), (-2, -1), 0.6, colors.white),
+                ("TOPPADDING", (0, 0), (-1, 0), 9),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
+                ("TOPPADDING", (0, 1), (-1, 1), 0),
+                ("BOTTOMPADDING", (0, 1), (-1, 1), 8),
+            ]
+        )
+    )
+    return table
+
+
+def _grid(
+    rows: list[list[Paragraph | str]], widths: list[float], st: dict[str, ParagraphStyle], head: list[str]
+) -> Table:
+    data = [[Paragraph(text(h), st["cell_head"]) for h in head]] + [
+        [c if isinstance(c, Paragraph) else Paragraph(c, st["body"]) for c in row] for row in rows
+    ]
+    table = Table(data, colWidths=widths, repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY_SOFT),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.4, LINE),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    return table
+
+
+def _tip_box(lines: list[str], st: dict[str, ParagraphStyle]) -> Table:
+    table = Table([[Paragraph("<br/>".join(lines), st["body"])]], colWidths=[CONTENT_W])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.8, PRIMARY),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7fbfd")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+    return table
+
+
+def _notes_block(label: str, value: str | None, empty: str, st: dict[str, ParagraphStyle]) -> list[Flowable]:
+    return [Paragraph(text(label), st["h1"]), Paragraph(text(value, empty), st["body"])]
+
+
+def _links_line(urls: Sequence[str]) -> str:
+    return " &nbsp; ".join(link(u, f"Link {i}" if len(urls) > 1 else "Open link") for i, u in enumerate(urls, 1))
+
+
+# ---- trip -------------------------------------------------------------------------------------------
+
+
+def _trip_length(detail: TripDetail) -> int:
+    trip = detail.trip
+    if trip.start_date and trip.end_date:
+        return (trip.end_date - trip.start_date).days + 1
+    return len(detail.days)
+
+
+def _item_cell(item: ItemOut, places: dict[str, TravelPlace], st: dict[str, ParagraphStyle]) -> Paragraph:
+    parts = [f"<b>{text(item.title, 'Untitled stop')}</b>"]
+    place = places.get(item.place_id) if item.place_id else None
+    if place is not None:
+        where = ", ".join(p for p in (place.address or place.city, place.region, place.country) if p)
+        parts.append(f"Place: {text(where, place.name)}")
+        parts.append(link(maps_url(place.lat, place.lng, place.external_place_id), "Open in Google Maps"))
+    if item.transport:
+        parts.append(f"How to get there: {text(item.transport)}")
+    if item.accommodation:
+        parts.append(f"Where we stay: {text(item.accommodation)}")
+    if item.notes:
+        parts.append(f"Note: {text(item.notes)}")
+    if item.links:
+        parts.append(_links_line(item.links))
+    return Paragraph("<br/>".join(parts), st["body"])
+
+
+def _day_flowables(day: DayOut, places: dict[str, TravelPlace], st: dict[str, ParagraphStyle]) -> list[Flowable]:
+    label = f"Day {day.day_index + 1} - {fmt_date(day.day_date, 'date not set')}"
+    heading_text = f"{label}: {day.title}" if day.title else label
+    key = f"day{day.day_index + 1}"
+    band = Table([[Paragraph(f'<a name="{key}"/>{text(heading_text)}', st["day"])]], colWidths=[CONTENT_W])
+    _outline(band, heading_text, key, 1)
+    band.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), PRIMARY),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    flow: list[Flowable] = [Spacer(1, 8)]
+    head: list[Flowable] = [band]
+    if day.notes:
+        head.append(Paragraph(f"<i>{text(day.notes)}</i>", st["muted"]))
+    if not day.items:
+        flow.append(
+            KeepTogether(
+                head
+                + [
+                    Spacer(1, 3),
+                    Paragraph("Nothing is planned for this day yet - a free day to relax or explore.", st["muted"]),
+                ]
+            )
+        )
+        return flow
+    rows = [
+        [
+            Paragraph(
+                f"{fmt_time(i.start_time)}" + (f"<br/>to {fmt_time(i.end_time)}" if i.end_time else ""), st["small"]
+            ),
+            _item_cell(i, places, st),
+        ]
+        for i in sorted(day.items, key=lambda i: i.position)
+    ]
+    table = _grid(rows, [26 * mm, CONTENT_W - 26 * mm], st, ["When", "What we do"])
+    flow.append(KeepTogether(head + [table]) if len(rows) <= 4 else head[0])
+    if len(rows) > 4:
+        flow.extend(head[1:] + [table])
+    return flow
+
+
+def _route_section(detail: TripDetail, st: dict[str, ParagraphStyle]) -> list[Flowable]:
+    flow: list[Flowable] = [Paragraph("The route", st["h1"])]
+    route: RouteOut | None = detail.route
+    points = [(s.lat, s.lng) for s in detail.stops]
+    if route is None:
+        flow.append(
+            Paragraph("The route has not been calculated yet. The stops are listed day by day above.", st["muted"])
+        )
+        url = directions_url(points, "driving")
+    else:
+        mode = MODE_HELP.get(route.mode, route.mode)
+        lines = [
+            f"Total distance: <b>{fmt_distance(route.distance_m)}</b> ({text(mode)})",
+            f"Travel time: <b>{fmt_duration(route.duration_s)}</b> (driving or walking only, without stops)",
+            f"Total climb up: <b>{fmt_height(route.elevation_gain_m)}</b> &nbsp; Total way down: "
+            f"<b>{fmt_height(route.elevation_loss_m)}</b>",
+            f"How it was made: {text(SOURCE_HELP.get(route.source), 'Planned in LifeOS')}",
+        ]
+        if route.is_stale:
+            lines.append("Note: the stops changed after this route was calculated, so the numbers may be slightly off.")
+        flow.append(Paragraph("<br/>".join(lines), st["body"]))
+        url = directions_url(points, route.mode)
+    if url:
+        flow.append(Spacer(1, 4))
+        flow.append(Paragraph(link(url, "Open the whole route in Google Maps"), st["body"]))
+    return flow
+
+
+def _places_section(
+    detail: TripDetail, places: dict[str, TravelPlace], st: dict[str, ParagraphStyle]
+) -> list[Flowable]:
+    flow: list[Flowable] = [Heading("Places on this trip", st["h1"], "places")]
+    if not detail.places:
+        flow.append(Paragraph("No places have been added to this trip yet.", st["muted"]))
+        return flow
+    rows = []
+    for p in detail.places:
+        full = places.get(p.id)
+        where = ", ".join(x for x in ((full.city, full.region, full.country) if full else ()) if x)
+        about = (full.description or full.notes) if full else None
+        rows.append(
+            [
+                Paragraph(f"<b>{text(p.name)}</b>", st["body"]),
+                Paragraph(text(where, "Location details not added"), st["body"]),
+                Paragraph(text(about, "No description added yet"), st["body"]),
+                Paragraph(link(maps_url(p.lat, p.lng, p.external_place_id), "Map"), st["body"]),
+            ]
+        )
+    flow.append(
+        _grid(
+            rows,
+            [42 * mm, 38 * mm, CONTENT_W - 42 * mm - 38 * mm - 14 * mm, 14 * mm],
+            st,
+            ["Place", "Where", "About it", "Open"],
+        )
+    )
+    return flow
+
+
+def _adventures_section(adventures: Sequence[AdventureOut], st: dict[str, ParagraphStyle]) -> list[Flowable]:
+    if not adventures:
+        return []
+    rows = []
+    for a in adventures:
+        when = fmt_date(a.start_date, "Dates not set") + (f" to {fmt_date(a.end_date)}" if a.end_date else "")
+        rows.append(
+            [
+                Paragraph(f"<b>{text(a.name)}</b>", st["body"]),
+                Paragraph(text(KIND_HELP.get(a.kind), a.kind.replace("_", " ").title()), st["body"]),
+                Paragraph(text(DIFFICULTY_HELP.get(a.difficulty or ""), "Difficulty not rated yet"), st["body"]),
+                Paragraph(text(when), st["body"]),
+            ]
+        )
+    return [
+        Heading("Adventures on this trip", st["h1"], "adventures"),
+        _grid(
+            rows, [36 * mm, 50 * mm, 50 * mm, CONTENT_W - 136 * mm], st, ["Adventure", "What it is", "How hard", "When"]
+        ),
+    ]
+
+
+def trip_guide_pdf(detail: TripDetail, places: dict[str, TravelPlace], adventures: Sequence[AdventureOut]) -> bytes:
+    st = _styles()
+    trip = detail.trip
+    length = _trip_length(detail)
+    dates = (
+        f"{fmt_date(trip.start_date)}  to  {fmt_date(trip.end_date)}" if trip.start_date else "Dates not decided yet"
+    )
+    if trip.dates_tentative and trip.start_date:
+        dates += "  (dates may still change)"
+    route = detail.route
+    story: list[Flowable] = [
+        _banner(trip.name, [dates, STATUS_HELP.get(trip.status, trip.status.title())], st),
+        Spacer(1, 10),
+        _tiles(
+            [
+                (str(length) if length else "Not set", "Days"),
+                (str(len(detail.places)), "Places"),
+                (fmt_distance(route.distance_m if route else None, "Not planned"), "Total distance"),
+                (fmt_duration(route.duration_s if route else None, "Not known"), "Travel time"),
+            ],
+            st,
+        ),
+        Spacer(1, 10),
+        _tip_box(
+            [
+                "<b>How to read this guide</b>",
+                "- Blue underlined words are buttons: tap them to open the place in Google Maps.",
+                "- Use the bookmarks panel of your PDF app to jump straight to any day.",
+                '- Times marked "Any time" are flexible - there is no fixed time.',
+            ],
+            st,
+        ),
+        *_notes_block("About this trip", trip.description, "The organiser has not written a description yet.", st),
+    ]
+    if detail.days:
+        index = " &nbsp;|&nbsp; ".join(
+            f'<a href="#day{d.day_index + 1}" color="{LINK}"><u>Day {d.day_index + 1}</u></a>' for d in detail.days
+        )
+        story += [Paragraph(f"Jump to: {index}", st["body"]), Heading("Day by day plan", st["h1"], "plan")]
+        for day in detail.days:
+            story += _day_flowables(day, places, st)
+    else:
+        story += [
+            Heading("Day by day plan", st["h1"], "plan"),
+            Paragraph("The day-by-day plan has not been written yet.", st["muted"]),
+        ]
+    story += _places_section(detail, places, st)
+    story += _route_section(detail, st)
+    story += _adventures_section(adventures, st)
+    story += _notes_block("Extra notes", trip.notes, "No extra notes.", st)
+    return _build(f"{plain(trip.name)} - trip guide", f"{plain(trip.name)} - shared from LifeOS", story)
+
+
+# ---- adventure --------------------------------------------------------------------------------------
+
+
+def _elevation_chart(profile: Sequence[float]) -> Drawing:
+    width, height, pad = CONTENT_W, 110, 28
+    drawing = Drawing(width, height)
+    low, high = min(profile), max(profile)
+    span = (high - low) or 1
+    step = (width - pad - 8) / max(len(profile) - 1, 1)
+    coords: list[float] = []
+    for i, value in enumerate(profile):
+        coords += [pad + i * step, 18 + (value - low) / span * (height - 34)]
+    drawing.add(Line(pad, 18, width - 8, 18, strokeColor=LINE))
+    drawing.add(PolyLine(coords, strokeColor=PRIMARY, strokeWidth=1.6))
+    drawing.add(String(0, height - 12, f"{round(high)} m", fontSize=7, fillColor=MUTED))
+    drawing.add(String(0, 14, f"{round(low)} m", fontSize=7, fillColor=MUTED))
+    drawing.add(String(pad, 4, "Start", fontSize=7, fillColor=MUTED))
+    drawing.add(String(width - 28, 4, "End", fontSize=7, fillColor=MUTED))
+    return drawing
+
+
+def adventure_guide_pdf(detail: AdventureDetail, trip_name: str | None) -> bytes:
+    st = _styles()
+    adv, route = detail.adventure, detail.route
+    when = (
+        f"{fmt_date(adv.start_date)}  to  {fmt_date(adv.end_date)}"
+        if adv.start_date and adv.end_date
+        else fmt_date(adv.start_date, "Dates not decided yet")
+    )
+    subtitle = [when, KIND_HELP.get(adv.kind, adv.kind.replace("_", " ").title())]
+    if trip_name:
+        subtitle.append(f"Part of the trip: {trip_name}")
+    story: list[Flowable] = [
+        _banner(adv.name, subtitle, st),
+        Spacer(1, 10),
+        _tiles(
+            [
+                (adv.difficulty.title() if adv.difficulty else "Not rated", "Difficulty"),
+                (fmt_distance(route.distance_m if route else None, "Not planned"), "Distance"),
+                (fmt_height(route.elevation_gain_m if route else None, "Not measured"), "Total climb up"),
+                (fmt_height(route.elevation_loss_m if route else None, "Not measured"), "Total way down"),
+            ],
+            st,
+        ),
+        Spacer(1, 10),
+        _tip_box(
+            [
+                "<b>What this means</b>",
+                text(DIFFICULTY_HELP.get(adv.difficulty or ""), "Difficulty has not been rated yet."),
+                "Climb up / way down add up all the uphill and downhill parts of the walk.",
+                "Blue underlined words open the place in Google Maps.",
+            ],
+            st,
+        ),
+        *_notes_block("About this adventure", adv.notes, "No notes have been written yet.", st),
+    ]
+    story.append(Heading("Route", st["h1"], "route"))
+    if route is None:
+        story.append(Paragraph("No route has been drawn or imported yet.", st["muted"]))
+    else:
+        story.append(
+            Paragraph(
+                f"{text(route.name, 'Route')}: <b>{fmt_distance(route.distance_m)}</b>. "
+                f"{text(SOURCE_HELP.get(route.source), 'Planned in LifeOS')}.",
+                st["body"],
+            )
+        )
+        url = directions_url(detail.route_points[:: max(len(detail.route_points) // 10, 1)], route.mode)
+        if url:
+            story += [Spacer(1, 4), Paragraph(link(url, "Open the route in Google Maps"), st["body"])]
+    story.append(Heading("Height along the way", st["h1"], "elevation"))
+    if detail.elevation_profile and len(detail.elevation_profile) >= 2:
+        story += [
+            _elevation_chart(detail.elevation_profile),
+            Paragraph("Higher on the chart means higher above sea level.", st["small"]),
+        ]
+    else:
+        story.append(Paragraph("Height details are not available for this route yet.", st["muted"]))
+    story.append(Heading("Important stops", st["h1"], "stops"))
+    if detail.waypoints:
+        rows = [
+            [
+                Paragraph(f"<b>{text(w.name, 'Stop')}</b>", st["body"]),
+                Paragraph(text(WAYPOINT_HELP.get(w.kind), "Stop"), st["body"]),
+                Paragraph(fmt_height(w.elevation_m, "Height not known"), st["body"]),
+                Paragraph(link(maps_url(w.lat, w.lng), "Map"), st["body"]),
+            ]
+            for w in sorted(detail.waypoints, key=lambda w: w.position)
+        ]
+        story.append(
+            _grid(
+                rows,
+                [60 * mm, 50 * mm, 40 * mm, CONTENT_W - 150 * mm],
+                st,
+                ["Stop", "What it is", "Height above sea", "Open"],
+            )
+        )
+    else:
+        story.append(Paragraph("No stops have been marked on this adventure yet.", st["muted"]))
+    return _build(f"{plain(adv.name)} - adventure guide", f"{plain(adv.name)} - shared from LifeOS", story)

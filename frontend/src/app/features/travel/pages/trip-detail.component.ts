@@ -5,6 +5,7 @@ import { Observable, catchError, forkJoin, map, of, switchMap, throwError } from
 import { readJsonLocalStorage, writeJsonLocalStorage } from '../../../core/services/preferences-sync';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
+import { ExportGuideComponent } from '../components/export-guide.component';
 import { ItemPatch, ItineraryEditorComponent, NewCheckpoints, NewItem, PlaceChange } from '../components/itinerary-editor.component';
 import { PickedPlace, PlaceSearchComponent } from '../components/place-search.component';
 import { PlaceSheetComponent, PlaceSheetSubmit } from '../components/place-sheet.component';
@@ -52,7 +53,7 @@ interface LegRow {
 @Component({
   selector: 'app-travel-trip-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, TravelMapComponent, ItineraryEditorComponent, PlaceSearchComponent, PlaceSheetComponent],
+  imports: [FormsModule, RouterLink, ExportGuideComponent, TravelMapComponent, ItineraryEditorComponent, PlaceSearchComponent, PlaceSheetComponent],
   template: `
     @if (detail(); as d) {
       <div class="space-y-3">
@@ -98,6 +99,7 @@ interface LegRow {
             @if (canComplete()) {
               <button type="button" class="btn-primary text-xs" [disabled]="busy()" (click)="complete()">Complete trip</button>
             }
+            <app-export-guide kind="trips" [id]="d.trip.id" [name]="d.trip.name" />
             <button type="button" class="text-xs" style="color: var(--danger)" [disabled]="busy()" (click)="remove()">Delete trip</button>
             <a routerLink="/travel/trips" class="self-center text-xs underline">All trips</a>
           </div>

@@ -6,6 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, Observable, Subject, catchError, concatMap } from 'rxjs';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
+import { ExportGuideComponent } from '../components/export-guide.component';
 import { RouteDraw } from '../map/route-draw';
 import { LatLng, MapLine, MapMarker, TravelMapComponent } from '../map/travel-map.component';
 import {
@@ -39,7 +40,7 @@ const SOURCE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-travel-adventure-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, DatePipe, TravelMapComponent],
+  imports: [FormsModule, RouterLink, DatePipe, ExportGuideComponent, TravelMapComponent],
   template: `
     @if (detail(); as d) {
       <div class="space-y-3">
@@ -142,7 +143,8 @@ const SOURCE_LABELS: Record<string, string> = {
                 <p class="text-xs" style="color: var(--text-muted)">Use Drop Pin to add camps, summits, water points…</p>
               }
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
+              <app-export-guide kind="adventures" [id]="d.adventure.id" [name]="d.adventure.name" />
               <button type="button" class="text-xs" style="color: var(--danger)" (click)="remove()">Delete adventure</button>
               <a routerLink="/travel/trips" class="text-xs underline">All trips &amp; adventures</a>
             </div>
