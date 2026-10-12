@@ -6,6 +6,8 @@ makes it "stale" as soon as stop order, a stop or the mode changes; the UI then 
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError, get_or_404
@@ -13,7 +15,7 @@ from app.modules.travel.geo import decode_polyline, elevation_gain_loss, encode_
 from app.modules.travel.itinerary import Stop, stops_fingerprint
 from app.modules.travel.maps.errors import MapsError
 from app.modules.travel.maps.gateway import MapsGateway
-from app.modules.travel.maps.types import Feature, RouteResult, Sku, TravelMode
+from app.modules.travel.maps.types import Feature, RouteLeg, RouteResult, Sku, TravelMode
 from app.modules.travel.models import TravelRoute, TravelRouteWaypoint
 from app.modules.travel.repository.adventures import AdventureRepository
 from app.modules.travel.repository.routes import RouteRepository
@@ -21,6 +23,9 @@ from app.modules.travel.repository.trips import TripRepository
 from app.modules.travel.schemas.routes import RouteDetail, RouteDraw, RouteOut
 from app.modules.travel.services.trip_service import TripService
 
+logger = logging.getLogger(__name__)
+
+PARTIAL_ROUTE = "partial_route"  # fallback_reason: some legs have no Google route and are straight lines
 MAX_ELEVATION_SAMPLES = 256  # Elevation API limit per request
 ELEVATION_PATH_POINTS = 200  # keeps the encoded path well inside the URL limit
 MAX_ROUTE_STOPS = 27  # origin + destination + Google's 25 intermediates
@@ -56,11 +61,10 @@ class RouteService:
             result, fallback_reason = straight_line(stops), "transit_multi_stop"
         else:
             try:
-                result = await self.gateway.call(
-                    user_id, Sku.ROUTES, Feature.TRIP_ROUTE, lambda p: p.compute_route(points, travel_mode)
-                )
+                result = await self._google_route(user_id, points, travel_mode)
             except MapsError as exc:
-                result, fallback_reason = straight_line(stops), exc.code
+                logger.warning("Google route failed (%s): %s", exc.code, exc)
+                result, fallback_reason = await self._per_leg_fallback(user_id, stops, points, travel_mode, exc)
 
         route = await self.repo.for_trip(trip.id)
         if route is None:
@@ -68,9 +72,10 @@ class RouteService:
                 TravelRoute(user_id=user_id, trip_id=trip.id, name=trip.name, source="straight_line", polyline="")
             )
         route.name = trip.name
-        route.source = "straight_line" if fallback_reason else "google"
+        has_road = fallback_reason in (None, PARTIAL_ROUTE)  # a partial route still has real Google road legs
+        route.source = "google" if has_road else "straight_line"
         route.mode = travel_mode.value
-        legs = _road_legs(result, stops, travel_mode) if fallback_reason is None else None
+        legs = _road_legs(result, stops, travel_mode) if has_road else None
         walked_m, walked_s = _walk_totals(legs)
         route.distance_m = round(result.distance_m + walked_m, 1)
         route.duration_s = None if result.duration_s is None else result.duration_s + walked_s
@@ -88,6 +93,37 @@ class RouteService:
             ],
         )
         return RouteOut.model_validate(await self.repo.flush_refresh(route))
+
+    async def _google_route(self, user_id: str, points: list[tuple[float, float]], mode: TravelMode) -> RouteResult:
+        return await self.gateway.call(user_id, Sku.ROUTES, Feature.TRIP_ROUTE, lambda p: p.compute_route(points, mode))
+
+    async def _per_leg_fallback(
+        self, user_id: str, stops: list[Stop], points: list[tuple[float, float]], mode: TravelMode, exc: MapsError
+    ) -> tuple[RouteResult, str]:
+        """Google refused the whole trip (e.g. one stop has no road for this mode): route each leg on its own.
+
+        Only a "no route" style failure is retried per leg; key, quota, timeout and cost-protection errors
+        would just repeat. Legs Google cannot route become straight lines; if none can, the whole route is one.
+        """
+        if exc.code != "provider_unavailable" or len(stops) < 3:
+            return straight_line(stops), exc.code
+        legs: list[RouteLeg] = []
+        for a, b in zip(points, points[1:]):
+            try:
+                legs.append((await self._google_route(user_id, [a, b], mode)).legs[0])
+            except (MapsError, IndexError):
+                legs.append(_straight_leg(a, b))
+        if all(leg.polyline == encode_polyline([a, b]) for leg, (a, b) in zip(legs, zip(points, points[1:]))):
+            return straight_line(stops), exc.code
+        path = [pt for leg in legs for pt in decode_polyline(leg.polyline)]
+        durations = [leg.duration_s for leg in legs]
+        result = RouteResult(
+            distance_m=sum(leg.distance_m for leg in legs),
+            duration_s=None if None in durations else sum(durations),
+            polyline=encode_polyline(path),
+            legs=tuple(legs),
+        )
+        return result, PARTIAL_ROUTE
 
     async def save_drawn(self, user_id: str, data: RouteDraw) -> RouteDetail:
         if data.trip_id:
@@ -179,6 +215,10 @@ def _road_legs(result: RouteResult, stops: list[Stop], mode: TravelMode) -> list
             }
         )
     return legs
+
+
+def _straight_leg(a: tuple[float, float], b: tuple[float, float]) -> RouteLeg:
+    return RouteLeg(distance_m=round(path_length_m([a, b]), 1), duration_s=None, polyline=encode_polyline([a, b]), start=a, end=b)
 
 
 def _walk(a: tuple[float, float] | None, b: tuple[float, float] | None) -> dict | None:

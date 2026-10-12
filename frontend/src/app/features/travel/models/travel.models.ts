@@ -146,6 +146,12 @@ export function fallbackMessage(reason: string | null): string | null {
       return 'Google lookup is off (no Google Maps key). Coordinates are saved; type a name.';
     case 'cost_protection':
       return 'Maps cost protection is active, so Google lookups are paused. Coordinates are saved; type a name.';
+    case 'invalid_credential':
+      return 'Google rejected the Maps key (or the needed API, e.g. Routes, is not enabled for it). Coordinates are saved; type a name.';
+    case 'rate_limit':
+      return 'Google Maps quota is exceeded right now. Coordinates are saved; type a name.';
+    case 'timeout':
+      return 'Google Maps timed out. Coordinates are saved; type a name.';
     case 'no_result':
       return 'No named place here. Type a name.';
     default:

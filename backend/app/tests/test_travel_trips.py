@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+
+import httpx
 import pytest
 from app.modules.calendar.models import CalendarEvent
 from app.modules.travel.itinerary import InvalidOrder, ItemRef, apply_order, stop_sequence, stops_fingerprint
@@ -364,3 +367,29 @@ async def test_drawn_route_round_trip(client):
     assert route["points"] == [[32.1, 77.1], [32.2, 77.2], [32.25, 77.3]]
     assert route["distance_m"] > 20_000
     assert (await client.post(f"{BASE}/routes", json={**body, "points": [[1, 1]]}, headers=h)).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_unroutable_leg_becomes_a_straight_line_while_other_legs_stay_on_roads(client, google, monkeypatch):
+    original = type(google).__call__
+
+    def refuse_unless_single_leg(self, request):
+        body = json.loads(request.read()) if request.url.path.endswith("computeRoutes") else {}
+        if "intermediates" in body:
+            return httpx.Response(400, json={"error": "no route"})
+        last_stop = body.get("destination", {}).get("location", {}).get("latLng", {}).get("longitude")
+        if last_stop is not None and last_stop > 77.5:  # the final stop has no road
+            return httpx.Response(400, json={"error": "no route"})
+        return original(self, request)
+
+    monkeypatch.setattr(type(google), "__call__", refuse_unless_single_leg)
+    h = await _auth(client, "partial@example.com")
+    await _connect_google(client, h)
+    places, tid = await _himachal(client, h)
+    await _dated_itinerary(client, h, places, tid)
+    route = (await client.post(f"{BASE}/trips/{tid}/route", json={"mode": "driving"}, headers=h)).json()
+
+    assert route["source"] == "google" and route["fallback_reason"] == "partial_route"
+    first, second = route["legs"]
+    assert first["duration_s"] == 3000 and second["duration_s"] is None and second["distance_m"] > 0
+    assert route["duration_s"] is None

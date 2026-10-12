@@ -611,6 +611,7 @@ export class TripDetailComponent implements OnInit {
   routeNote(reason: string | null): string | null {
     if (!reason) return null;
     if (reason === 'transit_multi_stop') return 'Google transit routing supports only two stops, so this is a straight-line estimate.';
+    if (reason === 'partial_route') return 'Google has no route for some legs of this trip (e.g. a stop with no road), so those legs are straight lines.';
     return fallbackMessage(reason)?.replace('Coordinates are saved; type a name.', 'Showing a straight-line estimate.') ?? null;
   }
 
