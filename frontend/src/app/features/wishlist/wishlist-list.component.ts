@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { FilesService } from '../files/services/files.service';
 import { ListPaginatorComponent } from '../../shared/pagination/list-paginator.component';
 import {
   WISHLIST_STATUS_FILTERS,
@@ -64,6 +65,9 @@ import { WishlistService } from './services/wishlist.service';
               (click)="open(item.id)"
               (keydown.enter)="open(item.id)"
             >
+              @if (covers[item.id]; as cover) {
+                <img [src]="cover" [alt]="item.title" class="h-32 w-full object-cover border border-[var(--xp-border)]" />
+              }
               <div class="flex flex-wrap items-start justify-between gap-2">
                 <a
                   [routerLink]="['/wishlist', item.id]"
@@ -108,10 +112,13 @@ export class WishlistListComponent implements OnInit {
   private readonly wishlistService = inject(WishlistService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly filesService = inject(FilesService);
 
   readonly categories = signal<string[]>([]);
   readonly statusFilters = WISHLIST_STATUS_FILTERS;
   items: WishlistListItem[] = [];
+  /** Browser-loadable cover URL per item id (private files get a short-lived token). */
+  covers: Record<string, string> = {};
   total = 0;
   loading = false;
   currentPage = 1;
@@ -197,12 +204,21 @@ export class WishlistListComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.items = result.items;
+          this.resolveCovers(result.items);
           this.total = result.total;
           this.clampPage();
           this.loading = false;
         },
         error: () => (this.loading = false),
       });
+  }
+
+  private resolveCovers(items: WishlistListItem[]): void {
+    this.covers = {};
+    for (const item of items) {
+      if (!item.image_url) continue;
+      this.filesService.displayUrl(item.image_url).subscribe((src) => (this.covers = { ...this.covers, [item.id]: src }));
+    }
   }
 
   setPage(page: number): void {

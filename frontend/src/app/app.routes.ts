@@ -286,6 +286,7 @@ export const routes: Routes = [
       },
       {
         path: 'wishlist',
+        pathMatch: 'full',
         loadComponent: () =>
           import('./features/wishlist/wishlist-list.component').then((m) => m.WishlistListComponent),
       },

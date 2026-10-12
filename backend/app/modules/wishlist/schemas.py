@@ -1,3 +1,5 @@
+import json
+import re
 from datetime import date, datetime
 from typing import Literal
 
@@ -7,9 +9,29 @@ WishlistStatus = Literal["in_progress", "completed", "delayed"]
 WishlistPriority = Literal["high", "medium", "low"]
 
 
+_FILE_CONTENT_URL = re.compile(r"/api/v1/files/([0-9a-f-]{36})/content", re.IGNORECASE)
+
+
+def canonical_photo_url(url: str) -> str:
+    """Private file URLs are stored as `/api/v1/files/{id}/content` (no host, no download token); others as-is."""
+    match = _FILE_CONTENT_URL.search(url)
+    return f"/api/v1/files/{match.group(1)}/content" if match else url
+
+
+def parse_photos(value: object) -> list[str]:
+    """Photos as a list of URLs, whether the row holds a list or (SQLite TEXT column) a JSON string."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+    return [str(p) for p in value] if isinstance(value, list) else []
+
+
 def _sync_cover(photos: list[str] | None, image_url: str | None) -> tuple[list[str], str | None]:
     """Prefer photos list; keep image_url as cover (first photo) for list cards."""
-    normalized = [str(p) for p in (photos or []) if p]
+    normalized = [canonical_photo_url(str(p)) for p in (photos or []) if p]
+    image_url = canonical_photo_url(image_url) if image_url else image_url
     if not normalized and image_url:
         normalized = [image_url]
     cover = normalized[0] if normalized else None
@@ -93,14 +115,13 @@ class WishlistResponse(BaseModel):
 
     @field_validator("photos", mode="before")
     @classmethod
-    def photos_none_to_empty(cls, value: list[str] | None) -> list[str]:
-        # Legacy rows created before the photos column have NULL.
-        return value or []
+    def photos_to_list(cls, value: object) -> list[str]:
+        # Legacy rows have NULL; SQLite may hand back the JSON text instead of a list.
+        return parse_photos(value)
 
     @model_validator(mode="after")
     def normalize_photos(self):
         photos, cover = _sync_cover(self.photos, self.image_url)
         self.photos = photos
-        if not self.image_url:
-            self.image_url = cover
+        self.image_url = cover
         return self

@@ -15,6 +15,7 @@ import { apiErrorMessage } from '../../core/utils/http';
 
 interface PhotoItem {
   url: string;
+  /** Browser-loadable URL; empty until a private file's download token arrives. */
   preview: string;
 }
 
@@ -78,7 +79,11 @@ interface PhotoItem {
               <div class="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 @for (photo of photos; track photo.url; let i = $index) {
                   <div class="relative overflow-hidden rounded border border-[var(--xp-border)]">
-                    <img [src]="photo.preview || photo.url" alt="Photo {{ i + 1 }}" class="h-28 w-full object-cover" />
+                    @if (photo.preview) {
+                      <img [src]="photo.preview" alt="Photo {{ i + 1 }}" class="h-28 w-full object-cover" />
+                    } @else {
+                      <div class="h-28 w-full" style="background: var(--surface)"></div>
+                    }
                     <button
                       type="button"
                       class="absolute right-1 top-1 rounded px-1.5 py-0.5 text-[10px]"
@@ -211,13 +216,11 @@ export class WishlistFormComponent implements OnInit {
   }
 
   private addPhoto(url: string): void {
-    this.photos = [...this.photos, { url, preview: url }];
-    const fileId = url.match(/\/files\/([0-9a-f-]{36})\/content/i)?.[1];
+    const fileId = this.filesService.fileIdFromUrl(url);
+    this.photos = [...this.photos, { url, preview: fileId ? '' : url }];
     if (fileId) {
-      this.filesService.tokenUrl(fileId).subscribe({
-        next: (preview) => {
-          this.photos = this.photos.map((p) => (p.url === url ? { ...p, preview } : p));
-        },
+      this.filesService.displayUrl(url).subscribe((preview) => {
+        this.photos = this.photos.map((p) => (p.url === url ? { ...p, preview } : p));
       });
       this.filesService.get(fileId).subscribe({
         next: (record) => {
@@ -231,7 +234,7 @@ export class WishlistFormComponent implements OnInit {
 
   private refreshPhotoChecksums(): void {
     const ids = this.photos
-      .map((p) => p.url.match(/\/files\/([0-9a-f-]{36})\/content/i)?.[1])
+      .map((p) => this.filesService.fileIdFromUrl(p.url))
       .filter((id): id is string => !!id);
     if (!ids.length) {
       this.photoChecksums = [];
@@ -267,8 +270,7 @@ export class WishlistFormComponent implements OnInit {
       achieved_date: raw.achieved_date || null,
       status: raw.status,
       priority: raw.priority,
-      photos: photoUrls,
-      image_url: photoUrls[0] ?? null,
+      photos: photoUrls, // the server derives the cover (image_url) from the first photo
       notes: raw.notes || null,
     };
     const req =
@@ -276,7 +278,7 @@ export class WishlistFormComponent implements OnInit {
         ? this.wishlistService.update(this.itemId, payload)
         : this.wishlistService.create(payload);
     req.subscribe({
-      next: (item) => this.router.navigate(['/wishlist', item.id]),
+      next: (item) => this.router.navigate(['/wishlist', item.id], { state: { item } }),
       error: (err) => {
         this.error = apiErrorMessage(err, 'Failed to save');
         this.saving = false;

@@ -1,7 +1,9 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { ActivatedRoute } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { catchError, forkJoin, of, switchMap, tap } from 'rxjs';
 import { FilesService } from '../files/services/files.service';
 import { WishlistItem, wishlistStatusAccent, wishlistStatusBadge } from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
@@ -64,8 +66,10 @@ import { WishlistService } from './services/wishlist.service';
       </div>
     } @else if (loading) {
       <p class="text-sm">Loading…</p>
-    } @else {
+    } @else if (notFound) {
       <p class="text-sm text-red-700">Not found.</p>
+    } @else {
+      <p class="text-sm text-red-700">Could not load this item. Try again.</p>
     }
   `,
 })
@@ -74,50 +78,52 @@ export class WishlistDetailComponent implements OnInit {
   private readonly filesService = inject(FilesService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   item: WishlistItem | null = null;
   loading = false;
+  /** True only for a real 404; other failures (401, 422, 500, network) get their own message. */
+  notFound = false;
   imageSrcs: string[] = [];
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.loading = true;
-      this.wishlistService.get(id).subscribe({
-        next: (i) => {
-          this.item = i;
-          this.loading = false;
-          this.resolveImages(i);
-        },
-        error: () => {
-          this.item = null;
-          this.loading = false;
-        },
+    this.route.paramMap
+      .pipe(
+        tap(() => {
+          this.loading = true;
+          this.notFound = false;
+        }),
+        switchMap((params) => {
+          const id = params.get('id') ?? '';
+          // A save just returned this item: show it at once; the fetch below keeps it fresh.
+          const saved = history.state?.item as WishlistItem | undefined;
+          if (saved?.id === id) this.show(saved);
+          else this.item = null;
+          return this.wishlistService.get(id).pipe(
+            catchError((err: HttpErrorResponse) => {
+              this.notFound = err.status === 404;
+              return of(null);
+            }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((item) => {
+        this.loading = false;
+        if (item) this.show(item);
       });
-    }
   }
 
-  private resolveImages(item: WishlistItem): void {
+  private show(item: WishlistItem): void {
+    this.item = item;
     const urls = item.photos?.length ? item.photos : item.image_url ? [item.image_url] : [];
-    for (const url of urls) {
-      const fileId = url.match(/\/files\/([0-9a-f-]{36})\/content/i)?.[1];
-      if (fileId) {
-        this.filesService.tokenUrl(fileId).subscribe({
-          next: (src) => {
-            if (!this.imageSrcs.includes(src)) {
-              this.imageSrcs = [...this.imageSrcs, src];
-            }
-          },
-          error: () => {
-            if (!this.imageSrcs.includes(url)) {
-              this.imageSrcs = [...this.imageSrcs, url];
-            }
-          },
-        });
-      } else if (!this.imageSrcs.includes(url)) {
-        this.imageSrcs = [...this.imageSrcs, url];
-      }
+    if (!urls.length) {
+      this.imageSrcs = [];
+      return;
     }
+    forkJoin(urls.map((url) => this.filesService.displayUrl(url)))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((srcs) => (this.imageSrcs = srcs));
   }
 
   statusLabel(status: string): string {

@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, catchError, map, of } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { DownloadToken, FileRecord, FileUsage } from '../models/file.models';
 import { Page, toPage } from '../../../core/utils/http';
@@ -57,6 +57,17 @@ export class FilesService {
         return `${apiRoot}/api/v1/files/${id}/content?token=${encodeURIComponent(t.token)}`;
       }),
     );
+  }
+
+  /** File id of a private `/files/{id}/content` URL (any host, with or without a token), else null. */
+  fileIdFromUrl(url: string): string | null {
+    return url.match(/\/files\/([0-9a-f-]{36})\/content/i)?.[1] ?? null;
+  }
+
+  /** An `<img src>`-ready URL: private file URLs get a short-lived token, external URLs pass through. */
+  displayUrl(url: string): Observable<string> {
+    const id = this.fileIdFromUrl(url);
+    return id ? this.tokenUrl(id).pipe(catchError(() => of(url))) : of(url);
   }
 
   /** Explicit download via authenticated blob request. */
