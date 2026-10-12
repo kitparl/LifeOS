@@ -1,4 +1,4 @@
-import { ItineraryDay, ItineraryItem, Stop } from '../models/travel.models';
+import { ItineraryDay, ItineraryItem, Stop, TripPlace } from '../models/travel.models';
 
 /**
  * The full `{day_id: [item_id, ...]}` layout after moving one item — what the backend's batched
@@ -45,4 +45,21 @@ export function stopDayLabels(days: readonly ItineraryDay[], stops: readonly Sto
     }
   }
   return labels;
+}
+
+/**
+ * Where to bias place search for a day: the centre of the day's pins, else of every pin on the trip,
+ * else null (the caller falls back to the map centre).
+ */
+export function searchBias(day: ItineraryDay, places: readonly TripPlace[]): { lat: number; lng: number } | null {
+  const onDay = new Set(day.items.flatMap((i) => (i.place_id ? [i.place_id] : [])));
+  const pins = places.filter((p) => onDay.has(p.id));
+  return centre(pins.length ? pins : places);
+}
+
+function centre(points: readonly { lat: number; lng: number }[]): { lat: number; lng: number } | null {
+  if (!points.length) return null;
+  const lat = points.reduce((sum, p) => sum + p.lat, 0) / points.length;
+  const lng = points.reduce((sum, p) => sum + p.lng, 0) / points.length;
+  return { lat, lng };
 }

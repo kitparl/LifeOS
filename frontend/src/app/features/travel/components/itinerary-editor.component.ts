@@ -1,9 +1,11 @@
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
 import { DatePipe } from '@angular/common';
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ItemUpdate, ItineraryDay, ItineraryItem, TripPlace } from '../models/travel.models';
-import { dayEndpoints, moveItem } from '../utils/itinerary';
+import { LatLng } from '../map/travel-map.component';
+import { GeoLookup, ItemUpdate, ItineraryDay, ItineraryItem, PlaceChoice, TripPlace } from '../models/travel.models';
+import { dayEndpoints, moveItem, searchBias } from '../utils/itinerary';
+import { PickedPlace, PlaceSearchComponent } from './place-search.component';
 
 export interface ItemPatch {
   id: string;
@@ -16,6 +18,12 @@ export interface NewItem {
   place_id: string | null;
 }
 
+export interface NewCheckpoints {
+  day_id: string;
+  /** In the order they were picked: start, vias, end. */
+  picks: PlaceChoice[];
+}
+
 /**
  * Day-by-day itinerary (spec §11). Presentational: every change is emitted and the page saves it.
  * Dragging within or across days emits the whole layout once (one request per drag); field edits
@@ -24,7 +32,7 @@ export interface NewItem {
 @Component({
   selector: 'app-itinerary-editor',
   standalone: true,
-  imports: [FormsModule, DatePipe, CdkDropListGroup, CdkDropList, CdkDrag, CdkDragHandle],
+  imports: [FormsModule, DatePipe, CdkDropListGroup, CdkDropList, CdkDrag, CdkDragHandle, PlaceSearchComponent],
   template: `
     <div class="space-y-3" cdkDropListGroup>
       @for (day of days(); track day.id) {
@@ -58,7 +66,14 @@ export interface NewItem {
             (cdkDropListDropped)="drop($event)"
           >
             @for (item of day.items; track item.id) {
-              <li class="rounded p-2" style="background: var(--surface)" cdkDrag [cdkDragData]="item">
+              <li
+                class="rounded p-2"
+                style="background: var(--surface)"
+                cdkDrag
+                [cdkDragData]="item"
+                [attr.data-place-id]="item.place_id"
+                [style.outline]="item.place_id && item.place_id === highlightPlaceId() ? '2px solid var(--primary)' : null"
+              >
                 <div class="flex items-start gap-2">
                   <span cdkDragHandle class="cursor-grab select-none" aria-label="Drag to reorder" title="Drag to reorder">⠿</span>
                   <div class="min-w-0 flex-1">
@@ -114,6 +129,32 @@ export interface NewItem {
             }
           </ol>
 
+          <div class="space-y-1">
+            <app-place-search
+              placeholder="Search to add checkpoints (start, stops, end)"
+              [tripPlaces]="places()"
+              [includeSaved]="true"
+              [clearOnPick]="true"
+              [bias]="biasFor(day)"
+              (pickedPlace)="queuePlace(day.id, $event)"
+              (picked)="queueLookup(day.id, $event)"
+            />
+            @let picks = queued(day.id);
+            @if (picks.length) {
+              <div class="flex flex-wrap items-center gap-1.5">
+                @for (pick of picks; track $index) {
+                  <span class="chip text-xs">
+                    {{ $index + 1 }}. {{ pick.name }}
+                    <button type="button" class="ml-1" [attr.aria-label]="'Remove ' + pick.name + ' from the checkpoints'" (click)="unqueue(day.id, $index)">×</button>
+                  </span>
+                }
+                <button type="button" class="btn-primary text-xs" [disabled]="disabled()" (click)="submitQueue(day.id)">
+                  Add {{ picks.length }} {{ picks.length === 1 ? 'checkpoint' : 'checkpoints' }}
+                </button>
+              </div>
+            }
+          </div>
+
           <form class="flex flex-wrap gap-2" (submit)="$event.preventDefault(); add(day.id)">
             <input class="input-field min-w-[8rem] flex-1 text-xs" maxlength="200" placeholder="Add activity (e.g. Start trek)" [(ngModel)]="drafts[day.id]" [name]="'new-' + day.id" />
             <select class="input-field !w-auto text-xs" [(ngModel)]="draftPlaces[day.id]" [name]="'place-' + day.id" aria-label="Place for new stop">
@@ -142,11 +183,16 @@ export class ItineraryEditorComponent {
   readonly places = input.required<readonly TripPlace[]>();
   readonly canFill = input(false);
   readonly disabled = input(false);
+  /** Where the trip map is looking; the fallback when a day has no pins to bias place search. */
+  readonly mapCenter = input<() => LatLng | null>(() => null);
+  /** Items at this place get an outline (a marker was clicked on the map). */
+  readonly highlightPlaceId = input<string | null>(null);
 
   readonly reorder = output<Record<string, string[]>>();
   readonly itemPatch = output<ItemPatch>();
   readonly deleteItem = output<string>();
   readonly addItem = output<NewItem>();
+  readonly addCheckpoints = output<NewCheckpoints>();
   readonly addDay = output<void>();
   readonly fillDays = output<void>();
   readonly deleteDay = output<string>();
@@ -167,6 +213,17 @@ export class ItineraryEditorComponent {
   });
   drafts: Record<string, string> = {};
   draftPlaces: Record<string, string> = {};
+  /** Checkpoints picked per day but not added yet. */
+  readonly queue = signal<Record<string, PlaceChoice[]>>({});
+  private readonly biasFns = new Map<string, () => LatLng | null>();
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  constructor() {
+    effect(() => {
+      const id = this.highlightPlaceId();
+      if (id) setTimeout(() => this.host.nativeElement.querySelector(`[data-place-id="${id}"]`)?.scrollIntoView?.({ block: 'nearest' }));
+    });
+  }
 
   toggle(id: string): void {
     this.open.set(this.open() === id ? null : id);
@@ -198,6 +255,46 @@ export class ItineraryEditorComponent {
     const index = day?.items.findIndex((i) => i.id === item.id) ?? -1;
     const target = this.days().find((d) => d.id === toDay);
     this.reorder.emit(moveItem(this.days(), { dayId: fromDay, index }, { dayId: toDay, index: target?.items.length ?? 0 }));
+  }
+
+  /** One stable function per day (a new one on every change detection would re-trigger the input). */
+  biasFor(day: ItineraryDay): () => LatLng | null {
+    let fn = this.biasFns.get(day.id);
+    if (!fn) {
+      fn = () => {
+        const current = this.days().find((d) => d.id === day.id) ?? day;
+        return searchBias(current, this.places()) ?? this.mapCenter()();
+      };
+      this.biasFns.set(day.id, fn);
+    }
+    return fn;
+  }
+
+  queuePlace(dayId: string, place: PickedPlace): void {
+    this.enqueue(dayId, { placeId: place.id, name: place.name });
+  }
+
+  queueLookup(dayId: string, lookup: GeoLookup): void {
+    if (lookup.result) this.enqueue(dayId, { lookup, name: lookup.result.name });
+  }
+
+  queued(dayId: string): PlaceChoice[] {
+    return this.queue()[dayId] ?? [];
+  }
+
+  unqueue(dayId: string, index: number): void {
+    this.queue.update((q) => ({ ...q, [dayId]: (q[dayId] ?? []).filter((_, i) => i !== index) }));
+  }
+
+  submitQueue(dayId: string): void {
+    const picks = this.queued(dayId);
+    if (!picks.length) return;
+    this.addCheckpoints.emit({ day_id: dayId, picks });
+    this.queue.update((q) => ({ ...q, [dayId]: [] }));
+  }
+
+  private enqueue(dayId: string, pick: PlaceChoice): void {
+    this.queue.update((q) => ({ ...q, [dayId]: [...(q[dayId] ?? []), pick] }));
   }
 
   add(dayId: string): void {

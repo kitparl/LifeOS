@@ -149,6 +149,11 @@ export class TravelApiService {
     return this.http.post<TripDetail>(`${this.base}/trips/${tripId}/items`, body);
   }
 
+  /** Start, vias and end of a day in one request: one item per place, in the order given. */
+  addCheckpoints(tripId: string, dayId: string, placeIds: readonly string[]): Observable<TripDetail> {
+    return this.http.post<TripDetail>(`${this.base}/trips/${tripId}/days/${dayId}/checkpoints`, { place_ids: placeIds });
+  }
+
   updateItem(tripId: string, itemId: string, body: ItemUpdate): Observable<TripDetail> {
     return this.http.patch<TripDetail>(`${this.base}/trips/${tripId}/items/${itemId}`, body);
   }

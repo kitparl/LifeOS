@@ -219,6 +219,34 @@ async def test_itinerary_map_route_and_lifecycle(client):
 
 
 @pytest.mark.asyncio
+async def test_checkpoints_are_added_in_order_in_one_request(client):
+    h = await _auth(client, "checkpoints@example.com")
+    places, tid = await _himachal(client, h)
+    day = (await client.post(f"{BASE}/trips/{tid}/days", json={}, headers=h)).json()["days"][0]["id"]
+    url = f"{BASE}/trips/{tid}/days/{day}/checkpoints"
+
+    order = [places["chandratal"], places["manali"], places["hampta"]]
+    detail = (await client.post(url, json={"place_ids": order}, headers=h)).json()
+    items = detail["days"][0]["items"]
+    assert [i["title"] for i in items] == ["Chandratal", "Manali", "Hampta Pass"]
+    assert [i["position"] for i in items] == [0, 1, 2]
+    assert [i["place_id"] for i in items] == order
+    assert [s["name"] for s in detail["stops"]] == ["Chandratal", "Manali", "Hampta Pass"]
+    assert {p["id"] for p in detail["places"]} == set(order)
+
+    # A loop (same place twice) keeps both items and appends after what is already there.
+    detail = (await client.post(url, json={"place_ids": [places["manali"], places["manali"]]}, headers=h)).json()
+    assert [i["position"] for i in detail["days"][0]["items"]] == [0, 1, 2, 3, 4]
+    assert len(detail["places"]) == 3
+
+    assert (await client.post(url, json={"place_ids": []}, headers=h)).status_code == 422
+    assert (await client.post(url, json={"place_ids": ["nope"]}, headers=h)).status_code == 400
+    other = await client.post(f"{BASE}/trips/{tid}/days/missing/checkpoints", json={"place_ids": order}, headers=h)
+    assert other.status_code == 404
+    assert len((await client.get(f"{BASE}/trips/{tid}", headers=h)).json()["days"][0]["items"]) == 5
+
+
+@pytest.mark.asyncio
 async def test_favourite_is_never_downgraded_and_deleting_trip_keeps_places(client):
     h = await _auth(client, "fav@example.com")
     pid = await _place(client, h, "Spiti", 32.2, 78.0)

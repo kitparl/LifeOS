@@ -18,6 +18,7 @@ from app.modules.travel.repository.routes import RouteRepository
 from app.modules.travel.repository.trips import TripRepository
 from app.modules.travel.schemas.trips import (
     MAX_TRIP_DAYS,
+    CheckpointsCreate,
     DayCreate,
     DayOut,
     DayUpdate,
@@ -278,6 +279,26 @@ class TripService:
                 position=await self.repo.next_position(day.id),
                 **data.model_dump(),
             )
+        )
+        return await self.detail(user_id, trip.id)
+
+    async def add_checkpoints(self, user_id: str, trip_id: str, day_id: str, data: CheckpointsCreate) -> TripDetail:
+        """Bulk add: each place becomes a normal item (titled with the place name) appended in the given order."""
+        trip = await self._require(user_id, trip_id)
+        day = get_or_404(await self.repo.get_day(trip.id, day_id), "Day not found")
+        if await self.places.owned_ids(user_id, set(data.place_ids)) != set(data.place_ids):
+            raise BadRequestError("Unknown place")
+        places = await self.places.get_many(user_id, set(data.place_ids))
+        position = await self.repo.next_position(day.id)
+        for place_id in dict.fromkeys(data.place_ids):
+            await self.repo.add_link(trip.id, place_id)
+        await self.repo.add_items(
+            [
+                TravelItineraryItem(
+                    trip_id=trip.id, day_id=day.id, position=position + i, place_id=pid, title=places[pid].name
+                )
+                for i, pid in enumerate(data.place_ids)
+            ]
         )
         return await self.detail(user_id, trip.id)
 

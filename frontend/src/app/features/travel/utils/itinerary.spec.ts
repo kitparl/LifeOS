@@ -1,5 +1,5 @@
-import { ItineraryDay, ItineraryItem, Stop } from '../models/travel.models';
-import { dayEndpoints, moveItem, stopDayLabels } from './itinerary';
+import { ItineraryDay, ItineraryItem, Stop, TripPlace } from '../models/travel.models';
+import { dayEndpoints, moveItem, searchBias, stopDayLabels } from './itinerary';
 
 function item(id: string, dayId: string): ItineraryItem {
   return {
@@ -89,5 +89,23 @@ describe('stopDayLabels', () => {
     const days = [placedDay('d1', 0, ['kasol', 'tosh', 'kasol'])];
     const stops = [stop('kasol', 'd1'), stop('tosh', 'd1'), stop('kasol', 'd1')];
     expect(Object.fromEntries(stopDayLabels(days, stops))).toEqual({ 0: ['Day 1 start'], 2: ['Day 1 end'] });
+  });
+});
+
+describe('searchBias', () => {
+  const place = (id: string, lat: number, lng: number): TripPlace => ({ id, name: id, lat, lng, status: 'wishlist', external_place_id: null });
+  const places = [place('a', 10, 20), place('b', 30, 40), place('c', 50, 60)];
+  const placed = (ids: string[]): ItineraryDay => ({ ...day('d', []), items: ids.map((id) => ({ ...item(id, 'd'), place_id: id })) });
+
+  it('centres on the day pins', () => {
+    expect(searchBias(placed(['a', 'b']), places)).toEqual({ lat: 20, lng: 30 });
+  });
+
+  it('falls back to every pin on the trip when the day has none', () => {
+    expect(searchBias(placed([]), places)).toEqual({ lat: 30, lng: 40 });
+  });
+
+  it('is null for a trip with no places', () => {
+    expect(searchBias(placed([]), [])).toBeNull();
   });
 });

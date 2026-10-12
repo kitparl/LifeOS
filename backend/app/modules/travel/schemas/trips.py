@@ -11,6 +11,7 @@ from app.modules.travel.schemas.routes import RouteOut
 TripStatus = Literal["draft", "planning", "booked", "active", "completed"]
 MAX_TRIP_DAYS = 120
 MAX_ORDER_ITEMS = 500
+MAX_CHECKPOINTS = 50
 
 
 def check_trip_dates(start: date | None, end: date | None) -> None:
@@ -95,6 +96,12 @@ class ItemCreate(BaseModel):
     accommodation: OptText200 = None
     notes: Notes = None
     links: Links
+
+
+class CheckpointsCreate(BaseModel):
+    """Start, vias and end of a day in one request: one itinerary item per place, in the order given."""
+
+    place_ids: list[EntityId] = Field(min_length=1, max_length=MAX_CHECKPOINTS)
 
 
 class ItemUpdate(BaseModel):

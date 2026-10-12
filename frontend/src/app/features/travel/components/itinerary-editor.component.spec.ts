@@ -1,6 +1,8 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ItineraryDay } from '../models/travel.models';
-import { ItineraryEditorComponent, NewItem } from './itinerary-editor.component';
+import { ItineraryEditorComponent, NewCheckpoints, NewItem } from './itinerary-editor.component';
 
 describe('ItineraryEditorComponent', () => {
   let fixture: ComponentFixture<ItineraryEditorComponent>;
@@ -21,7 +23,7 @@ describe('ItineraryEditorComponent', () => {
   ];
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [ItineraryEditorComponent] });
+    TestBed.configureTestingModule({ imports: [ItineraryEditorComponent], providers: [provideHttpClient(), provideHttpClientTesting()] });
     fixture = TestBed.createComponent(ItineraryEditorComponent);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('days', days);
@@ -56,5 +58,35 @@ describe('ItineraryEditorComponent', () => {
     component.itemPatch.subscribe(() => emitted++);
     component.patch(days[0].items[0], { title: '' });
     expect(emitted).toBe(0);
+  });
+
+  it('queues several checkpoints in pick order and adds them in one emit', () => {
+    const added: NewCheckpoints[] = [];
+    component.addCheckpoints.subscribe((c) => added.push(c));
+    const lookup = { result: { name: 'Tosh', address: null, country: null, region: null, city: null, lat: 32, lng: 77.4, external_place_id: 'g1' }, fallback_reason: null };
+    component.queuePlace('d2', { id: 'p1', name: 'Manali' });
+    component.queueLookup('d2', lookup);
+    component.queuePlace('d2', { id: 'p1', name: 'Manali' });
+    component.unqueue('d2', 1);
+    component.submitQueue('d2');
+    expect(added).toEqual([{ day_id: 'd2', picks: [{ placeId: 'p1', name: 'Manali' }, { placeId: 'p1', name: 'Manali' }] }]);
+    expect(component.queue()['d2']).toEqual([]);
+  });
+
+  it('ignores an unresolved Google lookup and an empty queue', () => {
+    let emitted = 0;
+    component.addCheckpoints.subscribe(() => emitted++);
+    component.queueLookup('d1', { result: null, fallback_reason: 'missing_credential' });
+    component.submitQueue('d1');
+    expect(emitted).toBe(0);
+  });
+
+  it('biases search to the day pins, then the trip, then the map centre', () => {
+    const centre = { lat: 1, lng: 2 };
+    fixture.componentRef.setInput('mapCenter', () => centre);
+    expect(component.biasFor(days[0])()).toEqual({ lat: 32.2, lng: 77.1 });
+    fixture.componentRef.setInput('places', []);
+    expect(component.biasFor(days[1])()).toEqual(centre);
+    expect(component.biasFor(days[1])).toBe(component.biasFor(days[1]));
   });
 });

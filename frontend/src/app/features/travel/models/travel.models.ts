@@ -106,6 +106,9 @@ export interface GeoLookup {
   fallback_reason: string | null;
 }
 
+/** A search pick: a place already saved (on the trip or in the library) or a Google result still to be saved. */
+export type PlaceChoice = { placeId: string; name: string } | { lookup: GeoLookup; name: string };
+
 export interface Suggestion {
   external_place_id: string;
   primary: string;

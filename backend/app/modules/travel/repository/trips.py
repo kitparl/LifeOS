@@ -163,6 +163,10 @@ class TripRepository:
         await self.db.refresh(item)
         return item
 
+    async def add_items(self, items: list[TravelItineraryItem]) -> None:
+        self.db.add_all(items)
+        await self.db.flush()
+
     async def delete_item(self, item: TravelItineraryItem) -> None:
         await self.db.delete(item)
         await self.db.flush()

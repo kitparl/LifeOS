@@ -7,6 +7,7 @@ from app.core.pagination import Pagination, pagination_params
 from app.modules.auth.models import User
 from app.modules.travel.schemas.routes import RouteOut, RouteRequest
 from app.modules.travel.schemas.trips import (
+    CheckpointsCreate,
     DayCreate,
     DayUpdate,
     ItemCreate,
@@ -111,6 +112,17 @@ async def add_trip_day(
 @router.post("/{trip_id}/days/fill", response_model=TripDetail)
 async def fill_trip_days(trip_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return await TripService(db).fill_days(user.id, trip_id)
+
+
+@router.post("/{trip_id}/days/{day_id}/checkpoints", response_model=TripDetail, status_code=status.HTTP_201_CREATED)
+async def add_day_checkpoints(
+    trip_id: str,
+    day_id: str,
+    data: CheckpointsCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await TripService(db).add_checkpoints(user.id, trip_id, day_id, data)
 
 
 @router.patch("/{trip_id}/days/{day_id}", response_model=TripDetail)
