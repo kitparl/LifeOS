@@ -33,7 +33,8 @@ ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 PLACE_FIELDS = "id,displayName,formattedAddress,location,addressComponents"
 ROUTE_FIELDS = (
     "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,"
-    "routes.legs.distanceMeters,routes.legs.duration,routes.legs.polyline.encodedPolyline"
+    "routes.legs.distanceMeters,routes.legs.duration,routes.legs.polyline.encodedPolyline,"
+    "routes.legs.startLocation,routes.legs.endLocation"
 )
 AUTOCOMPLETE_BIAS_RADIUS_M = 50_000.0
 
@@ -90,6 +91,13 @@ def _geocode_to_result(item: dict[str, Any], lat: float, lng: float) -> GeoResul
         lng=lng,
         external_place_id=item.get("place_id"),
     )
+
+
+def _leg_point(location: Any) -> Point | None:
+    latlng = (location or {}).get("latLng") or {}
+    if "latitude" not in latlng or "longitude" not in latlng:
+        return None
+    return float(latlng["latitude"]), float(latlng["longitude"])
 
 
 def _seconds(duration: Any) -> int | None:
@@ -212,6 +220,8 @@ class GoogleMapsProvider:
                     distance_m=float(leg.get("distanceMeters", 0)),
                     duration_s=_seconds(leg.get("duration")),
                     polyline=(leg.get("polyline") or {}).get("encodedPolyline", ""),
+                    start=_leg_point(leg.get("startLocation")),
+                    end=_leg_point(leg.get("endLocation")),
                 )
                 for leg in route.get("legs") or []
             ),

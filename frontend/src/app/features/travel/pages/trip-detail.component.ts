@@ -172,7 +172,7 @@ interface LegRow {
                       <li class="flex flex-wrap items-center gap-1">
                         <span [style.color]="'var(' + dayColorOf(row.dayId) + ')'">●</span>
                         <span>{{ row.from }} → {{ row.to }}</span>
-                        <span style="color: var(--text-muted)">· {{ distance(row.leg.distance_m) }}@if (duration(row.leg.duration_s); as t) { · {{ t }}}</span>
+                        <span style="color: var(--text-muted)">· {{ distance(row.leg.distance_m) }}@if (duration(row.leg.duration_s); as t) { · {{ t }}}@if (walkNote(row.leg); as walk) { · {{ walk }}}</span>
                       </li>
                     }
                   </ul>
@@ -370,7 +370,13 @@ export class TripDetailComponent implements OnInit {
     const r = d.route;
     const dashed = this.isDraft() || r?.source === 'straight_line';
     if (this.legs().length) {
-      return this.legRows().map((row, i) => ({ id: `leg-${i}`, points: decodePolyline(row.leg.polyline), color: this.dayColorOf(row.dayId), dashed }));
+      return this.legRows().flatMap((row, i) => {
+        const color = this.dayColorOf(row.dayId);
+        const walks = [row.leg.walk_start, row.leg.walk_end].flatMap((walk, w) =>
+          walk ? [{ id: `walk-${i}-${w}`, points: decodePolyline(walk.polyline), color, dashed: true }] : [],
+        );
+        return [{ id: `leg-${i}`, points: decodePolyline(row.leg.polyline), color, dashed }, ...walks];
+      });
     }
     if (r && !r.is_stale && r.polyline) {
       return [{ id: r.id, points: decodePolyline(r.polyline), color: '--primary', dashed }];
@@ -586,6 +592,12 @@ export class TripDetailComponent implements OnInit {
   selectMarker(marker: MapMarker): void {
     this.highlightPlaceId.update((current) => (current === marker.id ? null : marker.id));
     if (this.highlightPlaceId()) this.tab.set('itinerary');
+  }
+
+  /** "incl. 556 m walk" when a stop is off the road network and the last stretch is on foot. */
+  walkNote(leg: RouteLeg): string | null {
+    const metres = (leg.walk_start?.distance_m ?? 0) + (leg.walk_end?.distance_m ?? 0);
+    return metres > 0 ? `incl. ${formatDistance(metres)} walk (no road)` : null;
   }
 
   distance(m: number): string {

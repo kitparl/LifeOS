@@ -72,6 +72,9 @@ class RouteLeg:
     distance_m: float
     duration_s: int | None
     polyline: str
+    # Where the road actually starts/ends: Google snaps an off-road stop to the nearest road (lat, lng).
+    start: tuple[float, float] | None = None
+    end: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)

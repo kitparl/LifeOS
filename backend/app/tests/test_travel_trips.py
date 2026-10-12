@@ -7,6 +7,7 @@ from app.modules.calendar.models import CalendarEvent
 from app.modules.travel.itinerary import InvalidOrder, ItemRef, apply_order, stop_sequence, stops_fingerprint
 from app.modules.travel.lifecycle import can_transition, promoted_status, reverted_status, visited_status
 from app.modules.travel.models import MapsUsageEvent
+from app.tests import travel_support
 from app.tests.travel_support import auth as _auth
 from app.tests.travel_support import connect_google as _connect_google
 from hypothesis import given, settings
@@ -303,6 +304,51 @@ async def test_google_route_is_tracked(client, google):
     assert body["travelMode"] == "DRIVE" and len(body["intermediates"]) == 1
     events = [(e.sku, e.feature, e.outcome) for e in await _rows(client, MapsUsageEvent)]
     assert events == [("routes", "trip_route", "ok")]
+
+
+@pytest.mark.asyncio
+async def test_off_road_stop_gets_a_walk_from_the_nearest_road(client, google, monkeypatch):
+    def at(lat, lng):
+        return {"latLng": {"latitude": lat, "longitude": lng}}
+
+    snapped = (32.2717, 77.3667)  # ~556 m north of Hampta Pass: the nearest road Google found
+    legs = [
+        {
+            "distanceMeters": 50000,
+            "duration": "3000s",
+            "startLocation": at(32.2432, 77.1892),
+            "endLocation": at(*snapped),
+        },
+        {
+            "distanceMeters": 73456,
+            "duration": "4200s",
+            "startLocation": at(*snapped),
+            "endLocation": at(32.4753, 77.6178),
+        },
+    ]
+    body = {
+        "routes": [
+            {"distanceMeters": 123456, "duration": "7200s", "polyline": {"encodedPolyline": "_p~iF~ps|U"}, "legs": legs}
+        ]
+    }
+    monkeypatch.setattr(travel_support, "ROUTES_BODY", body)
+
+    h = await _auth(client, "offroad@example.com")
+    await _connect_google(client, h)
+    places, tid = await _himachal(client, h)
+    await _dated_itinerary(client, h, places, tid)
+    route = (await client.post(f"{BASE}/trips/{tid}/route", json={"mode": "driving"}, headers=h)).json()
+
+    first, second = route["legs"]
+    assert first["walk_start"] is None
+    assert 500 < first["walk_end"]["distance_m"] < 600
+    assert first["walk_end"]["duration_s"] == round(first["walk_end"]["distance_m"] / 1.4)
+    assert first["distance_m"] == pytest.approx(50000 + first["walk_end"]["distance_m"], abs=0.1)
+    assert first["duration_s"] == 3000 + first["walk_end"]["duration_s"]
+    # The same gap is walked again from the stop back to the road when the next leg starts.
+    assert second["walk_start"]["distance_m"] == first["walk_end"]["distance_m"] and second["walk_end"] is None
+    walked = first["walk_end"]["distance_m"] + second["walk_start"]["distance_m"]
+    assert route["distance_m"] == pytest.approx(123456 + walked, abs=0.2)
 
 
 @pytest.mark.asyncio

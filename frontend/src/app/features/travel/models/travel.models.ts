@@ -292,10 +292,20 @@ export interface Route {
   is_stale: boolean;
 }
 
+/** Straight-line walk between a stop with no road and the nearest road point. */
+export interface RouteWalk {
+  distance_m: number;
+  duration_s: number;
+  polyline: string;
+}
+
+/** Distance/time include any walk; `polyline` is the road part only. */
 export interface RouteLeg {
   distance_m: number;
   duration_s: number | null;
   polyline: string;
+  walk_start?: RouteWalk | null;
+  walk_end?: RouteWalk | null;
 }
 
 export interface RouteDetail extends Route {

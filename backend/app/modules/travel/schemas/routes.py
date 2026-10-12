@@ -12,12 +12,22 @@ MAX_DRAWN_POINTS = 5_000
 LatLngPair = Annotated[tuple[Lat, Lng], Field(description="[lat, lng]")]
 
 
+class WalkOut(BaseModel):
+    """Straight-line walk between a stop and the nearest road point (the stop is off the road network)."""
+
+    distance_m: float
+    duration_s: int
+    polyline: str
+
+
 class RouteLegOut(BaseModel):
-    """Road distance/time from stop i to stop i + 1 of the route."""
+    """Distance/time from stop i to stop i + 1 of the route, including any off-road walk at either end."""
 
     distance_m: float
     duration_s: int | None
     polyline: str
+    walk_start: WalkOut | None = None
+    walk_end: WalkOut | None = None
 
 
 class RouteOut(BaseModel):

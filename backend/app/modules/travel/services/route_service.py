@@ -24,6 +24,8 @@ from app.modules.travel.services.trip_service import TripService
 MAX_ELEVATION_SAMPLES = 256  # Elevation API limit per request
 ELEVATION_PATH_POINTS = 200  # keeps the encoded path well inside the URL limit
 MAX_ROUTE_STOPS = 27  # origin + destination + Google's 25 intermediates
+OFF_ROAD_MIN_M = 30  # a smaller gap between a stop and its road point is just map noise
+WALK_SPEED_MPS = 1.4  # ~5 km/h
 NOT_FOUND = "Route not found"
 
 
@@ -68,11 +70,13 @@ class RouteService:
         route.name = trip.name
         route.source = "straight_line" if fallback_reason else "google"
         route.mode = travel_mode.value
-        route.distance_m = result.distance_m
-        route.duration_s = result.duration_s
+        legs = _road_legs(result, stops, travel_mode) if fallback_reason is None else None
+        walked_m, walked_s = _walk_totals(legs)
+        route.distance_m = round(result.distance_m + walked_m, 1)
+        route.duration_s = None if result.duration_s is None else result.duration_s + walked_s
         route.polyline = result.polyline
         route.fallback_reason = fallback_reason
-        route.legs = _road_legs(result, len(stops)) if fallback_reason is None else None
+        route.legs = legs
         route.stops_fingerprint = stops_fingerprint(stops, travel_mode.value)
         await self.repo.replace_waypoints(
             route.id,
@@ -152,13 +156,48 @@ class RouteService:
         await self.repo.delete(get_or_404(await self.repo.get(user_id, route_id), NOT_FOUND))
 
 
-def _road_legs(result: RouteResult, stop_count: int) -> list[dict] | None:
-    """Keep legs only when they line up one-to-one with the stops, so leg i is always stop i -> i + 1."""
-    if len(result.legs) != stop_count - 1:
+def _road_legs(result: RouteResult, stops: list[Stop], mode: TravelMode) -> list[dict] | None:
+    """Keep legs only when they line up one-to-one with the stops, so leg i is always stop i -> i + 1.
+
+    Google snaps a stop with no road to the nearest road, so the road path stops short of it. For those
+    legs a straight-line walk covers the gap, and the leg's distance/time include it.
+    """
+    if len(result.legs) != len(stops) - 1:
         return None
-    return [
-        {"distance_m": leg.distance_m, "duration_s": leg.duration_s, "polyline": leg.polyline} for leg in result.legs
-    ]
+    legs: list[dict] = []
+    for i, leg in enumerate(result.legs):
+        walk_start = _walk((stops[i].lat, stops[i].lng), leg.start) if mode is not TravelMode.TRANSIT else None
+        walk_end = _walk(leg.end, (stops[i + 1].lat, stops[i + 1].lng)) if mode is not TravelMode.TRANSIT else None
+        walks = [w for w in (walk_start, walk_end) if w]
+        legs.append(
+            {
+                "distance_m": round(leg.distance_m + sum(w["distance_m"] for w in walks), 1),
+                "duration_s": None if leg.duration_s is None else leg.duration_s + sum(w["duration_s"] for w in walks),
+                "polyline": leg.polyline,
+                "walk_start": walk_start,
+                "walk_end": walk_end,
+            }
+        )
+    return legs
+
+
+def _walk(a: tuple[float, float] | None, b: tuple[float, float] | None) -> dict | None:
+    """A straight walk from a to b, or None when either end is unknown or they are (nearly) the same spot."""
+    if a is None or b is None:
+        return None
+    distance = path_length_m([a, b])
+    if distance < OFF_ROAD_MIN_M:
+        return None
+    return {
+        "distance_m": round(distance, 1),
+        "duration_s": round(distance / WALK_SPEED_MPS),
+        "polyline": encode_polyline([a, b]),
+    }
+
+
+def _walk_totals(legs: list[dict] | None) -> tuple[float, int]:
+    walks = [w for leg in legs or [] for w in (leg["walk_start"], leg["walk_end"]) if w]
+    return sum(w["distance_m"] for w in walks), sum(w["duration_s"] for w in walks)
 
 
 def route_detail(route: TravelRoute) -> RouteDetail:
