@@ -77,64 +77,88 @@ export interface NewCheckpoints {
                 class="rounded p-2"
                 style="background: var(--surface)"
                 cdkDrag
+                (keydown.escape)="open() === item.id && open.set(null)"
                 [cdkDragData]="item"
                 [attr.data-place-id]="item.place_id"
                 [style.outline]="item.place_id && item.place_id === highlightPlaceId() ? '2px solid var(--primary)' : null"
               >
                 <div class="flex items-start gap-2">
-                  <span cdkDragHandle class="cursor-grab select-none" aria-label="Drag to reorder" title="Drag to reorder">⠿</span>
+                  <span cdkDragHandle class="cursor-grab select-none pt-0.5" style="color: var(--text-muted)" aria-label="Drag to reorder" title="Drag to reorder">⠿</span>
                   <div class="min-w-0 flex-1">
-                    <button type="button" class="text-left" (click)="toggle(item.id)">
-                      @if (item.start_time) {
-                        <span class="text-xs" style="color: var(--text-muted)">{{ item.start_time.slice(0, 5) }}</span>
-                      }
-                      <span class="font-medium">{{ item.title }}</span>
-                      @if (placeName(item); as p) {
-                        <span class="text-xs" style="color: var(--text-muted)"> · 📍 {{ p }}</span>
-                      }
-                      @if (endpoints().get(item.id); as label) {
-                        <span class="chip ml-1 text-xs">{{ label }}</span>
-                      }
+                    <button
+                      type="button"
+                      class="flex w-full items-start justify-between gap-2 text-left"
+                      [attr.aria-expanded]="open() === item.id"
+                      [title]="open() === item.id ? 'Collapse' : 'Edit stop'"
+                      (click)="toggle(item.id)"
+                    >
+                      <span class="min-w-0">
+                        <span class="font-medium">{{ item.title }}</span>
+                        @if (endpoints().get(item.id); as label) {
+                          <span class="chip ml-1 text-xs">{{ label }}</span>
+                        }
+                        @if (summary(item); as line) {
+                          <span class="block truncate text-xs" style="color: var(--text-muted)">{{ line }}</span>
+                        }
+                      </span>
+                      <span class="shrink-0 text-xs transition-transform" style="color: var(--text-muted)" [style.transform]="open() === item.id ? 'rotate(180deg)' : null" aria-hidden="true">▾</span>
                     </button>
                     @if (open() === item.id) {
-                      <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                        <input class="input-field text-xs sm:col-span-2" maxlength="200" aria-label="Activity" [ngModel]="item.title" (change)="patch(item, { title: val($event) })" />
-                        <label class="text-xs">Start
-                          <input class="input-field text-xs" type="time" [ngModel]="item.start_time?.slice(0, 5)" (change)="patch(item, { start_time: val($event) || null })" />
+                      <div class="mt-3 space-y-3 border-t pt-3" style="border-color: var(--border)">
+                        <label class="block text-xs font-medium" style="color: var(--text-muted)">Activity
+                          <input class="input-field mt-1 text-sm" maxlength="200" [ngModel]="item.title" (change)="patch(item, { title: val($event) })" />
                         </label>
-                        <label class="text-xs">End
-                          <input class="input-field text-xs" type="time" [ngModel]="item.end_time?.slice(0, 5)" (change)="patch(item, { end_time: val($event) || null })" />
-                        </label>
-                        <label class="text-xs sm:col-span-2">Place
-                          <select class="input-field text-xs" [ngModel]="item.place_id ?? ''" (change)="patch(item, { place_id: val($event) || null })">
+
+                        <div class="space-y-1">
+                          <p class="text-xs font-medium" style="color: var(--text-muted)">Location</p>
+                          <select class="input-field text-sm" aria-label="Place" [ngModel]="item.place_id ?? ''" (change)="patch(item, { place_id: val($event) || null })">
                             <option value="">No place</option>
                             @for (p of places(); track p.id) {
                               <option [value]="p.id">{{ p.name }}</option>
                             }
                           </select>
-                        </label>
-                        <app-place-search
-                          class="sm:col-span-2"
-                          placeholder="Or search to change the location"
-                          [tripPlaces]="places()"
-                          [includeSaved]="true"
-                          [clearOnPick]="true"
-                          [bias]="biasFor(day)"
-                          (pickedPlace)="changePlace(item, { placeId: $event.id, name: $event.name })"
-                          (picked)="changeLookup(item, $event)"
-                        />
-                        <input class="input-field text-xs" maxlength="120" placeholder="Transport" aria-label="Transport" [ngModel]="item.transport ?? ''" (change)="patch(item, { transport: val($event) || null })" />
-                        <input class="input-field text-xs" maxlength="200" placeholder="Accommodation" aria-label="Accommodation" [ngModel]="item.accommodation ?? ''" (change)="patch(item, { accommodation: val($event) || null })" />
-                        <textarea class="input-field text-xs sm:col-span-2" rows="2" placeholder="Notes" aria-label="Notes" [ngModel]="item.notes ?? ''" (change)="patch(item, { notes: val($event) || null })"></textarea>
-                        <div class="flex flex-wrap gap-2 sm:col-span-2">
-                          <label class="text-xs">Move to
-                            <select class="input-field !w-auto text-xs" [ngModel]="day.id" (change)="moveTo(item, day.id, val($event))">
-                              @for (d of days(); track d.id) {
-                                <option [value]="d.id">Day {{ d.day_index + 1 }}</option>
-                              }
-                            </select>
+                          <app-place-search
+                            placeholder="Or search to change the location"
+                            [tripPlaces]="places()"
+                            [includeSaved]="true"
+                            [clearOnPick]="true"
+                            [bias]="biasFor(day)"
+                            (pickedPlace)="changePlace(item, { placeId: $event.id, name: $event.name })"
+                            (picked)="changeLookup(item, $event)"
+                          />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                          <label class="text-xs font-medium" style="color: var(--text-muted)">Start
+                            <input class="input-field mt-1 text-sm" type="time" [ngModel]="item.start_time?.slice(0, 5)" (change)="patch(item, { start_time: val($event) || null })" />
                           </label>
-                          <button type="button" class="text-xs" style="color: var(--danger)" (click)="deleteItem.emit(item.id)">Delete stop</button>
+                          <label class="text-xs font-medium" style="color: var(--text-muted)">End
+                            <input class="input-field mt-1 text-sm" type="time" [ngModel]="item.end_time?.slice(0, 5)" (change)="patch(item, { end_time: val($event) || null })" />
+                          </label>
+                          <label class="text-xs font-medium" style="color: var(--text-muted)">Transport
+                            <input class="input-field mt-1 text-sm" maxlength="120" placeholder="e.g. Taxi" [ngModel]="item.transport ?? ''" (change)="patch(item, { transport: val($event) || null })" />
+                          </label>
+                          <label class="text-xs font-medium" style="color: var(--text-muted)">Stay
+                            <input class="input-field mt-1 text-sm" maxlength="200" placeholder="e.g. Hotel name" [ngModel]="item.accommodation ?? ''" (change)="patch(item, { accommodation: val($event) || null })" />
+                          </label>
+                        </div>
+
+                        <label class="block text-xs font-medium" style="color: var(--text-muted)">Notes
+                          <textarea class="input-field mt-1 text-sm" rows="2" [ngModel]="item.notes ?? ''" (change)="patch(item, { notes: val($event) || null })"></textarea>
+                        </label>
+
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-t pt-3" style="border-color: var(--border)">
+                          <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-1.5 text-xs" style="color: var(--text-muted)">Move to
+                              <select class="input-field !w-auto text-xs" [ngModel]="day.id" (change)="moveTo(item, day.id, val($event))">
+                                @for (d of days(); track d.id) {
+                                  <option [value]="d.id">Day {{ d.day_index + 1 }}</option>
+                                }
+                              </select>
+                            </label>
+                            <button type="button" class="text-xs" style="color: var(--danger)" (click)="deleteItem.emit(item.id)">Delete stop</button>
+                          </div>
+                          <button type="button" class="btn-secondary text-xs" (click)="open.set(null)">Done</button>
                         </div>
                       </div>
                     }
@@ -245,6 +269,15 @@ export class ItineraryEditorComponent {
 
   toggle(id: string): void {
     this.open.set(this.open() === id ? null : id);
+  }
+
+  /** One muted line under the title: time range, place and transport, so a collapsed stop still says a lot. */
+  summary(item: ItineraryItem): string {
+    const start = item.start_time?.slice(0, 5);
+    const end = item.end_time?.slice(0, 5);
+    const time = start && end ? `${start}–${end}` : start ?? (end ? `until ${end}` : null);
+    const place = this.placeName(item);
+    return [time, place && `📍 ${place}`, item.transport].filter(Boolean).join(' · ');
   }
 
   placeName(item: ItineraryItem): string | null {
