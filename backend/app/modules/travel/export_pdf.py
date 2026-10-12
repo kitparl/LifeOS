@@ -11,10 +11,10 @@ import re
 from collections.abc import Sequence
 from datetime import date, time
 from io import BytesIO
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from xml.sax.saxutils import escape
 
-from reportlab.graphics.shapes import Drawing, Line, PolyLine, String
+from reportlab.graphics.shapes import Circle, Drawing, Line, PolyLine, String
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -23,9 +23,9 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
     BaseDocTemplate,
+    CondPageBreak,
     Flowable,
     Frame,
-    KeepTogether,
     PageTemplate,
     Paragraph,
     Spacer,
@@ -33,10 +33,12 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from app.modules.travel.export_map import day_color, day_map, overview_map
+from app.modules.travel.export_plan import DayPlan, PlannedItem, TripPlan, build_trip_plan
+from app.modules.travel.geo import Point, haversine_m
 from app.modules.travel.models import TravelPlace
 from app.modules.travel.schemas.adventures import AdventureDetail, AdventureOut
-from app.modules.travel.schemas.routes import RouteOut
-from app.modules.travel.schemas.trips import DayOut, ItemOut, TripDetail
+from app.modules.travel.schemas.trips import TripDetail
 
 PRIMARY = colors.HexColor("#0f6b8f")
 PRIMARY_SOFT = colors.HexColor("#e6f2f7")
@@ -152,7 +154,8 @@ def fmt_time(value: time | None) -> str:
 def fmt_distance(meters: float | None, fallback: str = "Not planned yet") -> str:
     if not meters:
         return fallback
-    return f"{meters / 1000:.1f} km" if meters >= 1000 else f"{round(meters)} m"
+    km = meters / 1000
+    return f"{km:.0f} km" if km >= 100 else f"{km:.1f} km"
 
 
 def fmt_duration(seconds: int | None, fallback: str = "Not known") -> str:
@@ -175,6 +178,8 @@ def _styles() -> dict[str, ParagraphStyle]:
     body = ParagraphStyle("body", parent=base, fontName="Helvetica", fontSize=9.5, leading=13.5, textColor=INK)
     return {
         "body": body,
+        "km": ParagraphStyle("km", parent=body, fontSize=8.5, leading=12, textColor=PRIMARY),
+        "day_title": ParagraphStyle("day_title", parent=body, fontSize=12.5, leading=16),
         "small": ParagraphStyle("small", parent=body, fontSize=8.5, leading=12, textColor=MUTED),
         "muted": ParagraphStyle("muted", parent=body, textColor=MUTED),
         "title": ParagraphStyle(
@@ -192,7 +197,7 @@ def _styles() -> dict[str, ParagraphStyle]:
             spaceAfter=6,
         ),
         "day": ParagraphStyle(
-            "day", parent=body, fontName="Helvetica-Bold", fontSize=11.5, leading=15, textColor=colors.white
+            "day", parent=body, fontName="Helvetica-Bold", fontSize=14, leading=17, textColor=colors.white
         ),
         "tile_value": ParagraphStyle(
             "tile_value",
@@ -395,6 +400,15 @@ def _links_line(urls: Sequence[str]) -> str:
 
 # ---- trip -------------------------------------------------------------------------------------------
 
+STATUS_SHORT = {
+    "draft": "Draft - plans may still change",
+    "planning": "Planning",
+    "booked": "Booked",
+    "active": "Happening now",
+    "completed": "Completed",
+}
+DOT = " · "
+
 
 def _trip_length(detail: TripDetail) -> int:
     trip = detail.trip
@@ -403,128 +417,245 @@ def _trip_length(detail: TripDetail) -> int:
     return len(detail.days)
 
 
-def _item_cell(item: ItemOut, places: dict[str, TravelPlace], st: dict[str, ParagraphStyle]) -> Paragraph:
-    parts = [f"<b>{text(item.title, 'Untitled stop')}</b>"]
-    place = places.get(item.place_id) if item.place_id else None
+def _km(meters: float, approx: bool) -> str:
+    return ("~" if approx else "") + fmt_distance(meters)
+
+
+def _site(url: str) -> str:
+    host = urlparse(url).netloc.lower().removeprefix("www.")
+    return host or "Open link"
+
+
+def _day_title(plan: DayPlan) -> str:
+    if plan.day.title:
+        return plan.day.title
+    names = [i.place.name for i in plan.items if i.place]
+    if not names:
+        return "Free day" if not plan.items else "Day plan"
+    return names[0] if len(set(names)) == 1 else f"{names[0]} to {names[-1]}"
+
+
+def _day_path(plan: DayPlan) -> list[Point]:
+    path: list[Point] = []
+    for leg in plan.legs:
+        path.extend(leg.path)
+    return path
+
+
+def _badge(number: int, color: colors.Color) -> Drawing:
+    badge = Drawing(20, 20)
+    badge.add(Circle(10, 10, 8.5, fillColor=color, strokeColor=None))
+    badge.add(
+        String(
+            10, 7.2, str(number), fontSize=8.5, fontName="Helvetica-Bold", textAnchor="middle", fillColor=colors.white
+        )
+    )
+    return badge
+
+
+def _stop_cell(stop: PlannedItem, st: dict[str, ParagraphStyle]) -> list[Flowable]:
+    item, place = stop.item, stop.place
+    clock = ""
+    if item.start_time:
+        clock = fmt_time(item.start_time) + (f" to {fmt_time(item.end_time)}" if item.end_time else "")
+    cell: list[Flowable] = [Paragraph(f"<b>{text(item.title, 'Stop')}</b>", st["body"])]
+    if clock:
+        cell.append(Paragraph(text(clock), st["small"]))
+    if stop.leg:
+        leg = stop.leg
+        how = f"{_km(leg.meters, leg.approx)} from {text(leg.from_name)}"
+        if leg.seconds:
+            how += f", about {fmt_duration(leg.seconds)}"
+        elif leg.approx:
+            how += " in a straight line (the road will be longer)"
+        cell.append(Paragraph(how, st["km"]))
     if place is not None:
         where = ", ".join(p for p in (place.address or place.city, place.region, place.country) if p)
-        parts.append(f"Place: {text(where, place.name)}")
-        parts.append(link(maps_url(place.lat, place.lng, place.external_place_id), "Open in Google Maps"))
-    if item.transport:
-        parts.append(f"How to get there: {text(item.transport)}")
-    if item.accommodation:
-        parts.append(f"Where we stay: {text(item.accommodation)}")
+        if where and plain(where) != plain(item.title):
+            cell.append(Paragraph(text(where), st["small"]))
+    for label, value in (("Getting there", item.transport), ("Stay", item.accommodation)):
+        if value:
+            cell.append(Paragraph(f"<b>{label}:</b> {text(value)}", st["body"]))
     if item.notes:
-        parts.append(f"Note: {text(item.notes)}")
-    if item.links:
-        parts.append(_links_line(item.links))
-    return Paragraph("<br/>".join(parts), st["body"])
+        cell.append(Paragraph(text(item.notes), st["body"]))
+    links = []
+    if place is not None:
+        links.append(link(maps_url(place.lat, place.lng, place.external_place_id), "Open in Maps"))
+    links += [link(u, _site(u)) for u in item.links]
+    if links:
+        cell.append(Paragraph(" &nbsp;&nbsp; ".join(links), st["small"]))
+    return cell
 
 
-def _day_flowables(day: DayOut, places: dict[str, TravelPlace], st: dict[str, ParagraphStyle]) -> list[Flowable]:
-    label = f"Day {day.day_index + 1} - {fmt_date(day.day_date, 'date not set')}"
-    heading_text = f"{label}: {day.title}" if day.title else label
-    key = f"day{day.day_index + 1}"
-    band = Table([[Paragraph(f'<a name="{key}"/>{text(heading_text)}', st["day"])]], colWidths=[CONTENT_W])
-    _outline(band, heading_text, key, 1)
-    band.setStyle(
+def _day_summary(plan: DayPlan) -> str:
+    parts = []
+    if plan.legs:
+        parts.append(
+            f"<b>{_km(plan.meters, plan.approx)}</b>" + (" by road" if not plan.approx else " (straight line)")
+        )
+        if plan.seconds:
+            parts.append(f"about {fmt_duration(plan.seconds)} on the road")
+    placed = sum(1 for i in plan.items if i.place)
+    if placed:
+        parts.append(f"{placed} {'stop' if placed == 1 else 'stops'}")
+    if plan.stay:
+        parts.append("Sleep at " + ", ".join(text(s) for s in plan.stay))
+    return DOT.join(parts)
+
+
+def _day_flowables(plan: DayPlan, mode: str, st: dict[str, ParagraphStyle]) -> list[Flowable]:
+    day = plan.day
+    n = day.day_index + 1
+    color = day_color(day.day_index)
+    key = f"day{n}"
+    when = fmt_date(day.day_date, "Date not set")
+    head = Table(
+        [
+            [
+                Paragraph(f'<a name="{key}"/>DAY {n}', st["day"]),
+                [Paragraph(text(when), st["small"]), Paragraph(f"<b>{text(_day_title(plan))}</b>", st["day_title"])],
+            ]
+        ],
+        colWidths=[26 * mm, CONTENT_W - 26 * mm],
+    )
+    head.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), PRIMARY),
+                ("BACKGROUND", (0, 0), (0, 0), color),
+                ("BACKGROUND", (1, 0), (1, 0), PRIMARY_SOFT),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
+    _outline(head, f"Day {n}: {_day_title(plan)}", key, 1)
+    top: list[Flowable] = [CondPageBreak(95 * mm), head]
+    summary = _day_summary(plan)
+    if summary:
+        top += [Spacer(1, 4), Paragraph(summary, st["body"])]
+    if day.notes:
+        top += [Spacer(1, 3), Paragraph(text(day.notes), st["body"])]
+
+    pins: dict[str, tuple[Point, list[str], str]] = {}
+    for stop in plan.items:
+        if stop.place:
+            point, numbers, _ = pins.setdefault(stop.place.id, ((stop.place.lat, stop.place.lng), [], stop.place.name))
+            numbers.append(str(stop.number))
+    previous = (plan.previous, plan.previous_name or "yesterday") if plan.previous and plan.legs else None
+    chart = day_map(
+        [(pt, ",".join(nums), name) for pt, nums, name in pins.values()],
+        _day_path(plan),
+        color,
+        CONTENT_W,
+        start=previous,
+    )
+    if chart is not None:
+        top += [Spacer(1, 6), chart]
+        url = directions_url(plan.points, mode)
+        label = "Open this day's route in Google Maps"
+        if url is None:
+            only = next(i.place for i in plan.items if i.place)
+            url, label = maps_url(only.lat, only.lng, only.external_place_id), "Open this place in Google Maps"
+        top.append(Paragraph(link(url, label), st["small"]))
+        if plan.approx:
+            top.append(
+                Paragraph("Distances for this day are straight-line estimates; the road will be longer.", st["small"])
+            )
+    if not plan.items:
+        return top + [Spacer(1, 3), Paragraph("Nothing planned yet. A free day to rest or explore.", st["muted"])]
+
+    rows = [[_badge(s.number, color), _stop_cell(s, st)] for s in plan.items]
+    table = Table(rows, colWidths=[12 * mm, CONTENT_W - 12 * mm], splitByRow=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LINEBELOW", (0, 0), (-1, -2), 0.4, LINE),
+                ("LEFTPADDING", (0, 0), (0, -1), 2),
                 ("TOPPADDING", (0, 0), (-1, -1), 6),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ]
         )
     )
-    flow: list[Flowable] = [Spacer(1, 8)]
-    head: list[Flowable] = [band]
-    if day.notes:
-        head.append(Paragraph(f"<i>{text(day.notes)}</i>", st["muted"]))
-    if not day.items:
-        flow.append(
-            KeepTogether(
-                head
-                + [
-                    Spacer(1, 3),
-                    Paragraph("Nothing is planned for this day yet - a free day to relax or explore.", st["muted"]),
-                ]
-            )
-        )
-        return flow
-    rows = [
-        [
-            Paragraph(
-                f"{fmt_time(i.start_time)}" + (f"<br/>to {fmt_time(i.end_time)}" if i.end_time else ""), st["small"]
-            ),
-            _item_cell(i, places, st),
-        ]
-        for i in sorted(day.items, key=lambda i: i.position)
-    ]
-    table = _grid(rows, [26 * mm, CONTENT_W - 26 * mm], st, ["When", "What we do"])
-    flow.append(KeepTogether(head + [table]) if len(rows) <= 4 else head[0])
-    if len(rows) > 4:
-        flow.extend(head[1:] + [table])
-    return flow
+    return top + [Spacer(1, 6), table, Spacer(1, 14)]
 
 
-def _route_section(detail: TripDetail, st: dict[str, ParagraphStyle]) -> list[Flowable]:
-    flow: list[Flowable] = [Paragraph("The route", st["h1"])]
-    route: RouteOut | None = detail.route
-    points = [(s.lat, s.lng) for s in detail.stops]
-    if route is None:
-        flow.append(
-            Paragraph("The route has not been calculated yet. The stops are listed day by day above.", st["muted"])
-        )
-        url = directions_url(points, "driving")
-    else:
-        mode = MODE_HELP.get(route.mode, route.mode)
-        lines = [
-            f"Total distance: <b>{fmt_distance(route.distance_m)}</b> ({text(mode)})",
-            f"Travel time: <b>{fmt_duration(route.duration_s)}</b> (driving or walking only, without stops)",
-            f"Total climb up: <b>{fmt_height(route.elevation_gain_m)}</b> &nbsp; Total way down: "
-            f"<b>{fmt_height(route.elevation_loss_m)}</b>",
-            f"How it was made: {text(SOURCE_HELP.get(route.source), 'Planned in LifeOS')}",
-        ]
-        if route.is_stale:
-            lines.append("Note: the stops changed after this route was calculated, so the numbers may be slightly off.")
-        flow.append(Paragraph("<br/>".join(lines), st["body"]))
-        url = directions_url(points, route.mode)
-    if url:
-        flow.append(Spacer(1, 4))
-        flow.append(Paragraph(link(url, "Open the whole route in Google Maps"), st["body"]))
-    return flow
+def _is_blank(plan: DayPlan) -> bool:
+    return not plan.items and not plan.day.notes and not plan.day.title
 
 
-def _places_section(
-    detail: TripDetail, places: dict[str, TravelPlace], st: dict[str, ParagraphStyle]
-) -> list[Flowable]:
-    flow: list[Flowable] = [Heading("Places on this trip", st["h1"], "places")]
-    if not detail.places:
-        flow.append(Paragraph("No places have been added to this trip yet.", st["muted"]))
-        return flow
+def _runs(days: Sequence[DayPlan]) -> list[list[DayPlan]]:
+    """Consecutive empty days travel together so a half-planned trip does not print ten blank days."""
+    runs: list[list[DayPlan]] = []
+    for d in days:
+        if runs and _is_blank(d) and _is_blank(runs[-1][0]):
+            runs[-1].append(d)
+        else:
+            runs.append([d])
+    return runs
+
+
+def _span(run: Sequence[DayPlan]) -> tuple[str, str]:
+    first, last = run[0].day, run[-1].day
+    number = f"{first.day_index + 1}" if len(run) == 1 else f"{first.day_index + 1}-{last.day_index + 1}"
+    short = "%a %d %b"
+    if not first.day_date:
+        return number, "Date not set"
+    when = first.day_date.strftime(short)
+    return number, when if len(run) == 1 else f"{when} to {last.day_date.strftime(short) if last.day_date else '...'}"
+
+
+def _glance(plan: TripPlan, st: dict[str, ParagraphStyle]) -> Table:
     rows = []
-    for p in detail.places:
+    for run in _runs(plan.days):
+        d = run[0]
+        number, when = _span(run)
+        if _is_blank(d):
+            title, distance = "Nothing planned yet", "No travel"
+        else:
+            title = f'<a href="#day{d.day.day_index + 1}" color="{LINK}">{text(_day_title(d))}</a>'
+            distance = _km(d.meters, d.approx) if d.legs else "No travel"
+        rows.append(
+            [
+                Paragraph(f"<b>{number}</b>", st["body"]),
+                Paragraph(text(when), st["body"]),
+                Paragraph(title, st["body"]),
+                Paragraph(distance, st["body"]),
+                Paragraph(text(", ".join(d.stay), "Not decided yet"), st["body"]),
+            ]
+        )
+    return _grid(
+        rows,
+        [16 * mm, 42 * mm, CONTENT_W - 16 * mm - 42 * mm - 24 * mm - 38 * mm, 24 * mm, 38 * mm],
+        st,
+        ["Day", "Date", "Plan", "Distance", "Where we sleep"],
+    )
+
+
+def _unscheduled(
+    detail: TripDetail, places: dict[str, TravelPlace], plan: TripPlan, st: dict[str, ParagraphStyle]
+) -> list[Flowable]:
+    used = {i.place.id for d in plan.days for i in d.items if i.place}
+    rest = [p for p in detail.places if p.id not in used]
+    if not rest:
+        return []
+    rows = []
+    for p in rest:
         full = places.get(p.id)
         where = ", ".join(x for x in ((full.city, full.region, full.country) if full else ()) if x)
-        about = (full.description or full.notes) if full else None
         rows.append(
             [
                 Paragraph(f"<b>{text(p.name)}</b>", st["body"]),
-                Paragraph(text(where, "Location details not added"), st["body"]),
-                Paragraph(text(about, "No description added yet"), st["body"]),
+                Paragraph(text(where, "Location not named"), st["body"]),
                 Paragraph(link(maps_url(p.lat, p.lng, p.external_place_id), "Map"), st["body"]),
             ]
         )
-    flow.append(
-        _grid(
-            rows,
-            [42 * mm, 38 * mm, CONTENT_W - 42 * mm - 38 * mm - 14 * mm, 14 * mm],
-            st,
-            ["Place", "Where", "About it", "Open"],
-        )
-    )
-    return flow
+    return [
+        Heading("Also on the list, not on a day yet", st["h1"], "unscheduled"),
+        _grid(rows, [60 * mm, CONTENT_W - 60 * mm - 20 * mm, 20 * mm], st, ["Place", "Where", "Open"]),
+    ]
 
 
 def _adventures_section(adventures: Sequence[AdventureOut], st: dict[str, ParagraphStyle]) -> list[Flowable]:
@@ -552,53 +683,63 @@ def _adventures_section(adventures: Sequence[AdventureOut], st: dict[str, Paragr
 def trip_guide_pdf(detail: TripDetail, places: dict[str, TravelPlace], adventures: Sequence[AdventureOut]) -> bytes:
     st = _styles()
     trip = detail.trip
+    plan = build_trip_plan(detail, places)
     length = _trip_length(detail)
-    dates = (
-        f"{fmt_date(trip.start_date)}  to  {fmt_date(trip.end_date)}" if trip.start_date else "Dates not decided yet"
-    )
-    if trip.dates_tentative and trip.start_date:
-        dates += "  (dates may still change)"
     route = detail.route
+    mode = route.mode if route else "driving"
+
+    dates = f"{fmt_date(trip.start_date)} to {fmt_date(trip.end_date)}" if trip.start_date else "Dates not decided yet"
+    if length and trip.start_date:
+        dates += f"{DOT}{length} {'day' if length == 1 else 'days'}"
+    status = STATUS_SHORT.get(trip.status, trip.status.title())
+    if trip.dates_tentative and trip.start_date:
+        status += ", dates may change"
     story: list[Flowable] = [
-        _banner(trip.name, [dates, STATUS_HELP.get(trip.status, trip.status.title())], st),
+        _banner(trip.name, [dates, status], st),
         Spacer(1, 10),
         _tiles(
             [
                 (str(length) if length else "Not set", "Days"),
+                (_km(plan.meters, plan.approx) if plan.meters else "Not planned", "Total distance"),
+                (fmt_duration(plan.seconds, "Not known"), "Time on the road"),
                 (str(len(detail.places)), "Places"),
-                (fmt_distance(route.distance_m if route else None, "Not planned"), "Total distance"),
-                (fmt_duration(route.duration_s if route else None, "Not known"), "Travel time"),
             ],
             st,
         ),
-        Spacer(1, 10),
-        _tip_box(
-            [
-                "<b>How to read this guide</b>",
-                "- Blue underlined words are buttons: tap them to open the place in Google Maps.",
-                "- Use the bookmarks panel of your PDF app to jump straight to any day.",
-                '- Times marked "Any time" are flexible - there is no fixed time.',
-            ],
-            st,
-        ),
-        *_notes_block("About this trip", trip.description, "The organiser has not written a description yet.", st),
     ]
-    if detail.days:
-        index = " &nbsp;|&nbsp; ".join(
-            f'<a href="#day{d.day_index + 1}" color="{LINK}"><u>Day {d.day_index + 1}</u></a>' for d in detail.days
+    if trip.description:
+        story += [Spacer(1, 8), Paragraph(text(trip.description), st["body"])]
+
+    overview = overview_map(
+        [(d.day.day_index, _day_path(d), [(i.place.lat, i.place.lng) for i in d.items if i.place]) for d in plan.days],
+        CONTENT_W,
+    )
+    if overview is not None:
+        story += [Heading("The whole route", st["h1"], "route"), overview]
+        url = directions_url([(s.lat, s.lng) for s in detail.stops], mode)
+        note = "Tap any underlined text to open it in Google Maps."
+        if plan.approx:
+            note += " Distances marked ~ are straight-line estimates; real roads are longer."
+        story.append(
+            Paragraph((link(url, "Open the whole route in Google Maps") + DOT if url else "") + text(note), st["small"])
         )
-        story += [Paragraph(f"Jump to: {index}", st["body"]), Heading("Day by day plan", st["h1"], "plan")]
-        for day in detail.days:
-            story += _day_flowables(day, places, st)
-    else:
-        story += [
-            Heading("Day by day plan", st["h1"], "plan"),
-            Paragraph("The day-by-day plan has not been written yet.", st["muted"]),
-        ]
-    story += _places_section(detail, places, st)
-    story += _route_section(detail, st)
+    if plan.days:
+        story += [Heading("Day by day at a glance", st["h1"], "glance"), _glance(plan, st)]
+        for run in _runs(plan.days):
+            if _is_blank(run[0]):
+                number, when = _span(run)
+                story.append(
+                    Paragraph(
+                        f"<b>{'Day' if len(run) == 1 else 'Days'} {number}</b> ({text(when)}): nothing planned yet.",
+                        st["muted"],
+                    )
+                )
+            else:
+                story += _day_flowables(run[0], mode, st)
+    story += _unscheduled(detail, places, plan, st)
     story += _adventures_section(adventures, st)
-    story += _notes_block("Extra notes", trip.notes, "No extra notes.", st)
+    if trip.notes:
+        story += [Heading("Good to know", st["h1"], "notes"), Paragraph(text(trip.notes), st["body"])]
     return _build(f"{plain(trip.name)} - trip guide", f"{plain(trip.name)} - shared from LifeOS", story)
 
 
@@ -681,23 +822,40 @@ def adventure_guide_pdf(detail: AdventureDetail, trip_name: str | None) -> bytes
     else:
         story.append(Paragraph("Height details are not available for this route yet.", st["muted"]))
     story.append(Heading("Important stops", st["h1"], "stops"))
-    if detail.waypoints:
+    waypoints = sorted(detail.waypoints, key=lambda w: w.position)
+    if waypoints:
+        spots = [(w.lat, w.lng) for w in waypoints]
+        along = [0.0]
+        for a, b in zip(spots, spots[1:], strict=False):
+            along.append(along[-1] + haversine_m(a, b))
+        chart = day_map(
+            [(pt, str(i), w.name) for i, (pt, w) in enumerate(zip(spots, waypoints, strict=True), 1)],
+            [tuple(p) for p in detail.route_points] or spots,
+            day_color(0),
+            CONTENT_W,
+        )
+        if chart is not None:
+            story += [chart, Spacer(1, 6)]
         rows = [
             [
-                Paragraph(f"<b>{text(w.name, 'Stop')}</b>", st["body"]),
+                Paragraph(f"<b>{i}. {text(w.name, 'Stop')}</b>", st["body"]),
                 Paragraph(text(WAYPOINT_HELP.get(w.kind), "Stop"), st["body"]),
                 Paragraph(fmt_height(w.elevation_m, "Height not known"), st["body"]),
+                Paragraph("Start" if i == 1 else f"~{fmt_distance(along[i - 1])}", st["body"]),
                 Paragraph(link(maps_url(w.lat, w.lng), "Map"), st["body"]),
             ]
-            for w in sorted(detail.waypoints, key=lambda w: w.position)
+            for i, w in enumerate(waypoints, 1)
         ]
         story.append(
             _grid(
                 rows,
-                [60 * mm, 50 * mm, 40 * mm, CONTENT_W - 150 * mm],
+                [52 * mm, 42 * mm, 32 * mm, 32 * mm, CONTENT_W - 158 * mm],
                 st,
-                ["Stop", "What it is", "Height above sea", "Open"],
+                ["Stop", "What it is", "Height above sea", "From the start", "Open"],
             )
+        )
+        story.append(
+            Paragraph("~ means a straight-line estimate between stops; the trail itself is longer.", st["small"])
         )
     else:
         story.append(Paragraph("No stops have been marked on this adventure yet.", st["muted"]))

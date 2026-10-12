@@ -9,6 +9,7 @@ from app.modules.travel.export_pdf import directions_url, fmt_distance, fmt_dura
 from app.modules.travel.services.export_service import file_name
 from app.tests.test_travel_trips import _dated_itinerary, _himachal
 from app.tests.travel_support import auth as _auth
+from app.tests.travel_support import connect_google as _connect_google
 
 BASE = "/api/v1/travel"
 pytestmark = pytest.mark.usefixtures("isolated_uploads")
@@ -49,8 +50,10 @@ async def test_trip_pdf_is_a_complete_guide(client):
     assert resp.headers["content-disposition"] == 'attachment; filename="Himachal-2027-guide.pdf"'
     assert resp.content.startswith(b"%PDF")
     content = _pdf_text(resp.content)
-    for expected in ("Himachal 2027", "Day 1", "Manali", "Hampta Pass", "Chandratal", "Open in Google Maps"):
+    for expected in ("Himachal 2027", "DAY 1", "Manali", "Hampta Pass", "Chandratal", "Open in Maps"):
         assert expected in content
+    assert "km" in content and "straight line" in content  # no Google key: estimates, clearly labelled
+    assert "Days 3-10" in content and content.count("DAY ") == 2  # empty days are folded into one line
     assert "None" not in content and "null" not in content and "undefined" not in content
 
 
@@ -61,7 +64,7 @@ async def test_empty_draft_trip_still_exports_without_blanks(client):
     resp = await client.get(f"{BASE}/trips/{tid}/export", headers=h)
     assert resp.status_code == 200
     content = _pdf_text(resp.content)
-    assert "Dates not decided yet" in content and "has not been written yet" in content
+    assert "Dates not decided yet" in content and "Nothing planned yet" not in content
     assert "None" not in content and "null" not in content
 
 
@@ -79,3 +82,16 @@ async def test_adventure_pdf_and_ownership(client):
     other = await _auth(client, "pdfother@example.com")
     assert (await client.get(f"{BASE}/adventures/{aid}/export", headers=other)).status_code == 404
     assert (await client.get(f"{BASE}/trips/{aid}/export", headers=other)).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_trip_pdf_uses_road_legs_when_the_route_is_current(client, google):
+    h = await _auth(client, "pdfroad@example.com")
+    await _connect_google(client, h)
+    places, tid = await _himachal(client, h)
+    await _dated_itinerary(client, h, places, tid)
+    await client.post(f"{BASE}/trips/{tid}/route", json={"mode": "driving"}, headers=h)
+    content = _pdf_text((await client.get(f"{BASE}/trips/{tid}/export", headers=h)).content)
+    assert "50.0 km from Manali, about 50 min" in content  # leg 1 of the fake Google route
+    assert "73.5 km from Hampta Pass, about 1 h 10 min" in content
+    assert "by road" in content and "straight-line estimates" not in content
