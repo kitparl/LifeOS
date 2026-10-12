@@ -18,6 +18,13 @@ export interface NewItem {
   place_id: string | null;
 }
 
+export interface PlaceChange {
+  id: string;
+  pick: PlaceChoice;
+  /** New title when it still mirrors the old place name; otherwise the user's own title is kept. */
+  title?: string;
+}
+
 export interface NewCheckpoints {
   day_id: string;
   /** In the order they were picked: start, vias, end. */
@@ -106,6 +113,16 @@ export interface NewCheckpoints {
                             }
                           </select>
                         </label>
+                        <app-place-search
+                          class="sm:col-span-2"
+                          placeholder="Or search to change the location"
+                          [tripPlaces]="places()"
+                          [includeSaved]="true"
+                          [clearOnPick]="true"
+                          [bias]="biasFor(day)"
+                          (pickedPlace)="changePlace(item, { placeId: $event.id, name: $event.name })"
+                          (picked)="changeLookup(item, $event)"
+                        />
                         <input class="input-field text-xs" maxlength="120" placeholder="Transport" aria-label="Transport" [ngModel]="item.transport ?? ''" (change)="patch(item, { transport: val($event) || null })" />
                         <input class="input-field text-xs" maxlength="200" placeholder="Accommodation" aria-label="Accommodation" [ngModel]="item.accommodation ?? ''" (change)="patch(item, { accommodation: val($event) || null })" />
                         <textarea class="input-field text-xs sm:col-span-2" rows="2" placeholder="Notes" aria-label="Notes" [ngModel]="item.notes ?? ''" (change)="patch(item, { notes: val($event) || null })"></textarea>
@@ -193,6 +210,7 @@ export class ItineraryEditorComponent {
   readonly deleteItem = output<string>();
   readonly addItem = output<NewItem>();
   readonly addCheckpoints = output<NewCheckpoints>();
+  readonly itemPlace = output<PlaceChange>();
   readonly addDay = output<void>();
   readonly fillDays = output<void>();
   readonly deleteDay = output<string>();
@@ -231,6 +249,15 @@ export class ItineraryEditorComponent {
 
   placeName(item: ItineraryItem): string | null {
     return this.places().find((p) => p.id === item.place_id)?.name ?? null;
+  }
+
+  changePlace(item: ItineraryItem, pick: PlaceChoice): void {
+    const oldName = this.placeName(item);
+    this.itemPlace.emit({ id: item.id, pick, title: oldName && item.title === oldName ? pick.name : undefined });
+  }
+
+  changeLookup(item: ItineraryItem, lookup: GeoLookup): void {
+    if (lookup.result) this.changePlace(item, { lookup, name: lookup.result.name });
   }
 
   val(event: Event): string {

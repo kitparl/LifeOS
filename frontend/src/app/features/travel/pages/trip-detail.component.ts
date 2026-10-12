@@ -5,7 +5,7 @@ import { Observable, catchError, forkJoin, map, of, switchMap, throwError } from
 import { readJsonLocalStorage, writeJsonLocalStorage } from '../../../core/services/preferences-sync';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
-import { ItemPatch, ItineraryEditorComponent, NewCheckpoints, NewItem } from '../components/itinerary-editor.component';
+import { ItemPatch, ItineraryEditorComponent, NewCheckpoints, NewItem, PlaceChange } from '../components/itinerary-editor.component';
 import { PickedPlace, PlaceSearchComponent } from '../components/place-search.component';
 import { PlaceSheetComponent, PlaceSheetSubmit } from '../components/place-sheet.component';
 import { LatLng, MapLine, MapMarker, TravelMapComponent } from '../map/travel-map.component';
@@ -232,6 +232,7 @@ interface LegRow {
               (deleteItem)="run(api.deleteItem(d.trip.id, $event))"
               (addItem)="addItem($event)"
               (addCheckpoints)="addCheckpoints($event)"
+              (itemPlace)="changeItemPlace($event)"
               (addDay)="run(api.addDay(d.trip.id))"
               (fillDays)="run(api.fillDays(d.trip.id))"
               (deleteDay)="run(api.deleteDay(d.trip.id, $event))"
@@ -561,6 +562,19 @@ export class TripDetailComponent implements OnInit {
         const existing = (err?.error?.detail as { place_id?: string } | undefined)?.place_id;
         return existing ? of(existing) : throwError(() => err);
       }),
+    );
+  }
+
+  /** Save a Google pick as a place if needed, then point the stop at it (the backend links it to the trip). */
+  changeItemPlace(event: PlaceChange): void {
+    const d = this.detail();
+    if (!d) return;
+    this.run(
+      this.resolvePlaceId(event.pick).pipe(
+        switchMap((placeId) =>
+          this.api.updateItem(d.trip.id, event.id, { place_id: placeId, ...(event.title ? { title: event.title } : {}) }),
+        ),
+      ),
     );
   }
 
