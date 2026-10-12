@@ -223,6 +223,7 @@ interface LegRow {
             <app-itinerary-editor
               [days]="d.days"
               [places]="d.places"
+              [legs]="editorLegs()"
               [canFill]="!!d.trip.start_date && !!d.trip.end_date"
               [disabled]="busy()"
               [mapCenter]="mapCenter"
@@ -354,6 +355,8 @@ export class TripDetailComponent implements OnInit {
     if (!d || !legs || legs.length !== d.stops.length - 1) return [];
     return legs.map((leg, i) => ({ from: d.stops[i].name, to: d.stops[i + 1].name, dayId: d.stops[i + 1].day_id, leg }));
   });
+
+  readonly editorLegs = computed(() => this.legs().map((row) => row.leg));
 
   /** A leg belongs to the day of the stop it arrives at. */
   readonly legRows = computed(() => {

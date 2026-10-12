@@ -350,8 +350,9 @@ export function formatDistance(meters: number): string {
 
 export function formatDuration(seconds: number | null): string | null {
   if (seconds == null) return null;
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
+  const total = Math.round(seconds / 60); // round before splitting, or 59.6 min shows as "1 h 60 min"
+  const h = Math.floor(total / 60);
+  const m = total % 60;
   return h ? `${h} h ${m} min` : `${m} min`;
 }
 

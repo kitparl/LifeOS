@@ -3,7 +3,17 @@ import { DatePipe } from '@angular/common';
 import { Component, ElementRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LatLng } from '../map/travel-map.component';
-import { GeoLookup, ItemUpdate, ItineraryDay, ItineraryItem, PlaceChoice, TripPlace } from '../models/travel.models';
+import {
+  GeoLookup,
+  ItemUpdate,
+  ItineraryDay,
+  ItineraryItem,
+  PlaceChoice,
+  RouteLeg,
+  TripPlace,
+  formatDistance,
+  formatDuration,
+} from '../models/travel.models';
 import { dayEndpoints, moveItem, searchBias } from '../utils/itinerary';
 import { PickedPlace, PlaceSearchComponent } from './place-search.component';
 
@@ -23,6 +33,12 @@ export interface PlaceChange {
   pick: PlaceChoice;
   /** New title when it still mirrors the old place name; otherwise the user's own title is kept. */
   title?: string;
+}
+
+/** Where a stop sits on the route: what is behind it and what it takes to reach the next stop. */
+interface StopProgress {
+  covered: string;
+  next: { to: string; text: string } | null;
 }
 
 export interface NewCheckpoints {
@@ -164,6 +180,14 @@ export interface NewCheckpoints {
                     }
                   </div>
                 </div>
+                @if (progress().get(item.id); as info) {
+                  <div class="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 border-t border-dashed pt-1.5 text-xs" style="border-color: var(--border); color: var(--text-muted)">
+                    <span>{{ info.covered }}</span>
+                    @if (info.next; as next) {
+                      <span>Next: {{ next.text }} → {{ next.to }}</span>
+                    }
+                  </div>
+                }
               </li>
             } @empty {
               <li class="p-1 text-xs" style="color: var(--text-muted)">Nothing planned yet — drop a stop here or add one.</li>
@@ -222,6 +246,8 @@ export interface NewCheckpoints {
 export class ItineraryEditorComponent {
   readonly days = input.required<readonly ItineraryDay[]>();
   readonly places = input.required<readonly TripPlace[]>();
+  /** Road legs of the current route (leg i runs from stop i to stop i + 1); empty when there is none. */
+  readonly legs = input<readonly RouteLeg[]>([]);
   readonly canFill = input(false);
   readonly disabled = input(false);
   /** Where the trip map is looking; the fallback when a day has no pins to bias place search. */
@@ -252,6 +278,33 @@ export class ItineraryEditorComponent {
       labels.set(ends.end.id, 'Day end');
     }
     return labels;
+  });
+  /**
+   * Per stop: distance covered so far and the distance/time to the next stop. Mirrors the server's stop
+   * order (days, then position; back-to-back repeats of a place are one stop), so item i of the sequence
+   * lines up with leg i.
+   */
+  readonly progress = computed(() => {
+    const info = new Map<string, StopProgress>();
+    const legs = this.legs();
+    const stops: ItineraryItem[] = [];
+    for (const day of this.days()) {
+      for (const item of day.items) {
+        if (item.place_id && item.place_id !== stops[stops.length - 1]?.place_id) stops.push(item);
+      }
+    }
+    if (!legs.length || legs.length !== stops.length - 1) return info;
+    let metres = 0;
+    stops.forEach((stop, i) => {
+      const leg = legs[i];
+      const time = leg ? formatDuration(leg.duration_s) : null;
+      info.set(stop.id, {
+        covered: i === 0 ? 'Start' : `${formatDistance(metres)} covered`,
+        next: leg ? { to: this.placeName(stops[i + 1]) ?? stops[i + 1].title, text: [formatDistance(leg.distance_m), time].filter(Boolean).join(' · ') } : null,
+      });
+      metres += leg?.distance_m ?? 0;
+    });
+    return info;
   });
   drafts: Record<string, string> = {};
   draftPlaces: Record<string, string> = {};
