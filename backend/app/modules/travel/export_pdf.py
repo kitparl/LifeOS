@@ -35,6 +35,7 @@ from reportlab.platypus import (
 
 from app.modules.travel.export_map import day_color, day_map, overview_map
 from app.modules.travel.export_plan import DayPlan, PlannedItem, TripPlan, build_trip_plan
+from app.modules.travel.export_tiles import TileBasemap
 from app.modules.travel.geo import Point, haversine_m
 from app.modules.travel.models import TravelPlace
 from app.modules.travel.schemas.adventures import AdventureDetail, AdventureOut
@@ -46,6 +47,7 @@ INK = colors.HexColor("#1f2933")
 MUTED = colors.HexColor("#5f6c7b")
 LINE = colors.HexColor("#d3dce4")
 LINK = "#0b5cad"
+DOT = " \u00b7 "
 
 PAGE_W, PAGE_H = A4
 MARGIN = 16 * mm
@@ -125,20 +127,44 @@ def maps_url(lat: float, lng: float, place_id: str | None = None) -> str:
     return f"https://www.google.com/maps/search/?{urlencode(params)}"
 
 
-def directions_url(points: Sequence[tuple[float, float]], mode: str) -> str | None:
-    if len(points) < 2:
+MAX_POINTS_PER_LINK = 11  # Google Maps links take an origin, a destination and at most 9 stops in between
+
+
+def _fmt_point(p: tuple[float, float]) -> str:
+    return f"{p[0]:.6f},{p[1]:.6f}"
+
+
+def route_links(points: Sequence[tuple[float, float]], mode: str) -> list[tuple[str, int, int]]:
+    """Google Maps directions links that together cover every point, as (url, first stop no., last stop no.).
+
+    One link holds at most 11 points, so a longer route is split into consecutive parts that share their
+    joining point; nothing is dropped. Points repeated back to back are merged first.
+    """
+    pts = [p for i, p in enumerate(points) if i == 0 or _fmt_point(p) != _fmt_point(points[i - 1])]
+    links: list[tuple[str, int, int]] = []
+    for start in range(0, max(len(pts) - 1, 0), MAX_POINTS_PER_LINK - 1):
+        chunk = pts[start : start + MAX_POINTS_PER_LINK]
+        params = {
+            "api": "1",
+            "origin": _fmt_point(chunk[0]),
+            "destination": _fmt_point(chunk[-1]),
+            "travelmode": "bicycling" if mode == "cycling" else mode,
+        }
+        if len(chunk) > 2:
+            params["waypoints"] = "|".join(_fmt_point(p) for p in chunk[1:-1])
+        links.append((f"https://www.google.com/maps/dir/?{urlencode(params)}", start + 1, start + len(chunk)))
+    return links
+
+
+def route_link_html(points: Sequence[tuple[float, float]], mode: str, label: str) -> str | None:
+    """One tappable link, or "Part 1 (stops 1-11) | Part 2 ..." when the route needs several. None if < 2 points."""
+    links = route_links(points, mode)
+    if not links:
         return None
-    fmt = lambda p: f"{p[0]:.6f},{p[1]:.6f}"  # noqa: E731
-    params = {
-        "api": "1",
-        "origin": fmt(points[0]),
-        "destination": fmt(points[-1]),
-        "travelmode": "bicycling" if mode == "cycling" else mode,
-    }
-    via = points[1:-1][:9]
-    if via:
-        params["waypoints"] = "|".join(fmt(p) for p in via)
-    return f"https://www.google.com/maps/dir/?{urlencode(params)}"
+    if len(links) == 1:
+        return link(links[0][0], label)
+    parts = DOT.join(link(url, f"Part {i} (stops {first}-{last})") for i, (url, first, last) in enumerate(links, 1))
+    return f"{text(label)}: {parts}"
 
 
 def fmt_date(value: date | None, fallback: str = "Date not decided yet") -> str:
@@ -503,7 +529,9 @@ def _day_summary(plan: DayPlan) -> str:
     return DOT.join(parts)
 
 
-def _day_flowables(plan: DayPlan, mode: str, st: dict[str, ParagraphStyle]) -> list[Flowable]:
+def _day_flowables(
+    plan: DayPlan, mode: str, st: dict[str, ParagraphStyle], basemap: TileBasemap | None
+) -> list[Flowable]:
     day = plan.day
     n = day.day_index + 1
     color = day_color(day.day_index)
@@ -550,15 +578,16 @@ def _day_flowables(plan: DayPlan, mode: str, st: dict[str, ParagraphStyle]) -> l
         color,
         CONTENT_W,
         start=previous,
+        dashed=plan.approx,
+        basemap=basemap,
     )
     if chart is not None:
         top += [Spacer(1, 6), chart]
-        url = directions_url(plan.points, mode)
-        label = "Open this day's route in Google Maps"
-        if url is None:
+        html = route_link_html(plan.points, mode, "Open this day's route in Google Maps")
+        if html is None:
             only = next(i.place for i in plan.items if i.place)
-            url, label = maps_url(only.lat, only.lng, only.external_place_id), "Open this place in Google Maps"
-        top.append(Paragraph(link(url, label), st["small"]))
+            html = link(maps_url(only.lat, only.lng, only.external_place_id), "Open this place in Google Maps")
+        top.append(Paragraph(html, st["small"]))
         if plan.approx:
             top.append(
                 Paragraph("Distances for this day are straight-line estimates; the road will be longer.", st["small"])
@@ -680,7 +709,12 @@ def _adventures_section(adventures: Sequence[AdventureOut], st: dict[str, Paragr
     ]
 
 
-def trip_guide_pdf(detail: TripDetail, places: dict[str, TravelPlace], adventures: Sequence[AdventureOut]) -> bytes:
+def trip_guide_pdf(
+    detail: TripDetail,
+    places: dict[str, TravelPlace],
+    adventures: Sequence[AdventureOut],
+    basemap: TileBasemap | None = None,
+) -> bytes:
     st = _styles()
     trip = detail.trip
     plan = build_trip_plan(detail, places)
@@ -711,18 +745,22 @@ def trip_guide_pdf(detail: TripDetail, places: dict[str, TravelPlace], adventure
         story += [Spacer(1, 8), Paragraph(text(trip.description), st["body"])]
 
     overview = overview_map(
-        [(d.day.day_index, _day_path(d), [(i.place.lat, i.place.lng) for i in d.items if i.place]) for d in plan.days],
+        [
+            (d.day.day_index, _day_path(d), [(i.place.lat, i.place.lng) for i in d.items if i.place], d.approx)
+            for d in plan.days
+        ],
         CONTENT_W,
+        basemap=basemap,
     )
     if overview is not None:
         story += [Heading("The whole route", st["h1"], "route"), overview]
-        url = directions_url([(s.lat, s.lng) for s in detail.stops], mode)
+        html = route_link_html(
+            [(s.lat, s.lng) for s in detail.stops], mode, "Open every stop of the trip in Google Maps"
+        )
         note = "Tap any underlined text to open it in Google Maps."
         if plan.approx:
             note += " Distances marked ~ are straight-line estimates; real roads are longer."
-        story.append(
-            Paragraph((link(url, "Open the whole route in Google Maps") + DOT if url else "") + text(note), st["small"])
-        )
+        story.append(Paragraph((html + DOT if html else "") + text(note), st["small"]))
     if plan.days:
         story += [Heading("Day by day at a glance", st["h1"], "glance"), _glance(plan, st)]
         for run in _runs(plan.days):
@@ -735,7 +773,7 @@ def trip_guide_pdf(detail: TripDetail, places: dict[str, TravelPlace], adventure
                     )
                 )
             else:
-                story += _day_flowables(run[0], mode, st)
+                story += _day_flowables(run[0], mode, st, basemap)
     story += _unscheduled(detail, places, plan, st)
     story += _adventures_section(adventures, st)
     if trip.notes:
@@ -764,7 +802,7 @@ def _elevation_chart(profile: Sequence[float]) -> Drawing:
     return drawing
 
 
-def adventure_guide_pdf(detail: AdventureDetail, trip_name: str | None) -> bytes:
+def adventure_guide_pdf(detail: AdventureDetail, trip_name: str | None, basemap: TileBasemap | None = None) -> bytes:
     st = _styles()
     adv, route = detail.adventure, detail.route
     when = (
@@ -810,9 +848,12 @@ def adventure_guide_pdf(detail: AdventureDetail, trip_name: str | None) -> bytes
                 st["body"],
             )
         )
-        url = directions_url(detail.route_points[:: max(len(detail.route_points) // 10, 1)], route.mode)
-        if url:
-            story += [Spacer(1, 4), Paragraph(link(url, "Open the route in Google Maps"), st["body"])]
+        trail = [(w.lat, w.lng) for w in sorted(detail.waypoints, key=lambda w: w.position)] or [
+            tuple(p) for p in detail.route_points[:: max(len(detail.route_points) // 10, 1)]
+        ]
+        html = route_link_html(trail, route.mode, "Open the route in Google Maps")
+        if html:
+            story += [Spacer(1, 4), Paragraph(html, st["body"])]
     story.append(Heading("Height along the way", st["h1"], "elevation"))
     if detail.elevation_profile and len(detail.elevation_profile) >= 2:
         story += [
@@ -833,6 +874,7 @@ def adventure_guide_pdf(detail: AdventureDetail, trip_name: str | None) -> bytes
             [tuple(p) for p in detail.route_points] or spots,
             day_color(0),
             CONTENT_W,
+            basemap=basemap,
         )
         if chart is not None:
             story += [chart, Spacer(1, 6)]
