@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     upload_dir: str = "./uploads"
+    # Real map background for the travel PDF guides. Defaults to OpenStreetMap's public tiles, which are meant for
+    # light use; point `travel_map_tile_url` at a keyed provider ({z}/{x}/{y} template) for heavier use.
+    travel_map_tiles: bool = Field(default=True, validation_alias="TRAVEL_MAP_TILES")
+    travel_map_tile_url: str = Field(
+        default="https://tile.openstreetmap.org/{z}/{x}/{y}.png", validation_alias="TRAVEL_MAP_TILE_URL"
+    )
+    travel_map_attribution: str = Field(
+        default="(c) OpenStreetMap contributors", validation_alias="TRAVEL_MAP_ATTRIBUTION"
+    )
     max_upload_bytes: int = 10 * 1024 * 1024
     storage_backend: str = "local"  # local | s3
     allowed_upload_types: str = (
@@ -110,9 +119,7 @@ class Settings(BaseSettings):
             raise ValueError("DSA_JUDGE_TOKEN must be set when DSA_JUDGE_URL is set")
         if self.is_production:
             if self.secret_key == _DEFAULT_SECRET_KEY:
-                raise ValueError(
-                    "SECRET_KEY must be set to a unique non-default value when ENV is production"
-                )
+                raise ValueError("SECRET_KEY must be set to a unique non-default value when ENV is production")
             if not (self.integration_enc_key or "").strip():
                 raise ValueError(
                     "INTEGRATION_ENC_KEY must be set when ENV is production "

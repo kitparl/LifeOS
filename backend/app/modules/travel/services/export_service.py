@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import re
 
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Pagination
 from app.modules.travel.export_pdf import adventure_guide_pdf, plain, trip_guide_pdf
+from app.modules.travel.export_tiles import TileBasemap
 from app.modules.travel.repository.adventures import AdventureRepository
 from app.modules.travel.repository.places import PlaceRepository
 from app.modules.travel.repository.trips import TripRepository
@@ -33,12 +35,17 @@ class ExportService:
             user_id, trip_id, Pagination(limit=MAX_LINKED_ADVENTURES, offset=0)
         )
         adventures = [AdventureOut.model_validate(a) for a in linked]
-        return trip_guide_pdf(detail, places, adventures), file_name(detail.trip.name, "trip")
+        # Rendering fetches map tiles over the network, so it runs off the event loop.
+        pdf = await run_in_threadpool(trip_guide_pdf, detail, places, adventures, TileBasemap.from_settings())
+        return pdf, file_name(detail.trip.name, "trip")
 
     async def adventure_pdf(self, user_id: str, adventure_id: str) -> tuple[bytes, str]:
         detail = await self.adventures.detail(user_id, adventure_id)
         trip = await self.trip_repo.get(user_id, detail.adventure.trip_id) if detail.adventure.trip_id else None
-        return adventure_guide_pdf(detail, trip.name if trip else None), file_name(detail.adventure.name, "adventure")
+        pdf = await run_in_threadpool(
+            adventure_guide_pdf, detail, trip.name if trip else None, TileBasemap.from_settings()
+        )
+        return pdf, file_name(detail.adventure.name, "adventure")
 
 
 def file_name(name: str, fallback: str) -> str:
