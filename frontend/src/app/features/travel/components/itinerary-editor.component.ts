@@ -38,6 +38,8 @@ export interface PlaceChange {
 /** Where a stop sits on the route: what is behind it and what it takes to reach the next stop. */
 interface StopProgress {
   covered: string;
+  total: string;
+  percent: number;
   next: { to: string; text: string } | null;
 }
 
@@ -181,11 +183,16 @@ export interface NewCheckpoints {
                   </div>
                 </div>
                 @if (progress().get(item.id); as info) {
-                  <div class="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 border-t border-dashed pt-1.5 text-xs" style="border-color: var(--border); color: var(--text-muted)">
-                    <span>{{ info.covered }}</span>
+                  <div class="mt-2 space-y-1 border-t border-dashed pt-1.5 text-xs" style="border-color: var(--border)">
                     @if (info.next; as next) {
-                      <span>Next: {{ next.text }} → {{ next.to }}</span>
+                      <p><span style="color: var(--text-muted)">To next stop ({{ next.to }}):</span> <span class="font-medium">{{ next.text }}</span></p>
+                    } @else {
+                      <p class="font-medium">Final stop of the trip</p>
                     }
+                    <p style="color: var(--text-muted)">Travelled so far: {{ info.covered }} of {{ info.total }}</p>
+                    <div class="h-1 overflow-hidden rounded-full" style="background: var(--border)" aria-hidden="true">
+                      <div class="h-full rounded-full" style="background: var(--primary)" [style.width.%]="info.percent"></div>
+                    </div>
                   </div>
                 }
               </li>
@@ -294,12 +301,16 @@ export class ItineraryEditorComponent {
       }
     }
     if (!legs.length || legs.length !== stops.length - 1) return info;
+    const totalM = legs.reduce((sum, leg) => sum + leg.distance_m, 0);
+    const total = formatDistance(totalM);
     let metres = 0;
     stops.forEach((stop, i) => {
       const leg = legs[i];
       const time = leg ? formatDuration(leg.duration_s) : null;
       info.set(stop.id, {
-        covered: i === 0 ? 'Start' : `${formatDistance(metres)} covered`,
+        covered: formatDistance(metres),
+        total,
+        percent: totalM ? Math.round((metres / totalM) * 100) : 0,
         next: leg ? { to: this.placeName(stops[i + 1]) ?? stops[i + 1].title, text: [formatDistance(leg.distance_m), time].filter(Boolean).join(' · ') } : null,
       });
       metres += leg?.distance_m ?? 0;
