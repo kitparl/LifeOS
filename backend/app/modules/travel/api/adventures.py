@@ -17,6 +17,7 @@ from app.modules.travel.schemas.adventures import (
 )
 from app.modules.travel.schemas.routes import RouteDetail
 from app.modules.travel.services.adventure_service import AdventureService
+from app.modules.travel.services.export_service import ExportService
 from app.modules.travel.services.gpx_service import GpxService
 from app.modules.travel.services.route_service import RouteService
 
@@ -56,6 +57,15 @@ async def create_adventure(
 @router.get("/adventures/{adventure_id}", response_model=AdventureDetail)
 async def get_adventure(adventure_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return await AdventureService(db).detail(user.id, adventure_id)
+
+
+@router.get("/adventures/{adventure_id}/export", response_class=Response)
+async def export_adventure(
+    adventure_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    """A shareable PDF guide of the adventure, written for friends who have never seen the app."""
+    pdf, name = await ExportService(db).adventure_pdf(user.id, adventure_id)
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @router.patch("/adventures/{adventure_id}", response_model=AdventureDetail)

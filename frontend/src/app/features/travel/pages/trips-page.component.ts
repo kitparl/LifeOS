@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { ADVENTURE_KINDS, Adventure, AdventureKind, TRIP_STATUS_LABELS, TripListItem, TripStatus } from '../models/travel.models';
+import { ExportGuideComponent } from '../components/export-guide.component';
 import { TravelApiService } from '../services/travel-api.service';
 
 const GROUPS: readonly TripStatus[] = ['active', 'booked', 'planning', 'draft', 'completed'];
@@ -17,7 +18,7 @@ type NewKind = 'trip' | 'adventure';
 @Component({
   selector: 'app-travel-trips-page',
   standalone: true,
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, ExportGuideComponent],
   template: `
     <div class="space-y-3">
       <form class="panel flex flex-wrap items-end gap-2 text-sm" (submit)="$event.preventDefault(); create()">
@@ -99,6 +100,7 @@ type NewKind = 'trip' | 'adventure';
                   }
                   · {{ t.place_count }} places
                 </p>
+                <app-export-guide kind="trips" [id]="t.id" [name]="t.name" />
               </div>
             }
           </div>
@@ -118,6 +120,7 @@ type NewKind = 'trip' | 'adventure';
                   {{ a.difficulty ?? 'difficulty not set' }} · {{ a.route_id ? 'has a route' : 'no route yet' }}
                   @if (tripName(a.trip_id); as t) { · part of {{ t }} }
                 </p>
+                <app-export-guide kind="adventures" [id]="a.id" [name]="a.name" />
               </div>
             }
           </div>
