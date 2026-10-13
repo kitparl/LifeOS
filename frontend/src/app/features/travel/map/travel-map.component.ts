@@ -91,6 +91,8 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
   readonly fitKey = input<string | null>(null);
   /** Crosshair cursor while a tool (drop pin, draw route) is active. */
   readonly toolActive = input(false);
+  /** Referrer sent with tile requests; the public planner sends only the origin (requirements D-16). */
+  readonly tileReferrerPolicy = input<Leaflet.TileLayerOptions['referrerPolicy']>(false);
 
   readonly mapTap = output<LatLng>();
   readonly markerSelect = output<MapMarker>();
@@ -144,6 +146,7 @@ export class TravelMapComponent implements AfterViewInit, OnDestroy {
       L.tileLayer(environment.travel.tileUrl, {
         attribution: environment.travel.tileAttribution,
         maxZoom: 19,
+        referrerPolicy: this.tileReferrerPolicy(),
       }).addTo(map);
       this.lineLayer = L.layerGroup().addTo(map);
       this.markerLayer = L.layerGroup().addTo(map);

@@ -4,7 +4,8 @@ import { apiErrorMessage } from '../../../core/utils/http';
 import { SplitCreateComponent } from '../components/split-create.component';
 import { SplitDeviceGroupListComponent } from '../components/device-group-list.component';
 import { SplitPrivacyNoteComponent } from '../components/privacy-note.component';
-import { SplitShareActionsComponent } from '../components/share-actions.component';
+import { ShareActionsComponent } from '../../../shared/share/share-actions.component';
+import { SPLIT_SHARE_TEXT } from '../utils/share-links';
 import { SplitGroupCreatePayload, SplitSeatIssued } from '../models/split.models';
 import { SplitDeviceStoreService } from '../services/split-device-store.service';
 import { SplitsApiService } from '../services/splits-api.service';
@@ -26,7 +27,7 @@ interface CreatedGroup {
     SplitCreateComponent,
     SplitDeviceGroupListComponent,
     SplitPrivacyNoteComponent,
-    SplitShareActionsComponent,
+    ShareActionsComponent,
   ],
   template: `
     <div class="mx-auto max-w-3xl space-y-4">
@@ -37,7 +38,7 @@ interface CreatedGroup {
             <p class="text-sm">
               <span class="font-medium">{{ done.name }}</span> is ready. Share the link — people join only if they want to.
             </p>
-            <app-split-share-actions [groupName]="done.name" [urlPath]="done.seat.url_path" qrMode="shown" />
+            <app-share-actions [name]="done.name" [urlPath]="done.seat.url_path" qrMode="shown" [text]="shareText" testIdPrefix="split" />
             <div class="flex flex-wrap gap-2">
               <a class="btn-primary text-xs" data-testid="split-open-created" [routerLink]="['/s', done.seat.code]">
                 Open group
@@ -63,6 +64,7 @@ interface CreatedGroup {
   `,
 })
 export class SplitsHomeComponent {
+  readonly shareText = SPLIT_SHARE_TEXT;
   private readonly api = inject(SplitsApiService);
   protected readonly store = inject(SplitDeviceStoreService);
 

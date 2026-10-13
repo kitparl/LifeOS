@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.pagination import Pagination, pagination_params
+from app.core.public_url import public_origin
 from app.modules.auth.models import User
 from app.modules.travel.schemas.routes import RouteOut, RouteRequest
 from app.modules.travel.schemas.trips import (
@@ -52,9 +53,11 @@ async def get_trip(trip_id: str, user: User = Depends(get_current_user), db: Asy
 
 
 @router.get("/{trip_id}/export", response_class=Response)
-async def export_trip(trip_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def export_trip(
+    trip_id: str, request: Request, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     """A shareable PDF guide of the trip, written for friends who have never seen the app."""
-    pdf, name = await ExportService(db).trip_pdf(user.id, trip_id)
+    pdf, name = await ExportService(db).trip_pdf(user.id, trip_id, public_origin(request))
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 

@@ -350,3 +350,103 @@ class TravelMapsSettings(Base):
     fx_rates: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     pricing_last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = _updated()
+
+
+# ---- shared trip plans (public /t/<code> planner) --------------------------------------------------
+
+SHARE_STATES = ("open", "locked", "revoked")
+CONTRIBUTOR_KINDS = ("google", "name")
+VERSION_KINDS = ("original", "plan", "owner", "backup")
+VERSION_STATUSES = ("draft", "submitted")
+
+
+class TravelTripShare(Base):
+    """At most one per trip. Friends reach it by `code`; the owner manages it from the trip."""
+
+    __tablename__ = "travel_trip_shares"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = _owner()
+    trip_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("travel_trips.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(8), unique=True, index=True, nullable=False)
+    state: Mapped[str] = mapped_column(String(8), nullable=False, default="open")
+    require_google: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    allowed_emails: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    original_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    locked_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TravelShareContributor(Base):
+    """A friend on one share (never a LifeOS user): a Google account or a name plus a device secret."""
+
+    __tablename__ = "travel_share_contributors"
+    __table_args__ = (UniqueConstraint("share_id", "google_sub", name="uq_travel_share_contributor_sub"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    share_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("travel_trip_shares.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(40), nullable=False)
+    google_sub: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    google_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # SHA-256 of the one active device secret; the secret itself only lives in the friend's browser.
+    secret_hash: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = _created()
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TravelShareVersion(Base):
+    """A snapshot document of an itinerary. Never touches the trip tables until the owner applies it.
+
+    `updated_at` moves only when the document changes (no `onupdate`), so the owner's list is
+    "latest edited first", not "latest renamed first".
+    """
+
+    __tablename__ = "travel_share_versions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    share_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("travel_trip_shares.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    contributor_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="draft")
+    message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    document: Mapped[dict] = mapped_column(JSON, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    submitted_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+Index(
+    "ix_travel_share_versions_share_updated",
+    TravelShareVersion.share_id,
+    TravelShareVersion.updated_at.desc(),
+)
+
+
+class TravelShareEvent(Base):
+    """Append-only audit trail of owner and contributor actions on a share (lock, unlock, apply, ...)."""
+
+    __tablename__ = "travel_share_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    share_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("travel_trip_shares.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    actor: Mapped[str] = mapped_column(String(16), nullable=False)
+    actor_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    action: Mapped[str] = mapped_column(String(24), nullable=False)
+    version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    at: Mapped[datetime] = _created()

@@ -5,6 +5,7 @@ token claims, never from client-supplied fields.
 """
 
 import time
+from dataclasses import dataclass
 
 import httpx
 from jose import JWTError, jwt
@@ -30,12 +31,26 @@ async def _get_google_jwks() -> dict:
     return _jwks_cache["keys"]
 
 
+@dataclass(frozen=True)
+class GoogleIdentity:
+    """Who a verified Google ID token belongs to. `sub` is Google's stable account id."""
+
+    sub: str
+    email: str
+    name: str
+
+
 async def verify_google_id_token(credential: str) -> str:
     """Return the verified, lowercased email from a Google ID token.
 
     Raises UnauthorizedError if the token is invalid, not issued for this app,
     or the email is not verified by Google.
     """
+    return (await verify_google_id_claims(credential)).email
+
+
+async def verify_google_id_claims(credential: str) -> GoogleIdentity:
+    """Verify a Google ID token and return the account's identity claims (no extra scopes involved)."""
     client_id = get_settings().google_client_id
     if not client_id:
         raise UnauthorizedError("Google sign-in is not configured")
@@ -53,6 +68,9 @@ async def verify_google_id_token(credential: str) -> str:
         raise UnauthorizedError("Google sign-in failed. Please try again.") from None
 
     email = claims.get("email")
-    if not email or claims.get("email_verified") is not True:
+    sub = claims.get("sub")
+    if not email or not sub or claims.get("email_verified") is not True:
         raise UnauthorizedError("Google sign-in failed. Please try again.")
-    return email.strip().lower()
+    email = email.strip().lower()
+    name = str(claims.get("name") or "").strip() or email.split("@", 1)[0]
+    return GoogleIdentity(sub=str(sub), email=email, name=name)

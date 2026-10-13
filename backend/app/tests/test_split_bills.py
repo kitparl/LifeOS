@@ -10,6 +10,7 @@ from decimal import Decimal
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from app.core.short_codes import SHORT_CODE_ALPHABET
 from app.core.timezone import utc_now
 from app.modules.finance.split import api as split_api
 from app.modules.finance.split.balances import (
@@ -21,7 +22,6 @@ from app.modules.finance.split.balances import (
     pairwise_debts,
     payable,
 )
-from app.modules.finance.split.codes import SHORT_CODE_ALPHABET
 from app.modules.finance.split.models import SplitGroup, SplitHistory, SplitMember
 from app.modules.finance.split.service import SplitService
 from app.modules.finance.split.upi import build_upi_uri, paise_to_rupees, rupees_to_paise

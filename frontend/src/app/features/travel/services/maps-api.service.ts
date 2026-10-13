@@ -1,11 +1,11 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { GeoLookup, MapsStatus, Suggestions } from '../models/travel.models';
+import { LatLngBias, newSessionToken, suggestionStream } from '../utils/place-suggestions';
 
-export const SEARCH_DEBOUNCE_MS = 300;
-export const SEARCH_MIN_LENGTH = 3;
+export { SEARCH_DEBOUNCE_MS, SEARCH_MIN_LENGTH } from '../utils/place-suggestions';
 
 /**
  * Map lookups through the backend proxy (every call is usage-tracked and cost-protected server-side).
@@ -25,23 +25,15 @@ export class MapsApiService {
     return this.http.post<GeoLookup>(`${this.base}/reverse-geocode`, { lat, lng });
   }
 
-  /**
-   * Debounced, min-length, cancelling search (spec §31). Short queries never reach the server;
-   * `switchMap` drops the in-flight request when the user keeps typing.
-   */
-  searchSuggestions(query$: Observable<string>, bias?: () => { lat: number; lng: number } | null): Observable<Suggestions> {
-    return query$.pipe(
-      map((q) => q.trim()),
-      debounceTime(SEARCH_DEBOUNCE_MS),
-      distinctUntilChanged(),
-      switchMap((q) => {
-        if (q.length < SEARCH_MIN_LENGTH) return of<Suggestions>({ suggestions: [], fallback_reason: null });
-        let params = new HttpParams().set('q', q).set('session', this.session);
-        const center = bias?.();
-        if (center) params = params.set('lat', center.lat.toFixed(5)).set('lng', center.lng.toFixed(5));
-        return this.http.get<Suggestions>(`${this.base}/autocomplete`, { params });
-      }),
-    );
+  /** Debounced, min-length, cancelling search (see `suggestionStream`). */
+  searchSuggestions(query$: Observable<string>, bias?: () => LatLngBias): Observable<Suggestions> {
+    return suggestionStream(query$, (q, center) => this.autocomplete(q, center), bias);
+  }
+
+  private autocomplete(q: string, center: LatLngBias): Observable<Suggestions> {
+    let params = new HttpParams().set('q', q).set('session', this.session);
+    if (center) params = params.set('lat', center.lat.toFixed(5)).set('lng', center.lng.toFixed(5));
+    return this.http.get<Suggestions>(`${this.base}/autocomplete`, { params });
   }
 
   /** Selecting a suggestion ends the Places session (Google's session pattern); the next search starts a new one. */
@@ -50,8 +42,4 @@ export class MapsApiService {
     this.session = newSessionToken();
     return this.http.get<GeoLookup>(`${this.base}/place/${encodeURIComponent(externalPlaceId)}`, { params });
   }
-}
-
-function newSessionToken(): string {
-  return crypto.randomUUID();
 }

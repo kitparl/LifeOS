@@ -41,6 +41,13 @@ export const routes: Routes = [
       import('./features/splits/pages/split-group-page.component').then((m) => m.SplitGroupPageComponent),
   },
   {
+    // Public shared trip planner: a separate friendly app for friends (no LifeOS login, own scoped design).
+    path: 't/:code',
+    loadComponent: () =>
+      import('./features/travel/planner/planner-page.component').then((m) => m.PlannerPageComponent),
+    canDeactivate: [(page: { canLeave(): boolean }) => page.canLeave()],
+  },
+  {
     path: '',
     loadComponent: () =>
       import('./shared/layout/app-shell.component').then((m) => m.AppShellComponent),

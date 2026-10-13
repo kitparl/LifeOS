@@ -2,52 +2,17 @@ import time
 
 import pytest
 from app.core.config import get_settings
-from app.modules.auth import google_auth
 from app.modules.auth.models import User
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from jose import jwk, jwt
+from app.tests.google_support import CLIENT_ID
+from app.tests.google_support import google_token as _google_token
 from sqlalchemy import func, select
 
-CLIENT_ID = "test-client.apps.googleusercontent.com"
 NOT_FOUND_MSG = "User not found. Please contact your administrator to get access."
-
-_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-_PRIVATE_PEM = _private_key.private_bytes(
-    serialization.Encoding.PEM,
-    serialization.PrivateFormat.PKCS8,
-    serialization.NoEncryption(),
-).decode()
-_PUBLIC_PEM = _private_key.public_key().public_bytes(
-    serialization.Encoding.PEM,
-    serialization.PublicFormat.SubjectPublicKeyInfo,
-).decode()
-_JWKS = {"keys": [{**jwk.construct(_PUBLIC_PEM, "RS256").to_dict(), "kid": "test-kid", "use": "sig"}]}
-
-
-def _google_token(email: str, **overrides) -> str:
-    now = int(time.time())
-    claims = {
-        "iss": "https://accounts.google.com",
-        "aud": CLIENT_ID,
-        "sub": "1234567890",
-        "email": email,
-        "email_verified": True,
-        "iat": now,
-        "exp": now + 600,
-        **overrides,
-    }
-    return jwt.encode(claims, _PRIVATE_PEM, algorithm="RS256", headers={"kid": "test-kid"})
 
 
 @pytest.fixture(autouse=True)
-def google_setup(monkeypatch):
-    monkeypatch.setattr(get_settings(), "google_client_id", CLIENT_ID)
-
-    async def fake_jwks():
-        return _JWKS
-
-    monkeypatch.setattr(google_auth, "_get_google_jwks", fake_jwks)
+def google_setup(fake_google_identity):
+    """Every test here runs against the local test key."""
 
 
 async def _register(client, email="alice@example.com"):

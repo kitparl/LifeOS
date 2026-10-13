@@ -36,6 +36,7 @@ from app.modules.search.api import router as search_router
 from app.modules.sticky_notes.api import router as sticky_notes_router
 from app.modules.tasks.api import router as tasks_router
 from app.modules.travel.api import router as travel_router
+from app.modules.travel.share_page import router as shared_plan_page_router
 from app.modules.users.api import router as users_router
 from app.modules.wishlist.api import router as wishlist_router
 
@@ -131,6 +132,8 @@ app.include_router(sticky_notes_router, prefix="/api/v1")
 app.include_router(news_router, prefix="/api/v1")
 app.include_router(dsa_router, prefix="/api/v1")
 app.include_router(travel_router, prefix="/api/v1")
+# Friend planner page (/t/<code>): must be registered before the SPA catch-all below.
+app.include_router(shared_plan_page_router)
 
 
 @app.get("/health")

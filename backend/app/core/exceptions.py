@@ -52,6 +52,31 @@ class UnauthorizedError(AppError):
         super().__init__(detail)
 
 
+class GoneError(AppError):
+    """The resource existed but was deliberately turned off (e.g. a revoked share link)."""
+
+    status_code = status.HTTP_410_GONE
+
+    def __init__(self, detail: str | dict = "Gone"):
+        super().__init__(detail)
+
+
+class PreconditionFailedError(AppError):
+    """An `If-Match` revision no longer matches (someone saved in between)."""
+
+    status_code = status.HTTP_412_PRECONDITION_FAILED
+
+    def __init__(self, detail: str | dict = "Precondition failed"):
+        super().__init__(detail)
+
+
+class PreconditionRequiredError(AppError):
+    status_code = status.HTTP_428_PRECONDITION_REQUIRED
+
+    def __init__(self, detail: str | dict = "Precondition required"):
+        super().__init__(detail)
+
+
 class BadRequestError(AppError):
     status_code = status.HTTP_400_BAD_REQUEST
 

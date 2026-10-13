@@ -48,6 +48,7 @@ MUTED = colors.HexColor("#5f6c7b")
 LINE = colors.HexColor("#d3dce4")
 LINK = "#0b5cad"
 DOT = " \u00b7 "
+FOOTER_NAME_MAX = 40
 
 PAGE_W, PAGE_H = A4
 MARGIN = 16 * mm
@@ -714,7 +715,9 @@ def trip_guide_pdf(
     places: dict[str, TravelPlace],
     adventures: Sequence[AdventureOut],
     basemap: TileBasemap | None = None,
+    share_url: str | None = None,
 ) -> bytes:
+    """`share_url`: the trip's active share link, printed in every page footer (requirements D-05)."""
     st = _styles()
     trip = detail.trip
     plan = build_trip_plan(detail, places)
@@ -778,7 +781,15 @@ def trip_guide_pdf(
     story += _adventures_section(adventures, st)
     if trip.notes:
         story += [Heading("Good to know", st["h1"], "notes"), Paragraph(text(trip.notes), st["body"])]
-    return _build(f"{plain(trip.name)} - trip guide", f"{plain(trip.name)} - shared from LifeOS", story)
+    return _build(f"{plain(trip.name)} - trip guide", _trip_footer(plain(trip.name), share_url), story)
+
+
+def _trip_footer(name: str, share_url: str | None) -> str:
+    if not share_url:
+        return f"{name} - shared from LifeOS"
+    # The page number shares the footer line, so a long name is shortened to keep the link whole.
+    short = name if len(name) <= FOOTER_NAME_MAX else name[: FOOTER_NAME_MAX - 3] + "..."
+    return f"{short} - plan it with us: {share_url}"
 
 
 # ---- adventure --------------------------------------------------------------------------------------

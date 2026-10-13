@@ -22,6 +22,7 @@ from app.core.exceptions import (
     NotFoundError,
     ServiceUnavailableError,
 )
+from app.core.short_codes import hash_secret
 from app.core.timezone import as_utc, ist_now, utc_now
 from app.modules.auth.models import User
 from app.modules.finance.split.balances import (
@@ -36,7 +37,6 @@ from app.modules.finance.split.balances import (
 from app.modules.finance.split.codes import (
     expires_at_for,
     generate_code,
-    hash_secret,
     new_seat_secret,
     url_path,
 )

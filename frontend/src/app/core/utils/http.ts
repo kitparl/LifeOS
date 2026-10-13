@@ -1,4 +1,10 @@
-import { HttpResponse } from '@angular/common/http';
+import { HttpContextToken, HttpResponse } from '@angular/common/http';
+
+/**
+ * Set on requests that must not carry the LifeOS session (no Bearer token, no refresh-on-401):
+ * the public shared trip planner, whose friends are not LifeOS users.
+ */
+export const SKIP_LIFEOS_AUTH = new HttpContextToken<boolean>(() => false);
 
 /** One page of a list endpoint; `total` comes from the `X-Total-Count` header. */
 export interface Page<T> {

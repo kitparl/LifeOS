@@ -3,13 +3,14 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { RouterLink } from '@angular/router';
 import { DeviceSplitGroup } from '../models/split.models';
 import { SplitPersonComponent } from './person.component';
-import { SplitShareActionsComponent } from './share-actions.component';
+import { ShareActionsComponent } from '../../../shared/share/share-actions.component';
+import { SPLIT_SHARE_TEXT } from '../utils/share-links';
 
 /** "On this device": every group this browser created or joined, each removable from this device. */
 @Component({
   selector: 'app-split-device-group-list',
   standalone: true,
-  imports: [LucideDynamicIcon, RouterLink, SplitPersonComponent, SplitShareActionsComponent],
+  imports: [LucideDynamicIcon, RouterLink, SplitPersonComponent, ShareActionsComponent],
   template: `
     <div class="panel !p-0 overflow-hidden" data-testid="split-device-list">
       @if (groups().length) {
@@ -57,7 +58,7 @@ import { SplitShareActionsComponent } from './share-actions.component';
                 </div>
               }
 
-              <app-split-share-actions [groupName]="group.name" [urlPath]="'/s/' + group.code" qrMode="toggle" />
+              <app-share-actions [name]="group.name" [urlPath]="'/s/' + group.code" qrMode="toggle" [text]="shareText" testIdPrefix="split" />
             </li>
           }
         </ul>
@@ -70,6 +71,7 @@ import { SplitShareActionsComponent } from './share-actions.component';
   `,
 })
 export class SplitDeviceGroupListComponent {
+  readonly shareText = SPLIT_SHARE_TEXT;
   readonly groups = input.required<DeviceSplitGroup[]>();
   /** Emits the code of a group to forget on this device. */
   readonly remove = output<string>();

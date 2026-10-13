@@ -1,0 +1,181 @@
+<app-planner-theme />
+<div class="tp-root page" [attr.data-mode]="store.mode()">
+  @switch (store.mode()) {
+    @case ('loading') {
+      <div class="shell" aria-busy="true">
+        <p class="tp-sr-only" role="status">{{ copy.loading }}</p>
+        <div class="skeleton title"></div>
+        <div class="skeleton line"></div>
+        <div class="skeleton card"></div>
+        <div class="skeleton card"></div>
+      </div>
+    }
+    @case ('unavailable') {
+      <div class="shell center">
+        <div class="tp-card notice" role="alert" data-testid="planner-unavailable">
+          <p class="big" aria-hidden="true">🧭</p>
+          <p>
+            @switch (store.unavailable()) {
+              @case ('gone') { {{ copy.gone }} }
+              @case ('not_found') { {{ copy.notFound }} }
+              @default { {{ copy.loadFailed }} }
+            }
+          </p>
+          @if (store.unavailable() === 'error') {
+            <button type="button" class="tp-btn tp-btn--primary" (click)="retry()">{{ copy.tryAgain }}</button>
+          }
+        </div>
+      </div>
+    }
+    @default {
+      @let view = store.view()!;
+      @let shown = plan()!;
+      <div class="shell">
+        <app-planner-header
+          [view]="view"
+          [saveState]="store.saveState()"
+          [editing]="store.mode() === 'editing'"
+          [canUndo]="store.canUndo() && editable()"
+          (undo)="store.undo()"
+          (openMe)="meOpen.set(true)"
+        />
+
+        <div class="banners" [class.inactive]="tab() !== 'plan'">
+          @if (showOwnerShortcut()) {
+            <p class="banner owner">{{ copy.ownerShortcut }} <a class="tp-btn" [href]="manageLink()" data-testid="owner-manage">{{ copy.manage }}</a></p>
+          }
+          @if (store.mode() === 'locked') {
+            <p class="banner" data-testid="final-note">{{ copy.finalNote(view.owner_name) }}</p>
+          } @else if (store.mode() === 'viewing' && !store.removed()) {
+            <p class="banner quiet">{{ copy.viewingNote(view.owner_name) }}</p>
+          }
+          @if (store.removed()) {
+            <p class="banner warn" role="alert">{{ copy.removedNote }}</p>
+          }
+          @if (store.lostAccess()) {
+            <p class="banner warn" role="alert">{{ copy.lostAccess }}</p>
+          }
+          @if (store.restorable()) {
+            <div class="banner warn" role="alert">
+              <p>{{ copy.restoreTitle }}</p>
+              <button type="button" class="tp-btn tp-btn--primary" (click)="store.restoreUnsaved()">{{ copy.restore }}</button>
+              <button type="button" class="tp-btn" (click)="store.discardUnsaved()">{{ copy.discard }}</button>
+            </div>
+          }
+          @if (store.saveState() === 'conflict') {
+            <div class="banner warn" role="alert" data-testid="conflict">
+              <p>{{ copy.conflict }}</p>
+              <button type="button" class="tp-btn tp-btn--primary" (click)="store.reloadNewer()">{{ copy.reload }}</button>
+              <button type="button" class="tp-btn" (click)="store.keepMine()">{{ copy.keepMine }}</button>
+            </div>
+          }
+          @if (firstRun() && editable()) {
+            <app-planner-first-run (done)="finishFirstRun()" />
+          }
+        </div>
+
+        <main class="layout">
+          <aside class="rail" aria-label="Days">
+            <app-planner-day-rail [days]="shown.days" [editable]="editable()" (jump)="jumpTo($event)" (addDay)="addDay()" />
+          </aside>
+
+          <section class="pane plan" [class.inactive]="tab() !== 'plan'" aria-label="Plan" cdkDropListGroup>
+            @for (day of shown.days; track $index) {
+              <app-planner-day
+                [day]="day"
+                [index]="$index"
+                [dayCount]="shown.days.length"
+                [date]="dayDate($index)"
+                [editable]="editable()"
+                (add)="openAdd($index)"
+                (openStop)="openStop($index, $event)"
+                (nudge)="nudge($index, $event.index, $event.direction)"
+                (dropped)="dropped($event)"
+                (removeDay)="removeDay($index)"
+              />
+            } @empty {
+              <p class="tp-card empty tp-muted">{{ copy.emptyPlan }}</p>
+            }
+            @if (editable()) {
+              <button type="button" class="tp-btn tp-btn--block add-day" (click)="addDay()">＋ {{ copy.addDay }}</button>
+            }
+          </section>
+
+          <section class="pane mapcol" [class.inactive]="tab() !== 'map'" aria-label="Map">
+            <!-- The map component loads Leaflet itself; it is only created where it can be seen. -->
+            @if (wide() || tab() === 'map') {
+              <app-planner-map [plan]="shown" />
+            }
+          </section>
+
+          <section class="pane mecol" [class.inactive]="tab() !== 'me'" aria-label="You">
+            @if (tab() === 'me') {
+            <app-planner-me
+              [contributor]="store.identity()?.contributor ?? null"
+              [googleEnabled]="view.google_enabled"
+              [editable]="store.mode() === 'editing'"
+              (upgrade)="upgrade($event)"
+              (startOver)="startOver()"
+              (forget)="forget()"
+            />
+            }
+          </section>
+        </main>
+      </div>
+
+      @if (store.mode() === 'editing') {
+        <div class="sendbar">
+          <app-planner-send [ownerName]="view.owner_name" [plan]="store.mine()" [busy]="busy()" (sent)="send($event)" />
+        </div>
+      }
+
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        @for (t of tabs; track t) {
+          <button type="button" role="tab" class="tab" [attr.aria-selected]="tab() === t" [attr.data-testid]="'tab-' + t" (click)="selectTab(t)">
+            <span aria-hidden="true">{{ t === 'plan' ? '🗓️' : t === 'map' ? '🗺️' : '🙂' }}</span>
+            {{ copy.tabs[t] }}
+          </button>
+        }
+      </nav>
+
+      <app-planner-add-stop
+        [open]="!!sheet()"
+        [stop]="sheet()?.stop ?? null"
+        [dayLabel]="sheetDayLabel()"
+        [bias]="biasFor"
+        (saved)="saveStop($event)"
+        (removed)="removeOpenStop()"
+        (closed)="sheet.set(null)"
+      />
+      <app-planner-who
+        [open]="store.askWho()"
+        [ownerName]="view.owner_name"
+        [namesAllowed]="view.names_allowed"
+        [googleEnabled]="view.google_enabled"
+        [busy]="busy()"
+        [error]="whoError()"
+        (named)="joinWithName($event)"
+        (google)="joinWithGoogle($event)"
+        (closed)="store.askWho.set(false)"
+      />
+      <app-planner-sheet [open]="meOpen()" [heading]="copy.me.title" (closed)="meOpen.set(false)">
+        @if (meOpen()) {
+        <app-planner-me
+          [contributor]="store.identity()?.contributor ?? null"
+          [googleEnabled]="view.google_enabled"
+          [editable]="store.mode() === 'editing'"
+          (upgrade)="upgrade($event)"
+          (startOver)="startOver()"
+          (forget)="forget()"
+        />
+        }
+      </app-planner-sheet>
+      <app-planner-toast
+        [message]="store.toast()?.message ?? null"
+        [canUndo]="!!store.toast()?.undo"
+        (undo)="store.undo()"
+        (dismissed)="store.toast.set(null)"
+      />
+    }
+  }
+</div>

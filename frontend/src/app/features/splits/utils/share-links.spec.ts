@@ -1,4 +1,5 @@
-import { absoluteShareUrl, mailtoHref, shareMessage, whatsappHref } from './share-links';
+import { absoluteShareUrl, mailtoHref, whatsappHref } from '../../../shared/share/share-links';
+import { shareMessage, shareSubject } from './share-links';
 
 describe('Split share links', () => {
   const url = absoluteShareUrl('/s/k7mq2p', 'https://lifeos.example');
@@ -22,7 +23,7 @@ describe('Split share links', () => {
   });
 
   it('Email href is a mailto with subject and the same URL in the body', () => {
-    const href = mailtoHref('Dinner', message);
+    const href = mailtoHref(shareSubject('Dinner'), message);
     expect(href.startsWith('mailto:')).toBeTrue();
     expect(href).toContain(`subject=${encodeURIComponent('Split the bills for Dinner')}`);
     expect(href).toContain(encodeURIComponent(url));

@@ -8,7 +8,8 @@ import { AddSplitSubmit, SplitAddFormComponent } from '../components/add-split-f
 import { MarkPaidRequest, SplitSettleListComponent } from '../components/settle-list.component';
 import { SplitPersonComponent } from '../components/person.component';
 import { SplitPrivacyNoteComponent } from '../components/privacy-note.component';
-import { SplitShareActionsComponent } from '../components/share-actions.component';
+import { ShareActionsComponent } from '../../../shared/share/share-actions.component';
+import { SPLIT_SHARE_TEXT } from '../utils/share-links';
 import { SplitBalances, SplitGroupView, SplitMember } from '../models/split.models';
 import { SplitDeviceStoreService } from '../services/split-device-store.service';
 import { SplitsApiService } from '../services/splits-api.service';
@@ -31,7 +32,7 @@ const CLOCK_TICK_MS = 60_000;
     SplitPersonComponent,
     SplitPrivacyNoteComponent,
     SplitSettleListComponent,
-    SplitShareActionsComponent,
+    ShareActionsComponent,
   ],
   template: `
     <!-- The app root is a fixed 100dvh box with overflow hidden, so this page scrolls itself. -->
@@ -58,7 +59,7 @@ const CLOCK_TICK_MS = 60_000;
               <h1 class="text-base font-semibold">{{ g.name }}</h1>
               <span class="chip text-xs" data-testid="split-link-status">{{ status() }}</span>
             </div>
-            <app-split-share-actions [groupName]="g.name" [urlPath]="g.url_path" />
+            <app-share-actions [name]="g.name" [urlPath]="g.url_path" [text]="shareText" testIdPrefix="split" />
             <div class="space-y-2 border-t border-[var(--xp-border)] pt-3">
               <p class="text-xs font-medium" style="color: var(--text-muted)">
                 {{ g.members.length }} {{ g.members.length === 1 ? 'person' : 'people' }} in this split
@@ -191,6 +192,7 @@ const CLOCK_TICK_MS = 60_000;
   `,
 })
 export class SplitGroupPageComponent implements OnInit {
+  readonly shareText = SPLIT_SHARE_TEXT;
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(SplitsApiService);
   private readonly store = inject(SplitDeviceStoreService);

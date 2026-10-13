@@ -7,10 +7,13 @@ otherwise they are straight-line estimates and every figure is flagged `approx`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from app.modules.travel.geo import Point, decode_polyline, haversine_m
+from app.modules.travel.itinerary import ItemRef, stop_sequence
 from app.modules.travel.models import TravelPlace
-from app.modules.travel.schemas.trips import DayOut, ItemOut, TripDetail
+from app.modules.travel.schemas.plan_document import PlanDocument
+from app.modules.travel.schemas.trips import DayOut, ItemOut, StopOut, TripDetail, TripPlaceOut, TripSummary
 
 
 @dataclass
@@ -112,3 +115,63 @@ def _leg(last: tuple[str, Point], place: TravelPlace, road) -> Leg:
         path = decode_polyline(road.polyline) if road.polyline else [start, end]
         return Leg(last[0], road.distance_m, road.duration_s, path, approx=False)
     return Leg(last[0], haversine_m(start, end), None, [start, end], approx=True)
+
+
+def plan_document_detail(trip: TripSummary, doc: PlanDocument) -> tuple[TripDetail, dict[str, TravelPlace]]:
+    """A shared plan in the shape the PDF guide reads, with unsaved places (so any version can be exported).
+
+    No saved route: every distance is a straight-line estimate, flagged `approx` like any stale route.
+    """
+    places: dict[str, TravelPlace] = {}
+    keys: dict[tuple, str] = {}
+    days: list[DayOut] = []
+    refs: list[ItemRef] = []
+    for d_index, day in enumerate(doc.days):
+        day_id = f"d{d_index}"
+        items: list[ItemOut] = []
+        for position, stop in enumerate(day.stops):
+            place_id = None
+            if stop.place is not None:
+                key = (stop.place.google_place_id or "", stop.place.lat, stop.place.lng)
+                place_id = keys.setdefault(key, f"p{len(keys)}")
+                places.setdefault(
+                    place_id,
+                    TravelPlace(
+                        id=place_id,
+                        name=stop.place.name,
+                        lat=stop.place.lat,
+                        lng=stop.place.lng,
+                        external_place_id=stop.place.google_place_id,
+                    ),
+                )
+            item = ItemOut(
+                id=stop.id,
+                day_id=day_id,
+                position=position,
+                place_id=place_id,
+                title=stop.title,
+                start_time=stop.start_time,
+                end_time=stop.end_time,
+                transport=stop.transport,
+                accommodation=stop.stay,
+                notes=stop.notes,
+                links=list(stop.links),
+            )
+            items.append(item)
+            refs.append(ItemRef(id=item.id, day_id=day_id, position=position, place_id=place_id))
+        day_date = trip.start_date + timedelta(days=d_index) if trip.start_date else None
+        days.append(DayOut(id=day_id, day_index=d_index, day_date=day_date, title=day.title, notes=day.notes, items=items))
+    stops = stop_sequence(
+        [d.id for d in days], refs, {pid: (p.name, p.lat, p.lng) for pid, p in places.items()}
+    )
+    detail = TripDetail(
+        trip=trip,
+        days=days,
+        places=[
+            TripPlaceOut(id=p.id, name=p.name, lat=p.lat, lng=p.lng, status="planned", external_place_id=p.external_place_id)
+            for p in places.values()
+        ],
+        stops=[StopOut(place_id=s.place_id, day_id=s.day_id, name=s.name, lat=s.lat, lng=s.lng) for s in stops],
+        route=None,
+    )
+    return detail, places

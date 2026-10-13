@@ -9,6 +9,7 @@ import { ExportGuideComponent } from '../components/export-guide.component';
 import { ItemPatch, ItineraryEditorComponent, NewCheckpoints, NewItem, PlaceChange } from '../components/itinerary-editor.component';
 import { PickedPlace, PlaceSearchComponent } from '../components/place-search.component';
 import { PlaceSheetComponent, PlaceSheetSubmit } from '../components/place-sheet.component';
+import { TripSharePanelComponent } from '../components/trip-share-panel.component';
 import { LatLng, MapLine, MapMarker, TravelMapComponent } from '../map/travel-map.component';
 import {
   GeoLookup,
@@ -53,7 +54,16 @@ interface LegRow {
 @Component({
   selector: 'app-travel-trip-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, ExportGuideComponent, TravelMapComponent, ItineraryEditorComponent, PlaceSearchComponent, PlaceSheetComponent],
+  imports: [
+    FormsModule,
+    RouterLink,
+    ExportGuideComponent,
+    TravelMapComponent,
+    ItineraryEditorComponent,
+    PlaceSearchComponent,
+    PlaceSheetComponent,
+    TripSharePanelComponent,
+  ],
   template: `
     @if (detail(); as d) {
       <div class="space-y-3">
@@ -107,6 +117,15 @@ interface LegRow {
             <p class="text-xs" style="color: var(--danger)">{{ error() }}</p>
           }
         </div>
+
+        <app-trip-share-panel
+          [tripId]="d.trip.id"
+          [tripName]="d.trip.name"
+          [tripDays]="d.days.length"
+          [tripStart]="d.trip.start_date"
+          [startOpen]="sharePanelOpen"
+          (applied)="reload()"
+        />
 
         <div class="flex gap-1 lg:hidden" role="tablist">
           <button type="button" class="text-xs" [class.btn-primary]="tab() === 'map'" [class.btn-secondary]="tab() !== 'map'" (click)="setTab('map')">Map</button>
@@ -295,6 +314,8 @@ export class TripDetailComponent implements OnInit {
     return (d && day ? searchBias(day, d.places) : null) ?? this.mapCenter();
   };
   mode: RouteMode = 'driving';
+  /** Opened from a "sent you a plan" notification (`?panel=share`). */
+  sharePanelOpen = false;
   /** Day the open place sheet adds to (set when a search result or a map tap opens it). */
   private sheetDayId: string | null = null;
   /** Day that searched and saved places are added to ('' = linked to the trip, not on a day). Defaults to Day 1. */
@@ -399,6 +420,12 @@ export class TripDetailComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.sharePanelOpen = this.route$.snapshot.queryParamMap.get('panel') === 'share';
+    this.reload();
+  }
+
+  /** Loads the trip (again after a shared plan was applied to it). */
+  reload(): void {
     const id = this.route$.snapshot.paramMap.get('id') ?? '';
     this.api.getTrip(id).subscribe({
       next: (d) => this.apply(d),

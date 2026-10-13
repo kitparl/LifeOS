@@ -37,6 +37,7 @@ class Feature(str, Enum):
     TRIP_ROUTE = "trip_route"
     ADVENTURE_ELEVATION = "adventure_elevation"
     CONNECTION_TEST = "connection_test"
+    SHARED_SEARCH = "shared_search"  # friends searching on a shared trip link (owner's key and budget)
 
 
 class TravelMode(str, Enum):

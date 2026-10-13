@@ -25,6 +25,7 @@ from app.modules.integrations.wordnik import client as wordnik_client
 from app.modules.news import client as news_client
 from app.modules.news import service as news_service
 from app.modules.travel.maps import google as google_maps_client
+from app.tests.google_support import fake_google_identity  # noqa: F401  (Google ID token fixture)
 from app.tests.travel_support import google, isolated_uploads  # noqa: F401  (Travel fixtures)
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

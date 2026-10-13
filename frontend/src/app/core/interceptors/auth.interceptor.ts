@@ -2,6 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn, HttpStatusCode } from '@angular/c
 import { inject } from '@angular/core';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { SKIP_LIFEOS_AUTH } from '../utils/http';
 
 const AUTH_SKIP_REFRESH = [
   '/auth/login',
@@ -18,6 +19,8 @@ function shouldSkipRefresh(url: string): boolean {
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // Public shared-plan calls: an expired friend token must never refresh or end a LifeOS session.
+  if (req.context.get(SKIP_LIFEOS_AUTH)) return next(req);
   const auth = inject(AuthService);
   const token = auth.getToken();
 

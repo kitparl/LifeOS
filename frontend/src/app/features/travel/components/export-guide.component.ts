@@ -1,4 +1,5 @@
 import { Component, inject, input, signal } from '@angular/core';
+import { saveBlob } from '../../../core/utils/download';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { TravelApiService } from '../services/travel-api.service';
 
@@ -36,12 +37,7 @@ export class ExportGuideComponent {
     this.error.set(null);
     this.api.exportGuide(this.kind(), this.id()).subscribe({
       next: (blob) => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${this.fileName()}.pdf`;
-        link.click();
-        URL.revokeObjectURL(url);
+        saveBlob(blob, `${this.fileName()}.pdf`);
         this.busy.set(false);
       },
       error: (err) => {

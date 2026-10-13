@@ -48,7 +48,12 @@ class LookupService:
         return GeoLookupOut(result=_geo_out(result))
 
     async def autocomplete(
-        self, user_id: str, query: str, session_token: str, bias: tuple[float, float] | None
+        self,
+        user_id: str,
+        query: str,
+        session_token: str,
+        bias: tuple[float, float] | None,
+        feature: Feature = Feature.SEARCH,
     ) -> SuggestionsOut:
         query = query.strip()
         if len(query) < MIN_QUERY_LENGTH:
@@ -57,7 +62,7 @@ class LookupService:
             items = await self.gateway.call(
                 user_id,
                 Sku.PLACES_AUTOCOMPLETE,
-                Feature.SEARCH,
+                feature,
                 lambda p: p.autocomplete(query, session_token, bias),
             )
         except MapsError as exc:
@@ -69,12 +74,18 @@ class LookupService:
             ]
         )
 
-    async def place_details(self, user_id: str, external_place_id: str, session_token: str | None) -> GeoLookupOut:
+    async def place_details(
+        self,
+        user_id: str,
+        external_place_id: str,
+        session_token: str | None,
+        feature: Feature = Feature.SEARCH_SELECT,
+    ) -> GeoLookupOut:
         try:
             result = await self.gateway.call(
                 user_id,
                 Sku.PLACE_DETAILS,
-                Feature.SEARCH_SELECT,
+                feature,
                 lambda p: p.place_details(external_place_id, session_token),
             )
         except MapsError as exc:

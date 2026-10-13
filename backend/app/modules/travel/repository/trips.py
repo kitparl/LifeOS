@@ -11,8 +11,12 @@ from app.modules.travel.models import (
     TravelPlace,
     TravelRoute,
     TravelRouteWaypoint,
+    TravelShareContributor,
+    TravelShareEvent,
+    TravelShareVersion,
     TravelTrip,
     TravelTripPlace,
+    TravelTripShare,
 )
 
 
@@ -66,6 +70,10 @@ class TripRepository:
         await self.db.execute(delete(TravelItineraryItem).where(TravelItineraryItem.trip_id == trip.id))
         await self.db.execute(delete(TravelItineraryDay).where(TravelItineraryDay.trip_id == trip.id))
         await self.db.execute(delete(TravelTripPlace).where(TravelTripPlace.trip_id == trip.id))
+        share_ids = select(TravelTripShare.id).where(TravelTripShare.trip_id == trip.id)
+        for child in (TravelShareVersion, TravelShareContributor, TravelShareEvent):
+            await self.db.execute(delete(child).where(child.share_id.in_(share_ids)))
+        await self.db.execute(delete(TravelTripShare).where(TravelTripShare.trip_id == trip.id))
         await self.db.execute(
             update(TravelPhoto).where(TravelPhoto.trip_id == trip.id).values(trip_id=None, day_id=None)
         )
@@ -135,6 +143,12 @@ class TripRepository:
     async def delete_day(self, day: TravelItineraryDay) -> None:
         await self.db.execute(delete(TravelItineraryItem).where(TravelItineraryItem.day_id == day.id))
         await self.db.delete(day)
+        await self.db.flush()
+
+    async def clear_itinerary(self, trip_id: str) -> None:
+        """Every day and item of the trip (applying a shared plan replaces them all)."""
+        await self.db.execute(delete(TravelItineraryItem).where(TravelItineraryItem.trip_id == trip_id))
+        await self.db.execute(delete(TravelItineraryDay).where(TravelItineraryDay.trip_id == trip_id))
         await self.db.flush()
 
     async def items(self, trip_id: str) -> list[TravelItineraryItem]:

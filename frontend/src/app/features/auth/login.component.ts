@@ -5,6 +5,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
+import { googleId, loadGoogleScript } from '../../core/utils/google-identity';
 
 @Component({
   selector: 'app-login',
@@ -415,7 +416,7 @@ export class LoginComponent implements AfterViewInit {
   }
 
   private renderGoogleButton(clientId: string): void {
-    google.accounts.id.initialize({
+    googleId().initialize({
       client_id: clientId,
       callback: (res: { credential?: string }) =>
         this.zone.run(() => this.onGoogleCredential(res.credential)),
@@ -429,7 +430,7 @@ export class LoginComponent implements AfterViewInit {
     if (!el) return;
     el.replaceChildren();
     const width = this.googleSlot?.nativeElement.clientWidth || 340;
-    google.accounts.id.renderButton(el, {
+    googleId().renderButton(el, {
       type: 'standard',
       theme: mode === 'dark' ? 'filled_black' : 'outline',
       size: 'large',
@@ -479,36 +480,4 @@ export class LoginComponent implements AfterViewInit {
       complete: () => this.submitting.set(false),
     });
   }
-}
-
-/** Minimal typing for the Google Identity Services global we use. */
-declare const google: {
-  accounts: {
-    id: {
-      initialize(config: { client_id: string; callback: (res: { credential?: string }) => void }): void;
-      renderButton(parent: HTMLElement, options: Record<string, unknown>): void;
-    };
-  };
-};
-
-const GOOGLE_GSI_SRC = 'https://accounts.google.com/gsi/client';
-let googleScriptPromise: Promise<void> | null = null;
-
-/** Load the Google Identity Services script once per page. */
-function loadGoogleScript(): Promise<void> {
-  if (!googleScriptPromise) {
-    googleScriptPromise = new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = GOOGLE_GSI_SRC;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => resolve();
-      script.onerror = () => {
-        googleScriptPromise = null;
-        reject(new Error('Failed to load Google Identity Services'));
-      };
-      document.head.appendChild(script);
-    });
-  }
-  return googleScriptPromise;
 }
