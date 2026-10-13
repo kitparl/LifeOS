@@ -167,7 +167,7 @@ class SubmissionRepository:
         await self.db.flush()
 
     async def finish(
-        self, submission: DsaSubmission, outcome: JudgeOutcome, *, status: str, message: str | None
+        self, submission: DsaSubmission, outcome: JudgeOutcome, *, status: str, failed_test: dict | None
     ) -> None:
         submission.status = status
         submission.verdict = outcome.verdict.value
@@ -176,7 +176,8 @@ class SubmissionRepository:
         submission.runtime_ms = outcome.runtime_ms
         submission.memory_kb = outcome.memory_kb
         submission.failed_case = outcome.failed_case
-        submission.message = message
+        submission.failed_test = failed_test
+        submission.message = outcome.message
         submission.finished_at = utc_now()
         await self.db.flush()
 

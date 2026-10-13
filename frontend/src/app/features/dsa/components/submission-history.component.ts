@@ -3,7 +3,14 @@ import { Component, effect, inject, input, output, signal, untracked } from '@an
 import { MarkdownEditorComponent } from '../../../shared/code-workspace/components/markdown-editor/markdown-editor.component';
 import { ListPaginatorComponent } from '../../../shared/pagination/list-paginator.component';
 import { PaginatedListState } from '../../../shared/pagination/paginated-list.state';
-import { DsaLanguage, LANGUAGE_LABELS, SubmissionDetail, SubmissionSummary } from '../models/dsa.models';
+import {
+  DsaLanguage,
+  JsonValue,
+  LANGUAGE_LABELS,
+  SignatureSpec,
+  SubmissionDetail,
+  SubmissionSummary,
+} from '../models/dsa.models';
 import { DsaService } from '../services/dsa.service';
 import { DsaStateComponent } from './dsa-state.component';
 import { SubmissionResultComponent } from './submission-result.component';
@@ -39,7 +46,7 @@ const PAGE_SIZE = 10;
             Load into editor
           </button>
         </div>
-        <app-dsa-submission-result [submission]="s" />
+        <app-dsa-submission-result [submission]="s" [signature]="signature()" [canUseAsTestCase]="true" (useAsTestCase)="useAsTestCase.emit($event)" />
         <div class="h-72 overflow-hidden rounded" style="border: 1px solid var(--border)">
           <app-markdown-editor [content]="s.code" [language]="s.language" [theme]="theme()" [readOnly]="true" />
         </div>
@@ -79,7 +86,10 @@ export class SubmissionHistoryComponent {
   /** Bump to reload (e.g. after a new submission). */
   readonly refresh = input(0);
   readonly theme = input<'light' | 'dark'>('light');
+  readonly signature = input<SignatureSpec | null>(null);
   readonly loadCode = output<{ code: string; language: DsaLanguage }>();
+  /** A failed test's input, to add to the Run test cases. */
+  readonly useAsTestCase = output<JsonValue>();
 
   readonly languages = LANGUAGE_LABELS;
   readonly page = new PaginatedListState(PAGE_SIZE);

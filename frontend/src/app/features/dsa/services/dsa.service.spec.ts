@@ -24,6 +24,7 @@ describe('DsaService', () => {
     problem_slug: 'two-sum',
     code: 'x',
     failed_case: null,
+    failed_test: null,
     message: null,
   });
 
@@ -74,11 +75,11 @@ describe('DsaService', () => {
     expect(completed).toBeTrue();
   }));
 
-  it('run sends custom inputs and polls /runs', fakeAsync(() => {
+  it('run sends the test case inputs and polls /runs', fakeAsync(() => {
     let verdict: string | null = null;
-    service.run('two-sum', { language: 'cpp', code: 'x', custom_inputs: [[[1], 2]] }).subscribe((r) => (verdict = r.verdict));
+    service.run('two-sum', { language: 'cpp', code: 'x', inputs: [[[1], 2]] }).subscribe((r) => (verdict = r.verdict));
     const post = http.expectOne(`${api}/problems/two-sum/run`);
-    expect(post.request.body.custom_inputs).toEqual([[[1], 2]]);
+    expect(post.request.body.inputs).toEqual([[[1], 2]]);
     post.flush({ id: 'r1', status: 'pending' });
     http.expectOne(`${api}/runs/r1`).flush({ id: 'r1', status: 'done', verdict: 'Accepted', message: null, cases: [], stdout: '', stderr: '' });
     expect(verdict as string | null).toBe('Accepted');

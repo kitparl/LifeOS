@@ -90,7 +90,7 @@ class JudgeOutcome:
 
 @dataclass(frozen=True)
 class Grading:
-    """How to judge one job; `expected[i] is None` means "not compared" (custom inputs)."""
+    """How to judge one job; `expected[i] is None` means "not compared" (Run cases that are not examples)."""
 
     inputs: list[object]
     expected: list[object]

@@ -2,11 +2,12 @@ import { Injectable } from '@angular/core';
 import { DsaLanguage } from '../models/dsa.models';
 
 const PREFIX = 'dsa:draft:';
+const CASES_PREFIX = 'dsa:cases:';
 const LANGUAGE_KEY = 'dsa:language';
 const SPLIT_KEY = 'dsa:split';
 
 /**
- * Per-browser code drafts (per problem and language) and the last language used.
+ * Per-browser code drafts (per problem and language), Run test cases (per problem) and the last language used.
  * A convenience only: every storage access may throw (private mode, blocked storage) and then
  * silently does nothing.
  */
@@ -24,11 +25,26 @@ export class DsaDraftStore {
   }
 
   clear(slug: string, language: DsaLanguage): void {
+    this.remove(`${PREFIX}${slug}:${language}`);
+  }
+
+  /** Run test cases as edited: one JSON text per input field, per case. Null if unset or malformed. */
+  loadCases(slug: string): string[][] | null {
     try {
-      this.storage().removeItem(`${PREFIX}${slug}:${language}`);
+      const value: unknown = JSON.parse(this.read(`${CASES_PREFIX}${slug}`) ?? 'null');
+      const valid = Array.isArray(value) && value.every((c) => Array.isArray(c) && c.every((t) => typeof t === 'string'));
+      return valid ? (value as string[][]) : null;
     } catch {
-      /* storage unavailable */
+      return null;
     }
+  }
+
+  saveCases(slug: string, cases: string[][]): void {
+    this.write(`${CASES_PREFIX}${slug}`, JSON.stringify(cases));
+  }
+
+  clearCases(slug: string): void {
+    this.remove(`${CASES_PREFIX}${slug}`);
   }
 
   lastLanguage(): DsaLanguage | null {
@@ -62,6 +78,14 @@ export class DsaDraftStore {
       this.storage().setItem(key, value);
     } catch {
       /* storage unavailable or full */
+    }
+  }
+
+  private remove(key: string): void {
+    try {
+      this.storage().removeItem(key);
+    } catch {
+      /* storage unavailable */
     }
   }
 }

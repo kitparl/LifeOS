@@ -26,6 +26,18 @@ describe('DsaDraftStore', () => {
     expect(store.load('two-sum', 'python')).toBeNull();
   });
 
+  it('keeps Run test cases per problem and ignores malformed ones', () => {
+    expect(store.loadCases('two-sum')).toBeNull();
+    store.saveCases('two-sum', [['[1,2]', '3']]);
+    expect(store.loadCases('two-sum')).toEqual([['[1,2]', '3']]);
+    data.set('dsa:cases:bad', '[[1]]');
+    expect(store.loadCases('bad')).toBeNull();
+    data.set('dsa:cases:broken', '[[');
+    expect(store.loadCases('broken')).toBeNull();
+    store.clearCases('two-sum');
+    expect(store.loadCases('two-sum')).toBeNull();
+  });
+
   it('remembers the last language', () => {
     expect(store.lastLanguage()).toBeNull();
     store.rememberLanguage('cpp');

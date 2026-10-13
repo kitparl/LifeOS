@@ -63,7 +63,15 @@ const PROBLEM: ProblemDetail = {
   pattern_name: 'Two Pointers',
   statement: 'Find two numbers.',
   constraints: '- small',
-  signature: { kind: 'function', name: 'twoSum' },
+  signature: {
+    kind: 'function',
+    name: 'twoSum',
+    params: [
+      { name: 'nums', type: 'int[]' },
+      { name: 'target', type: 'int' },
+    ],
+    returns: 'int[]',
+  },
   time_limit_ms: 1000,
   memory_limit_mb: 256,
   samples: [{ input: [[2, 7], 9], expected: [0, 1], explanation: '2 + 7 = 9' }],
@@ -177,12 +185,18 @@ describe('ProblemDetailPageComponent', () => {
   const el = () => fixture.nativeElement as HTMLElement;
   const click = (id: string) => (el().querySelector(`[data-testid="${id}"]`) as HTMLButtonElement).click();
 
-  const create = () => {
+  let store: Map<string, string>;
+
+  const create = (stored: Record<string, string> = {}) => {
     http = setup({ slug: 'two-sum' });
     const drafts = TestBed.inject(DsaDraftStore);
-    const store = new Map<string, string>();
+    store = new Map(Object.entries(stored));
     drafts.storage = () =>
-      ({ getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: () => undefined }) as unknown as Storage;
+      ({
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+        removeItem: (k: string) => void store.delete(k),
+      }) as unknown as Storage;
     fixture = TestBed.createComponent(ProblemDetailPageComponent);
     fixture.detectChanges();
     http.expectOne(`${api}/me`).flush({ can_edit: false });
@@ -210,13 +224,48 @@ describe('ProblemDetailPageComponent', () => {
     http.verify();
   });
 
-  it('runs with parsed custom inputs and shows results', fakeAsync(() => {
+  it('starts with the examples as test cases, one field per parameter', () => {
     create();
-    fixture.componentInstance.customInputs.set(['[[1, 2], 3]']);
+    expect(fixture.componentInstance.cases()).toEqual([['[2,7]', '9']]);
+    const nums = el().querySelector('[data-testid="dsa-case-field-nums"]') as HTMLTextAreaElement;
+    expect(nums).toBeTruthy();
+    expect(el().querySelector('[data-testid="dsa-test-cases"]')?.textContent).toContain('int[]');
+    http.verify();
+  });
+
+  it('adds a copy of the current case and saves the cases', () => {
+    create();
+    click('dsa-case-add-button');
+    fixture.detectChanges();
+    expect(fixture.componentInstance.cases()).toEqual([['[2,7]', '9'], ['[2,7]', '9']]);
+    expect(fixture.componentInstance.selectedCase()).toBe(1);
+    expect(JSON.parse(store.get('dsa:cases:two-sum') ?? 'null')).toEqual([['[2,7]', '9'], ['[2,7]', '9']]);
+    http.verify();
+  });
+
+  it('restores saved cases that fit the signature, and resets to the examples', () => {
+    create({ 'dsa:cases:two-sum': JSON.stringify([['[1,2]', '3']]) });
+    expect(fixture.componentInstance.cases()).toEqual([['[1,2]', '3']]);
+    click('dsa-case-reset-button');
+    fixture.detectChanges();
+    expect(fixture.componentInstance.cases()).toEqual([['[2,7]', '9']]);
+    expect(store.has('dsa:cases:two-sum')).toBeFalse();
+    http.verify();
+  });
+
+  it('ignores saved cases that no longer fit the signature', () => {
+    create({ 'dsa:cases:two-sum': JSON.stringify([['[1,2]']]) });
+    expect(fixture.componentInstance.cases()).toEqual([['[2,7]', '9']]);
+    http.verify();
+  });
+
+  it('runs every test case and shows the results', fakeAsync(() => {
+    create();
+    fixture.componentInstance.setCases([['[2,7]', '9'], ['[1,2]', '3']]);
     fixture.detectChanges();
     click('dsa-detail-run-button');
     const post = http.expectOne(`${api}/problems/two-sum/run`);
-    expect(post.request.body).toEqual({ language: 'python', code: 'class Solution: ...', custom_inputs: [[[1, 2], 3]] });
+    expect(post.request.body).toEqual({ language: 'python', code: 'class Solution: ...', inputs: [[[2, 7], 9], [[1, 2], 3]] });
     post.flush({ id: 'r1', status: 'pending' });
     http.expectOne(`${api}/runs/r1`).flush({
       id: 'r1',
@@ -228,20 +277,49 @@ describe('ProblemDetailPageComponent', () => {
       stderr: '',
     });
     fixture.detectChanges();
+    expect(fixture.componentInstance.consoleTab()).toBe('result');
     expect(el().querySelector('[data-testid="dsa-run-results"]')?.textContent).toContain('hello');
+    expect(el().querySelector('[data-testid="dsa-run-summary"]')?.textContent).toContain('1/1 example cases passed');
+    expect(el().querySelector('[data-testid="dsa-run-case-0"]')?.textContent).toContain('target =');
     expect(fixture.componentInstance.busy()).toBeNull();
     tick(1000);
     http.verify();
   }));
 
-  it('rejects invalid custom JSON without calling the API', () => {
+  it('rejects invalid JSON without calling the API and shows the bad case', () => {
     create();
-    fixture.componentInstance.customInputs.set(['[1,']);
+    fixture.componentInstance.setCases([['[2,7]', '9'], ['[1,', '3']]);
     fixture.componentInstance.run();
     fixture.detectChanges();
-    expect(el().querySelector('[data-testid="dsa-detail-action-error"]')?.textContent).toContain('not valid JSON');
+    expect(el().querySelector('[data-testid="dsa-detail-action-error"]')?.textContent).toContain('Case 2: nums is not valid JSON');
+    expect(fixture.componentInstance.selectedCase()).toBe(1);
+    expect(fixture.componentInstance.consoleTab()).toBe('cases');
     http.verify();
   });
+
+  it('shows the first failing test of a submission and can add it as a test case', fakeAsync(() => {
+    create();
+    click('dsa-detail-submit-button');
+    http.expectOne(`${api}/problems/two-sum/submissions`).flush({ id: 's1', status: 'pending' });
+    http.expectOne(`${api}/submissions/s1`).flush({
+      id: 's1', language: 'python', status: 'done', verdict: 'Wrong Answer', passed: 3, total: 5, runtime_ms: null, memory_kb: 2048,
+      created_at: '2026-09-26T10:00:00Z', problem_slug: 'two-sum', code: 'x', failed_case: 4, message: null,
+      failed_test: { input: [[3, 3], 6], expected: [0, 1], actual: [1, 0], error: null, answered: true, is_sample: false },
+    });
+    fixture.detectChanges();
+    const failed = el().querySelector('[data-testid="dsa-submission-failed-test"]')?.textContent ?? '';
+    expect(failed).toContain('Failed on test 4');
+    expect(failed).toContain('Hidden');
+    expect(failed).toContain('nums =');
+    expect(failed).toContain('[1,0]');
+    click('dsa-submission-use-case-button');
+    fixture.detectChanges();
+    expect(fixture.componentInstance.cases()).toEqual([['[2,7]', '9'], ['[3,3]', '6']]);
+    expect(fixture.componentInstance.selectedCase()).toBe(1);
+    expect(fixture.componentInstance.consoleTab()).toBe('cases');
+    tick(1000);
+    http.verify();
+  }));
 
   it('explains when the judge is not configured', fakeAsync(() => {
     create();
@@ -259,7 +337,7 @@ describe('ProblemDetailPageComponent', () => {
     http.expectOne(`${api}/problems/two-sum/submissions`).flush({ id: 's1', status: 'pending' });
     http.expectOne(`${api}/submissions/s1`).flush({
       id: 's1', language: 'python', status: 'done', verdict: 'Accepted', passed: 5, total: 5, runtime_ms: 3, memory_kb: 2048,
-      created_at: '2026-09-26T10:00:00Z', problem_slug: 'two-sum', code: 'x', failed_case: null, message: null,
+      created_at: '2026-09-26T10:00:00Z', problem_slug: 'two-sum', code: 'x', failed_case: null, failed_test: null, message: null,
     });
     fixture.detectChanges();
     expect(fixture.componentInstance.problem()?.progress).toBe('solved');

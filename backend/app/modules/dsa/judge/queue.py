@@ -31,7 +31,6 @@ class RunJob:
     spec: dict
     grading: Grading
     limits: Limits
-    sample_count: int
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     status: Literal["pending", "running", "done", "error"] = "pending"
     outcome: JudgeOutcome | None = None

@@ -118,7 +118,7 @@ The sandbox receives test **inputs only**, never expected outputs.
 - The per-test limit is `time_limit_ms` multiplied by a language factor: C++ ×1, Java ×2, JS ×2, Python ×3.
 - Each run gets a CPU cap of min(per-test limit × number of tests, 10 s) plus start-up time.
 - Memory is `memory_limit_mb` plus runtime overhead.
-- Code is at most 64 KB. There are at most 3 custom Run inputs.
+- Code is at most 64 KB. A Run takes 1–6 test cases of at most 64 KB of JSON each.
 - Rate limits are `DSA_RUN_PER_MINUTE` and `DSA_SUBMIT_PER_MINUTE`, with one active Run per user.
 - Output is capped.
 
@@ -126,7 +126,11 @@ The sandbox receives test **inputs only**, never expected outputs.
 - The verdict is decided by the first failing test, in test order: samples first, then hidden tests.
 - If the judge is unreachable or misbehaves, the verdict is **Internal Error**, never Accepted. Progress is left untouched.
 
+**Run** executes exactly the test cases the user sends. The page seeds them from the examples, and the user can edit, add (copying the current case) or delete them. They are saved per problem in the browser.
+A case whose input equals an example input (canonical JSON) is compared with that example's output; any other case is only executed.
+
 **What a Submit reveals:**
-- Hidden tests are never shown. A Submit reveals only which hidden case failed.
-- A runtime error past the samples shows only its exception type.
-- stdout and stderr are shown for Run only.
+- The first failing test, sample or hidden: its input, expected output, and the user's output or error. This is a deliberate trade-off for a practice tool: it makes debugging possible, at the cost of letting someone collect hidden tests one failure at a time.
+  It is stored as a snapshot (`dsa_submissions.failed_test`), so later admin edits don't change old results. An output over 64 KB is replaced by a note.
+- From that result (or the Submissions tab), **Use as test case** copies the failing input into the Run test cases.
+- stdout and stderr are shown for Run only. They are never stored.

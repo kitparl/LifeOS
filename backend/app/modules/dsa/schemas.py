@@ -19,8 +19,9 @@ TestKind = Literal["example", "edge", "random", "manual"]
 
 MAX_CODE_CHARS = 64 * 1024
 MAX_NOTE_CHARS = 100_000
-MAX_CUSTOM_INPUTS = 3
-MAX_CUSTOM_INPUT_BYTES = 16 * 1024
+MAX_RUN_CASES = 6
+# Room for a failed hidden test copied into Run (generated inputs reach ~60 KB).
+MAX_RUN_INPUT_BYTES = 64 * 1024
 MAX_STATEMENT_CHARS = 50_000
 MAX_TEST_JSON_BYTES = 256 * 1024
 
@@ -96,14 +97,16 @@ class SubmitRequest(BaseModel):
 
 
 class RunRequest(SubmitRequest):
-    custom_inputs: list[Any] = Field(default_factory=list, max_length=MAX_CUSTOM_INPUTS)
+    """Run executes exactly these test inputs; ones equal to an example are checked against its output."""
 
-    @field_validator("custom_inputs")
+    inputs: list[Any] = Field(min_length=1, max_length=MAX_RUN_CASES)
+
+    @field_validator("inputs")
     @classmethod
     def _bounded(cls, values: list[Any]) -> list[Any]:
         for value in values:
-            if _json_size(value) > MAX_CUSTOM_INPUT_BYTES:
-                raise ValueError(f"each custom input must be at most {MAX_CUSTOM_INPUT_BYTES} bytes of JSON")
+            if _json_size(value) > MAX_RUN_INPUT_BYTES:
+                raise ValueError(f"each test case must be at most {MAX_RUN_INPUT_BYTES} bytes of JSON")
         return values
 
 
@@ -145,10 +148,23 @@ class SubmissionSummary(BaseModel):
     created_at: datetime
 
 
+class FailedTest(BaseModel):
+    """The first failing test of a submission (a snapshot taken when it was judged)."""
+
+    input: Any
+    expected: Any
+    actual: Any | None
+    error: str | None
+    # False when the program stopped on this test before producing a result (see `message`).
+    answered: bool
+    is_sample: bool
+
+
 class SubmissionDetail(SubmissionSummary):
     problem_slug: str
     code: str
     failed_case: int | None
+    failed_test: FailedTest | None
     message: str | None
 
 

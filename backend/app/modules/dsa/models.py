@@ -110,7 +110,9 @@ class DsaSubmission(Base):
     runtime_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     memory_kb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     failed_case: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Compiler output or runtime error text (truncated); stderr only when safe to show (see service).
+    # Snapshot of the first failing test (see worker.failed_test and schemas.FailedTest).
+    failed_test: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Compiler output, runtime error text (truncated) or sandbox status. stdout/stderr are never stored.
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

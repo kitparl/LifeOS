@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from pydantic import ValidationError
@@ -367,26 +368,28 @@ class DsaJudgeService:
         queue = self._require_queue()
         problem = await self._judgeable(slug)
         spec = parse_spec(problem.signature)
-        for i, custom in enumerate(req.custom_inputs):
+        for i, value in enumerate(req.inputs):
             try:
-                validate_input(spec, custom)
+                validate_input(spec, value)
             except SignatureError as exc:
-                raise BadRequestError(f"Custom input {i + 1}: {exc}") from exc
+                raise BadRequestError(f"Case {i + 1}: {exc}") from exc
         if queue.has_active_run(user_id):
             raise ConflictError("A run is already in progress")
         run_limiter, _ = _limiters(self.settings)
         if not run_limiter.hit(user_id):
             raise TooManyRequestsError("Too many runs; wait a moment")
         samples = await self.catalog.list_tests(problem.id, samples_only=True)
+        sample_outputs = {_json_key(t.input): t.expected for t in samples}
         limits = Limits(problem.time_limit_ms, problem.memory_limit_mb)
         grading = Grading(
-            inputs=[t.input for t in samples] + list(req.custom_inputs),
-            expected=[t.expected for t in samples] + [None] * len(req.custom_inputs),
+            inputs=list(req.inputs),
+            # Only example outputs are known; any other case is run without comparing.
+            expected=[sample_outputs.get(_json_key(value)) for value in req.inputs],
             per_test_limit_ms=per_test_limit_ms(req.language, limits),
             compare_mode=problem.compare_mode,
             checker=problem.checker,
         )
-        job = RunJob(user_id, req.language, req.code, problem.signature, grading, limits, len(samples))
+        job = RunJob(user_id, req.language, req.code, problem.signature, grading, limits)
         queue.enqueue_run(job)
         return schemas.JobAccepted(id=job.id, status=job.status)
 
@@ -410,7 +413,7 @@ class DsaJudgeService:
                     passed=report.passed,
                     ms=report.ms,
                     error=report.error,
-                    is_custom=report.index >= job.sample_count,
+                    is_custom=g.expected[report.index] is None,
                 )
             )
         return result.model_copy(
@@ -446,6 +449,7 @@ class DsaJudgeService:
             problem_slug=problem.slug,
             code=submission.code,
             failed_case=submission.failed_case,
+            failed_test=submission.failed_test,
             message=submission.message,
         )
 
@@ -455,6 +459,11 @@ class DsaJudgeService:
             raise NotFoundError("Problem not found")
         rows, total = await self.submissions.list_for_problem(user_id, problem.id, pagination)
         return schemas.SubmissionPage(items=[_summary(s) for s in rows], total=total)
+
+
+def _json_key(value: object) -> str:
+    """Canonical JSON for matching a Run input to an example (unlike `==`, keeps `true` and `1` apart)."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def _summary(submission: DsaSubmission) -> schemas.SubmissionSummary:

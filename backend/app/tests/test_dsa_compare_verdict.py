@@ -9,6 +9,8 @@ from app.modules.dsa.judge.verdict import (
     Verdict,
     decide,
 )
+from app.modules.dsa.models import DsaTestCase
+from app.modules.dsa.worker import MAX_STORED_OUTPUT_BYTES, failed_test
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -370,3 +372,38 @@ def test_all_one_checker(actual, match):
 )
 def test_palindrome_substring_checker(actual, match):
     assert outputs_match("checker", "bab", actual, checker_name="palindrome_substring", test_input=["babad"]) is match
+
+
+# ---------------------------------------------------------------- failed test snapshot (worker)
+
+
+def _tests(n: int) -> list[DsaTestCase]:
+    return [DsaTestCase(position=i, input=[i], expected=i, is_sample=i == 0) for i in range(n)]
+
+
+def test_failed_test_snapshot_of_wrong_answer():
+    out = decide(None, RunOutcome("Accepted", cases=[_ok(0), _ok(1, out=99)]), _grading(2))
+    assert failed_test(out, _tests(2)) == {
+        "input": [1],
+        "expected": 1,
+        "actual": 99,
+        "error": None,
+        "answered": True,
+        "is_sample": False,
+    }
+    accepted = decide(None, RunOutcome("Accepted", cases=[_ok(0)]), _grading(1))
+    assert failed_test(accepted, _tests(1)) is None
+
+
+def test_failed_test_snapshot_when_program_stopped():
+    out = decide(None, RunOutcome("Time Limit Exceeded", cases=[_ok(0)]), _grading(3))
+    snapshot = failed_test(out, _tests(3))
+    assert snapshot is not None and snapshot["input"] == [1] and snapshot["answered"] is False
+    assert snapshot["actual"] is None and snapshot["error"] is None
+
+
+def test_failed_test_snapshot_drops_oversized_output():
+    huge = list(range(MAX_STORED_OUTPUT_BYTES))
+    out = decide(None, RunOutcome("Accepted", cases=[_ok(0, out=huge)]), _grading(1))
+    snapshot = failed_test(out, _tests(1))
+    assert snapshot is not None and snapshot["actual"] is None and "isn't shown" in snapshot["error"]

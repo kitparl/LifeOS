@@ -172,7 +172,7 @@ async def test_submit_accepted_updates_progress(client, dsa):
     assert history["total"] == 1 and "code" not in history["items"][0]
 
 
-async def test_hidden_failure_reveals_only_exception_type(client, dsa):
+async def test_submit_shows_first_failing_test(client, dsa):
     await dsa()
     h = await _user(client, "carol")
     sub = await client.post(
@@ -180,39 +180,86 @@ async def test_hidden_failure_reveals_only_exception_type(client, dsa):
     )
     result = await _wait(client, f"{BASE}/submissions/{sub.json()['id']}", h)
     assert result["verdict"] == "Runtime Error" and result["failed_case"] == 3
-    assert result["message"] == "ValueError"  # not "ValueError: secret []"
+    assert result["message"].startswith("ValueError: secret []")
+    failed = result["failed_test"]
+    assert (failed["input"], failed["expected"], failed["is_sample"], failed["answered"]) == ([[]], 0, False, True)
+    assert failed["error"].startswith("ValueError: secret []")
     problem = (await client.get(f"{BASE}/problems/array-sum", headers=h)).json()
     assert problem["progress"] == "attempted"
 
 
-async def test_run_samples_and_custom_inputs(client, dsa):
+async def test_accepted_submission_has_no_failed_test(client, dsa):
+    await dsa()
+    h = await _user(client, "carl")
+    sub = await client.post(f"{BASE}/problems/array-sum/submissions", json={"language": "python", "code": GOOD}, headers=h)
+    result = await _wait(client, f"{BASE}/submissions/{sub.json()['id']}", h)
+    assert result["verdict"] == "Accepted" and result["failed_case"] is None and result["failed_test"] is None
+
+
+async def test_wrong_answer_records_actual_output(client, dsa):
+    await dsa()
+    h = await _user(client, "cleo")
+    off_by_one = "class Solution:\n    def arraySum(self, nums):\n        return sum(nums) + (len(nums) == 2)\n"
+    sub = await client.post(
+        f"{BASE}/problems/array-sum/submissions", json={"language": "python", "code": off_by_one}, headers=h
+    )
+    result = await _wait(client, f"{BASE}/submissions/{sub.json()['id']}", h)
+    assert result["verdict"] == "Wrong Answer" and result["failed_case"] == 4
+    assert result["failed_test"] == {
+        "input": [[-1, 1]],
+        "expected": 0,
+        "actual": 1,
+        "error": None,
+        "answered": True,
+        "is_sample": False,
+    }
+
+
+async def test_run_checks_example_cases_and_runs_custom_ones(client, dsa):
     await dsa()
     h = await _user(client, "dave")
     started = await client.post(
         f"{BASE}/problems/array-sum/run",
-        json={"language": "python", "code": GOOD, "custom_inputs": [[[10, 20]]]},
+        json={"language": "python", "code": GOOD, "inputs": [[[5]], [[10, 20]]]},
         headers=h,
     )
     assert started.status_code == 202
     result = await _wait(client, f"{BASE}/runs/{started.json()['id']}", h)
     assert result["verdict"] == "Accepted"
-    assert [(c["passed"], c["is_custom"], c["actual"]) for c in result["cases"]] == [
-        (True, False, 6),
-        (True, False, 5),
-        (None, True, 30),
+    # Only the cases sent run, in order; the one equal to an example is compared with its output.
+    assert [(c["input"], c["expected"], c["passed"], c["is_custom"], c["actual"]) for c in result["cases"]] == [
+        ([[5]], 5, True, False, 5),
+        ([[10, 20]], None, None, True, 30),
     ]
-    assert result["cases"][2]["expected"] is None and "debug" in result["stdout"]
+    assert "debug" in result["stdout"]
     async with client.session_factory() as db:
         assert (await db.execute(select(DsaSubmission))).first() is None  # runs are not stored
 
 
-async def test_run_rejects_bad_custom_input_and_draft(client, dsa):
+async def test_run_wrong_answer_on_example_case(client, dsa):
+    await dsa()
+    h = await _user(client, "dina")
+    wrong = "class Solution:\n    def arraySum(self, nums):\n        return 0\n"
+    started = await client.post(
+        f"{BASE}/problems/array-sum/run", json={"language": "python", "code": wrong, "inputs": [[[1, 2, 3]]]}, headers=h
+    )
+    result = await _wait(client, f"{BASE}/runs/{started.json()['id']}", h)
+    assert result["verdict"] == "Wrong Answer"
+    assert [(c["expected"], c["actual"], c["passed"]) for c in result["cases"]] == [(6, 0, False)]
+
+
+async def test_run_rejects_bad_cases_and_draft(client, dsa):
     await dsa()
     h = await _user(client, "erin")
     bad = await client.post(
-        f"{BASE}/problems/array-sum/run", json={"language": "python", "code": GOOD, "custom_inputs": [["x"]]}, headers=h
+        f"{BASE}/problems/array-sum/run", json={"language": "python", "code": GOOD, "inputs": [[[1]], ["x"]]}, headers=h
     )
-    assert bad.status_code == 400
+    assert bad.status_code == 400 and bad.json()["detail"].startswith("Case 2:")
+    for inputs in ([], [[[1]]] * 7):
+        resp = await client.post(
+            f"{BASE}/problems/array-sum/run", json={"language": "python", "code": GOOD, "inputs": inputs}, headers=h
+        )
+        assert resp.status_code == 422
     draft = await client.post(
         f"{BASE}/problems/coming-later/submissions", json={"language": "python", "code": GOOD}, headers=h
     )
@@ -234,7 +281,9 @@ async def test_cross_user_isolation(client, dsa):
     sub = await client.post(
         f"{BASE}/problems/array-sum/submissions", json={"language": "python", "code": GOOD}, headers=owner
     )
-    run = await client.post(f"{BASE}/problems/array-sum/run", json={"language": "python", "code": GOOD}, headers=owner)
+    run = await client.post(
+        f"{BASE}/problems/array-sum/run", json={"language": "python", "code": GOOD, "inputs": [[[1]]]}, headers=owner
+    )
     await _wait(client, f"{BASE}/submissions/{sub.json()['id']}", owner)
     await _wait(client, f"{BASE}/runs/{run.json()['id']}", owner)
 

@@ -16,21 +16,29 @@ import { ProgressIconComponent } from '../components/progress-icon.component';
 import { RunResultsComponent } from '../components/run-results.component';
 import { SubmissionHistoryComponent } from '../components/submission-history.component';
 import { SubmissionResultComponent } from '../components/submission-result.component';
+import { TestCasesComponent } from '../components/test-cases.component';
+import { TestInputComponent } from '../components/test-input.component';
 import {
   DsaLanguage,
   JsonValue,
   LANGUAGE_LABELS,
-  MAX_CUSTOM_INPUTS,
+  MAX_RUN_CASES,
+  MAX_RUN_INPUT_BYTES,
   ProblemDetail,
   RunResult,
   SubmissionDetail,
   formatJson,
+  inputFields,
   isTerminal,
+  joinInput,
+  parseJson,
+  splitInput,
 } from '../models/dsa.models';
 import { DsaDraftStore } from '../services/dsa-draft.store';
 import { DsaPollTimeoutError, DsaService } from '../services/dsa.service';
 
 type Tab = 'description' | 'submissions' | 'note';
+type ConsoleTab = 'cases' | 'result';
 type Action = 'run' | 'submit';
 
 const DRAFT_SAVE_DELAY_MS = 1000;
@@ -42,7 +50,7 @@ export function actionErrorMessage(err: unknown): string {
     if (err.status === 503) return "The judge isn't available on this server right now.";
     const detail = (err.error as { detail?: unknown } | null)?.detail;
     if ((err.status === 400 || err.status === 409 || err.status === 429) && typeof detail === 'string') return detail;
-    if (err.status === 422) return 'Check your code and custom inputs, then try again.';
+    if (err.status === 422) return 'Check your code and test cases, then try again.';
   }
   return 'Something went wrong. Please try again.';
 }
@@ -64,6 +72,8 @@ export function actionErrorMessage(err: unknown): string {
     RunResultsComponent,
     SubmissionHistoryComponent,
     SubmissionResultComponent,
+    TestCasesComponent,
+    TestInputComponent,
   ],
   template: `
     <div class="mx-auto max-w-7xl space-y-3">
@@ -128,7 +138,8 @@ export function actionErrorMessage(err: unknown): string {
                     @for (s of p.samples; track $index) {
                       <div class="panel--flat space-y-1 !p-3 text-xs" [attr.data-testid]="'dsa-detail-example-' + $index">
                         <p class="font-medium">Example {{ $index + 1 }}</p>
-                        <div><span style="color: var(--text-muted)">Input</span> <code class="break-all">{{ json(s.input) }}</code></div>
+                        <div style="color: var(--text-muted)">Input</div>
+                        <app-dsa-test-input class="block pl-3" [signature]="p.signature" [value]="s.input" />
                         <div><span style="color: var(--text-muted)">Output</span> <code class="break-all">{{ json(s.expected) }}</code></div>
                         @if (s.explanation) {
                           <p style="color: var(--text-muted)">{{ s.explanation }}</p>
@@ -145,7 +156,8 @@ export function actionErrorMessage(err: unknown): string {
               } @else if (tab() === 'note') {
                 <app-dsa-note-editor scope="problems" [slug]="p.slug" />
               } @else {
-                <app-dsa-submission-history [slug]="p.slug" [refresh]="historyVersion()" [theme]="theme()" (loadCode)="loadIntoEditor($event)" />
+                <app-dsa-submission-history [slug]="p.slug" [refresh]="historyVersion()" [theme]="theme()" [signature]="p.signature"
+                  (loadCode)="loadIntoEditor($event)" (useAsTestCase)="useAsTestCase($event)" />
               }
             </div>
           </section>
@@ -192,44 +204,37 @@ export function actionErrorMessage(err: unknown): string {
                 </div>
               </div>
 
-              <div class="panel max-h-[45%] space-y-3 overflow-auto">
-                <details [open]="customInputs().length > 0">
-                  <summary class="cursor-pointer text-xs font-medium" style="color: var(--text-muted)">
-                    Custom inputs ({{ customInputs().length }}/{{ maxCustom }})
-                  </summary>
-                  <div class="mt-2 space-y-2">
+              <div class="panel !p-0 flex max-h-[45%] min-h-0 flex-col">
+                <div class="tab-bar px-2" role="tablist">
+                  <button type="button" role="tab" class="tab-bar__btn" [class.active]="consoleTab() === 'cases'"
+                    [attr.aria-selected]="consoleTab() === 'cases'" data-testid="dsa-detail-console-cases" (click)="consoleTab.set('cases')">
+                    Test cases
+                  </button>
+                  <button type="button" role="tab" class="tab-bar__btn" [class.active]="consoleTab() === 'result'"
+                    [attr.aria-selected]="consoleTab() === 'result'" data-testid="dsa-detail-console-result" (click)="consoleTab.set('result')">
+                    Result
+                  </button>
+                </div>
+                <div class="min-h-0 flex-1 space-y-3 overflow-auto p-3">
+                  @if (actionError()) {
+                    <p class="text-sm" role="alert" style="color: var(--danger)" data-testid="dsa-detail-action-error">{{ actionError() }}</p>
+                  }
+                  @if (consoleTab() === 'cases') {
+                    <app-dsa-test-cases [fields]="fields()" [cases]="cases()" [max]="maxCases" [(selected)]="selectedCase"
+                      (casesChange)="setCases($event)" (resetToExamples)="resetCases()" />
+                  } @else if (lastAction() === 'run' && runResult()) {
+                    <app-dsa-run-results [result]="runResult()!" [signature]="p.signature" />
+                  } @else if (lastAction() === 'submit' && submission()) {
+                    <app-dsa-submission-result [submission]="submission()!" [signature]="p.signature" [canUseAsTestCase]="true"
+                      (useAsTestCase)="useAsTestCase($event)" />
+                  } @else if (busy()) {
+                    <p class="text-xs" style="color: var(--text-muted)">Queued…</p>
+                  } @else if (!actionError()) {
                     <p class="text-xs" style="color: var(--text-faint)">
-                      One JSON value per input, shaped like an example input, e.g. <code>{{ placeholder() }}</code>
+                      Run executes your test cases and checks the ones that match an example. Submit checks every test.
                     </p>
-                    @for (text of customInputs(); track $index) {
-                      <div class="flex items-start gap-2">
-                        <textarea class="input-field font-mono text-xs" rows="2" [attr.data-testid]="'dsa-detail-custom-input-' + $index"
-                          [placeholder]="placeholder()" [ngModel]="text" (ngModelChange)="setCustomInput($index, $event)"></textarea>
-                        <button type="button" class="btn-ghost !min-h-8 !px-2 text-xs" [attr.data-testid]="'dsa-detail-custom-remove-' + $index"
-                          (click)="removeCustomInput($index)" aria-label="Remove custom input">
-                          <svg class="h-3.5 w-3.5" lucideIcon="trash-2" aria-hidden="true"></svg>
-                        </button>
-                      </div>
-                    }
-                    @if (customInputs().length < maxCustom) {
-                      <button type="button" class="btn-ghost !min-h-8 !px-2 text-xs" data-testid="dsa-detail-custom-add-button" (click)="addCustomInput()">
-                        <svg class="h-3.5 w-3.5" lucideIcon="plus" aria-hidden="true"></svg>
-                        Add custom input
-                      </button>
-                    }
-                  </div>
-                </details>
-
-                @if (actionError()) {
-                  <p class="text-sm" role="alert" style="color: var(--danger)" data-testid="dsa-detail-action-error">{{ actionError() }}</p>
-                }
-                @if (lastAction() === 'run' && runResult()) {
-                  <app-dsa-run-results [result]="runResult()!" />
-                } @else if (lastAction() === 'submit' && submission()) {
-                  <app-dsa-submission-result [submission]="submission()!" />
-                } @else if (!actionError()) {
-                  <p class="text-xs" style="color: var(--text-faint)">Run checks the examples and your custom inputs. Submit checks every test.</p>
-                }
+                  }
+                </div>
               </div>
             } @else {
               <div class="panel">
@@ -253,7 +258,7 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
   @ViewChild('splitGrid') splitGrid?: ElementRef<HTMLElement>;
 
   readonly labels = LANGUAGE_LABELS;
-  readonly maxCustom = MAX_CUSTOM_INPUTS;
+  readonly maxCases = MAX_RUN_CASES;
   readonly json = formatJson;
   readonly theme = this.themeService.resolved;
 
@@ -268,14 +273,17 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
   readonly runResult = signal<RunResult | null>(null);
   readonly submission = signal<SubmissionDetail | null>(null);
   readonly actionError = signal<string | null>(null);
-  readonly customInputs = signal<string[]>([]);
+  readonly consoleTab = signal<ConsoleTab>('cases');
+  /** Run test cases: per case, one JSON text per input field. */
+  readonly cases = signal<string[][]>([]);
+  readonly selectedCase = signal(0);
+  readonly fields = computed(() => inputFields(this.problem()?.signature ?? null));
   readonly historyVersion = signal(0);
   readonly splitMin = 0.25;
   readonly splitMax = 0.75;
   /** Description column's share of the desktop split. */
   readonly splitRatio = signal(this.clampSplit(this.drafts.splitRatio()));
   readonly splitColumns = computed(() => `minmax(0,${this.splitRatio()}fr) auto minmax(0,${1 - this.splitRatio()}fr)`);
-  readonly placeholder = computed(() => formatJson(this.problem()?.samples[0]?.input));
 
   /** Content the editor is created with; later changes go through the editor API. */
   initialCode = '';
@@ -327,6 +335,7 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
         this.language.set(language);
         this.code = this.initialCodeFor(p, language);
         this.initialCode = this.code;
+        this.cases.set(this.initialCases(p));
         this.problem.set(p);
         this.loading.set(false);
       },
@@ -390,39 +399,88 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
     this.tab.set('description');
   }
 
-  addCustomInput(): void {
-    this.customInputs.update((list) => [...list, this.placeholder()]);
+  /** The cases saved for this problem if they still fit its signature, else its examples. */
+  private initialCases(p: ProblemDetail): string[][] {
+    const width = inputFields(p.signature).length;
+    const saved = this.drafts.loadCases(p.slug);
+    const fits = saved !== null && saved.length > 0 && saved.length <= MAX_RUN_CASES && saved.every((c) => c.length === width);
+    return fits ? saved : this.exampleCases(p);
   }
 
-  setCustomInput(index: number, value: string): void {
-    this.customInputs.update((list) => list.map((v, i) => (i === index ? value : v)));
+  private exampleCases(p: ProblemDetail): string[][] {
+    const cases = p.samples
+      .slice(0, MAX_RUN_CASES)
+      .map((s) => this.caseTexts(p, s.input))
+      .filter((texts): texts is string[] => texts !== null);
+    return cases.length > 0 ? cases : [inputFields(p.signature).map(() => '')];
   }
 
-  removeCustomInput(index: number): void {
-    this.customInputs.update((list) => list.filter((_, i) => i !== index));
+  private caseTexts(p: ProblemDetail, input: JsonValue): string[] | null {
+    return splitInput(p.signature, input)?.map((value) => formatJson(value)) ?? null;
   }
 
-  private parsedCustomInputs(): JsonValue[] | null {
-    const parsed: JsonValue[] = [];
-    for (const [i, text] of this.customInputs().entries()) {
-      if (!text.trim()) continue;
-      try {
-        parsed.push(JSON.parse(text) as JsonValue);
-      } catch {
-        this.actionError.set(`Custom input ${i + 1} is not valid JSON.`);
-        return null;
-      }
+  setCases(cases: string[][]): void {
+    this.cases.set(cases);
+    const p = this.problem();
+    if (p) this.drafts.saveCases(p.slug, cases);
+  }
+
+  resetCases(): void {
+    const p = this.problem();
+    if (!p) return;
+    this.drafts.clearCases(p.slug);
+    this.cases.set(this.exampleCases(p));
+    this.selectedCase.set(0);
+  }
+
+  /** Adds a (failed) test's input to the Run test cases and shows it. */
+  useAsTestCase(input: JsonValue): void {
+    const p = this.problem();
+    if (!p) return;
+    const texts = this.caseTexts(p, input);
+    this.consoleTab.set('cases');
+    if (texts === null) {
+      this.actionError.set("This test doesn't match the problem's current inputs.");
+    } else if (formatJson(input).length > MAX_RUN_INPUT_BYTES) {
+      this.actionError.set('This test is too large to run as a test case.');
+    } else if (this.cases().length >= MAX_RUN_CASES) {
+      this.actionError.set(`You already have ${MAX_RUN_CASES} test cases. Delete one, then try again.`);
+    } else {
+      this.actionError.set(null);
+      this.setCases([...this.cases(), texts]);
+      this.selectedCase.set(this.cases().length - 1);
     }
-    return parsed;
+  }
+
+  /** Every case as a Run input, or null (with the first bad field shown) if any field isn't JSON. */
+  private parsedCases(p: ProblemDetail): JsonValue[] | null {
+    const fields = this.fields();
+    const inputs: JsonValue[] = [];
+    for (const [i, texts] of this.cases().entries()) {
+      const values: JsonValue[] = [];
+      for (const [f, text] of texts.entries()) {
+        const value = parseJson(text);
+        if (value === undefined) {
+          this.actionError.set(`Case ${i + 1}: ${fields[f]?.name ?? 'input'} is not valid JSON.`);
+          this.selectedCase.set(i);
+          this.consoleTab.set('cases');
+          return null;
+        }
+        values.push(value);
+      }
+      inputs.push(joinInput(p.signature, values));
+    }
+    return inputs;
   }
 
   run(): void {
     const p = this.problem();
-    const customInputs = this.parsedCustomInputs();
-    if (!p || customInputs === null) return;
+    if (!p) return;
+    const inputs = this.parsedCases(p);
+    if (inputs === null) return;
     this.start('run');
     this.runResult.set(null);
-    this.job = this.dsa.run(p.slug, { language: this.language(), code: this.code, custom_inputs: customInputs }).subscribe({
+    this.job = this.dsa.run(p.slug, { language: this.language(), code: this.code, inputs }).subscribe({
       next: (r) => this.runResult.set(r),
       error: (err: unknown) => this.fail(err),
       complete: () => this.busy.set(null),
@@ -450,6 +508,7 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
     this.actionError.set(null);
     this.busy.set(action);
     this.lastAction.set(action);
+    this.consoleTab.set('result');
   }
 
   private fail(err: unknown): void {

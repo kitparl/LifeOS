@@ -107,6 +107,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("vocabulary", "wotd_for_date", "DATE"),
     # Travel: per-leg road distances of a Google trip route (JSON list; NULL for older/fallback routes).
     ("travel_routes", "legs", "JSON"),
+    # DSA: snapshot of a submission's first failing test (NULL when accepted or for older rows).
+    ("dsa_submissions", "failed_test", "JSON"),
 ]
 
 _BOOLEAN_DEFAULTS_TO_BACKFILL: list[tuple[str, str]] = [
