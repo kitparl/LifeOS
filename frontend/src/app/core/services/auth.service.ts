@@ -202,9 +202,9 @@ export class AuthService {
     const path = this.router.url.split('?')[0];
     const publicPaths = ['/login', '/register', '/register-access', '/add-new-user', '/offline'];
     const isExplorePath = path === '/explore' || path.startsWith('/explore/');
-    // Shared Split Bills links (/s/{code}) work signed in or out; never bounce them to login.
-    const isSplitLink = path.startsWith('/s/');
-    if (!publicPaths.includes(path) && !isExplorePath && !isSplitLink) {
+    // Shared links (Split Bills /s/{code}, trip plans /t/{code}) work signed in or out; never bounce them to login.
+    const isSharedLink = path.startsWith('/s/') || path.startsWith('/t/');
+    if (!publicPaths.includes(path) && !isExplorePath && !isSharedLink) {
       void this.router.navigate(['/login']);
     }
   }

@@ -198,6 +198,17 @@ describe('PlannerStore', () => {
     http.expectNone(() => true);
   }));
 
+  it('still opens the plan when a LifeOS session has run out', fakeAsync(() => {
+    void store.load(CODE);
+    http.expectOne(BASE).flush({ detail: 'Invalid token' }, { status: 401, statusText: 'Unauthorized' });
+    flushMicrotasks();
+    const guest = http.expectOne(BASE);
+    expect(guest.request.headers.has('Authorization')).toBeFalse();
+    guest.flush(view());
+    flushMicrotasks();
+    expect(store.mode()).toBe('viewing');
+  }));
+
   it('explains an unknown or turned-off link', fakeAsync(() => {
     void store.load(CODE);
     http.expectOne(BASE).flush({ detail: 'gone' }, { status: 410, statusText: 'Gone' });

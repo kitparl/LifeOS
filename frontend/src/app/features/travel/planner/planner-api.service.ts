@@ -31,8 +31,14 @@ export class PlannerApiService {
     return { ...PUBLIC, headers };
   }
 
+  /** Sends the LifeOS sign-in, if any, so the owner is recognised. */
   view(code: string): Observable<PublicPlanView> {
     return this.http.get<PublicPlanView>(`${this.base}/${code}`);
+  }
+
+  /** The same read without the LifeOS sign-in (an expired session must not block the plan). */
+  viewAsGuest(code: string): Observable<PublicPlanView> {
+    return this.http.get<PublicPlanView>(`${this.base}/${code}`, PUBLIC);
   }
 
   joinName(code: string, name: string): Observable<JoinResult> {

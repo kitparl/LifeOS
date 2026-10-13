@@ -101,7 +101,7 @@ export class PlannerStore {
     this.code.set(code);
     this.unavailable.set(null);
     try {
-      this.view.set(await firstValueFrom(this.api.view(code)));
+      this.view.set(await this.firstView(code));
     } catch (err) {
       const status = (err as HttpErrorResponse).status;
       this.unavailable.set(status === HttpStatusCode.NotFound ? 'not_found' : status === HttpStatusCode.Gone ? 'gone' : 'error');
@@ -122,6 +122,16 @@ export class PlannerStore {
     const mine = this.mine();
     if (draft && mine && !this.isFinal() && JSON.stringify(draft.doc) !== JSON.stringify(mine.document)) {
       this.restorable.set(draft);
+    }
+  }
+
+  /** A LifeOS session that has run out (refresh fails: 401) just reads the plan as a guest. */
+  private async firstView(code: string): Promise<PublicPlanView> {
+    try {
+      return await firstValueFrom(this.api.view(code));
+    } catch (err) {
+      if ((err as HttpErrorResponse).status !== HttpStatusCode.Unauthorized) throw err;
+      return firstValueFrom(this.api.viewAsGuest(code));
     }
   }
 

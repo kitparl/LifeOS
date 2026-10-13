@@ -36,6 +36,10 @@ describe('AuthService', () => {
       expect(clearAt('/s/k7mq2p')).not.toHaveBeenCalled();
     });
 
+    it('keeps a shared trip plan link open instead of bouncing to login', () => {
+      expect(clearAt('/t/k7mq2p3x')).not.toHaveBeenCalled();
+    });
+
     it('still sends private pages to login', () => {
       expect(clearAt('/finance')).toHaveBeenCalledWith(['/login']);
     });
