@@ -36,7 +36,10 @@
           [saveState]="store.saveState()"
           [editing]="store.mode() === 'editing'"
           [canUndo]="store.canUndo() && editable()"
+          [facts]="store.facts()"
+          [pdfBusy]="pdfBusy()"
           (undo)="store.undo()"
+          (pdf)="downloadPdf()"
           (openMe)="meOpen.set(true)"
         />
 
@@ -76,7 +79,7 @@
 
         <main class="layout">
           <aside class="rail" aria-label="Days">
-            <app-planner-day-rail [days]="shown.days" [editable]="editable()" (jump)="jumpTo($event)" (addDay)="addDay()" />
+            <app-planner-day-rail [days]="shown.days" [facts]="store.facts()" [editable]="editable()" (jump)="jumpTo($event)" (addDay)="addDay()" />
           </aside>
 
           <section class="pane plan" [class.inactive]="tab() !== 'plan'" aria-label="Plan" cdkDropListGroup>
@@ -87,7 +90,10 @@
                 [dayCount]="shown.days.length"
                 [date]="dayDate($index)"
                 [editable]="editable()"
+                [facts]="store.facts()?.days?.[$index] ?? null"
+                [routing]="store.routingDay() === $index"
                 (add)="openAdd($index)"
+                (roadKm)="roadKm($index)"
                 (openStop)="openStop($index, $event)"
                 (nudge)="nudge($index, $event.index, $event.direction)"
                 (dropped)="dropped($event)"
@@ -104,7 +110,7 @@
           <section class="pane mapcol" [class.inactive]="tab() !== 'map'" aria-label="Map">
             <!-- The map component loads Leaflet itself; it is only created where it can be seen. -->
             @if (wide() || tab() === 'map') {
-              <app-planner-map [plan]="shown" />
+              <app-planner-map [plan]="shown" [facts]="store.facts()" />
             }
           </section>
 

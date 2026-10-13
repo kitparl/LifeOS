@@ -31,14 +31,16 @@ from app.modules.auth.models import User
 from app.modules.notifications.schemas import NotificationCreate
 from app.modules.notifications.service import NotificationService
 from app.modules.travel import share_token
-from app.modules.travel.maps.types import Feature
+from app.modules.travel.maps.errors import MapsError, MapsUnavailable
+from app.modules.travel.maps.gateway import MapsGateway
+from app.modules.travel.maps.types import Feature, Sku, TravelMode
 from app.modules.travel.maps_links import is_short_link, parse_maps_url, resolve_short_link
 from app.modules.travel.models import TravelShareContributor, TravelShareVersion, TravelTripShare
-from app.modules.travel.plan_document import copy_document
+from app.modules.travel.plan_document import copy_document, slim_leg
 from app.modules.travel.repository.shares import ShareRepository
 from app.modules.travel.repository.trips import TripRepository
 from app.modules.travel.schemas.places import GeoLookupOut, SuggestionsOut
-from app.modules.travel.schemas.plan_document import MAX_PLAN_BYTES, PlanDocument
+from app.modules.travel.schemas.plan_document import MAX_PLAN_BYTES, PlanDocument, RoadLeg
 from app.modules.travel.schemas.shared import (
     ContributorMe,
     JoinOut,
@@ -49,9 +51,11 @@ from app.modules.travel.schemas.shared import (
     PublicPlanView,
     PublicTrip,
     ResolvedLink,
+    RoadRouteOut,
     SessionOut,
 )
 from app.modules.travel.schemas.trips import MAX_ORDER_ITEMS, MAX_TRIP_DAYS
+from app.modules.travel.services.export_service import ExportService
 from app.modules.travel.services.lookup_service import LookupService
 from app.modules.travel.services.share_service import owner_first_name
 
@@ -69,6 +73,9 @@ REMOVED = "The trip owner has removed you from this plan."
 # visitor, on top of the owner's own monthly budget (requirements D-11).
 _lookups_per_share = SlidingWindowLimiter(limit=150, window_seconds=24 * 3600)
 _lookups_per_ip = SlidingWindowLimiter(limit=30, window_seconds=600)
+# Road km: one Routes call per tap on a day, so the caps are lower than search.
+_routes_per_share = SlidingWindowLimiter(limit=40, window_seconds=24 * 3600)
+_routes_per_ip = SlidingWindowLimiter(limit=10, window_seconds=600)
 
 
 @dataclass
@@ -80,8 +87,8 @@ class ContributorCtx:
 
 
 def reset_limiters() -> None:
-    _lookups_per_share.reset()
-    _lookups_per_ip.reset()
+    for limiter in (_lookups_per_share, _lookups_per_ip, _routes_per_share, _routes_per_ip):
+        limiter.reset()
 
 
 def _contributor_me(c: TravelShareContributor) -> ContributorMe:
@@ -111,6 +118,8 @@ class SharedPlanService:
         self.repo = ShareRepository(db)
         self.trips = TripRepository(db)
         self.lookup = LookupService(db)
+        self.gateway = MapsGateway(db)
+        self.export = ExportService(db)
         self.notifications = NotificationService(db)
 
     # ---- helpers ----------------------------------------------------------------------------
@@ -121,6 +130,11 @@ class SharedPlanService:
     async def _document(self, share: TravelTripShare, version_id: str | None) -> PlanDocument:
         version = await self.repo.get_version(share.id, version_id) if version_id else None
         return PlanDocument.model_validate(version.document) if version else PlanDocument()
+
+    async def _shown(self, share: TravelTripShare) -> tuple[PlanDocument, bool]:
+        """What the link shows: the final plan once locked, else the Original. Returns (plan, is_final)."""
+        is_final = share.state == "locked" and share.locked_version_id is not None
+        return await self._document(share, share.locked_version_id if is_final else share.original_version_id), is_final
 
     async def _session(
         self, contributor: TravelShareContributor, share: TravelTripShare, *, new_device: bool
@@ -174,9 +188,8 @@ class SharedPlanService:
 
     async def view(self, share: TravelTripShare, viewer: User | None) -> PublicPlanView:
         trip = await self.trips.get(share.user_id, share.trip_id)
-        is_final = share.state == "locked" and share.locked_version_id is not None
+        plan, is_final = await self._shown(share)
         is_owner = viewer is not None and viewer.id == share.user_id
-        plan = await self._document(share, share.locked_version_id if is_final else share.original_version_id)
         return PublicPlanView(
             trip=PublicTrip(
                 name=trip.name, description=trip.description, start_date=trip.start_date, end_date=trip.end_date
@@ -340,3 +353,38 @@ class SharedPlanService:
         if parsed is None:
             return ResolvedLink()
         return ResolvedLink(name=parsed.name, lat=parsed.lat, lng=parsed.lng, google_place_id=parsed.google_place_id)
+
+    # ---- road km and the PDF ----------------------------------------------------------------
+
+    async def road_route(self, ctx: ContributorCtx, client_key: str, points: list[tuple[float, float]]) -> RoadRouteOut:
+        """Road legs for one day's chain on the owner's key; the planner keeps straight-line estimates otherwise."""
+        _assert_open(ctx.share)
+        if not (_routes_per_ip.hit(f"{ctx.share.id}:{client_key}") and _routes_per_share.hit(ctx.share.id)):
+            return RoadRouteOut(legs=[], fallback_reason=GUEST_LIMIT)
+        try:
+            result = await self.gateway.call(
+                ctx.share.user_id,
+                Sku.ROUTES,
+                Feature.SHARED_ROUTE,
+                lambda provider: provider.compute_route(points, TravelMode.DRIVING),
+            )
+        except MapsError as exc:
+            return RoadRouteOut(legs=[], fallback_reason=exc.code)
+        if len(result.legs) != len(points) - 1:
+            return RoadRouteOut(legs=[], fallback_reason=MapsUnavailable.code)
+        return RoadRouteOut(
+            legs=[
+                slim_leg(RoadLeg(distance_m=leg.distance_m, duration_s=leg.duration_s, polyline=leg.polyline))
+                for leg in result.legs
+            ]
+        )
+
+    async def shown_pdf(self, share: TravelTripShare) -> tuple[bytes, str]:
+        plan, is_final = await self._shown(share)
+        label = "final plan" if is_final else "plan"
+        return await self.export.plan_pdf(share.user_id, share.trip_id, plan, label, public=True)
+
+    async def my_plan_pdf(self, ctx: ContributorCtx) -> tuple[bytes, str]:
+        plan = await self._require_plan(ctx)
+        doc = PlanDocument.model_validate(plan.document)
+        return await self.export.plan_pdf(ctx.share.user_id, ctx.share.trip_id, doc, plan.label, public=True)

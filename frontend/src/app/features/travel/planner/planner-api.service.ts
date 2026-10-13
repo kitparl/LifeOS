@@ -11,6 +11,7 @@ import {
   PlanDocument,
   PublicPlanView,
   ResolvedLink,
+  RoadRoute,
   ShareSession,
 } from '../models/share.models';
 import { LatLngBias } from '../utils/place-suggestions';
@@ -83,5 +84,18 @@ export class PlannerApiService {
 
   resolveLink(code: string, token: string, url: string): Observable<ResolvedLink> {
     return this.http.get<ResolvedLink>(`${this.base}/${code}/resolve-link`, { ...this.opts(token), params: { url } });
+  }
+
+  route(code: string, token: string, points: [number, number][]): Observable<RoadRoute> {
+    return this.http.post<RoadRoute>(`${this.base}/${code}/route`, { points }, this.opts(token));
+  }
+
+  /** The plan the link shows (the final plan once locked) as the PDF guide. */
+  shownPdf(code: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${code}/pdf`, { ...PUBLIC, responseType: 'blob' });
+  }
+
+  myPlanPdf(code: string, token: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${code}/me/plan/pdf`, { ...this.opts(token), responseType: 'blob' });
   }
 }

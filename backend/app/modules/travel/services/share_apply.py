@@ -52,7 +52,7 @@ class ShareApplyService:
         detail = await self.trips.detail(user_id, trip_id)
         place_ids = {item.place_id for day in detail.days for item in day.items if item.place_id}
         places = await self.places.get_many(user_id, place_ids)
-        return snapshot_from_trip(detail.days, places)
+        return snapshot_from_trip(detail.days, places, detail.route)
 
     async def apply(self, trip: TravelTrip, share: TravelTripShare, version: TravelShareVersion) -> ApplyResult:
         doc = PlanDocument.model_validate(version.document)

@@ -11,8 +11,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from app.modules.travel.schemas.common import OptText500, Text40
-from app.modules.travel.schemas.plan_document import PlanDocument
+from app.modules.travel.schemas.common import Lat, Lng, OptText500, Text40
+from app.modules.travel.schemas.plan_document import MAX_ROUTE_POINTS, PlanDocument, RoadLeg
 
 
 class PublicTrip(BaseModel):
@@ -101,3 +101,17 @@ class ResolvedLink(BaseModel):
     lat: float | None = None
     lng: float | None = None
     google_place_id: str | None = None
+
+
+class RoadRouteIn(BaseModel):
+    """One day's leg chain (see `plan_document.day_chains`), routed by road."""
+
+    points: list[tuple[Lat, Lng]] = Field(min_length=2, max_length=MAX_ROUTE_POINTS)
+
+
+class RoadRouteOut(BaseModel):
+    """`legs` is empty when no road route could be had; `fallback_reason` says why."""
+
+    mode: Literal["driving"] = "driving"
+    legs: list[RoadLeg]
+    fallback_reason: str | None = None

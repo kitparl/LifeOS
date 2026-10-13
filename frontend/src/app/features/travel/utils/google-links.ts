@@ -33,3 +33,34 @@ export function directionsUrl(stops: readonly LatLngLike[], mode: 'driving' | 'w
   if (via.length) params.set('waypoints', via.map(coord).join('|'));
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
+
+/** One link of a route split into parts: `first` and `last` are 1-based point numbers. */
+export interface RouteLink {
+  url: string;
+  first: number;
+  last: number;
+}
+
+const MAX_POINTS_PER_LINK = 11; // origin + destination + 9 waypoints
+
+/**
+ * Google Maps directions links that together cover every point, from the first point (not the
+ * phone's location). A longer route is split into consecutive parts that share their joining point,
+ * so nothing is dropped; back-to-back repeats are merged first. Mirrors the PDF guide's `route_links`.
+ */
+export function routeLinks(points: readonly LatLngLike[], mode: 'driving' | 'walking' | 'cycling' | 'transit' = 'driving'): RouteLink[] {
+  const pts = points.filter((p, i) => i === 0 || coord(p) !== coord(points[i - 1]));
+  const links: RouteLink[] = [];
+  for (let start = 0; start < pts.length - 1; start += MAX_POINTS_PER_LINK - 1) {
+    const chunk = pts.slice(start, start + MAX_POINTS_PER_LINK);
+    const params = new URLSearchParams({
+      api: '1',
+      origin: coord(chunk[0]),
+      destination: coord(chunk[chunk.length - 1]),
+      travelmode: mode === 'cycling' ? 'bicycling' : mode,
+    });
+    if (chunk.length > 2) params.set('waypoints', chunk.slice(1, -1).map(coord).join('|'));
+    links.push({ url: `https://www.google.com/maps/dir/?${params.toString()}`, first: start + 1, last: start + chunk.length });
+  }
+  return links;
+}

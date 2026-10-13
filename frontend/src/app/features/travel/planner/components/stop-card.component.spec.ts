@@ -1,12 +1,13 @@
 import { TestBed } from '@angular/core/testing';
+import { PlanStop } from '../../models/share.models';
 import { newStop } from '../plan-ops';
 import { PlannerStopCardComponent } from './stop-card.component';
 
 describe('PlannerStopCardComponent', () => {
-  function render(editable: boolean, first = false) {
+  function render(editable: boolean, first = false, extra: Partial<PlanStop> = {}) {
     TestBed.configureTestingModule({ imports: [PlannerStopCardComponent] });
     const fixture = TestBed.createComponent(PlannerStopCardComponent);
-    fixture.componentRef.setInput('stop', newStop({ title: 'Hampta Pass', start_time: '09:30:00', place: { name: 'Hampta', lat: 32.2, lng: 77.3 } }));
+    fixture.componentRef.setInput('stop', newStop({ title: 'Hampta Pass', start_time: '09:30:00', place: { name: 'Hampta', lat: 32.2, lng: 77.3 }, ...extra }));
     fixture.componentRef.setInput('index', 1);
     fixture.componentRef.setInput('color', 'var(--tp-day-1)');
     fixture.componentRef.setInput('editable', editable);
@@ -38,5 +39,22 @@ describe('PlannerStopCardComponent', () => {
   it('shows no move controls when the plan is read-only', () => {
     const el = render(false).nativeElement as HTMLElement;
     expect(el.querySelector('[data-testid="stop-up"]')).toBeNull();
+  });
+
+  it('shows every detail a friend filled in: time range, getting there, stay, notes and links', () => {
+    const el = render(false, false, {
+      end_time: '17:00:00',
+      transport: 'Shared taxi',
+      stay: 'Camp Chika',
+      notes: 'Carry water',
+      links: ['https://www.himachaltourism.gov.in/hampta'],
+    }).nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="stop-time"]')!.textContent).toContain('09:30 – 17:00');
+    expect(el.textContent).toContain('Getting there: Shared taxi');
+    expect(el.textContent).toContain('Stay: Camp Chika');
+    expect(el.textContent).toContain('Carry water');
+    const link = el.querySelector<HTMLAnchorElement>('[data-testid="stop-link"]')!;
+    expect(link.textContent).toContain('himachaltourism.gov.in');
+    expect(link.rel).toBe('noopener noreferrer');
   });
 });

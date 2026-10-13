@@ -6,14 +6,25 @@ otherwise they are straight-line estimates and every figure is flagged `approx`.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
+from typing import Protocol
 
 from app.modules.travel.geo import Point, decode_polyline, haversine_m
 from app.modules.travel.itinerary import ItemRef, stop_sequence
 from app.modules.travel.models import TravelPlace
+from app.modules.travel.plan_document import road_legs
 from app.modules.travel.schemas.plan_document import PlanDocument
 from app.modules.travel.schemas.trips import DayOut, ItemOut, StopOut, TripDetail, TripPlaceOut, TripSummary
+
+
+class RoadData(Protocol):
+    """A saved trip route leg or a shared plan's road leg."""
+
+    distance_m: float
+    duration_s: int | None
+    polyline: str
 
 
 @dataclass
@@ -75,12 +86,17 @@ class TripPlan:
     approx: bool
 
 
-def build_trip_plan(detail: TripDetail, places: dict[str, TravelPlace]) -> TripPlan:
+def build_trip_plan(
+    detail: TripDetail, places: dict[str, TravelPlace], roads: Sequence[RoadData | None] | None = None
+) -> TripPlan:
+    """`roads` (one per leg of `detail.stops`; None where unknown) replaces the saved route: shared
+    plans carry road data per day instead of as one trip route."""
     route = detail.route
     stops = detail.stops
-    road_legs = (
-        route.legs if route and not route.is_stale and route.legs and len(route.legs) == len(stops) - 1 else None
-    )
+    if roads is None or len(roads) != max(len(stops) - 1, 0):
+        roads = (
+            route.legs if route and not route.is_stale and route.legs and len(route.legs) == len(stops) - 1 else None
+        )
 
     current = -1  # index into `stops`, advanced exactly like the backend's stop_sequence
     last: tuple[str, Point] | None = None
@@ -96,7 +112,7 @@ def build_trip_plan(detail: TripDetail, places: dict[str, TravelPlace]) -> TripP
                 if current < 0 or stops[current].place_id != place.id:
                     current += 1
                     if last is not None:
-                        planned.leg = _leg(last, place, road_legs[current - 1] if road_legs else None)
+                        planned.leg = _leg(last, place, roads[current - 1] if roads else None)
                 last = (place.name, (place.lat, place.lng))
             plan.items.append(planned)
             if item.accommodation and item.accommodation not in plan.stay:
@@ -108,7 +124,7 @@ def build_trip_plan(detail: TripDetail, places: dict[str, TravelPlace]) -> TripP
     return TripPlan(days, sum(leg.meters for leg in legs), seconds, any(leg.approx for leg in legs))
 
 
-def _leg(last: tuple[str, Point], place: TravelPlace, road) -> Leg:
+def _leg(last: tuple[str, Point], place: TravelPlace, road: RoadData | None) -> Leg:
     start = last[1]
     end = (place.lat, place.lng)
     if road is not None:
@@ -117,11 +133,11 @@ def _leg(last: tuple[str, Point], place: TravelPlace, road) -> Leg:
     return Leg(last[0], haversine_m(start, end), None, [start, end], approx=True)
 
 
-def plan_document_detail(trip: TripSummary, doc: PlanDocument) -> tuple[TripDetail, dict[str, TravelPlace]]:
-    """A shared plan in the shape the PDF guide reads, with unsaved places (so any version can be exported).
-
-    No saved route: every distance is a straight-line estimate, flagged `approx` like any stale route.
-    """
+def plan_document_detail(
+    trip: TripSummary, doc: PlanDocument
+) -> tuple[TripDetail, dict[str, TravelPlace], list[RoadData | None]]:
+    """A shared plan in the shape the PDF guide reads, with unsaved places (so any version can be exported),
+    and its road legs: days whose route is current have road km; the rest are straight-line estimates."""
     places: dict[str, TravelPlace] = {}
     keys: dict[tuple, str] = {}
     days: list[DayOut] = []
@@ -174,4 +190,4 @@ def plan_document_detail(trip: TripSummary, doc: PlanDocument) -> tuple[TripDeta
         stops=[StopOut(place_id=s.place_id, day_id=s.day_id, name=s.name, lat=s.lat, lng=s.lng) for s in stops],
         route=None,
     )
-    return detail, places
+    return detail, places, list(road_legs(doc))

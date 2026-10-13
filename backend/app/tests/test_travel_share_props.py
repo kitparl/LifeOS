@@ -6,6 +6,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 
 from app.core.short_codes import SHORT_CODE_ALPHABET, code_pattern, generate_code, hash_secret, new_secret
+from app.modules.travel.export_plan import plan_document_detail
 from app.modules.travel.maps_links import parse_maps_url
 from app.modules.travel.plan_document import (
     MAX_BACKUPS,
@@ -13,10 +14,13 @@ from app.modules.travel.plan_document import (
     apply_rows,
     backups_to_prune,
     copy_document,
+    day_chains,
     plan_km,
+    road_legs,
     summarize,
 )
-from app.modules.travel.schemas.plan_document import PlanDay, PlanDocument
+from app.modules.travel.schemas.plan_document import DayRoute, PlanDay, PlanDocument, PlanPlace, PlanStop, RoadLeg
+from app.modules.travel.schemas.trips import TripSummary
 from app.tests.share_support import lat_lngs, plan_documents, plan_stops
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -146,3 +150,87 @@ def test_maps_url_parse_round_trip(point, style):
     parsed = parse_maps_url(url)
     assert parsed is not None
     assert abs(parsed.lat - lat) < 1e-6 and abs(parsed.lng - lng) < 1e-6
+
+
+# ---- road km per day ----------------------------------------------------------------------------
+
+_TRIP = TripSummary(
+    id="t1",
+    name="Trip",
+    description=None,
+    start_date=date(2027, 6, 1),
+    end_date=None,
+    dates_tentative=False,
+    status="planning",
+    cover_photo_id=None,
+    notes=None,
+    confirmed_at=None,
+    completed_at=None,
+    created_at=datetime(2027, 1, 1, tzinfo=timezone.utc),
+    updated_at=datetime(2027, 1, 1, tzinfo=timezone.utc),
+)
+
+
+def _routed(doc: PlanDocument) -> PlanDocument:
+    """The plan with a current road route on every day that has legs."""
+    routed = doc.model_copy(deep=True)
+    for day, chain in zip(routed.days, day_chains(routed), strict=True):
+        if len(chain) >= 2:
+            day.route = DayRoute(points=chain, legs=[RoadLeg(distance_m=1000.0 * (i + 1)) for i in range(len(chain) - 1)])
+    return routed
+
+
+def _leg_count(doc: PlanDocument) -> int:
+    return sum(max(len(chain) - 1, 0) for chain in day_chains(doc))
+
+
+@given(plan_documents())
+@settings(deadline=None)
+def test_day_chains_cover_each_leg_of_the_pdf_exactly_once(doc):
+    """Day routes line up with the PDF guide's stop sequence, so every road leg lands on its stop."""
+    detail, _, roads = plan_document_detail(_TRIP, doc)
+    assert _leg_count(doc) == max(len(detail.stops) - 1, 0) == len(roads)
+    assert all(road is None for road in roads)  # no route saved: straight-line estimates only
+
+
+@given(plan_documents())
+@settings(deadline=None)
+def test_routed_plan_round_trips_and_every_leg_has_road_data(doc):
+    routed = _routed(doc)
+    assert PlanDocument.model_validate_json(routed.model_dump_json()) == routed
+    roads = road_legs(routed)
+    assert len(roads) == _leg_count(routed) and all(road is not None for road in roads)
+
+
+@given(plan_documents(), st.data())
+@settings(deadline=None)
+def test_a_day_route_counts_only_while_its_chain_is_unchanged(doc, data):
+    routed = _routed(doc)
+    placed = [stop for stop in routed.stops() if stop.place is not None]
+    if not placed:
+        return
+    before = day_chains(routed)
+    moved = data.draw(st.sampled_from(placed))
+    moved.place = moved.place.model_copy(update={"lat": moved.place.lat + (0.5 if moved.place.lat < 0 else -0.5)})
+    after = day_chains(routed)
+    expected = [
+        known
+        for old, new in zip(before, after, strict=True)
+        for known in [old == new] * max(len(new) - 1, 0)
+    ]
+    assert [road is not None for road in road_legs(routed)] == expected
+
+
+def test_back_to_back_stops_at_one_place_are_one_point_and_days_start_where_the_last_ended():
+    def stop(sid: str, lat: float | None) -> PlanStop:
+        place = PlanPlace(name=f"P{lat}", lat=lat, lng=77.0) if lat is not None else None
+        return PlanStop(id=sid, title=sid, place=place)
+
+    doc = PlanDocument(
+        days=[
+            PlanDay(stops=[stop("a", 32.0), stop("b", 32.0), stop("note", None), stop("c", 32.5)]),
+            PlanDay(stops=[]),
+            PlanDay(stops=[stop("d", 32.5), stop("e", 33.0)]),
+        ]
+    )
+    assert day_chains(doc) == [[(32.0, 77.0), (32.5, 77.0)], [], [(32.5, 77.0), (33.0, 77.0)]]

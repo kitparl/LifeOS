@@ -25,10 +25,30 @@ export interface PlanStop {
   links: string[];
 }
 
+export type RouteMode = 'driving' | 'walking' | 'cycling' | 'transit';
+
+/** Getting from one point of a day route to the next by road. */
+export interface RoadLeg {
+  distance_m: number;
+  duration_s: number | null;
+  polyline: string;
+}
+
+/**
+ * Road distances for one day. Used only while `points` still equal the day's leg chain
+ * (`planner/plan-route.ts`): any change to the stops makes it stale.
+ */
+export interface DayRoute {
+  mode: RouteMode;
+  points: [number, number][];
+  legs: RoadLeg[];
+}
+
 export interface PlanDay {
   title: string | null;
   notes: string | null;
   stops: PlanStop[];
+  route?: DayRoute | null;
 }
 
 export interface PlanDocument {
@@ -171,4 +191,11 @@ export interface ResolvedLink {
   lat: number | null;
   lng: number | null;
   google_place_id: string | null;
+}
+
+/** A road route for one day's chain; `legs` is empty when none could be had (`fallback_reason` says why). */
+export interface RoadRoute {
+  mode: 'driving';
+  legs: RoadLeg[];
+  fallback_reason: string | null;
 }

@@ -1,4 +1,4 @@
-import { PlanDay, PlanDocument, PlanStop } from '../models/share.models';
+import { DayRoute, PlanDay, PlanDocument, PlanStop } from '../models/share.models';
 
 /** Pure, immutable edits of a plan document. Every edit returns a new document (undo keeps the old one). */
 
@@ -96,6 +96,14 @@ export function nudgeStop(doc: PlanDocument, day: number, index: number, directi
   const otherDay = day + direction;
   if (otherDay < 0 || otherDay >= doc.days.length) return doc;
   return moveStopToDay(doc, day, index, otherDay, direction === 1 ? 0 : doc.days[otherDay].stops.length);
+}
+
+/** Road km for a day; it counts only while the day's chain stays the same (see `plan-route.ts`). */
+export function setDayRoute(doc: PlanDocument, day: number, route: DayRoute): PlanDocument {
+  return withDays(
+    doc,
+    doc.days.map((d, i) => (i === day ? { ...d, route } : d)),
+  );
 }
 
 export function stopCount(doc: PlanDocument): number {

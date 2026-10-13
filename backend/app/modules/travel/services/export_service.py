@@ -21,6 +21,8 @@ from app.modules.travel.services.adventure_service import AdventureService
 from app.modules.travel.services.trip_service import TripService
 
 MAX_LINKED_ADVENTURES = 100
+# Trip fields a friend's PDF never shows (the public planner's allow-list has none of them).
+PRIVATE_TRIP_FIELDS = ("notes", "cover_photo_id", "confirmed_at", "completed_at")
 
 
 class ExportService:
@@ -48,11 +50,20 @@ class ExportService:
         )
         return pdf, file_name(detail.trip.name, "trip")
 
-    async def plan_pdf(self, user_id: str, trip_id: str, doc: PlanDocument, label: str) -> tuple[bytes, str]:
-        """The PDF guide of a shared plan version, before (or without) applying it to the trip."""
+    async def plan_pdf(
+        self, user_id: str, trip_id: str, doc: PlanDocument, label: str, *, public: bool = False
+    ) -> tuple[bytes, str]:
+        """The PDF guide of a shared plan version, before (or without) applying it to the trip.
+
+        `public`: for friends on the trip link, so the trip's private fields (notes, cover) stay out.
+        """
         trip = (await self.trips.detail(user_id, trip_id)).trip
-        detail, places = plan_document_detail(trip, doc)
-        pdf = await run_in_threadpool(trip_guide_pdf, detail, places, [], TileBasemap.from_settings())
+        if public:
+            trip = trip.model_copy(update=dict.fromkeys(PRIVATE_TRIP_FIELDS))
+        detail, places, roads = plan_document_detail(trip, doc)
+        pdf = await run_in_threadpool(
+            trip_guide_pdf, detail, places, [], TileBasemap.from_settings(), None, roads
+        )
         return pdf, file_name(f"{detail.trip.name} {label}", "plan")
 
     async def adventure_pdf(self, user_id: str, adventure_id: str) -> tuple[bytes, str]:

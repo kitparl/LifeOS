@@ -26,6 +26,8 @@ from app.modules.travel.schemas.shared import (
     OwnerHint,
     PublicPlanView,
     ResolvedLink,
+    RoadRouteIn,
+    RoadRouteOut,
     SessionOut,
     SessionRenew,
     SubmitIn,
@@ -44,7 +46,21 @@ _write_friend = SlidingWindowLimiter(limit=120, window_seconds=_TEN_MIN)
 _write_code = SlidingWindowLimiter(limit=600, window_seconds=_TEN_MIN)
 _submit_friend = SlidingWindowLimiter(limit=10, window_seconds=_TEN_MIN)
 _resolve_ip = SlidingWindowLimiter(limit=20, window_seconds=_TEN_MIN)
-_LIMITERS = (_view_ip, _join_ip, _join_code, _session_ip, _write_friend, _write_code, _submit_friend, _resolve_ip)
+# A PDF fetches map tiles and renders every day, so it is the most expensive read.
+_pdf_ip = SlidingWindowLimiter(limit=6, window_seconds=_TEN_MIN)
+_pdf_code = SlidingWindowLimiter(limit=60, window_seconds=24 * 3600)
+_LIMITERS = (
+    _view_ip,
+    _join_ip,
+    _join_code,
+    _session_ip,
+    _write_friend,
+    _write_code,
+    _submit_friend,
+    _resolve_ip,
+    _pdf_ip,
+    _pdf_code,
+)
 
 
 def reset_limiters() -> None:
@@ -89,6 +105,18 @@ def _body_size(request: Request) -> None:
     length = request.headers.get("content-length")
     if length and length.isdigit() and int(length) > MAX_PLAN_BYTES:
         raise PayloadTooLargeError("This plan is too big to save.")
+
+
+def _pdf_limits(request: Request, share: TravelTripShare) -> None:
+    _hit(_pdf_ip, _visitor(request))
+    _hit(_pdf_code, share.id)
+
+
+def _pdf_response(pdf: bytes, name: str) -> Response:
+    # A returned Response skips the router's header dependency, so the same headers are set here.
+    response = Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+    _no_store(response)
+    return response
 
 
 IfMatch = Header(default=None, alias="If-Match", max_length=32)
@@ -233,3 +261,30 @@ async def resolve_link(
 ):
     _hit(_resolve_ip, _visitor(request))
     return await SharedPlanService(db).resolve_link(ctx, url)
+
+
+@router.post("/route", response_model=RoadRouteOut)
+async def road_route(
+    data: RoadRouteIn,
+    request: Request,
+    ctx: ContributorCtx = Depends(require_contributor),
+    db: AsyncSession = Depends(get_db),
+):
+    return await SharedPlanService(db).road_route(ctx, _visitor(request), data.points)
+
+
+@router.get("/pdf", response_class=Response)
+async def shown_plan_pdf(
+    request: Request, share: TravelTripShare = Depends(share_by_code), db: AsyncSession = Depends(get_db)
+):
+    """The plan the link shows (the final plan once locked) as the PDF guide. Anyone with the link."""
+    _pdf_limits(request, share)
+    return _pdf_response(*await SharedPlanService(db).shown_pdf(share))
+
+
+@router.get("/me/plan/pdf", response_class=Response)
+async def my_plan_pdf(
+    request: Request, ctx: ContributorCtx = Depends(require_contributor), db: AsyncSession = Depends(get_db)
+):
+    _pdf_limits(request, ctx.share)
+    return _pdf_response(*await SharedPlanService(db).my_plan_pdf(ctx))

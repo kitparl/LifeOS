@@ -12,21 +12,30 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from itertools import pairwise
 
-from app.modules.travel.geo import haversine_m
+from app.modules.travel.geo import Point, decode_polyline, encode_polyline, haversine_m, simplify_dp
 from app.modules.travel.models import TravelPlace
-from app.modules.travel.schemas.plan_document import PlanDay, PlanDocument, PlanPlace, PlanStop
+from app.modules.travel.schemas.plan_document import DayRoute, PlanDay, PlanDocument, PlanPlace, PlanStop, RoadLeg
+from app.modules.travel.schemas.routes import RouteOut
 from app.modules.travel.schemas.shares import PlanSummary
 from app.modules.travel.schemas.trips import DayOut
 
 MAX_BACKUPS = 5
+# Road paths are kept for the PDF's day maps only; ~30 m of detail is plenty and keeps plans small.
+ROUTE_TOLERANCE_M = 30
+_SAME_POINT_DEG = 1e-7
 
 
 def new_stop_id() -> str:
     return str(uuid.uuid4())
 
 
-def snapshot_from_trip(days: Sequence[DayOut], places: Mapping[str, TravelPlace]) -> PlanDocument:
-    """The trip's days and stops as a plan. Only itinerary fields; trip notes, photos etc. never enter."""
+def snapshot_from_trip(
+    days: Sequence[DayOut], places: Mapping[str, TravelPlace], route: RouteOut | None = None
+) -> PlanDocument:
+    """The trip's days and stops as a plan. Only itinerary fields; trip notes, photos etc. never enter.
+
+    A current trip `route` is kept, split per day, so friends see road km without a new Google call.
+    """
     plan_days = []
     for day in sorted(days, key=lambda d: d.day_index):
         stops = []
@@ -52,7 +61,71 @@ def snapshot_from_trip(days: Sequence[DayOut], places: Mapping[str, TravelPlace]
                 )
             )
         plan_days.append(PlanDay(title=day.title, notes=day.notes, stops=stops))
-    return PlanDocument(days=plan_days)
+    doc = PlanDocument(days=plan_days)
+    if route is not None and not route.is_stale and route.legs:
+        legs = [RoadLeg(distance_m=leg.distance_m, duration_s=leg.duration_s, polyline=leg.polyline) for leg in route.legs]
+        _attach_trip_route(doc, route.mode, legs)
+    return doc
+
+
+def _attach_trip_route(doc: PlanDocument, mode: str, legs: list[RoadLeg]) -> None:
+    chains = day_chains(doc)
+    if sum(max(len(chain) - 1, 0) for chain in chains) != len(legs):
+        return  # the route was computed for other stops
+    start = 0
+    for day, chain in zip(doc.days, chains, strict=True):
+        count = max(len(chain) - 1, 0)
+        if count:
+            day.route = DayRoute(
+                mode=mode, points=chain, legs=[slim_leg(leg) for leg in legs[start : start + count]]
+            )
+        start += count
+
+
+def slim_leg(leg: RoadLeg) -> RoadLeg:
+    """The leg with its road path simplified (see `ROUTE_TOLERANCE_M`)."""
+    if not leg.polyline:
+        return leg
+    path = encode_polyline(simplify_dp(decode_polyline(leg.polyline), ROUTE_TOLERANCE_M))
+    return leg.model_copy(update={"polyline": path})
+
+
+def day_chains(doc: PlanDocument) -> list[list[Point]]:
+    """Per day, the points its legs run through: where the trip was before the day (the last place
+    so far) and then each new place of the day. Back-to-back stops at the same place are one point,
+    as in `itinerary.stop_sequence`. A day without legs has an empty chain."""
+    chains: list[list[Point]] = []
+    last: tuple[tuple, Point] | None = None
+    for day in doc.days:
+        chain: list[Point] = []
+        for stop in day.stops:
+            if stop.place is None:
+                continue
+            key = (stop.place.google_place_id or "", stop.place.lat, stop.place.lng)
+            point = (stop.place.lat, stop.place.lng)
+            if last is not None and key != last[0]:
+                chain.extend([last[1], point] if not chain else [point])
+            last = (key, point)
+        chains.append(chain)
+    return chains
+
+
+def _same_points(a: Sequence[Point], b: Sequence[Point]) -> bool:
+    return len(a) == len(b) and all(
+        abs(p[0] - q[0]) <= _SAME_POINT_DEG and abs(p[1] - q[1]) <= _SAME_POINT_DEG for p, q in zip(a, b, strict=True)
+    )
+
+
+def road_legs(doc: PlanDocument) -> list[RoadLeg | None]:
+    """One entry per leg of the whole plan, in order: the road leg where the day's route is current, else None."""
+    legs: list[RoadLeg | None] = []
+    for day, chain in zip(doc.days, day_chains(doc), strict=True):
+        route = day.route
+        if route is not None and _same_points(route.points, chain):
+            legs.extend(route.legs)
+        else:
+            legs.extend([None] * max(len(chain) - 1, 0))
+    return legs
 
 
 def copy_document(doc: PlanDocument) -> PlanDocument:

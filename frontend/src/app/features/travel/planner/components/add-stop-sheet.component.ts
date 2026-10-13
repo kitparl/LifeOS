@@ -11,8 +11,9 @@ import { looksLikeLink } from '../maps-link';
 import { PlannerSheetComponent } from './planner-sheet.component';
 
 /**
- * Adding or changing a stop in a few taps: What, Where, Time, plus quick chips. Where takes a
- * search, or a pasted Google Maps link; everything else waits under "More details".
+ * Adding or changing a stop in a few taps: What, Where, Time, plus quick chips (tap again to
+ * unselect). Where takes a search, or a pasted Google Maps link; the rest is one tap away under
+ * "More details", which opens by itself when changing a stop.
  */
 @Component({
   selector: 'app-planner-add-stop',
@@ -59,24 +60,52 @@ import { PlannerSheetComponent } from './planner-sheet.component';
           @if (notice()) { <p class="tp-muted" role="status">{{ notice() }}</p> }
         </div>
 
-        <div>
-          <label class="tp-label" for="tp-time">{{ copy.sheet.time }}</label>
-          <input id="tp-time" class="tp-input time" type="time" [value]="startTime()" (input)="startTime.set(value($event))" />
-        </div>
+        <fieldset class="times">
+          <legend class="tp-label">{{ copy.sheet.time }}</legend>
+          <label class="time">
+            <span class="tp-muted">{{ copy.sheet.start }}</span>
+            <input class="tp-input" type="time" data-testid="stop-start" [value]="startTime()" (input)="startTime.set(value($event))" />
+          </label>
+          <label class="time">
+            <span class="tp-muted">{{ copy.sheet.end }}</span>
+            <input class="tp-input" type="time" data-testid="stop-end" [value]="endTime()" (input)="endTime.set(value($event))" />
+          </label>
+        </fieldset>
 
-        <details [open]="moreOpen()">
-          <summary class="tp-btn tp-btn--quiet">{{ copy.sheet.moreDetails }}</summary>
-          <div class="more">
-            <label class="tp-label" for="tp-notes">{{ copy.sheet.notes }}</label>
-            <textarea id="tp-notes" class="tp-input" rows="3" maxlength="10000" [value]="notes()" (input)="notes.set(value($event))"></textarea>
-            <label class="tp-label" for="tp-stay">{{ copy.sheet.stay }}</label>
-            <input id="tp-stay" class="tp-input" maxlength="200" [value]="stay()" (input)="stay.set(value($event))" />
-            <label class="tp-label" for="tp-transport">{{ copy.sheet.transport }}</label>
-            <input id="tp-transport" class="tp-input" maxlength="120" [value]="transport()" (input)="transport.set(value($event))" />
-            <label class="tp-label" for="tp-links">{{ copy.sheet.links }}</label>
-            <textarea id="tp-links" class="tp-input" rows="2" [value]="links()" (input)="links.set(value($event))"></textarea>
+        <button
+          type="button"
+          class="tp-card toggle"
+          data-testid="more-details"
+          aria-controls="tp-more"
+          [attr.aria-expanded]="moreOpen()"
+          (click)="moreOpen.set(!moreOpen())"
+        >
+          <span class="grow">
+            <strong>{{ copy.sheet.moreDetails }}</strong>
+            <span class="tp-muted hint">{{ copy.sheet.moreDetailsHint }}</span>
+          </span>
+          <span class="chevron" aria-hidden="true">{{ moreOpen() ? '−' : '＋' }}</span>
+        </button>
+        @if (moreOpen()) {
+          <div id="tp-more" class="more">
+            <div>
+              <label class="tp-label" for="tp-transport">{{ copy.sheet.transport }}</label>
+              <input id="tp-transport" class="tp-input" data-testid="stop-transport" maxlength="120" [value]="transport()" (input)="transport.set(value($event))" />
+            </div>
+            <div>
+              <label class="tp-label" for="tp-stay">{{ copy.sheet.stay }}</label>
+              <input id="tp-stay" class="tp-input" data-testid="stop-stay" maxlength="200" [value]="stay()" (input)="stay.set(value($event))" />
+            </div>
+            <div>
+              <label class="tp-label" for="tp-notes">{{ copy.sheet.notes }}</label>
+              <textarea id="tp-notes" class="tp-input" data-testid="stop-notes" rows="3" maxlength="10000" [value]="notes()" (input)="notes.set(value($event))"></textarea>
+            </div>
+            <div>
+              <label class="tp-label" for="tp-links">{{ copy.sheet.links }}</label>
+              <textarea id="tp-links" class="tp-input" data-testid="stop-links" rows="2" [value]="links()" (input)="links.set(value($event))"></textarea>
+            </div>
           </div>
-        </details>
+        }
 
         <div class="footer">
           @if (stop()) {
@@ -99,9 +128,19 @@ import { PlannerSheetComponent } from './planner-sheet.component';
       .list button:hover, .list button:focus-visible { background: var(--tp-surface-2); outline: 3px solid var(--tp-focus); }
       .picked { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.25rem 0.25rem 0.75rem; margin: 0; }
       .grow { flex: 1; font-weight: 600; }
-      .time { max-width: 12rem; }
-      .more { display: grid; gap: 0.5rem; padding-top: 0.5rem; }
-      summary { list-style: none; padding-left: 0; }
+      .times { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+      .times legend { padding: 0; }
+      .time { display: grid; gap: 0.25rem; font-size: 0.875rem; }
+      .toggle {
+        display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: var(--tp-tap); padding: 0.75rem 1rem;
+        font: inherit; color: inherit; text-align: left; cursor: pointer; border: 2px dashed var(--tp-muted);
+      }
+      .toggle strong { color: var(--tp-accent); }
+      .toggle[aria-expanded='true'] { border-style: solid; border-color: var(--tp-border); background: var(--tp-surface-2); }
+      .toggle .grow { display: grid; gap: 0.125rem; font-weight: 400; }
+      .hint { font-size: 0.875rem; }
+      .chevron { font-size: 1.25rem; }
+      .more { display: grid; gap: 0.875rem; }
       .footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0.5rem; position: sticky; bottom: 0; padding-top: 0.5rem; background: var(--tp-surface); }
       .danger { color: var(--tp-danger); margin-right: auto; }
       .error { color: var(--tp-danger); margin-top: 0.25rem; }
@@ -128,7 +167,7 @@ export class PlannerAddStopComponent {
   readonly where = signal('');
   readonly place = signal<PlanPlace | null>(null);
   readonly startTime = signal('');
-  readonly endTime = signal<string | null>(null);
+  readonly endTime = signal('');
   readonly notes = signal('');
   readonly stay = signal('');
   readonly transport = signal('');
@@ -167,20 +206,27 @@ export class PlannerAddStopComponent {
     this.place.set(s?.place ?? null);
     this.where.set('');
     this.startTime.set(s?.start_time?.slice(0, 5) ?? '');
-    this.endTime.set(s?.end_time ?? null);
+    this.endTime.set(s?.end_time?.slice(0, 5) ?? '');
     this.notes.set(s?.notes ?? '');
     this.stay.set(s?.stay ?? '');
     this.transport.set(s?.transport ?? '');
     this.links.set((s?.links ?? []).join('\n'));
-    this.moreOpen.set(!!(s?.notes || s?.stay || s?.transport || s?.links?.length));
+    this.moreOpen.set(!!s); // changing a stop shows everything it has
     this.suggestions.set([]);
     this.notice.set(null);
     this.error.set(null);
   }
 
+  /** A chip toggles: tapping the selected one unselects it and clears the "what" it filled in. */
   pickChip(kind: StopKind, title: string): void {
+    if (this.kind() === kind) {
+      this.kind.set('other');
+      if (this.title().trim() === title) this.title.set('');
+      return;
+    }
+    const previous = this.chips.find((c) => c.kind === this.kind());
     this.kind.set(kind);
-    if (!this.title().trim()) this.title.set(title);
+    if (!this.title().trim() || this.title().trim() === previous?.title) this.title.set(title);
   }
 
   async onWhere(text: string): Promise<void> {
@@ -234,7 +280,7 @@ export class PlannerAddStopComponent {
       kind: this.kind(),
       place: this.place(),
       start_time: this.startTime() || null,
-      end_time: this.endTime(),
+      end_time: this.endTime() || null,
       transport: this.transport().trim() || null,
       stay: this.stay().trim() || null,
       notes: this.notes().trim() || null,

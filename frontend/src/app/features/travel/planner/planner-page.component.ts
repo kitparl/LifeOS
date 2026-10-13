@@ -3,6 +3,7 @@ import { DOCUMENT } from '@angular/common';
 import { Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
+import { saveBlob } from '../../../core/utils/download';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { PlanStop } from '../models/share.models';
 import { LatLngBias } from '../utils/place-suggestions';
@@ -70,6 +71,7 @@ export class PlannerPageComponent implements OnInit, OnDestroy {
   readonly sheet = signal<{ day: number; stop: PlanStop | null } | null>(null);
   readonly whoError = signal<string | null>(null);
   readonly busy = signal(false);
+  readonly pdfBusy = signal(false);
   private referrerMeta: HTMLMetaElement | null = null;
   private previousTitle = '';
 
@@ -191,6 +193,24 @@ export class PlannerPageComponent implements OnInit, OnDestroy {
 
   removeDay(day: number): void {
     void this.store.removeWithUndo((doc) => removeDay(doc, day), COPY.removed(COPY.day(day + 1)));
+  }
+
+  /** Road km for a day (saved in the friend's plan, so it asks who they are first). */
+  roadKm(day: number): void {
+    this.store.whenIdentified(async () => {
+      if (!(await this.store.roadKm(day))) this.store.toast.set({ message: COPY.roadKmFailed, undo: false });
+    });
+  }
+
+  async downloadPdf(): Promise<void> {
+    this.pdfBusy.set(true);
+    try {
+      saveBlob(await this.store.pdf(), `${this.store.view()?.trip.name ?? 'Trip'}.pdf`);
+    } catch {
+      this.store.toast.set({ message: COPY.pdfFailed, undo: false });
+    } finally {
+      this.pdfBusy.set(false);
+    }
   }
 
   /** Phone tabs: each section starts at its top. */

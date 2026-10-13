@@ -17,6 +17,8 @@ from app.modules.travel.models import MapsUsageEvent, TravelShareContributor, Tr
 from app.modules.travel.services import shared_plan_service
 from app.tests.google_support import google_token
 from app.tests.share_support import BASE, rows, shared_trip
+from app.tests.test_travel_export import _pdf_text
+from app.tests.test_travel_trips import _dated_itinerary, _himachal
 from app.tests.travel_support import auth as _auth
 from app.tests.travel_support import connect_google as _connect_google
 from sqlalchemy import func, select
@@ -333,6 +335,7 @@ def _writes(code: str, revision: int) -> list[tuple[str, str, dict]]:
         ("get", f"{base}/maps/autocomplete?q=manali&session=abcdefgh1", {}),
         ("get", f"{base}/maps/place/ChIJmanali", {}),
         ("get", f"{base}/resolve-link?url=https://www.google.com/maps/@1,2,3z", {}),
+        ("post", f"{base}/route", {"json": {"points": [[32.2, 77.1], [32.3, 77.4]]}}),
     ]
 
 
@@ -537,3 +540,108 @@ async def test_share_versions_table_stays_clean_after_failed_writes(client):
     await _save(client, share["code"], joined, {"days": [{"stops": [{"id": "x", "title": ""}]}]}, 1)
     [plan] = [v for v in await rows(client, TravelShareVersion) if v.kind == "plan"]
     assert plan.revision == 1
+
+
+# ---- road km and the PDF -------------------------------------------------------------------------
+
+MANALI, HAMPTA, CHANDRATAL = [32.2432, 77.1892], [32.2667, 77.3667], [32.4753, 77.6178]
+
+
+@pytest.mark.asyncio
+async def test_original_keeps_the_owners_road_route_split_per_day(client, google):
+    h = await _auth(client, "pubroute1@example.com")
+    await _connect_google(client, h)
+    places, tid = await _himachal(client, h)
+    await _dated_itinerary(client, h, places, tid)
+    assert (await client.post(f"{BASE}/trips/{tid}/route", json={"mode": "driving"}, headers=h)).status_code == 200
+    share = (await client.post(f"{BASE}/trips/{tid}/share", headers=h)).json()
+
+    days = (await client.get(f"{SHARED}/{share['code']}")).json()["plan"]["days"]
+    assert days[0]["route"]["points"] == [MANALI, HAMPTA] and days[0]["route"]["mode"] == "driving"
+    assert [(leg["distance_m"], leg["duration_s"]) for leg in days[0]["route"]["legs"]] == [(50000, 3000)]
+    assert days[1]["route"]["points"] == [HAMPTA, CHANDRATAL]  # day 2 starts where day 1 ended
+    assert [leg["distance_m"] for leg in days[1]["route"]["legs"]] == [73456]
+    assert all(day["route"] is None for day in days[2:])
+    assert len(google.bodies("directions/v2:computeRoutes")) == 1  # nothing new was routed for friends
+
+
+@pytest.mark.asyncio
+async def test_road_km_uses_the_owners_key_needs_a_friend_and_is_capped(client, google, monkeypatch):
+    h, _, share = await _setup(client, "pubroute2@example.com")
+    await _connect_google(client, h)
+    code = share["code"]
+    url = f"{SHARED}/{code}/route"
+    body = {"points": [MANALI, HAMPTA, CHANDRATAL]}
+    assert (await client.post(url, json=body)).status_code == 401  # viewers who have not joined
+    joined = await _join(client, code)
+
+    routed = (await client.post(url, json=body, headers=_tok(joined))).json()
+    assert routed["fallback_reason"] is None and routed["mode"] == "driving"
+    assert [(leg["distance_m"], leg["duration_s"]) for leg in routed["legs"]] == [(50000, 3000), (73456, 4200)]
+    (sent,) = google.bodies("directions/v2:computeRoutes")
+    assert sent["travelMode"] == "DRIVE" and len(sent["intermediates"]) == 1
+    events = await rows(client, MapsUsageEvent)
+    [owner] = await rows(client, User, email="pubroute2@example.com")
+    assert [(e.user_id, e.sku, e.feature) for e in events] == [(owner.id, "routes", "shared_route")]
+
+    for bad in ([MANALI], [MANALI] * 28, [[91, 0], MANALI]):
+        assert (await client.post(url, json={"points": bad}, headers=_tok(joined))).status_code == 422
+    monkeypatch.setattr(shared_plan_service, "_routes_per_share", shared_plan_service.SlidingWindowLimiter(limit=0, window_seconds=60))
+    capped = (await client.post(url, json=body, headers=_tok(joined))).json()
+    assert capped == {"mode": "driving", "legs": [], "fallback_reason": "guest_limit"}
+
+
+@pytest.mark.asyncio
+async def test_road_km_without_a_maps_key_falls_back_quietly(client):
+    _, _, share = await _setup(client, "pubroute3@example.com")
+    joined = await _join(client, share["code"])
+    resp = await client.post(f"{SHARED}/{share['code']}/route", json={"points": [MANALI, HAMPTA]}, headers=_tok(joined))
+    assert resp.status_code == 200 and resp.json()["legs"] == [] and resp.json()["fallback_reason"] == "missing_credential"
+
+
+@pytest.mark.asyncio
+async def test_a_saved_day_route_must_have_one_leg_per_gap(client):
+    _, _, share = await _setup(client, "pubroute4@example.com")
+    code = share["code"]
+    joined = await _join(client, code)
+    plan = await _start(client, code, joined)
+    doc = json.loads(json.dumps(plan["document"]))
+    doc["days"][0]["route"] = {"points": [MANALI, HAMPTA], "legs": [{"distance_m": 1}, {"distance_m": 2}]}
+    assert (await _save(client, code, joined, doc, plan["revision"])).status_code == 422
+    doc["days"][0]["route"] = {"points": [MANALI, HAMPTA], "legs": [{"distance_m": 51000, "duration_s": 3100}]}
+    saved = await _save(client, code, joined, doc, plan["revision"])
+    assert saved.status_code == 200 and saved.json()["document"]["days"][0]["route"]["legs"][0]["distance_m"] == 51000
+    pdf = (await client.get(f"{SHARED}/{code}/me/plan/pdf", headers=_tok(joined))).content
+    text = _pdf_text(pdf)
+    assert "51.0 km by road" in text and "about 52 min" in text  # day 1 uses the road leg
+    assert "(straight line)" in text  # day 2 has no road route yet
+
+
+@pytest.mark.asyncio
+async def test_anyone_with_the_link_can_download_the_plan_pdf_without_private_notes(client):
+    h, tid, share = await _setup(client, "pubpdf1@example.com")
+    code = share["code"]
+    resp = await client.get(f"{SHARED}/{code}/pdf")
+    assert resp.status_code == 200 and resp.headers["content-type"] == "application/pdf"
+    assert resp.headers["content-disposition"].startswith('attachment; filename="Himachal-2027-plan')
+    assert resp.headers["cache-control"] == "no-store" and resp.headers["x-robots-tag"] == "noindex"
+    text = _pdf_text(resp.content)
+    assert "Manali" in text and "door code" not in text
+
+
+@pytest.mark.asyncio
+async def test_a_friend_downloads_their_own_plan_and_pdfs_are_rate_limited(client):
+    _, _, share = await _setup(client, "pubpdf2@example.com")
+    code = share["code"]
+    url = f"{SHARED}/{code}/me/plan/pdf"
+    assert (await client.get(url)).status_code == 401
+    joined = await _join(client, code)
+    assert (await client.get(url, headers=_tok(joined))).status_code == 404  # no plan yet
+    plan = await _start(client, code, joined)
+    await _save(client, code, joined, _with_new_stop(plan["document"]), plan["revision"])
+    mine = await client.get(url, headers=_tok(joined))
+    assert mine.status_code == 200 and "Asha" in mine.headers["content-disposition"]
+    for _ in range(4):
+        await client.get(f"{SHARED}/{code}/pdf")
+    assert (await client.get(f"{SHARED}/{code}/pdf")).status_code == 429  # 6 per visitor per 10 minutes
+    assert "Cafe 1947" in _pdf_text(mine.content)

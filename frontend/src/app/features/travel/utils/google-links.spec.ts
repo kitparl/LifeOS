@@ -1,4 +1,4 @@
-import { directionsUrl, openInGoogleMapsUrl } from './google-links';
+import { directionsUrl, openInGoogleMapsUrl, routeLinks } from './google-links';
 
 describe('google-links', () => {
   it('opens a saved place by coordinates, with the Google place id when known', () => {
@@ -35,5 +35,33 @@ describe('google-links', () => {
     const url = new URL(directionsUrl(stops)!);
     expect(url.searchParams.get('waypoints')!.split('|').length).toBe(9);
     expect(directionsUrl([])).toBeNull();
+  });
+
+  describe('routeLinks', () => {
+    const points = (n: number) => Array.from({ length: n }, (_, i) => ({ lat: 30 + i, lng: 77 }));
+
+    it('starts from the first point and keeps every point in between', () => {
+      const [link] = routeLinks(points(3));
+      const url = new URL(link.url);
+      expect(url.searchParams.get('origin')).toBe('30.000000,77.000000');
+      expect(url.searchParams.get('destination')).toBe('32.000000,77.000000');
+      expect(url.searchParams.get('waypoints')).toBe('31.000000,77.000000');
+      expect(url.searchParams.get('travelmode')).toBe('driving');
+      expect([link.first, link.last]).toEqual([1, 3]);
+    });
+
+    it('splits a long route into parts that share their joining point, dropping nothing', () => {
+      const links = routeLinks(points(25));
+      expect(links.map((l) => [l.first, l.last])).toEqual([[1, 11], [11, 21], [21, 25]]);
+      const second = new URL(links[1].url);
+      expect(second.searchParams.get('origin')).toBe('40.000000,77.000000');
+      expect(second.searchParams.get('waypoints')!.split('|').length).toBe(9);
+    });
+
+    it('merges back-to-back repeats and needs two points', () => {
+      expect(routeLinks([{ lat: 1, lng: 2 }, { lat: 1, lng: 2 }])).toEqual([]);
+      expect(routeLinks([])).toEqual([]);
+      expect(routeLinks([{ lat: 1, lng: 2 }, { lat: 1, lng: 2 }, { lat: 3, lng: 4 }]).length).toBe(1);
+    });
   });
 });

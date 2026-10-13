@@ -34,7 +34,7 @@ from reportlab.platypus import (
 )
 
 from app.modules.travel.export_map import day_color, day_map, overview_map
-from app.modules.travel.export_plan import DayPlan, PlannedItem, TripPlan, build_trip_plan
+from app.modules.travel.export_plan import DayPlan, PlannedItem, RoadData, TripPlan, build_trip_plan
 from app.modules.travel.export_tiles import TileBasemap
 from app.modules.travel.geo import Point, haversine_m
 from app.modules.travel.models import TravelPlace
@@ -716,11 +716,13 @@ def trip_guide_pdf(
     adventures: Sequence[AdventureOut],
     basemap: TileBasemap | None = None,
     share_url: str | None = None,
+    roads: Sequence[RoadData | None] | None = None,
 ) -> bytes:
-    """`share_url`: the trip's active share link, printed in every page footer (requirements D-05)."""
+    """`share_url`: the trip's active share link, printed in every page footer (requirements D-05).
+    `roads`: per-leg road data of a shared plan (see `build_trip_plan`)."""
     st = _styles()
     trip = detail.trip
-    plan = build_trip_plan(detail, places)
+    plan = build_trip_plan(detail, places, roads)
     length = _trip_length(detail)
     route = detail.route
     mode = route.mode if route else "driving"

@@ -6,6 +6,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { environment } from '../../../../environments/environment';
 import { PlanDocument, PublicPlanView } from '../models/share.models';
 import { newStop } from './plan-ops';
+import { PlanFacts } from './plan-route';
 import { PlannerMapComponent } from './components/planner-map.component';
 import { PlannerPageComponent } from './planner-page.component';
 import { plannerStorage } from './planner-identity';
@@ -14,6 +15,7 @@ import { plannerStorage } from './planner-identity';
 @Component({ selector: 'app-planner-map', standalone: true, template: '' })
 class MapStubComponent {
   readonly plan = input<PlanDocument | null>(null);
+  readonly facts = input<PlanFacts | null>(null);
 }
 
 const CODE = 'k7mq2p3x';
@@ -135,4 +137,53 @@ describe('PlannerPageComponent', () => {
     fixture.detectChanges();
     expect(el.querySelector('[data-testid="planner-unavailable"]')!.textContent).toContain('turned this link off');
   }));
+
+  describe('distances, routes and the PDF', () => {
+    const placed: PlanDocument = {
+      schema_version: 1,
+      days: [
+        {
+          title: null,
+          notes: null,
+          stops: [
+            newStop({ title: 'Manali', place: { name: 'Manali', lat: 32.2432, lng: 77.1892 }, stay: 'Hotel Snow Valley' }),
+            newStop({ title: 'Hampta Pass', place: { name: 'Hampta Pass', lat: 32.2667, lng: 77.3667 } }),
+          ],
+        },
+      ],
+    };
+
+    it('shows the day like the PDF: km from the last stop, a summary, the route in Google Maps and the trip at a glance', fakeAsync(() => {
+      open(view({ plan: placed }));
+      const leg = el.querySelector('[data-testid="stop-leg"]')!.textContent!;
+      expect(leg).toMatch(/~1[67]\.\d km from Manali/);
+      const summary = el.querySelector('[data-testid="day-summary"]')!.textContent!;
+      expect(summary).toContain('(straight line)');
+      expect(summary).toContain('2 stops');
+      expect(summary).toContain('Sleep at Hotel Snow Valley');
+      const route = new URL(el.querySelector<HTMLAnchorElement>('[data-testid="day-route"]')!.href);
+      expect(route.searchParams.get('origin')).toBe('32.243200,77.189200');
+      expect(route.searchParams.get('destination')).toBe('32.266700,77.366700');
+      expect(el.querySelector('[data-testid="trip-glance"]')!.textContent).toContain('1 day');
+      expect(el.textContent).toContain('~ is a straight-line estimate');
+    }));
+
+    it('"Get road km" asks who the friend is first', fakeAsync(() => {
+      open(view({ plan: placed }));
+      el.querySelector<HTMLButtonElement>('[data-testid="road-km"]')!.click();
+      flushMicrotasks();
+      fixture.detectChanges();
+      expect(document.querySelector('[data-testid="who-name"]')).not.toBeNull();
+      http.expectNone(`${BASE}/route`);
+    }));
+
+    it('downloads the plan as a PDF', fakeAsync(() => {
+      open(view({ plan: placed }));
+      const save = spyOn(URL, 'createObjectURL').and.returnValue('blob:x');
+      el.querySelector<HTMLButtonElement>('[data-testid="download-pdf"]')!.click();
+      http.expectOne(`${BASE}/pdf`).flush(new Blob(['%PDF']));
+      flushMicrotasks();
+      expect(save).toHaveBeenCalled();
+    }));
+  });
 });

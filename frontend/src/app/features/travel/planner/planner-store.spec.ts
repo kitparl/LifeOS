@@ -205,4 +205,80 @@ describe('PlannerStore', () => {
     expect(store.mode()).toBe('unavailable');
     expect(store.unavailable()).toBe('gone');
   }));
+
+  describe('road km and the PDF', () => {
+    const routable: PlanDocument = {
+      schema_version: 1,
+      days: [
+        {
+          title: null,
+          notes: null,
+          stops: [
+            newStop({ title: 'Manali', place: { name: 'Manali', lat: 32.2432, lng: 77.1892 } }),
+            newStop({ title: 'Hampta', place: { name: 'Hampta', lat: 32.2667, lng: 77.3667 } }),
+          ],
+        },
+      ],
+    };
+
+    it('fetches road km for a day with the friend\'s token and saves the route in their plan', fakeAsync(() => {
+      load(view({ plan: routable }));
+      expect(store.facts()!.days[0]).toEqual(jasmine.objectContaining({ approx: true, canRoute: true }));
+      joinAndStart();
+      let ok: boolean | undefined;
+      void store.roadKm(0).then((r) => (ok = r));
+      const route = http.expectOne({ method: 'POST', url: `${BASE}/route` });
+      expect(route.request.headers.get('X-Share-Token')).toBe('tok');
+      expect(route.request.body).toEqual({ points: [[32.2432, 77.1892], [32.2667, 77.3667]] });
+      expect(store.routingDay()).toBe(0);
+      route.flush({ mode: 'driving', legs: [{ distance_m: 51_000, duration_s: 3_100, polyline: '' }], fallback_reason: null });
+      flushMicrotasks();
+      http.expectOne({ method: 'POST', url: `${BASE}/me/plan` }).flush(myPlan(1, routable));
+      flushMicrotasks();
+
+      expect(ok).toBeTrue();
+      expect(store.routingDay()).toBeNull();
+      expect(store.facts()!.days[0]).toEqual(jasmine.objectContaining({ meters: 51_000, seconds: 3_100, road: true, canRoute: false }));
+      tick(SAVE_DELAY_MS);
+      const put = http.expectOne({ method: 'PUT', url: `${BASE}/me/plan` });
+      expect((put.request.body as PlanDocument).days[0].route?.legs[0].distance_m).toBe(51_000);
+      put.flush(myPlan(2));
+    }));
+
+    it('keeps the estimates when the link has used up its road km for today', fakeAsync(() => {
+      load(view({ plan: routable }));
+      joinAndStart();
+      let ok: boolean | undefined;
+      void store.roadKm(0).then((r) => (ok = r));
+      http.expectOne(`${BASE}/route`).flush({ mode: 'driving', legs: [], fallback_reason: 'guest_limit' });
+      flushMicrotasks();
+      expect(ok).toBeFalse();
+      expect(store.facts()!.days[0].approx).toBeTrue();
+      http.expectNone(`${BASE}/me/plan`);
+    }));
+
+    it('downloads the shared plan, or the friend\'s own plan once it is saved', fakeAsync(() => {
+      load();
+      let blob: Blob | undefined;
+      void store.pdf().then((b) => (blob = b));
+      const shown = http.expectOne(`${BASE}/pdf`);
+      expect(shown.request.headers.has('X-Share-Token')).toBeFalse();
+      shown.flush(new Blob(['%PDF']));
+      flushMicrotasks();
+      expect(blob).toBeTruthy();
+
+      joinAndStart();
+      void store.edit((d) => addStop(d, 0, newStop({ title: 'Cafe' })));
+      http.expectOne(`${BASE}/me/plan`).flush(myPlan(1));
+      flushMicrotasks();
+      void store.pdf();
+      flushMicrotasks();
+      http.expectOne({ method: 'PUT', url: `${BASE}/me/plan` }).flush(myPlan(2)); // saved first
+      flushMicrotasks();
+      const mine = http.expectOne(`${BASE}/me/plan/pdf`);
+      expect(mine.request.headers.get('X-Share-Token')).toBe('tok');
+      mine.flush(new Blob(['%PDF']));
+      flushMicrotasks();
+    }));
+  });
 });

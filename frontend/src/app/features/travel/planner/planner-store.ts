@@ -5,6 +5,8 @@ import { JoinResult, MyPlan, PlanDocument, PublicPlanView, ResolvedLink, ShareSe
 import { GeoLookup, Suggestions } from '../models/travel.models';
 import { LatLngBias, newSessionToken, suggestionStream } from '../utils/place-suggestions';
 import { isShortMapsLink, parseMapsLink } from './maps-link';
+import { setDayRoute } from './plan-ops';
+import { planFacts } from './plan-route';
 import { PlannerApiService } from './planner-api.service';
 import { StoredDraft, StoredIdentity, plannerStorage } from './planner-identity';
 
@@ -42,6 +44,8 @@ export class PlannerStore {
   readonly lostAccess = signal(false);
   readonly toast = signal<{ message: string; undo: boolean } | null>(null);
   readonly restorable = signal<StoredDraft<PlanDocument> | null>(null);
+  /** The day whose road km are being fetched. */
+  readonly routingDay = signal<number | null>(null);
   private readonly history = signal<PlanDocument[]>([]);
 
   readonly canUndo = computed(() => this.history().length > 0);
@@ -61,6 +65,10 @@ export class PlannerStore {
     return this.doc() ?? view.plan;
   });
   readonly pending = computed(() => ['saving', 'offline', 'error', 'conflict'].includes(this.saveState()));
+  readonly facts = computed(() => {
+    const shown = this.shown();
+    return shown ? planFacts(shown) : null;
+  });
 
   private token: string | null = null;
   private revision = 0;
@@ -434,5 +442,36 @@ export class PlannerStore {
     } catch {
       return null;
     }
+  }
+
+  // ---- road km and the PDF -----------------------------------------------------------------
+
+  /**
+   * Road km and time for one day on the owner's key (capped per link), saved in the friend's plan
+   * like any other change (call it via `whenIdentified`). False when no road route could be had:
+   * the straight-line estimates stay.
+   */
+  async roadKm(day: number): Promise<boolean> {
+    const chain = this.facts()?.days[day]?.chain;
+    if (!chain || chain.length < 2) return false;
+    this.routingDay.set(day);
+    try {
+      const route = await firstValueFrom(this.withToken((t) => this.api.route(this.code(), t, chain)));
+      if (!route.legs.length) return false;
+      await this.edit((doc) => setDayRoute(doc, day, { mode: route.mode, points: chain, legs: route.legs }));
+      return true;
+    } catch (err) {
+      if ((err as HttpErrorResponse).status === HttpStatusCode.Conflict) await this.refreshView();
+      return false;
+    } finally {
+      this.routingDay.set(null);
+    }
+  }
+
+  /** The PDF guide of what is on screen: the friend's own plan (once saved), else the shared plan. */
+  async pdf(): Promise<Blob> {
+    if (this.mode() !== 'editing') return firstValueFrom(this.api.shownPdf(this.code()));
+    if (!(await this.whenSaved())) throw new Error('not saved');
+    return firstValueFrom(this.withToken((t) => this.api.myPlanPdf(this.code(), t)));
   }
 }

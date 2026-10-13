@@ -16,8 +16,12 @@ from app.modules.travel.schemas.places import ExternalId
 from app.modules.travel.schemas.trips import MAX_ORDER_ITEMS, MAX_TRIP_DAYS
 
 StopKind = Literal["stay", "food", "travel", "sightseeing", "rest", "other"]
+RouteMode = Literal["driving", "walking", "cycling", "transit"]
 # Serialized size cap for one document (and the request body that carries it).
 MAX_PLAN_BYTES = 512 * 1024
+# One Google route: origin + destination + 25 intermediates (same as a trip route).
+MAX_ROUTE_POINTS = 27
+MAX_POLYLINE_CHARS = 20_000
 
 
 class PlanPlace(BaseModel):
@@ -46,12 +50,40 @@ class PlanStop(BaseModel):
     links: Links
 
 
+class RoadLeg(BaseModel):
+    """Getting from one point of a day route to the next by road."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    distance_m: float = Field(ge=0, le=5_000_000)
+    duration_s: int | None = Field(default=None, ge=0, le=30 * 24 * 3600)
+    polyline: str = Field(default="", max_length=MAX_POLYLINE_CHARS)
+
+
+class DayRoute(BaseModel):
+    """Road distances for one day. Used only while `points` still equal the day's leg chain
+    (`plan_document.day_chains`): any change to the stops makes it stale."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: RouteMode = "driving"
+    points: list[tuple[Lat, Lng]] = Field(min_length=2, max_length=MAX_ROUTE_POINTS)
+    legs: list[RoadLeg]
+
+    @model_validator(mode="after")
+    def _one_leg_per_gap(self) -> DayRoute:
+        if len(self.legs) != len(self.points) - 1:
+            raise ValueError("a day route needs one leg between each pair of points")
+        return self
+
+
 class PlanDay(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: OptText200 = None
     notes: Notes = None
     stops: list[PlanStop] = Field(default_factory=list, max_length=MAX_ORDER_ITEMS)
+    route: DayRoute | None = None
 
 
 class PlanDocument(BaseModel):
