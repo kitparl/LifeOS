@@ -1,11 +1,11 @@
 """Pure Split Bills arithmetic on integer paise. No I/O — every function here is property-tested.
 
-Debts are pairwise with no simplification: on each bill every included non-payer owes the
-payer their share; each pair is netted in both directions, minus confirmed payments between them.
+Debts are simplified: each person's net balance (paid − own shares ± confirmed payments) is
+settled with the fewest transfers, largest debtor paying largest creditor first. So nobody who
+is owed money is ever asked to pay, and circular debts (A→B→C→A) cancel out.
 """
 
-from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 
@@ -53,25 +53,29 @@ def member_nets(member_ids: Iterable[str], bills: Iterable[Bill], confirmed: Ite
     return nets
 
 
-def pairwise_debts(member_ids: Sequence[str], bills: Iterable[Bill], confirmed: Iterable[Payment]) -> list[Debt]:
-    """One debt per pair with a positive remainder, ordered by seat order of (payer, payee)."""
-    owed: defaultdict[tuple[str, str], int] = defaultdict(int)
-    for bill in bills:
-        for member_id, share in bill.shares:
-            if member_id != bill.paid_by:
-                owed[(member_id, bill.paid_by)] += share
-    for payment in confirmed:
-        owed[(payment.payer, payment.payee)] -= payment.amount
+def simplify_debts(member_ids: Sequence[str], nets: Mapping[str, int]) -> list[Debt]:
+    """Settle `nets` (which sum to zero) with at most n − 1 transfers, ordered by seat of (payer, payee).
+
+    Greedy: the biggest debtor pays the biggest creditor; ties go to the earlier seat. Each step
+    clears one side, so a pair never repeats and every debt is positive.
+    """
+    seat = {member_id: index for index, member_id in enumerate(member_ids)}
+    owing = {m: -nets[m] for m in member_ids if nets[m] < 0}
+    owed = {m: nets[m] for m in member_ids if nets[m] > 0}
+
+    def biggest(balances: dict[str, int]) -> str:
+        return max(balances, key=lambda m: (balances[m], -seat[m]))
 
     debts: list[Debt] = []
-    for i, a in enumerate(member_ids):
-        for b in member_ids[i + 1:]:
-            balance = owed[(a, b)] - owed[(b, a)]
-            if balance > 0:
-                debts.append(Debt(payer=a, payee=b, amount=balance))
-            elif balance < 0:
-                debts.append(Debt(payer=b, payee=a, amount=-balance))
-    return debts
+    while owing and owed:
+        payer, payee = biggest(owing), biggest(owed)
+        amount = min(owing[payer], owed[payee])
+        debts.append(Debt(payer=payer, payee=payee, amount=amount))
+        for balances, member_id in ((owing, payer), (owed, payee)):
+            balances[member_id] -= amount
+            if balances[member_id] == 0:
+                del balances[member_id]
+    return sorted(debts, key=lambda d: (seat[d.payer], seat[d.payee]))
 
 
 def payable(debt: Debt, pending: Iterable[Payment]) -> int:

@@ -1,4 +1,4 @@
-"""Split Bills — short links, seats, equal split in paise, pairwise settle, expiry and history.
+"""Split Bills — short links, seats, equal/exact split in paise, simplified settle, expiry and history.
 
 Pure money logic is tested directly (with Hypothesis for the invariants); everything
 that crosses the trust boundary (seat secrets, open/closed links) is tested through the API.
@@ -19,8 +19,8 @@ from app.modules.finance.split.balances import (
     Payment,
     equal_split,
     member_nets,
-    pairwise_debts,
     payable,
+    simplify_debts,
 )
 from app.modules.finance.split.models import SplitGroup, SplitHistory, SplitMember
 from app.modules.finance.split.service import SplitService
@@ -312,15 +312,91 @@ async def test_seat_from_another_group_is_rejected(client):
 
 
 async def test_bill_validation(client):
-    code, (asha, bala) = await _group_with(client, "Asha", "Bala")
+    code, (asha, _bala) = await _group_with(client, "Asha", "Bala")
     _, (outsider,) = await _group_with(client, "Outsider")
-    secret, a, b = asha["seat_secret"], asha["member_id"], bala["member_id"]
-    assert (await _bill(client, code, secret, a, [b], 10)).status_code == 400  # payer not included
+    secret, a = asha["seat_secret"], asha["member_id"]
     assert (await _bill(client, code, secret, a, [a, outsider["member_id"]], 10)).status_code == 400
+    assert (await _bill(client, code, secret, outsider["member_id"], [a], 10)).status_code == 400  # payer outside
     assert (await _bill(client, code, secret, a, [], 10)).status_code == 422
     assert (await _bill(client, code, secret, a, [a, a], 10)).status_code == 422
     assert (await _bill(client, code, secret, a, [a], 0)).status_code == 422
     assert (await _bill(client, code, secret, a, [a], "1.234")).status_code == 422
+
+
+async def _exact_bill(client, code: str, secret: str, paid_by: str, shares: list[tuple[str, str]], rupees: str):
+    return await client.post(
+        f"{BASE}/groups/{code}/expenses",
+        json={
+            "title": "Exact",
+            "amount_rupees": rupees,
+            "paid_by": paid_by,
+            "shares": [{"member_id": m, "amount_rupees": r} for m, r in shares],
+        },
+        headers=_seat(secret),
+    )
+
+
+async def test_paying_for_someone_else_puts_the_whole_bill_on_them(client):
+    code, (asha, bala) = await _group_with(client, "Asha", "Bala")
+    resp = await _bill(client, code, asha["seat_secret"], asha["member_id"], [bala["member_id"]], 250)
+    assert resp.status_code == 201
+    assert resp.json()["shares"] == [{"member_id": bala["member_id"], "amount_paise": 25000}]
+    debts = (await _balances(client, code))["debts"]
+    assert [(d["payer_name"], d["payee_name"], d["amount_paise"]) for d in debts] == [("Bala", "Asha", 25000)]
+
+
+async def test_exact_shares_are_stored_as_given_in_seat_order(client):
+    code, (asha, bala, chen) = await _group_with(client, "Asha", "Bala", "Chen")
+    a, b, c = asha["member_id"], bala["member_id"], chen["member_id"]
+    resp = await _exact_bill(client, code, asha["seat_secret"], a, [(c, "50.25"), (a, "100"), (b, "349.75")], "500")
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["shares"] == [
+        {"member_id": a, "amount_paise": 10000},
+        {"member_id": b, "amount_paise": 34975},
+        {"member_id": c, "amount_paise": 5025},
+    ]
+    nets = [n["net_paise"] for n in (await _balances(client, code))["nets"]]
+    assert nets == [40000, -34975, -5025]
+
+
+async def test_exact_shares_must_add_up_and_split_mode_is_exclusive(client):
+    code, (asha, bala) = await _group_with(client, "Asha", "Bala")
+    a, b, secret = asha["member_id"], bala["member_id"], asha["seat_secret"]
+    assert (await _exact_bill(client, code, secret, a, [(a, "100"), (b, "99.99")], "200")).status_code == 422
+    assert (await _exact_bill(client, code, secret, a, [(a, "100"), (a, "100")], "200")).status_code == 422
+    assert (await _exact_bill(client, code, secret, a, [(a, "0"), (b, "200")], "200")).status_code == 422
+    both = {"title": "x", "amount_rupees": 10, "paid_by": a, "member_ids": [a], "shares": [{"member_id": a, "amount_rupees": 10}]}
+    neither = {"title": "x", "amount_rupees": 10, "paid_by": a}
+    for body in (both, neither):
+        assert (await client.post(f"{BASE}/groups/{code}/expenses", json=body, headers=_seat(secret))).status_code == 422
+
+
+async def test_delete_bill_by_its_author_or_the_creator_and_balances_follow(client):
+    code, (asha, bala, chen) = await _group_with(client, "Asha", "Bala", "Chen")
+    ids = [asha["member_id"], bala["member_id"], chen["member_id"]]
+    by_bala = (await _bill(client, code, bala["seat_secret"], bala["member_id"], ids, 300)).json()
+    by_asha = (await _bill(client, code, asha["seat_secret"], asha["member_id"], ids, 90)).json()
+
+    def delete(expense_id: str, secret: str | None):
+        headers = _seat(secret) if secret else {}
+        return client.delete(f"{BASE}/groups/{code}/expenses/{expense_id}", headers=headers)
+
+    assert (await delete(by_bala["id"], None)).status_code == 403
+    assert (await delete(by_bala["id"], chen["seat_secret"])).status_code == 403  # not the author
+    assert (await delete("missing", bala["seat_secret"])).status_code == 404
+    assert (await delete(by_bala["id"], bala["seat_secret"])).status_code == 204
+    assert (await delete(by_asha["id"], asha["seat_secret"])).status_code == 204
+
+    group = (await client.get(f"{BASE}/groups/{code}")).json()
+    assert group["expenses"] == []
+    body = await _balances(client, code)
+    assert [n["net_paise"] for n in body["nets"]] == [0, 0, 0] and body["debts"] == []
+
+    by_chen = (await _bill(client, code, chen["seat_secret"], chen["member_id"], ids, 30)).json()
+    kept = (await _bill(client, code, chen["seat_secret"], chen["member_id"], ids, 30)).json()
+    assert (await delete(by_chen["id"], asha["seat_secret"])).status_code == 204  # the creator can tidy up
+    await _shift_group(client, code, expires_at=utc_now() - timedelta(seconds=1))
+    assert (await delete(kept["id"], chen["seat_secret"])).status_code == 409  # closed links are read-only
 
 
 async def test_bill_rejected_after_link_expires(client):
@@ -360,14 +436,34 @@ def test_build_upi_uri_matches_the_intent_format():
         build_upi_uri(None, "Asha", 100, "x")
 
 
-def test_pairwise_debts_net_each_pair_without_simplification():
-    # A paid 300 for A,B,C; B paid 90 for A,B,C. B owes A 100-30=70, C owes A 100, C owes B 30.
+def _debts(members: list[str], bills: list[Bill], confirmed: list[Payment]) -> list[Debt]:
+    return simplify_debts(members, member_nets(members, bills, confirmed))
+
+
+def test_simplified_debts_follow_each_persons_net():
+    # A paid 300 for A,B,C; B paid 90 for A,B,C. A is up 170, B down 40, C down 130.
     bills = [Bill("a", equal_split(30000, ["a", "b", "c"])), Bill("b", equal_split(9000, ["a", "b", "c"]))]
-    debts = pairwise_debts(["a", "b", "c"], bills, [])
-    assert debts == [Debt("b", "a", 7000), Debt("c", "a", 10000), Debt("c", "b", 3000)]
-    confirmed = [Payment("c", "a", 10000)]
-    assert pairwise_debts(["a", "b", "c"], bills, confirmed) == [Debt("b", "a", 7000), Debt("c", "b", 3000)]
+    assert member_nets(["a", "b", "c"], bills, []) == {"a": 17000, "b": -4000, "c": -13000}
+    assert _debts(["a", "b", "c"], bills, []) == [Debt("b", "a", 4000), Debt("c", "a", 13000)]
+    assert _debts(["a", "b", "c"], bills, [Payment("c", "a", 13000)]) == [Debt("b", "a", 4000)]
     assert payable(Debt("b", "a", 7000), [Payment("b", "a", 2000), Payment("c", "a", 500)]) == 5000
+
+
+def test_circular_debts_cancel_out():
+    # Each person paid 200 for themselves and one other: everyone is even, nobody pays anybody.
+    bills = [
+        Bill("a", equal_split(20000, ["a", "b"])),
+        Bill("b", equal_split(20000, ["b", "c"])),
+        Bill("c", equal_split(20000, ["a", "c"])),
+    ]
+    assert _debts(["a", "b", "c"], bills, []) == []
+
+
+def test_someone_who_is_owed_is_never_asked_to_pay():
+    # A paid 300 for A,B,C; B paid 300 for B,C,D. B is owed 100 overall, so B pays nobody.
+    bills = [Bill("a", equal_split(30000, ["a", "b", "c"])), Bill("b", equal_split(30000, ["b", "c", "d"]))]
+    debts = _debts(["a", "b", "c", "d"], bills, [])
+    assert debts == [Debt("c", "a", 20000), Debt("d", "b", 10000)]
 
 
 @st.composite
@@ -377,7 +473,7 @@ def ledgers(draw):
     bills = []
     for _ in range(draw(st.integers(min_value=0, max_value=6))):
         included = draw(st.lists(st.sampled_from(members), min_size=1, unique=True))
-        payer = draw(st.sampled_from(included))
+        payer = draw(st.sampled_from(members))  # the payer may be left off the bill
         amount = draw(st.integers(min_value=1, max_value=10_000_000))
         bills.append(Bill(payer, equal_split(amount, [m for m in members if m in included])))
     payments = []
@@ -390,13 +486,15 @@ def ledgers(draw):
 
 @given(ledger=ledgers())
 @settings(deadline=None)
-def test_nets_sum_to_zero_and_pairwise_debts_reconcile(ledger):
+def test_nets_sum_to_zero_and_simplified_debts_reconcile(ledger):
     members, bills, payments = ledger
     nets = member_nets(members, bills, payments)
     assert sum(nets.values()) == 0
-    debts = pairwise_debts(members, bills, payments)
+    debts = simplify_debts(members, nets)
     assert all(d.amount > 0 and d.payer != d.payee for d in debts)
     assert len({frozenset((d.payer, d.payee)) for d in debts}) == len(debts)  # one row per pair
+    assert len(debts) <= max(0, len(members) - 1)  # never more transfers than people − 1
+    assert all(nets[d.payer] < 0 < nets[d.payee] for d in debts)  # only debtors pay, only creditors get
     for m in members:
         received = sum(d.amount for d in debts if d.payee == m)
         owes = sum(d.amount for d in debts if d.payer == m)

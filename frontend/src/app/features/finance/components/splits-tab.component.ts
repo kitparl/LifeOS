@@ -31,7 +31,10 @@ import { formatInr } from '../../splits/utils/money';
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   @if (item.my_net_paise !== null) {
-                    <span class="text-xs" [style.color]="item.my_net_paise < 0 ? 'var(--danger)' : 'var(--text-muted)'">
+                    <span
+                      class="text-xs font-medium"
+                      [style.color]="item.my_net_paise < 0 ? 'var(--danger)' : item.my_net_paise > 0 ? 'var(--success)' : 'var(--text-muted)'"
+                    >
                       {{ netLabel(item.my_net_paise) }}
                     </span>
                   }

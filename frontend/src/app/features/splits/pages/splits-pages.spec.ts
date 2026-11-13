@@ -279,6 +279,69 @@ describe('Split bills pages', () => {
       flushBalances();
     });
 
+    it('shows my balance, what each bill did to me, and lets the bill author delete it', () => {
+      seed([{ code: 'k7mq2p', name: 'Dinner', seatSecret: 'secret-b', displayName: 'Bala', role: 'member' }]);
+      configure();
+      const fixture = render();
+      const members = [member('m-a', 'Asha', 0), member('m-b', 'Bala', 1)];
+      const base = { expense_date: '2026-11-13', created_at: '2026-11-13T10:00:00Z' };
+      const dinner = {
+        ...base,
+        id: 'e-1',
+        title: 'Dinner',
+        amount_paise: 60000,
+        paid_by: 'm-a',
+        created_by: 'm-a',
+        shares: [{ member_id: 'm-a', amount_paise: 30000 }, { member_id: 'm-b', amount_paise: 30000 }],
+      };
+      const cab = {
+        ...base,
+        id: 'e-2',
+        title: 'Cab',
+        amount_paise: 20000,
+        paid_by: 'm-b',
+        created_by: 'm-b',
+        shares: [{ member_id: 'm-a', amount_paise: 20000 }],
+      };
+      const view = groupView({ members, expenses: [dinner, cab], my_member_id: 'm-b' });
+      http.expectOne(`${api}/groups/k7mq2p`).flush(view);
+      flushBalances({
+        nets: [
+          { member_id: 'm-a', display_name: 'Asha', net_paise: 10000 },
+          { member_id: 'm-b', display_name: 'Bala', net_paise: -10000 },
+        ],
+        debts: [],
+      });
+      fixture.detectChanges();
+
+      expect(byTestId(fixture, 'split-my-net')[0].textContent).toContain('₹100');
+      expect(byTestId(fixture, 'split-my-balance')[0].textContent).toContain('You owe');
+      // Newest first; my impact per bill.
+      const rows = byTestId(fixture, 'split-bill-row');
+      expect(rows.map((r) => r.querySelector('[data-testid="split-bill-impact"]')!.textContent!.trim())).toEqual([
+        'you lent ₹200',
+        'you borrowed ₹300',
+      ]);
+      expect(rows[0].textContent).toContain('split equally · 1 person');
+      // Only my own bill can be deleted (I am not the creator).
+      expect(byTestId(fixture, 'split-bill-delete').length).toBe(1);
+      byTestId(fixture, 'split-bill-delete')[0].click();
+      fixture.detectChanges();
+      byTestId(fixture, 'split-bill-delete-confirm')[0].click();
+      const del = http.expectOne({ method: 'DELETE', url: `${api}/groups/k7mq2p/expenses/e-2` });
+      expect(del.request.headers.get('X-Split-Seat')).toBe('secret-b');
+      del.flush(null);
+      http.expectOne(`${api}/groups/k7mq2p`).flush(groupView({ members, expenses: [dinner], my_member_id: 'm-b' }));
+      flushBalances();
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-bill-row').length).toBe(1);
+
+      byTestId(fixture, 'split-tab-balances')[0].click();
+      fixture.detectChanges();
+      expect(byTestId(fixture, 'split-bill-row').length).toBe(0);
+      expect(el(fixture).textContent).toContain('Everyone is settled up.');
+    });
+
     it('shows Keep in my history only to a signed-in seat holder whose history lacks the group', () => {
       seed([{ code: 'k7mq2p', name: 'Dinner', seatSecret: 'secret-b', displayName: 'Bala', role: 'member' }]);
       configure('k7mq2p', true);

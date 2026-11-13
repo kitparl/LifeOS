@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SplitDebt, SplitSettlement } from '../models/split.models';
+import { NAV_LUCIDE_ICON_PROVIDERS } from '../../../shared/layout/nav-lucide';
 import { member } from '../testing/split-fixtures';
 import { MarkPaidRequest, SplitSettleListComponent } from './settle-list.component';
 
@@ -27,7 +28,9 @@ describe('SplitSettleListComponent', () => {
   let http: HttpTestingController;
 
   function render(debts: SplitDebt[], me: string | null = 'm-b', settlements: SplitSettlement[] = []): HTMLElement {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), ...NAV_LUCIDE_ICON_PROVIDERS],
+    });
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(SplitSettleListComponent);
     fixture.componentRef.setInput('debts', debts);
@@ -49,6 +52,14 @@ describe('SplitSettleListComponent', () => {
     expect(qr.getAttribute('data-payload')).toBe(UPI);
     expect(qr.getAttribute('data-payload')).not.toContain('/s/');
     expect(root.querySelector('[data-testid="split-mark-paid"]')!.textContent).toContain('Mark paid');
+  });
+
+  it('the payer can also mark a UPI debt as paid in cash', () => {
+    const root = render([debt()]);
+    let emitted: MarkPaidRequest | undefined;
+    fixture.componentInstance.markPaid.subscribe((v) => (emitted = v));
+    root.querySelector<HTMLButtonElement>('[data-testid="split-mark-cash"]')!.click();
+    expect(emitted).toEqual({ debt: debt(), method: 'cash' });
   });
 
   it('a debt with no VPA has no payment QR and is cash only', () => {
@@ -104,7 +115,9 @@ describe('SplitSettleListComponent', () => {
   });
 
   it('once the link closes, hides payment settings and explains why there is no pay link', () => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), ...NAV_LUCIDE_ICON_PROVIDERS],
+    });
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(SplitSettleListComponent);
     fixture.componentRef.setInput('debts', [debt({ upi_uri: null })]);

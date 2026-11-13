@@ -30,6 +30,7 @@ router = APIRouter(prefix="/splits", tags=["splits"])
 
 GroupCode = Path(pattern=SHORT_CODE_PATTERN)
 SettlementId = Path(max_length=36)
+ExpenseId = Path(max_length=36)
 SeatSecret = Header(default=None, alias="X-Split-Seat", max_length=64)
 
 # Per-client-IP sliding windows for the unauthenticated write endpoints.
@@ -94,6 +95,16 @@ async def add_expense(
     db: AsyncSession = Depends(get_db),
 ):
     return await SplitService(db).add_expense(code, seat, data)
+
+
+@router.delete("/groups/{code}/expenses/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_expense(
+    code: str = GroupCode,
+    expense_id: str = ExpenseId,
+    seat: str | None = SeatSecret,
+    db: AsyncSession = Depends(get_db),
+):
+    await SplitService(db).delete_expense(code, seat, expense_id)
 
 
 @router.get("/groups/{code}/balances", response_model=BalancesOut)

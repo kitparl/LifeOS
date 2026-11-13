@@ -46,6 +46,12 @@ export class SplitsApiService {
     });
   }
 
+  deleteExpense(code: string, seatSecret: string, expenseId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/groups/${code}/expenses/${expenseId}`, {
+      headers: seatHeaders(seatSecret),
+    });
+  }
+
   updateMe(code: string, seatSecret: string, payload: SplitMemberUpdatePayload): Observable<SplitMember> {
     return this.http.patch<SplitMember>(`${this.base}/groups/${code}/members/me`, payload, {
       headers: seatHeaders(seatSecret),

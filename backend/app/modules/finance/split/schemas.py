@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints, field_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from app.modules.finance.split.codes import Expiry
 
@@ -35,18 +35,48 @@ class JoinRequest(BaseModel):
     display_name: DisplayName
 
 
+class ShareCreate(BaseModel):
+    member_id: MemberId
+    amount_rupees: RupeeAmount
+
+
 class ExpenseCreate(BaseModel):
+    """Split equally between `member_ids`, or by exact `shares` that add up to the bill.
+
+    Exactly one of the two is given. The payer need not be on the bill (paying for someone else).
+    """
+
     title: BillTitle
     amount_rupees: RupeeAmount
     paid_by: MemberId
-    member_ids: list[MemberId] = Field(min_length=1, max_length=MAX_MEMBERS)
+    member_ids: list[MemberId] | None = Field(default=None, min_length=1, max_length=MAX_MEMBERS)
+    shares: list[ShareCreate] | None = Field(default=None, min_length=1, max_length=MAX_MEMBERS)
 
     @field_validator("member_ids")
     @classmethod
-    def _unique(cls, value: list[str]) -> list[str]:
-        if len(set(value)) != len(value):
+    def _unique(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None and len(set(value)) != len(value):
             raise ValueError("member_ids must be unique")
         return value
+
+    @field_validator("shares")
+    @classmethod
+    def _unique_shares(cls, value: list[ShareCreate] | None) -> list[ShareCreate] | None:
+        if value is not None and len({s.member_id for s in value}) != len(value):
+            raise ValueError("Each person can have only one share")
+        return value
+
+    @model_validator(mode="after")
+    def _one_split_mode(self) -> "ExpenseCreate":
+        if (self.member_ids is None) == (self.shares is None):
+            raise ValueError("Give either member_ids (equal split) or shares (exact amounts)")
+        if self.shares is not None and sum(s.amount_rupees for s in self.shares) != self.amount_rupees:
+            raise ValueError("Shares must add up to the bill amount")
+        return self
+
+    @property
+    def included_ids(self) -> list[str]:
+        return self.member_ids if self.member_ids is not None else [s.member_id for s in self.shares or []]
 
 
 SettlementMethod = Literal["upi", "cash"]

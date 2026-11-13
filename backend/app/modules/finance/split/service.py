@@ -5,7 +5,8 @@ Rules that shape this module:
 1. **The code grants read; the seat grants write.** Anyone with the short code can
    read a group. Every mutating member action needs that member's seat secret.
 2. **Money is integer paise**, and stored shares always sum to the bill.
-3. **Ledger rows are append-only.** Adding a bill never rewrites settlements.
+3. **Settlements are append-only.** Adding or deleting a bill never rewrites settlements;
+   balances are recomputed from the ledger, so a deleted bill simply stops counting.
 4. **UPI ids live only while the link is open.** They are hidden the moment it closes
    and erased on End and by the periodic purge (`erase_closed_upi`).
 """
@@ -31,8 +32,8 @@ from app.modules.finance.split.balances import (
     Payment,
     equal_split,
     member_nets,
-    pairwise_debts,
     payable,
+    simplify_debts,
 )
 from app.modules.finance.split.codes import (
     expires_at_for,
@@ -142,7 +143,7 @@ class _Ledger:
         ]
 
     def debts(self) -> list[Debt]:
-        return pairwise_debts(self.member_ids, self.bills(), self.payments(SETTLEMENT_CONFIRMED))
+        return simplify_debts(self.member_ids, self.nets())
 
     def nets(self) -> dict[str, int]:
         return member_nets(self.member_ids, self.bills(), self.payments(SETTLEMENT_CONFIRMED))
@@ -259,12 +260,16 @@ class SplitService:
         if await self.repo.count_expenses(group.id) >= MAX_EXPENSES:
             raise ConflictError(f"This group has reached {MAX_EXPENSES} bills")
         seat_order = {m.id: m.seat_no for m in await self.repo.list_members(group.id)}
-        if any(member_id not in seat_order for member_id in data.member_ids):
+        if data.paid_by not in seat_order or any(m not in seat_order for m in data.included_ids):
             raise BadRequestError("Every person on a bill must have joined the group")
-        if data.paid_by not in data.member_ids:
-            raise BadRequestError("Whoever paid must be included on the bill")
         amount_paise = rupees_to_paise(data.amount_rupees)
-        included = sorted(data.member_ids, key=seat_order.__getitem__)
+        if data.shares is not None:
+            split = sorted(
+                ((s.member_id, rupees_to_paise(s.amount_rupees)) for s in data.shares),
+                key=lambda share: seat_order[share[0]],
+            )
+        else:  # remainder paise go out in join order
+            split = equal_split(amount_paise, sorted(data.included_ids, key=seat_order.__getitem__))
         expense = SplitExpense(
             group_id=group.id,
             paid_by=data.paid_by,
@@ -274,12 +279,21 @@ class SplitService:
             created_by=me.id,
         )
         await self.repo.add(expense)
-        shares = [
-            SplitShare(expense_id=expense.id, member_id=member_id, amount_paise=share)
-            for member_id, share in equal_split(amount_paise, included)
-        ]
+        shares = [SplitShare(expense_id=expense.id, member_id=member_id, amount_paise=share) for member_id, share in split]
         await self.repo.add(*shares)
         return _expense_out(expense, shares)
+
+    async def delete_expense(self, code: str, seat_secret: str | None, expense_id: str) -> None:
+        """Remove a wrong bill. Only whoever added it, or the group creator, while the link is open."""
+        group = await self._group(code)
+        me = await self._require_seat(group, seat_secret)
+        self._require_open(group)
+        expense = await self.repo.get_expense(group.id, expense_id)
+        if expense is None:
+            raise NotFoundError("Bill not found")
+        if me.id != expense.created_by and not me.is_creator:
+            raise ForbiddenError("Only the person who added this bill can delete it")
+        await self.repo.delete_expense(expense)
 
     # ------------------------------------------------------------------
     # Settle

@@ -22,12 +22,19 @@ export interface SplitJoinPayload {
   display_name: string;
 }
 
-export interface SplitExpensePayload {
+export type SplitMode = 'equal' | 'exact';
+
+export interface SplitShareInput {
+  member_id: string;
+  amount_rupees: number;
+}
+
+/** Either `member_ids` (split equally) or `shares` (exact amounts that add up to the bill). */
+export type SplitExpensePayload = {
   title: string;
   amount_rupees: number;
   paid_by: string;
-  member_ids: string[];
-}
+} & ({ member_ids: string[]; shares?: never } | { shares: SplitShareInput[]; member_ids?: never });
 
 export interface SplitSettlementPayload {
   payee_member_id: string;

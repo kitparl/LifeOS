@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.finance.split.models import (
@@ -88,6 +88,17 @@ class SplitRepository:
             .order_by(SplitSettlement.paid_at, SplitSettlement.id)
         )
         return list(result.scalars().all())
+
+    async def get_expense(self, group_id: str, expense_id: str) -> SplitExpense | None:
+        result = await self.db.execute(
+            select(SplitExpense).where(SplitExpense.group_id == group_id, SplitExpense.id == expense_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def delete_expense(self, expense: SplitExpense) -> None:
+        await self.db.execute(delete(SplitShare).where(SplitShare.expense_id == expense.id))
+        await self.db.delete(expense)
+        await self.db.flush()
 
     async def get_settlement(self, settlement_id: str) -> SplitSettlement | None:
         return await self.db.get(SplitSettlement, settlement_id)
