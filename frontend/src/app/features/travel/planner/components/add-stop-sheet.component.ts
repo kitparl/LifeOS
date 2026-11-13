@@ -9,6 +9,7 @@ import { COPY, QUICK_CHIPS } from '../planner-copy';
 import { PlannerStore } from '../planner-store';
 import { looksLikeLink } from '../maps-link';
 import { PlannerSheetComponent } from './planner-sheet.component';
+import { DateInputComponent } from '../../../../shared/date-input/date-input.component';
 
 /**
  * Adding or changing a stop in a few taps: What, Where, Time, plus quick chips (tap again to
@@ -18,7 +19,7 @@ import { PlannerSheetComponent } from './planner-sheet.component';
 @Component({
   selector: 'app-planner-add-stop',
   standalone: true,
-  imports: [PlannerSheetComponent],
+  imports: [DateInputComponent, PlannerSheetComponent],
   template: `
     <app-planner-sheet [open]="open()" [heading]="stop() ? copy.sheet.editTitle : copy.sheet.addTitle" (closed)="closed.emit()">
       <form class="form" (submit)="$event.preventDefault(); done()">
@@ -64,11 +65,11 @@ import { PlannerSheetComponent } from './planner-sheet.component';
           <legend class="tp-label">{{ copy.sheet.time }}</legend>
           <label class="time">
             <span class="tp-muted">{{ copy.sheet.start }}</span>
-            <input class="tp-input" type="time" data-testid="stop-start" [value]="startTime()" (input)="startTime.set(value($event))" />
+            <app-date-input mode="time" inputClass="tp-input" testId="stop-start" [ariaLabel]="copy.sheet.start" [value]="startTime()" (valueChange)="startTime.set($event)" />
           </label>
           <label class="time">
             <span class="tp-muted">{{ copy.sheet.end }}</span>
-            <input class="tp-input" type="time" data-testid="stop-end" [value]="endTime()" (input)="endTime.set(value($event))" />
+            <app-date-input mode="time" inputClass="tp-input" testId="stop-end" [ariaLabel]="copy.sheet.end" [value]="endTime()" (valueChange)="endTime.set($event)" />
           </label>
         </fieldset>
 

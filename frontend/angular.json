@@ -20,7 +20,7 @@
               "zone.js"
             ],
             "tsConfig": "tsconfig.app.json",
-            "allowedCommonJsDependencies": ["leaflet"],
+            "allowedCommonJsDependencies": ["leaflet", "flatpickr/dist/plugins/monthSelect"],
             "assets": [
               {
                 "glob": "**/*",
@@ -35,6 +35,16 @@
                 "glob": "leaflet.css",
                 "input": "node_modules/leaflet/dist",
                 "output": "leaflet/"
+              },
+              {
+                "glob": "flatpickr.min.css",
+                "input": "node_modules/flatpickr/dist",
+                "output": "flatpickr/"
+              },
+              {
+                "glob": "style.css",
+                "input": "node_modules/flatpickr/dist/plugins/monthSelect",
+                "output": "flatpickr/month-select/"
               }
             ],
             "styles": [

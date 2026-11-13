@@ -4,12 +4,13 @@ import { ModalComponent } from '../../../shared/modal/modal.component';
 import { TypeSelectComponent } from '../../../shared/type-select/type-select.component';
 import { Income, IncomePayload } from '../models/finance.models';
 import { localIsoDate } from '../../../core/utils/date';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 /** Add/edit an income record. Income is context only — nothing is derived from it. */
 @Component({
   selector: 'app-income-form',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent, TypeSelectComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, ModalComponent, TypeSelectComponent],
   template: `
     <app-modal
       [open]="open"
@@ -30,7 +31,7 @@ import { localIsoDate } from '../../../core/utils/date';
           </div>
           <div>
             <label class="mb-1 block">Date</label>
-            <input class="input-field" type="date" formControlName="txn_date" />
+            <app-date-input formControlName="txn_date" ariaLabel="Date" />
           </div>
         </div>
 

@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ModalComponent } from '../../../shared/modal/modal.component';
 import { Loan, LoanPayload } from '../models/finance.models';
 import { localIsoDate } from '../../../core/utils/date';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 /**
  * Loan details are entered once. The EMI schedule is generated from them, so
@@ -11,7 +12,7 @@ import { localIsoDate } from '../../../core/utils/date';
 @Component({
   selector: 'app-loan-form',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, ModalComponent],
   template: `
     <app-modal
       [open]="open"
@@ -56,7 +57,7 @@ import { localIsoDate } from '../../../core/utils/date';
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="mb-1 block">Start date</label>
-            <input class="input-field" type="date" formControlName="start_date" [attr.disabled]="loan ? true : null" />
+            <app-date-input formControlName="start_date" ariaLabel="Start date" [readonly]="!!loan" />
           </div>
           <div>
             <label class="mb-1 block">
@@ -65,11 +66,10 @@ import { localIsoDate } from '../../../core/utils/date';
                 <span class="text-xs" style="color: var(--text-muted)"> (locked — an EMI is already paid)</span>
               }
             </label>
-            <input
-              class="input-field"
-              type="date"
+            <app-date-input
               formControlName="emi_start_date"
-              [attr.disabled]="loan && loan.emis_paid > 0 ? true : null"
+              ariaLabel="EMI start date"
+              [readonly]="!!loan && loan.emis_paid > 0"
             />
           </div>
         </div>
@@ -89,7 +89,7 @@ import { localIsoDate } from '../../../core/utils/date';
           @if (form.value.scheduleMode === 'tenure') {
             <input class="input-field" type="number" min="1" formControlName="tenure_months" />
           } @else {
-            <input class="input-field" type="date" formControlName="last_emi_date" />
+            <app-date-input formControlName="last_emi_date" ariaLabel="Last EMI date" />
           }
         </div>
 

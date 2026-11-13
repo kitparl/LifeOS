@@ -6,11 +6,12 @@ import { Run, WEATHER_OPTIONS, durationToSeconds, secondsToParts } from './model
 import { RunningService } from './services/running.service';
 import { utcIsoDate } from '../../core/utils/date';
 import { apiErrorMessage } from '../../core/utils/http';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 @Component({
   selector: 'app-run-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, TypeSelectComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, RouterLink, TypeSelectComponent],
   template: `
     <div style="max-width: 520px">
       <div class="panel !p-0 overflow-hidden">
@@ -19,7 +20,7 @@ import { apiErrorMessage } from '../../core/utils/http';
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="form-label" for="run_date">Date</label>
-              <input id="run_date" class="input-field mt-1" type="date" formControlName="run_date" />
+              <app-date-input class="mt-1" inputId="run_date" formControlName="run_date" [clearable]="false" />
             </div>
             <div>
               <label class="form-label" for="distance_km">Distance (km)</label>

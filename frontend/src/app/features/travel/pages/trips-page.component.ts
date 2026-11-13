@@ -6,6 +6,7 @@ import { apiErrorMessage } from '../../../core/utils/http';
 import { ADVENTURE_KINDS, Adventure, AdventureKind, TRIP_STATUS_LABELS, TripListItem, TripStatus } from '../models/travel.models';
 import { ExportGuideComponent } from '../components/export-guide.component';
 import { TravelApiService } from '../services/travel-api.service';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 const GROUPS: readonly TripStatus[] = ['active', 'booked', 'planning', 'draft', 'completed'];
 
@@ -18,7 +19,7 @@ type NewKind = 'trip' | 'adventure';
 @Component({
   selector: 'app-travel-trips-page',
   standalone: true,
-  imports: [FormsModule, DatePipe, ExportGuideComponent],
+  imports: [DateInputComponent, FormsModule, DatePipe, ExportGuideComponent],
   template: `
     <div class="space-y-3">
       <form class="panel flex flex-wrap items-end gap-2 text-sm" (submit)="$event.preventDefault(); create()">
@@ -43,11 +44,11 @@ type NewKind = 'trip' | 'adventure';
         @if (newKind === 'trip') {
           <div class="flex flex-col gap-1">
             <label class="form-label" for="trip-start">Start (optional)</label>
-            <input id="trip-start" name="start" class="input-field" type="date" [(ngModel)]="start" />
+            <app-date-input inputId="trip-start" name="start" [(ngModel)]="start" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="form-label" for="trip-end">End (optional)</label>
-            <input id="trip-end" name="end" class="input-field" type="date" [(ngModel)]="end" />
+            <app-date-input inputId="trip-end" name="end" [(ngModel)]="end" />
           </div>
         } @else {
           <div class="flex flex-col gap-1">

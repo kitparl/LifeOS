@@ -8,6 +8,7 @@ import { apiErrorMessage } from '../../../core/utils/http';
 import { MapsSettings, PricingRow, USAGE_LEVEL_LABELS, UsageLevel, UsageSummary } from '../models/travel.models';
 import { UsageApiService } from '../services/usage-api.service';
 import { fromUsd, thresholdAlerts } from '../utils/usage';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 interface SettingsForm {
   protection_enabled: boolean;
@@ -25,12 +26,12 @@ interface SettingsForm {
 @Component({
   selector: 'app-travel-maps-usage-page',
   standalone: true,
-  imports: [FormsModule, RouterLink, DatePipe, DecimalPipe],
+  imports: [DateInputComponent, FormsModule, RouterLink, DatePipe, DecimalPipe],
   template: `
     <div class="space-y-3 text-sm">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h2 class="text-base font-semibold">Google Maps Usage</h2>
-        <input class="input-field !w-auto text-xs" type="month" aria-label="Month" [ngModel]="month()" (ngModelChange)="setMonth($event)" />
+        <app-date-input class="w-40" mode="month" inputClass="input-field text-xs" ariaLabel="Month" [clearable]="false" [value]="month()" (valueChange)="setMonth($event)" />
       </div>
       <p class="text-xs rounded p-2" style="background: var(--info-soft)">
         Application monitoring estimate. Google Cloud billing is the authoritative source for actual charges.

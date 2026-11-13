@@ -47,12 +47,12 @@ describe('PlannerAddStopComponent (quick add)', () => {
     });
     fixture.componentRef.setInput('open', true);
     fixture.detectChanges();
-    expect(q<HTMLInputElement>('[data-testid="stop-end"]').value).toBe('17:00');
+    expect(q<HTMLInputElement>('[data-testid="stop-end"]').value).toBe('5:00 pm');
     expect(q<HTMLInputElement>('[data-testid="stop-transport"]').value).toBe('Taxi');
     expect(q<HTMLTextAreaElement>('[data-testid="stop-notes"]').value).toBe('Carry water');
     const end = q<HTMLInputElement>('[data-testid="stop-end"]');
     end.value = '18:15';
-    end.dispatchEvent(new Event('input'));
+    end.dispatchEvent(new FocusEvent('blur')); // the time field reads typed text when it is left
     q<HTMLButtonElement>('[data-testid="stop-done"]').click();
     expect(saved[0]).toEqual(jasmine.objectContaining({ start_time: '09:30', end_time: '18:15', transport: 'Taxi', stay: 'Camp' }));
   });

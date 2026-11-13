@@ -14,6 +14,7 @@ import { RunningService } from './services/running.service';
 import { isPastDate } from './running-date.utils';
 import { utcIsoDate } from '../../core/utils/date';
 import { apiErrorMessage } from '../../core/utils/http';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 interface EventPhotoItem {
   url: string;
@@ -23,7 +24,7 @@ interface EventPhotoItem {
 @Component({
   selector: 'app-race-event-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, TypeSelectComponent, FileUploadComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, RouterLink, TypeSelectComponent, FileUploadComponent],
   template: `
     <div style="max-width: 640px">
       <div class="panel !p-0 overflow-hidden">
@@ -39,7 +40,7 @@ interface EventPhotoItem {
               </div>
               <div>
                 <label class="form-label" for="race_date">Date</label>
-                <input id="race_date" class="input-field mt-1" type="date" formControlName="race_date" />
+                <app-date-input class="mt-1" inputId="race_date" formControlName="race_date" />
               </div>
               <div>
                 <label class="form-label">Distance</label>

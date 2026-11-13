@@ -9,6 +9,7 @@ import { PhotoUploadComponent } from '../components/photo-upload.component';
 import { MapMarker, TravelMapComponent } from '../map/travel-map.component';
 import { JournalEntry, Place, TravelPhoto, TripListItem } from '../models/travel.models';
 import { TravelApiService } from '../services/travel-api.service';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 type View = 'photos' | 'map' | 'journal';
 
@@ -16,7 +17,7 @@ type View = 'photos' | 'map' | 'journal';
 @Component({
   selector: 'app-travel-memories-page',
   standalone: true,
-  imports: [FormsModule, DatePipe, FileImageSrcDirective, ModalComponent, PhotoUploadComponent, TravelMapComponent],
+  imports: [DateInputComponent, FormsModule, DatePipe, FileImageSrcDirective, ModalComponent, PhotoUploadComponent, TravelMapComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center gap-2">
@@ -52,7 +53,7 @@ type View = 'photos' | 'map' | 'journal';
         @case ('journal') {
           <form class="panel space-y-2 text-sm" (submit)="$event.preventDefault(); saveEntry()">
             <div class="flex flex-wrap gap-2">
-              <input class="input-field !w-auto" type="date" name="date" aria-label="Date" [(ngModel)]="entry.entry_date" />
+              <app-date-input class="w-44" name="date" ariaLabel="Date" [(ngModel)]="entry.entry_date" />
               <input class="input-field min-w-[12rem] flex-1" name="title" maxlength="200" placeholder="June 17 — Trek Day 2" aria-label="Title" [(ngModel)]="entry.title" />
               <select class="input-field !w-auto" name="place" aria-label="Place" [(ngModel)]="entry.place_id">
                 <option [ngValue]="null">No place</option>

@@ -23,6 +23,7 @@ import {
 } from '../models/travel.models';
 import { TravelApiService } from '../services/travel-api.service';
 import { pathLengthM } from '../utils/geo';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 type Mode = 'select' | 'pin' | 'draw' | 'gpx';
 
@@ -40,7 +41,7 @@ const SOURCE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-travel-adventure-detail',
   standalone: true,
-  imports: [FormsModule, RouterLink, DatePipe, ExportGuideComponent, TravelMapComponent],
+  imports: [DateInputComponent, FormsModule, RouterLink, DatePipe, ExportGuideComponent, TravelMapComponent],
   template: `
     @if (detail(); as d) {
       <div class="space-y-3">
@@ -57,8 +58,8 @@ const SOURCE_LABELS: Record<string, string> = {
               <option [value]="x">{{ x }}</option>
             }
           </select>
-          <label class="text-xs">Start <input class="input-field" type="date" [ngModel]="d.adventure.start_date" (change)="save({ start_date: val($event) || null })" /></label>
-          <label class="text-xs">End <input class="input-field" type="date" [ngModel]="d.adventure.end_date" (change)="save({ end_date: val($event) || null })" /></label>
+          <label class="text-xs">Start <app-date-input ariaLabel="Start" [value]="d.adventure.start_date" (valueChange)="save({ start_date: $event || null })" /></label>
+          <label class="text-xs">End <app-date-input ariaLabel="End" [value]="d.adventure.end_date" (valueChange)="save({ end_date: $event || null })" /></label>
           <label class="text-xs sm:col-span-2">Trip
             <select class="input-field" [ngModel]="d.adventure.trip_id ?? ''" (ngModelChange)="save({ trip_id: $event || null })">
               <option value="">Not part of a trip</option>

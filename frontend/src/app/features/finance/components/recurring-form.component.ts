@@ -4,6 +4,7 @@ import { ModalComponent } from '../../../shared/modal/modal.component';
 import { TypeSelectComponent } from '../../../shared/type-select/type-select.component';
 import { RecurringExpense, RecurringPayload } from '../models/finance.models';
 import { startOfMonthIso } from '../utils/period';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 /**
  * A recurring definition. It is not an expense — it generates one expense per
@@ -12,7 +13,7 @@ import { startOfMonthIso } from '../utils/period';
 @Component({
   selector: 'app-recurring-form',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent, TypeSelectComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, ModalComponent, TypeSelectComponent],
   template: `
     <app-modal
       [open]="open"
@@ -70,11 +71,11 @@ import { startOfMonthIso } from '../utils/period';
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="mb-1 block">Start date</label>
-            <input class="input-field" type="date" formControlName="start_date" />
+            <app-date-input formControlName="start_date" ariaLabel="Start date" />
           </div>
           <div>
             <label class="mb-1 block">End date (optional)</label>
-            <input class="input-field" type="date" formControlName="end_date" />
+            <app-date-input formControlName="end_date" ariaLabel="End date" />
           </div>
         </div>
 

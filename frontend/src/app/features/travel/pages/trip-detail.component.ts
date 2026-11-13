@@ -32,6 +32,7 @@ import { TravelApiService } from '../services/travel-api.service';
 import { decodePolyline } from '../utils/geo';
 import { searchBias, stopDayLabels } from '../utils/itinerary';
 import { directionsUrl } from '../utils/google-links';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 type MobileTab = 'map' | 'itinerary';
 
@@ -54,7 +55,7 @@ interface LegRow {
 @Component({
   selector: 'app-travel-trip-detail',
   standalone: true,
-  imports: [
+  imports: [DateInputComponent, 
     FormsModule,
     RouterLink,
     ExportGuideComponent,
@@ -75,10 +76,10 @@ interface LegRow {
           </div>
           <div class="flex flex-wrap items-end gap-2">
             <label class="text-xs">Start
-              <input class="input-field" type="date" [ngModel]="d.trip.start_date" (change)="update({ start_date: val($event) || null })" />
+              <app-date-input ariaLabel="Start" [value]="d.trip.start_date" (valueChange)="update({ start_date: $event || null })" />
             </label>
             <label class="text-xs">End
-              <input class="input-field" type="date" [ngModel]="d.trip.end_date" (change)="update({ end_date: val($event) || null })" />
+              <app-date-input ariaLabel="End" [value]="d.trip.end_date" (valueChange)="update({ end_date: $event || null })" />
             </label>
             @if (isDraft()) {
               <label class="flex items-center gap-1 text-xs">

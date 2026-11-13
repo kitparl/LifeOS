@@ -8,11 +8,12 @@ import { combineDueDate, splitDueDate } from './task-due-date.util';
 import { TasksService } from './services/tasks.service';
 import { localIsoDate } from '../../core/utils/date';
 import { apiErrorMessage } from '../../core/utils/http';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 @Component({
   selector: 'app-task-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, UserPickerComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, RouterLink, UserPickerComponent],
   template: `
     <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
@@ -25,8 +26,8 @@ import { apiErrorMessage } from '../../core/utils/http';
           <div>
             <label for="task-due-date" class="mb-1 block">Due date</label>
             <div class="flex flex-wrap items-center gap-2">
-              <input id="task-due-date" class="input-field min-w-[10rem] flex-1" type="date" formControlName="due_date" />
-              <input class="input-field !w-auto" type="time" formControlName="due_time" aria-label="Due time (optional)" />
+              <app-date-input class="min-w-[10rem] flex-1" inputId="task-due-date" formControlName="due_date" />
+              <app-date-input class="w-36" mode="time" formControlName="due_time" ariaLabel="Due time (optional)" />
               <button type="button" class="btn-ghost text-xs shrink-0" (click)="clearDueDate()">Clear</button>
             </div>
             <p class="mt-1 text-xs" style="color: var(--text-muted)">Time is optional. Clear for no date.</p>

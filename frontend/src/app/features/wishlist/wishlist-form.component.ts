@@ -12,6 +12,7 @@ import {
 } from './models/wishlist.models';
 import { WishlistService } from './services/wishlist.service';
 import { apiErrorMessage } from '../../core/utils/http';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 interface PhotoItem {
   url: string;
@@ -22,7 +23,7 @@ interface PhotoItem {
 @Component({
   selector: 'app-wishlist-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, FileUploadComponent, TypeSelectComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, RouterLink, FileUploadComponent, TypeSelectComponent],
   template: `
     <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
@@ -52,7 +53,7 @@ interface PhotoItem {
             </div>
             <div>
               <label class="mb-1 block">Achieved date</label>
-              <input class="input-field" type="date" formControlName="achieved_date" />
+              <app-date-input formControlName="achieved_date" ariaLabel="Achieved date" />
             </div>
           </div>
           <div class="grid grid-cols-2 gap-2">

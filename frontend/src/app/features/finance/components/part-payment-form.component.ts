@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ModalComponent } from '../../../shared/modal/modal.component';
 import { LoanPartPaymentPayload } from '../models/finance.models';
 import { localIsoDate } from '../../../core/utils/date';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 /**
  * Records a part-payment as a tracking event. The user picks whether it
@@ -12,14 +13,14 @@ import { localIsoDate } from '../../../core/utils/date';
 @Component({
   selector: 'app-part-payment-form',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, ModalComponent],
   template: `
     <app-modal [open]="open" title="Make Part Payment" [maxWidth]="'480px'" (closed)="closed.emit()">
       <form body class="grid gap-3 text-sm" [formGroup]="form" (ngSubmit)="submit()">
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="mb-1 block">Payment date</label>
-            <input class="input-field" type="date" formControlName="payment_date" />
+            <app-date-input formControlName="payment_date" ariaLabel="Payment date" />
           </div>
           <div>
             <label class="mb-1 block">Part payment amount</label>

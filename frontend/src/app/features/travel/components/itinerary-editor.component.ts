@@ -16,6 +16,7 @@ import {
 } from '../models/travel.models';
 import { dayEndpoints, moveItem, searchBias } from '../utils/itinerary';
 import { PickedPlace, PlaceSearchComponent } from './place-search.component';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 export interface ItemPatch {
   id: string;
@@ -57,7 +58,7 @@ export interface NewCheckpoints {
 @Component({
   selector: 'app-itinerary-editor',
   standalone: true,
-  imports: [FormsModule, DatePipe, CdkDropListGroup, CdkDropList, CdkDrag, CdkDragHandle, PlaceSearchComponent],
+  imports: [DateInputComponent, FormsModule, DatePipe, CdkDropListGroup, CdkDropList, CdkDrag, CdkDragHandle, PlaceSearchComponent],
   template: `
     <div class="space-y-3" cdkDropListGroup>
       @for (day of days(); track day.id) {
@@ -148,10 +149,10 @@ export interface NewCheckpoints {
 
                         <div class="grid grid-cols-2 gap-2">
                           <label class="text-xs font-medium" style="color: var(--text-muted)">Start
-                            <input class="input-field mt-1 text-sm" type="time" [ngModel]="item.start_time?.slice(0, 5)" (change)="patch(item, { start_time: val($event) || null })" />
+                            <app-date-input class="mt-1" mode="time" inputClass="input-field text-sm" ariaLabel="Start time" [value]="item.start_time?.slice(0, 5) ?? ''" (valueChange)="patch(item, { start_time: $event || null })" />
                           </label>
                           <label class="text-xs font-medium" style="color: var(--text-muted)">End
-                            <input class="input-field mt-1 text-sm" type="time" [ngModel]="item.end_time?.slice(0, 5)" (change)="patch(item, { end_time: val($event) || null })" />
+                            <app-date-input class="mt-1" mode="time" inputClass="input-field text-sm" ariaLabel="End time" [value]="item.end_time?.slice(0, 5) ?? ''" (valueChange)="patch(item, { end_time: $event || null })" />
                           </label>
                           <label class="text-xs font-medium" style="color: var(--text-muted)">Transport
                             <input class="input-field mt-1 text-sm" maxlength="120" placeholder="e.g. Taxi" [ngModel]="item.transport ?? ''" (change)="patch(item, { transport: val($event) || null })" />

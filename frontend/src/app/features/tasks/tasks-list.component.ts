@@ -7,6 +7,7 @@ import { combineDueDate } from './task-due-date.util';
 import { TaskListItem, TaskScope } from './models/task.models';
 import { TasksService } from './services/tasks.service';
 import { localIsoDate } from '../../core/utils/date';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 type TaskListKey = 'today' | 'overdue' | 'nodate' | 'upcoming';
 /** Overdue is shown inside the Today view, so it has no view of its own. */
@@ -32,7 +33,7 @@ interface TaskListState {
 @Component({
   selector: 'app-tasks-list',
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, RouterLink, TaskListSectionComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, FormsModule, RouterLink, TaskListSectionComponent],
   template: `
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -104,17 +105,16 @@ interface TaskListState {
         <div class="panel space-y-2 !py-3">
           <p class="text-sm font-medium">Due date for “{{ scheduleTaskTitle }}”</p>
           <div class="flex flex-wrap gap-2">
-            <input
-              class="input-field flex-1 min-w-[10rem]"
-              type="date"
-              aria-label="Due date"
+            <app-date-input
+              class="flex-1 min-w-[10rem]"
+              ariaLabel="Due date"
               [(ngModel)]="scheduleDate"
               [ngModelOptions]="{ standalone: true }"
             />
-            <input
-              class="input-field !w-auto"
-              type="time"
-              aria-label="Time (optional)"
+            <app-date-input
+              class="w-36"
+              mode="time"
+              ariaLabel="Time (optional)"
               [(ngModel)]="scheduleTime"
               [ngModelOptions]="{ standalone: true }"
             />

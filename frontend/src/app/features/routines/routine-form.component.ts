@@ -19,11 +19,12 @@ import {
 } from './models/routine.models';
 import { RoutinesService } from './services/routines.service';
 import { utcIsoDate } from '../../core/utils/date';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 @Component({
   selector: 'app-routine-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DateChipsComponent, TypeSelectComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, RouterLink, DateChipsComponent, TypeSelectComponent],
   template: `
     <div class="max-w-2xl space-y-3">
       <div class="panel !p-0 overflow-hidden">
@@ -53,11 +54,11 @@ import { utcIsoDate } from '../../core/utils/date';
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="mb-1 block">Period start</label>
-              <input class="input-field" type="date" formControlName="start_date" />
+              <app-date-input formControlName="start_date" ariaLabel="Period start" />
             </div>
             <div>
               <label class="mb-1 block">Period end (optional)</label>
-              <input class="input-field" type="date" formControlName="end_date" />
+              <app-date-input formControlName="end_date" ariaLabel="Period end" />
             </div>
           </div>
 
@@ -133,11 +134,11 @@ import { utcIsoDate } from '../../core/utils/date';
                 <div class="grid grid-cols-2 gap-2">
                   <div>
                     <label class="mb-1 block text-xs">Start</label>
-                    <input class="input-field" type="time" formControlName="start_time" />
+                    <app-date-input mode="time" formControlName="start_time" ariaLabel="Start time" />
                   </div>
                   <div>
                     <label class="mb-1 block text-xs">End</label>
-                    <input class="input-field" type="time" formControlName="end_time" />
+                    <app-date-input mode="time" formControlName="end_time" ariaLabel="End time" />
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">

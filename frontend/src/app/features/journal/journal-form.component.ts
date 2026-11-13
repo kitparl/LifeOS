@@ -11,11 +11,12 @@ import { JOURNAL_TYPES, JournalType } from './models/journal.models';
 import { JournalService } from './services/journal.service';
 import { utcIsoDate } from '../../core/utils/date';
 import { apiErrorMessage } from '../../core/utils/http';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 @Component({
   selector: 'app-journal-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, CodeWorkspaceComponent, MarkdownPipe, DatePipe, TitleCasePipe, MarkdownImportButtonComponent, MarkdownExportButtonComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, RouterLink, CodeWorkspaceComponent, MarkdownPipe, DatePipe, TitleCasePipe, MarkdownImportButtonComponent, MarkdownExportButtonComponent],
   template: `
     <form class="journal-writer" [formGroup]="form" (ngSubmit)="submit()">
       <div class="journal-writer__bar">
@@ -83,7 +84,7 @@ import { apiErrorMessage } from '../../core/utils/http';
         />
 
         <div class="journal-writer__meta">
-          <input class="journal-writer__date" type="date" formControlName="entry_date" aria-label="Date" />
+          <app-date-input class="w-40" inputClass="journal-writer__date" formControlName="entry_date" ariaLabel="Date" [clearable]="false" />
           <select class="journal-writer__date" formControlName="entry_type" aria-label="Type">
             @for (t of types; track t.value) {
               <option [value]="t.value">{{ t.label }}</option>

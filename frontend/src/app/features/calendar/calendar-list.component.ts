@@ -24,6 +24,7 @@ import {
   categoryColor,
 } from './models/calendar.models';
 import { toDatetimeLocalValue } from '../../core/utils/date';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 interface QuickCreateState {
   startStr: string;   // datetime-local format
@@ -34,7 +35,7 @@ interface QuickCreateState {
 @Component({
   selector: 'app-calendar-list',
   standalone: true,
-  imports: [FullCalendarModule, FormsModule, RouterLink, CalendarEventModalComponent],
+  imports: [DateInputComponent, FullCalendarModule, FormsModule, RouterLink, CalendarEventModalComponent],
   template: `
     <!-- ====== Quick-Create Modal ====== -->
     @if (quickCreate()) {
@@ -73,19 +74,22 @@ interface QuickCreateState {
               <div class="grid grid-cols-2 gap-2">
                 <div>
                   <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">Start</label>
-                  <input
-                    [type]="qcAllDay ? 'date' : 'datetime-local'"
-                    class="input-field w-full text-sm"
+                  <app-date-input
+                    [mode]="qcAllDay ? 'date' : 'datetime'"
+                    inputClass="input-field text-sm"
+                    ariaLabel="Start"
                     [(ngModel)]="qcStart"
                     name="start"
+                    [clearable]="false"
                     required
                   />
                 </div>
                 <div>
                   <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">End</label>
-                  <input
-                    [type]="qcAllDay ? 'date' : 'datetime-local'"
-                    class="input-field w-full text-sm"
+                  <app-date-input
+                    [mode]="qcAllDay ? 'date' : 'datetime'"
+                    inputClass="input-field text-sm"
+                    ariaLabel="End"
                     [(ngModel)]="qcEnd"
                     name="end"
                   />

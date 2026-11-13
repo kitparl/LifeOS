@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { toDatetimeLocalValue } from '../../../core/utils/date';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 /**
  * A date/time input that supports free typing and pasting (any format `Date` or
@@ -10,7 +11,7 @@ import { toDatetimeLocalValue } from '../../../core/utils/date';
 @Component({
   selector: 'app-date-time-input',
   standalone: true,
-  imports: [FormsModule],
+  imports: [DateInputComponent, FormsModule],
   template: `
     <div class="flex gap-2">
       <input
@@ -20,12 +21,13 @@ import { toDatetimeLocalValue } from '../../../core/utils/date';
         [ngModel]="value"
         (ngModelChange)="valueChange.emit($event)"
       />
-      <input
-        class="input-field w-auto"
-        type="datetime-local"
-        title="Pick a date and time"
-        [ngModel]="pickerValue()"
-        (ngModelChange)="valueChange.emit($event)"
+      <app-date-input
+        class="w-60 shrink-0"
+        mode="datetime"
+        ariaLabel="Pick a date and time"
+        [clearable]="false"
+        [value]="pickerValue()"
+        (valueChange)="valueChange.emit($event)"
       />
     </div>
   `,

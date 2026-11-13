@@ -12,11 +12,12 @@ import {
 import { CalendarService } from './services/calendar.service';
 import { utcIsoMinute } from '../../core/utils/date';
 import { apiErrorMessage } from '../../core/utils/http';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 @Component({
   selector: 'app-event-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [DateInputComponent, ReactiveFormsModule, RouterLink],
   template: `
     <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
@@ -61,19 +62,11 @@ import { apiErrorMessage } from '../../core/utils/http';
           </div>
           <div>
             <label class="mb-1 block">Starts</label>
-            <input
-              class="input-field"
-              [type]="useDateInputs ? 'date' : 'datetime-local'"
-              formControlName="starts_at"
-            />
+            <app-date-input [mode]="useDateInputs ? 'date' : 'datetime'" formControlName="starts_at" ariaLabel="Starts" />
           </div>
           <div>
             <label class="mb-1 block">Ends</label>
-            <input
-              class="input-field"
-              [type]="useDateInputs ? 'date' : 'datetime-local'"
-              formControlName="ends_at"
-            />
+            <app-date-input [mode]="useDateInputs ? 'date' : 'datetime'" formControlName="ends_at" ariaLabel="Ends" />
           </div>
           <label class="flex items-center gap-2">
             <input type="checkbox" formControlName="all_day" (change)="onAllDayChange()" />

@@ -4,12 +4,13 @@ import { ModalComponent } from '../../../shared/modal/modal.component';
 import { TypeSelectComponent } from '../../../shared/type-select/type-select.component';
 import { Expense, ExpensePayload, RecurringPayload } from '../models/finance.models';
 import { localIsoDate } from '../../../core/utils/date';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 /** Add/edit an expense. Date defaults to today so entry stays fast. */
 @Component({
   selector: 'app-expense-form',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent, TypeSelectComponent],
+  imports: [DateInputComponent, ReactiveFormsModule, ModalComponent, TypeSelectComponent],
   template: `
     <app-modal
       [open]="open"
@@ -30,7 +31,7 @@ import { localIsoDate } from '../../../core/utils/date';
           </div>
           <div>
             <label class="mb-1 block">Date</label>
-            <input class="input-field" type="date" formControlName="txn_date" />
+            <app-date-input formControlName="txn_date" ariaLabel="Date" />
           </div>
         </div>
 
@@ -80,7 +81,7 @@ import { localIsoDate } from '../../../core/utils/date';
               <div class="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
                   <label class="mb-1 block">End date (optional)</label>
-                  <input class="input-field" type="date" formControlName="end_date" />
+                  <app-date-input formControlName="end_date" ariaLabel="End date" />
                 </div>
               </div>
               <p class="mt-2 text-xs" style="color: var(--text-muted)">

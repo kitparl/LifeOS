@@ -6,10 +6,11 @@ import {
   forwardRef,
   signal,
 } from '@angular/core';
-import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { DateInputComponent } from '../date-input/date-input.component';
 
 /**
- * DateChipsComponent — pick ISO dates into a removable chip list.
+ * DateChipsComponent — pick ISO dates into a removable chip list. Picking (or typing) a date adds it.
  *
  *   <app-date-chips formControlName="skip_dates" />
  *   <app-date-chips [(ngModel)]="skipDates" />
@@ -17,7 +18,7 @@ import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/f
 @Component({
   selector: 'app-date-chips',
   standalone: true,
-  imports: [FormsModule],
+  imports: [DateInputComponent],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -44,23 +45,13 @@ import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/f
           <span class="text-xs" style="color: var(--text-muted)">No dates added</span>
         }
       </div>
-      <div class="flex gap-2 items-end">
-        <input
-          class="input-field flex-1"
-          type="date"
-          [disabled]="disabled()"
-          [(ngModel)]="draft"
-          [ngModelOptions]="{ standalone: true }"
-        />
-        <button
-          type="button"
-          class="btn-primary text-xs shrink-0"
-          [disabled]="disabled() || !draft"
-          (click)="add()"
-        >
-          Add
-        </button>
-      </div>
+      <app-date-input
+        #picker
+        ariaLabel="Add a date"
+        [placeholder]="placeholder"
+        [readonly]="disabled()"
+        (valueChange)="add($event); picker.writeValue('')"
+      />
     </div>
   `,
   styles: [
@@ -82,12 +73,11 @@ import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/f
   ],
 })
 export class DateChipsComponent implements ControlValueAccessor {
-  @Input() placeholder = 'Add a date';
+  @Input() placeholder = 'Pick or type a date to add it';
   @Output() changed = new EventEmitter<string[]>();
 
   readonly dates = signal<string[]>([]);
   readonly disabled = signal(false);
-  draft = '';
 
   private onChange: (value: string[]) => void = () => {};
   private onTouched: () => void = () => {};
@@ -108,12 +98,10 @@ export class DateChipsComponent implements ControlValueAccessor {
     this.disabled.set(isDisabled);
   }
 
-  add(): void {
-    const d = (this.draft || '').trim();
-    if (!d) return;
-    const next = Array.from(new Set([...this.dates(), d])).sort();
+  add(date: string): void {
+    if (!date) return;
+    const next = Array.from(new Set([...this.dates(), date])).sort();
     this.dates.set(next);
-    this.draft = '';
     this.emit(next);
   }
 

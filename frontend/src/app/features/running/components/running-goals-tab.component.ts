@@ -1,10 +1,11 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 @Component({
   selector: 'app-running-goals-tab',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [DateInputComponent, ReactiveFormsModule],
   host: { class: 'contents' },
   template: `
     <div class="panel !p-0 overflow-hidden" style="max-width: 400px">
@@ -20,11 +21,11 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
         </div>
         <div>
           <label class="form-label">Marathon date</label>
-          <input class="input-field mt-1" type="date" formControlName="target_marathon_date" />
+          <app-date-input class="mt-1" formControlName="target_marathon_date" ariaLabel="Marathon date" />
         </div>
         <div>
           <label class="form-label">Half marathon date</label>
-          <input class="input-field mt-1" type="date" formControlName="target_half_marathon_date" />
+          <app-date-input class="mt-1" formControlName="target_half_marathon_date" ariaLabel="Half marathon date" />
         </div>
         <button type="submit" class="btn-primary text-xs w-full" [disabled]="settingsForm.invalid">Save goals</button>
       </form>

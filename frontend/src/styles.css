@@ -2396,3 +2396,121 @@ summary::-webkit-details-marker {
   }
 }
 
+
+/* =========================================================
+   DATE INPUT — flatpickr themed with the design tokens
+   (base stylesheet loads on demand; `html` keeps these ahead of it)
+   ========================================================= */
+
+html .flatpickr-calendar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-family: inherit;
+  color: var(--text);
+}
+html .flatpickr-calendar.arrowTop:before { border-bottom-color: var(--border); }
+html .flatpickr-calendar.arrowTop:after { border-bottom-color: var(--surface); }
+html .flatpickr-calendar.arrowBottom:before { border-top-color: var(--border); }
+html .flatpickr-calendar.arrowBottom:after { border-top-color: var(--surface); }
+
+html .flatpickr-months .flatpickr-month,
+html .flatpickr-current-month .flatpickr-monthDropdown-months,
+html .flatpickr-current-month input.cur-year,
+html span.flatpickr-weekday {
+  background: transparent;
+  color: var(--text);
+  fill: var(--text);
+}
+html .flatpickr-current-month .flatpickr-monthDropdown-months .flatpickr-monthDropdown-month {
+  background: var(--surface);
+  color: var(--text);
+}
+html .flatpickr-current-month .flatpickr-monthDropdown-months:hover,
+html .numInputWrapper:hover { background: var(--surface-2); }
+html .flatpickr-months .flatpickr-prev-month,
+html .flatpickr-months .flatpickr-next-month { color: var(--text-muted); fill: var(--text-muted); }
+html .flatpickr-months .flatpickr-prev-month:hover svg,
+html .flatpickr-months .flatpickr-next-month:hover svg { fill: var(--primary); }
+html .numInputWrapper span.arrowUp:after { border-bottom-color: var(--text-muted); }
+html .numInputWrapper span.arrowDown:after { border-top-color: var(--text-muted); }
+
+html .flatpickr-day { color: var(--text); border-radius: var(--radius-md); }
+html .flatpickr-day:hover,
+html .flatpickr-day:focus,
+html .flatpickr-day.prevMonthDay:hover,
+html .flatpickr-day.nextMonthDay:hover {
+  background: var(--surface-2);
+  border-color: var(--surface-2);
+}
+html .flatpickr-day.today { border-color: var(--primary); }
+html .flatpickr-day.today:hover,
+html .flatpickr-day.today:focus { background: var(--primary-soft); border-color: var(--primary); color: var(--text); }
+html .flatpickr-day.selected,
+html .flatpickr-day.selected:hover,
+html .flatpickr-day.selected:focus,
+html .flatpickr-day.selected.today,
+html .flatpickr-day.selected.prevMonthDay,
+html .flatpickr-day.selected.nextMonthDay {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-contrast);
+}
+html .flatpickr-day.prevMonthDay,
+html .flatpickr-day.nextMonthDay,
+html .flatpickr-day.flatpickr-disabled,
+html .flatpickr-day.flatpickr-disabled:hover { color: var(--text-faint); }
+
+html .flatpickr-calendar.hasTime .flatpickr-time { border-top-color: var(--border); }
+html .flatpickr-time input,
+html .flatpickr-time .flatpickr-am-pm,
+html .flatpickr-time .flatpickr-time-separator { color: var(--text); }
+html .flatpickr-time input:hover,
+html .flatpickr-time input:focus,
+html .flatpickr-time .flatpickr-am-pm:hover,
+html .flatpickr-time .flatpickr-am-pm:focus { background: var(--surface-2); }
+
+/* monthSelect plugin */
+html .flatpickr-monthSelect-month { color: var(--text); border-radius: var(--radius-md); }
+html .flatpickr-monthSelect-month:hover,
+html .flatpickr-monthSelect-month:focus { background: var(--surface-2); }
+html .flatpickr-monthSelect-month.selected,
+html .flatpickr-monthSelect-month.selected:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-contrast);
+}
+
+/* Quick picks + typing hint (added by <app-date-input>) */
+.date-input__footer {
+  border-top: 1px solid var(--border);
+  padding: 0.5rem;
+  max-width: 307px;
+}
+.date-input__picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.date-input__pick {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.date-input__pick:hover,
+.date-input__pick:focus-visible {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.date-input__hint {
+  margin-top: 0.4rem;
+  font-size: 0.65rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}

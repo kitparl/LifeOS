@@ -1,4 +1,5 @@
 import type * as Leaflet from 'leaflet';
+import { ensureStylesheet } from '../../../core/utils/stylesheet';
 
 /**
  * Leaflet is loaded on demand so it (and its CSS) only ever reaches users who open Travel.
@@ -8,18 +9,8 @@ let loading: Promise<typeof Leaflet> | null = null;
 
 export function loadLeaflet(): Promise<typeof Leaflet> {
   if (!loading) {
-    ensureStylesheet();
+    ensureStylesheet('leaflet-css', 'leaflet/leaflet.css');
     loading = import('leaflet').then((mod) => ((mod as { default?: typeof Leaflet }).default ?? mod) as typeof Leaflet);
   }
   return loading;
-}
-
-function ensureStylesheet(): void {
-  const id = 'leaflet-css';
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = 'leaflet/leaflet.css';
-  document.head.appendChild(link);
 }

@@ -11,11 +11,12 @@ import {
   TelegramWebhookStatus,
 } from '../services/integrations.service';
 import { apiErrorMessage } from '../../../core/utils/http';
+import { DateInputComponent } from '../../../shared/date-input/date-input.component';
 
 @Component({
   selector: 'app-telegram-config',
   standalone: true,
-  imports: [FormsModule, SecretInputComponent],
+  imports: [DateInputComponent, FormsModule, SecretInputComponent],
   host: { class: 'contents' },
   template: `
     <div class="panel text-sm sm:col-span-2 lg:col-span-2">
@@ -118,7 +119,7 @@ import { apiErrorMessage } from '../../../core/utils/http';
               Morning
             </label>
             <div>
-              <input class="input-field w-full" type="time" [(ngModel)]="morningTime" />
+              <app-date-input mode="time" ariaLabel="Morning time" [clearable]="false" [(ngModel)]="morningTime" />
               <p class="text-xs mt-1" style="color: var(--text-muted)">
                 {{ nextRunLabel('morning') }}
               </p>
@@ -128,7 +129,7 @@ import { apiErrorMessage } from '../../../core/utils/http';
               Midday nudge
             </label>
             <div>
-              <input class="input-field w-full" type="time" [(ngModel)]="middayTime" />
+              <app-date-input mode="time" ariaLabel="Midday time" [clearable]="false" [(ngModel)]="middayTime" />
               <p class="text-xs mt-1" style="color: var(--text-muted)">
                 {{ nextRunLabel('midday') }}
               </p>
@@ -138,7 +139,7 @@ import { apiErrorMessage } from '../../../core/utils/http';
               Night wrap
             </label>
             <div>
-              <input class="input-field w-full" type="time" [(ngModel)]="nightTime" />
+              <app-date-input mode="time" ariaLabel="Night time" [clearable]="false" [(ngModel)]="nightTime" />
               <p class="text-xs mt-1" style="color: var(--text-muted)">
                 {{ nextRunLabel('night') }}
               </p>
@@ -149,7 +150,7 @@ import { apiErrorMessage } from '../../../core/utils/http';
             </label>
             <div>
               <div class="flex gap-1">
-                <input class="input-field flex-1" type="time" [(ngModel)]="weeklyTime" />
+                <app-date-input class="flex-1" mode="time" ariaLabel="Weekly time" [clearable]="false" [(ngModel)]="weeklyTime" />
                 <select class="input-field" [(ngModel)]="weeklyWeekday">
                   <option [ngValue]="0">Mon</option>
                   <option [ngValue]="1">Tue</option>
@@ -169,7 +170,7 @@ import { apiErrorMessage } from '../../../core/utils/http';
               AI briefing
             </label>
             <div>
-              <input class="input-field w-full" type="time" [(ngModel)]="aiBriefingTime" />
+              <app-date-input mode="time" ariaLabel="AI briefing time" [clearable]="false" [(ngModel)]="aiBriefingTime" />
               <p class="text-xs mt-1" style="color: var(--text-muted)">
                 {{ nextRunLabel('ai_briefing') }}
               </p>
