@@ -92,6 +92,15 @@ class Settings(BaseSettings):
     article_retention_days: int = Field(default=30, ge=1, validation_alias="ARTICLE_RETENTION_DAYS")
     news_proxy_per_minute: int = Field(default=60, ge=1, validation_alias="NEWS_PROXY_PER_MINUTE")
     news_writes_per_hour: int = Field(default=300, ge=1, validation_alias="NEWS_WRITES_PER_HOUR")
+    # --- Garmin activity import (.fit files and Garmin export archives; untrusted uploads) ---
+    garmin_import_max_fit_bytes: int = Field(default=20 * 1024 * 1024, ge=1024, validation_alias="GARMIN_IMPORT_MAX_FIT_BYTES")
+    garmin_import_max_archive_bytes: int = Field(default=500 * 1024 * 1024, ge=1024, validation_alias="GARMIN_IMPORT_MAX_ARCHIVE_BYTES")
+    garmin_import_max_files: int = Field(default=20, ge=1, le=100, validation_alias="GARMIN_IMPORT_MAX_FILES")
+    garmin_import_max_archive_entries: int = Field(default=20000, ge=1, validation_alias="GARMIN_IMPORT_MAX_ARCHIVE_ENTRIES")
+    garmin_import_max_uncompressed_bytes: int = Field(default=2 * 1024**3, ge=1024, validation_alias="GARMIN_IMPORT_MAX_UNCOMPRESSED_BYTES")
+    garmin_import_max_entry_bytes: int = Field(default=50 * 1024 * 1024, ge=1024, validation_alias="GARMIN_IMPORT_MAX_ENTRY_BYTES")
+    fit_parse_max_messages: int = Field(default=1_000_000, ge=1000, validation_alias="FIT_PARSE_MAX_MESSAGES")
+    fit_parse_max_seconds: float = Field(default=20.0, gt=0, validation_alias="FIT_PARSE_MAX_SECONDS")
     # --- DSA practice (go-judge sandbox, internal only; empty URL disables judging) ---
     dsa_judge_url: str = Field(default="", validation_alias="DSA_JUDGE_URL")
     dsa_judge_token: str = Field(default="", validation_alias="DSA_JUDGE_TOKEN")

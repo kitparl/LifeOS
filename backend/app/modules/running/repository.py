@@ -1,11 +1,13 @@
 
-from sqlalchemy import select
+from datetime import date
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import taxonomy
 from app.core.pagination import Pagination, paginate
 from app.core.timezone import utc_today
-from app.modules.running.models import RaceEvent, Run, RunningAccreditation, RunningSettings, RunningShoe
+from app.modules.running.models import ORIGIN_MANUAL, RaceEvent, Run, RunningAccreditation, RunningSettings, RunningShoe
 from app.modules.running.schemas import RaceCreate, RaceUpdate, RunCreate, RunningSettingsUpdate, RunUpdate
 
 
@@ -62,8 +64,9 @@ class RunningRepository:
         await self.db.refresh(run)
         return run
 
-    async def update_run(self, run: Run, data: RunUpdate) -> Run:
-        updates = data.model_dump(exclude_unset=True)
+    async def update_run(self, run: Run, data: RunUpdate, locked: frozenset[str] = frozenset()) -> Run:
+        """Apply the fields the caller sent, except `locked` ones (synced values the user cannot edit)."""
+        updates = {k: v for k, v in data.model_dump(exclude_unset=True).items() if k not in locked}
         if "shoe" in updates:
             shoe = (updates["shoe"] or "").strip() or None
             updates["shoe"] = shoe
@@ -74,6 +77,67 @@ class RunningRepository:
         await self.db.flush()
         await self.db.refresh(run)
         return run
+
+    async def get_run_by_activity(self, user_id: str, activity_id: str) -> Run | None:
+        result = await self.db.execute(select(Run).where(Run.user_id == user_id, Run.activity_id == activity_id))
+        return result.scalars().first()
+
+    async def list_runs_by_activity_ids(self, user_id: str, activity_ids: list[str]) -> list[Run]:
+        if not activity_ids:
+            return []
+        result = await self.db.execute(select(Run).where(Run.user_id == user_id, Run.activity_id.in_(activity_ids)))
+        return list(result.scalars().all())
+
+    async def list_unlinked_runs_on(self, user_id: str, run_date: date) -> list[Run]:
+        """Manual runs of one day that no activity is linked to yet (match candidates)."""
+        result = await self.db.execute(
+            select(Run).where(Run.user_id == user_id, Run.run_date == run_date, Run.activity_id.is_(None))
+        )
+        return list(result.scalars().all())
+
+    async def list_synced_runs_between(self, user_id: str, start: date, end: date) -> list[Run]:
+        result = await self.db.execute(
+            select(Run).where(
+                Run.user_id == user_id,
+                Run.activity_id.is_not(None),
+                Run.run_date >= start,
+                Run.run_date <= end,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def count_synced_runs(self, user_id: str) -> tuple[int, int]:
+        """(runs created by an import, manual runs a synced activity was merged into)."""
+        manual = func.coalesce(Run.origin, ORIGIN_MANUAL) == ORIGIN_MANUAL
+        total = await self.db.scalar(
+            select(func.count()).select_from(Run).where(Run.user_id == user_id, Run.activity_id.is_not(None))
+        )
+        merged = await self.db.scalar(
+            select(func.count()).select_from(Run).where(Run.user_id == user_id, Run.activity_id.is_not(None), manual)
+        )
+        return (total or 0) - (merged or 0), merged or 0
+
+    async def add_run(self, run: Run) -> Run:
+        self.db.add(run)
+        await self.db.flush()
+        await self.db.refresh(run)
+        return run
+
+    async def save(self, entity: Run | RaceEvent) -> None:
+        await self.db.flush()
+        await self.db.refresh(entity)
+
+    async def get_race_by_run(self, user_id: str, run_id: str) -> RaceEvent | None:
+        result = await self.db.execute(
+            select(RaceEvent).where(RaceEvent.user_id == user_id, RaceEvent.run_id == run_id)
+        )
+        return result.scalars().first()
+
+    async def list_attached_races(self, user_id: str) -> list[RaceEvent]:
+        result = await self.db.execute(
+            select(RaceEvent).where(RaceEvent.user_id == user_id, RaceEvent.run_id.is_not(None))
+        )
+        return list(result.scalars().all())
 
     async def delete_run(self, run: Run) -> None:
         await self.db.delete(run)

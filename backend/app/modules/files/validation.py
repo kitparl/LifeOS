@@ -39,6 +39,10 @@ _TEXT_EXT_MIME = {
 }
 
 # Sniffed MIME → preferred extension (server-generated keys never use client filename).
+# Garmin/ANT .FIT activity files: recognised by their header, accepted regardless of ALLOWED_UPLOAD_TYPES.
+# They are only ever stored as originals of an import and parsed by a bounded parser, never rendered.
+FIT_MIME = "application/vnd.ant.fit"
+
 _MIME_TO_EXT = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
@@ -63,6 +67,7 @@ _MIME_TO_EXT = {
     "image/bmp": ".bmp",
     "image/tiff": ".tiff",
     "video/mp4": ".mp4",
+    FIT_MIME: ".fit",
     "video/webm": ".webm",
     "audio/mp4": ".m4a",
     "audio/mpeg": ".mp3",
@@ -122,6 +127,11 @@ NEVER_INLINE_TYPES = frozenset(
     }
 )
 
+def looks_like_fit(head_bytes: bytes) -> bool:
+    """True when the bytes start with a FIT file header (size 12 or 14, '.FIT' signature at offset 8)."""
+    return len(head_bytes) >= 12 and head_bytes[0] in (12, 14) and head_bytes[8:12] == b".FIT"
+
+
 def parse_allowed_types(settings: Settings | None = None) -> set[str]:
     settings = settings or get_settings()
     return {t.strip().lower() for t in settings.allowed_upload_types.split(",") if t.strip()}
@@ -143,6 +153,9 @@ def sniff_content_type(head_bytes: bytes, filename: str, settings: Settings | No
     settings = settings or get_settings()
     allowed = parse_allowed_types(settings)
     client_ext = PurePosixPath(filename).suffix.lower()
+
+    if client_ext == ".fit" and looks_like_fit(head_bytes):
+        return FIT_MIME
 
     kind = filetype.guess(head_bytes) if head_bytes else None
     sniffed: str | None = kind.mime if kind else None

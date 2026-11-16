@@ -87,6 +87,18 @@ export class RunningService {
     return this.http.delete<void>(`${this.api}/races/${id}`);
   }
 
+  listRaceCandidates(raceId: string): Observable<RunListItem[]> {
+    return this.http.get<RunListItem[]>(`${this.api}/races/${raceId}/candidates`);
+  }
+
+  attachRun(raceId: string, runId: string): Observable<RaceEvent> {
+    return this.http.put<RaceEvent>(`${this.api}/races/${raceId}/attachment`, { run_id: runId });
+  }
+
+  detachRun(raceId: string): Observable<RaceEvent> {
+    return this.http.delete<RaceEvent>(`${this.api}/races/${raceId}/attachment`);
+  }
+
   getSettings(): Observable<RunningSettings> {
     return this.http.get<RunningSettings>(`${this.api}/settings`);
   }

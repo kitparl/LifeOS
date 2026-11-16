@@ -49,6 +49,13 @@ import { RunListItem, formatDuration, formatPace } from '../models/running.model
                 @if (run.event_name) {
                   <span class="text-xs ml-1" style="color: var(--text-muted)">{{ run.event_name }}</span>
                 }
+              } @else {
+                @if (run.activity_id) {
+                  <span class="badge badge--default ml-1" data-testid="runs-synced-badge">Synced</span>
+                }
+                @if (run.event_name) {
+                  <span class="text-xs ml-1" style="color: var(--text-muted)">{{ run.event_name }}</span>
+                }
               }
               <p class="text-xs" style="color: var(--text-muted)">
                 {{ run.distance_km }} km
@@ -100,6 +107,13 @@ import { RunListItem, formatDuration, formatPace } from '../models/running.model
                     </a>
                     @if (run.source === 'race') {
                       <span class="badge badge--default ml-1">Event</span>
+                      @if (run.event_name) {
+                        <span class="text-xs ml-1" style="color: var(--text-muted)">{{ run.event_name }}</span>
+                      }
+                    } @else {
+                      @if (run.activity_id) {
+                        <span class="badge badge--default ml-1" data-testid="runs-synced-badge">Synced</span>
+                      }
                       @if (run.event_name) {
                         <span class="text-xs ml-1" style="color: var(--text-muted)">{{ run.event_name }}</span>
                       }

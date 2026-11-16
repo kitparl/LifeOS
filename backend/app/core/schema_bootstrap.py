@@ -40,6 +40,7 @@ def _schema_lock():
 
 def _import_models() -> None:
     """Register every ORM table on Base.metadata before create_all (the deploy CLI imports nothing else)."""
+    import app.modules.activities.models  # noqa: F401
     import app.modules.ai.models  # noqa: F401
     import app.modules.auth.models  # noqa: F401
     import app.modules.calendar.models  # noqa: F401
@@ -51,6 +52,8 @@ def _import_models() -> None:
     import app.modules.finance.models  # noqa: F401
     import app.modules.finance.split.models  # noqa: F401
     import app.modules.habits.models  # noqa: F401
+    import app.modules.health.models  # noqa: F401
+    import app.modules.integrations.garmin.models  # noqa: F401
     import app.modules.integrations.github.sync_models  # noqa: F401
     import app.modules.integrations.models  # noqa: F401
     import app.modules.integrations.notifications.outbox_models  # noqa: F401

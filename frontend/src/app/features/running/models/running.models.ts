@@ -14,6 +14,13 @@ export interface Run {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** "manual" for runs logged by hand, otherwise the import source. */
+  origin?: string;
+  /** Set when the run is synced from a recorded activity. */
+  activity_id?: string | null;
+  race_id?: string | null;
+  start_time_utc?: string | null;
+  elapsed_seconds?: number | null;
 }
 
 export interface RunListItem {
@@ -28,6 +35,9 @@ export interface RunListItem {
   updated_at: string;
   source?: 'run' | 'race';
   event_name?: string | null;
+  origin?: string;
+  activity_id?: string | null;
+  race_id?: string | null;
 }
 
 export interface RunCreate {
@@ -73,6 +83,9 @@ export interface RaceEvent {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** Attached synced run and its activity, when a recorded activity is attached. */
+  run_id?: string | null;
+  activity_id?: string | null;
 }
 
 export interface RaceCreate {

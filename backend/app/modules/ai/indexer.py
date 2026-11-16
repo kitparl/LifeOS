@@ -8,7 +8,7 @@ from app.modules.finance.models import FinanceTransaction
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
 from app.modules.qa.models import QAEntry
-from app.modules.running.models import Run
+from app.modules.running.models import Run, manual_origin_clause, user_entered_distance_km
 from app.modules.tasks.models import Task
 from app.modules.wishlist.models import WishlistItem
 
@@ -39,9 +39,10 @@ class AiIndexer:
             text = " ".join(filter(None, [h.name, h.description, h.frequency]))
             docs.append(IndexDocument("habit", h.id, h.name, text, f"/habits/{h.id}"))
 
-        runs = await self.db.execute(select(Run).where(Run.user_id == user_id))
+        # Only runs the user logged by hand, with the values they typed: synced data stays out of AI.
+        runs = await self.db.execute(select(Run).where(Run.user_id == user_id, manual_origin_clause()))
         for r in runs.scalars().all():
-            title = f"Run {r.distance_km}km"
+            title = f"Run {user_entered_distance_km(r)}km"
             text = " ".join(filter(None, [title, r.notes, r.weather, str(r.run_date)]))
             docs.append(IndexDocument("run", r.id, title, text, f"/running/{r.id}"))
 

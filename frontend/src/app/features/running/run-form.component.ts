@@ -17,6 +17,12 @@ import { DateInputComponent } from '../../shared/date-input/date-input.component
       <div class="panel !p-0 overflow-hidden">
         <div class="title-bar">{{ isEdit ? 'Edit Run' : 'Log Run' }}</div>
         <form class="space-y-3 p-4 text-sm" [formGroup]="form" (ngSubmit)="submit()">
+          @if (synced) {
+            <p class="text-xs" style="color: var(--text-muted)" data-testid="run-form-synced-note">
+              Date, distance and time come from your watch and can't be edited. You can change the weather,
+              location, shoes and notes.
+            </p>
+          }
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="form-label" for="run_date">Date</label>
@@ -101,6 +107,7 @@ export class RunFormComponent implements OnInit {
   isEdit = false;
   runId: string | null = null;
   saving = false;
+  synced = false;
   error = '';
 
   form = this.fb.nonNullable.group({
@@ -124,6 +131,12 @@ export class RunFormComponent implements OnInit {
       this.runId = id;
       this.runningService.getRun(id).subscribe({
         next: (run: Run) => {
+          this.synced = !!run.activity_id;
+          if (this.synced) {
+            for (const name of ['run_date', 'distance_km', 'hours', 'minutes', 'seconds'] as const) {
+              this.form.controls[name].disable();
+            }
+          }
           const parts = secondsToParts(run.duration_seconds);
           this.form.patchValue({
             run_date: run.run_date.slice(0, 10),
@@ -152,25 +165,24 @@ export class RunFormComponent implements OnInit {
     this.error = '';
     const raw = this.form.getRawValue();
     const duration_seconds = durationToSeconds(raw.hours, raw.minutes, raw.seconds);
-    if (duration_seconds <= 0) {
+    if (!this.synced && duration_seconds <= 0) {
       this.error = 'Duration must be greater than zero';
       this.saving = false;
       return;
     }
-    const payload = {
-      run_date: raw.run_date,
-      distance_km: raw.distance_km,
-      duration_seconds,
+    const editable = {
       weather: raw.weather || null,
       location: raw.location || null,
       shoe: raw.shoe || null,
       notes: raw.notes || null,
     };
+    const full = { run_date: raw.run_date, distance_km: raw.distance_km, duration_seconds, ...editable };
 
+    // A synced run's date, distance and time belong to the recording: send only what can change.
     const req =
       this.isEdit && this.runId
-        ? this.runningService.updateRun(this.runId, payload)
-        : this.runningService.createRun(payload);
+        ? this.runningService.updateRun(this.runId, this.synced ? editable : full)
+        : this.runningService.createRun(full);
 
     req.subscribe({
       next: (run) => this.router.navigate(['/running', run.id]),

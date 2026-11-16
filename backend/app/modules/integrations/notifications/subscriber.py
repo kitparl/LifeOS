@@ -16,6 +16,8 @@ from app.core.events import (
     CALENDAR_EVENT_CREATED,
     HABIT_CREATED,
     RACE_ADDED,
+    RUN_SYNCED,
+    RUNS_IMPORTED,
     TASK_ASSIGNED,
     TASK_ASSIGNMENT_ACCEPTED,
     TASK_ASSIGNMENT_CANCELLED,
@@ -47,6 +49,11 @@ _TASK_EVENTS = {
 }
 
 
+# Synced-run events: notified in-app, and on Telegram whenever race notifications are enabled
+# (they were added after users saved their notify_on lists).
+_RUN_SYNC_EVENTS = {RUN_SYNCED, RUNS_IMPORTED}
+
+
 def format_entity_message(event: EntityCreated) -> str:
     title = html.escape(event.title or "")
     when = html.escape(event.when) if event.when else None
@@ -73,6 +80,10 @@ def format_entity_message(event: EntityCreated) -> str:
     if event.event_type == RACE_ADDED:
         on = f" on {when}" if when else ""
         return f"New race added: {title}{on}"
+    if event.event_type == RUN_SYNCED:
+        return f"New run synced: {title}"
+    if event.event_type == RUNS_IMPORTED:
+        return f"Runs imported: {title}"
     if event.event_type == CALENDAR_EVENT_CREATED:
         on = f" at {when}" if when else ""
         return f"New calendar event: {title}{on}"
@@ -115,10 +126,19 @@ def _assignment_keyboard(entity_id: str, assignment_id: str | None) -> dict[str,
     }
 
 
+def _in_app_route(event: EntityCreated) -> str:
+    if event.event_type == RUN_SYNCED and event.entity_id:
+        return f"/running/{event.entity_id}"
+    if event.event_type in _RUN_SYNC_EVENTS:
+        return "/running"
+    return f"/tasks/{event.entity_id}" if event.entity_id else "/tasks"
+
+
 async def _create_in_app(db: AsyncSession, event: EntityCreated) -> None:
     # Only task events notify in-app; TASK_CREATED already notifies the owner via Telegram,
     # so skip duplicate in-app spam on create.
-    if event.event_type == TASK_CREATED or event.event_type not in _TASK_EVENTS:
+    is_run_sync = event.event_type in _RUN_SYNC_EVENTS
+    if event.event_type == TASK_CREATED or not (event.event_type in _TASK_EVENTS or is_run_sync):
         return
     try:
         plain = format_entity_message(event)
@@ -133,9 +153,9 @@ async def _create_in_app(db: AsyncSession, event: EntityCreated) -> None:
             event.user_id,
             NotificationCreate(
                 message=plain,
-                module="tasks",
+                module="running" if is_run_sync else "tasks",
                 entity_id=event.entity_id,
-                route=f"/tasks/{event.entity_id}" if event.entity_id else "/tasks",
+                route=_in_app_route(event),
             ),
         )
     except Exception:
@@ -155,6 +175,8 @@ async def on_entity_created(db: AsyncSession, event: EntityCreated) -> None:
     if event.event_type not in notify_keys:
         if event.event_type in _TASK_EVENTS and TASK_CREATED in notify_keys:
             pass  # allow task-family events when task_created is enabled
+        elif event.event_type in _RUN_SYNC_EVENTS and RACE_ADDED in notify_keys:
+            pass  # allow synced-run events when race notifications are enabled
         else:
             return
     text = format_entity_message(event)

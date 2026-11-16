@@ -43,4 +43,20 @@ describe('RunningService', () => {
     expect(req.request.method).toBe('DELETE');
     req.flush(null);
   });
+
+  it('lists candidates, attaches a run to a race and detaches it', () => {
+    service.listRaceCandidates('r1').subscribe((runs) => expect(runs.length).toBe(1));
+    http.expectOne(`${environment.apiUrl}/running/races/r1/candidates`).flush([{ id: 'run1' }]);
+
+    service.attachRun('r1', 'run1').subscribe((race) => expect(race.run_id).toBe('run1'));
+    const attach = http.expectOne(`${environment.apiUrl}/running/races/r1/attachment`);
+    expect(attach.request.method).toBe('PUT');
+    expect(attach.request.body).toEqual({ run_id: 'run1' });
+    attach.flush({ id: 'r1', run_id: 'run1' });
+
+    service.detachRun('r1').subscribe((race) => expect(race.run_id).toBeNull());
+    const detach = http.expectOne(`${environment.apiUrl}/running/races/r1/attachment`);
+    expect(detach.request.method).toBe('DELETE');
+    detach.flush({ id: 'r1', run_id: null });
+  });
 });

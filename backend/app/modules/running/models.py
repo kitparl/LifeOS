@@ -1,6 +1,19 @@
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    ColumnElement,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    or_,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, new_id
@@ -12,6 +25,9 @@ SUGGESTED_SHOES: tuple[str, ...] = (
     "Race day",
     "Trail",
 )
+
+# Run.origin for a run the user logged by hand. Import-created runs carry their source name instead.
+ORIGIN_MANUAL = "manual"
 
 SUGGESTED_ACCREDITATIONS: tuple[str, ...] = (
     "AIMS Certified",
@@ -32,10 +48,31 @@ class Run(Base):
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
     shoe: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Who created the row: ORIGIN_MANUAL or the import source. Never changes after creation.
+    origin: Mapped[str | None] = mapped_column(String(16), nullable=True, default=ORIGIN_MANUAL)
+    # Linked activity (activities.id). Set means the run is synced. Plain id: running does not import activities.
+    activity_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    start_time_utc: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Wall-clock time including pauses; duration_seconds holds timer (moving) time.
+    elapsed_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Values the user typed, kept when a matched activity replaces distance and duration.
+    manual_distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    manual_duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+
+
+def manual_origin_clause() -> ColumnElement[bool]:
+    """Runs the user logged by hand (legacy rows have no origin). Import-created runs are excluded."""
+    return or_(Run.origin.is_(None), Run.origin == ORIGIN_MANUAL)
+
+
+def user_entered_distance_km(run: Run) -> float:
+    """The distance the user typed, even after a matched activity replaced it."""
+    return run.manual_distance_km if run.manual_distance_km is not None else run.distance_km
 
 
 class RunningShoe(Base):
@@ -88,6 +125,10 @@ class RaceEvent(Base):
     shoe: Mapped[str | None] = mapped_column(String(80), nullable=True)
     accreditations: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Attached synced run (runs.id) and the values the race had before attaching, for detach.
+    run_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    finish_time_before_attach: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    attended_before_attach: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now

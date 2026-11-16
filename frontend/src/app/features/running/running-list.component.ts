@@ -7,7 +7,9 @@ import { RunningBestsTabComponent } from './components/running-bests-tab.compone
 import { RunningEventsTabComponent } from './components/running-events-tab.component';
 import { RunningGoalsTabComponent } from './components/running-goals-tab.component';
 import { RunningRunsTabComponent } from './components/running-runs-tab.component';
+import { RunningImportDialogComponent } from './components/running-import-dialog.component';
 import { RunningShoesTabComponent } from './components/running-shoes-tab.component';
+import { RunningSyncLogTabComponent } from './components/running-sync-log-tab.component';
 import { RunningStatsTabComponent } from './components/running-stats-tab.component';
 import {
   RaceEvent,
@@ -16,7 +18,7 @@ import {
 } from './models/running.models';
 import { RunningService } from './services/running.service';
 
-type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
+type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats' | 'sync';
 
 @Component({
   selector: 'app-running-list',
@@ -31,6 +33,8 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
     RunningGoalsTabComponent,
     RunningShoesTabComponent,
     RunningStatsTabComponent,
+    RunningImportDialogComponent,
+    RunningSyncLogTabComponent,
   ],
   template: `
     <div class="space-y-4">
@@ -90,6 +94,7 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
           }
         </div>
         <div class="flex shrink-0 gap-2 pb-1">
+          <button type="button" class="btn-secondary text-xs" data-testid="running-import-button" (click)="importOpen.set(true)">Import</button>
           <a routerLink="/running/races/new" class="btn-secondary text-xs no-underline">Add Event</a>
           <a routerLink="/running/new" class="btn-primary text-xs no-underline">Log Run</a>
         </div>
@@ -129,6 +134,16 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats';
       @if (activeTab() === 'stats') {
         <app-running-stats-tab [stats]="stats" />
       }
+
+      @if (activeTab() === 'sync') {
+        <app-running-sync-log-tab (dataChanged)="load()" />
+      }
+
+      <app-running-import-dialog
+        [open]="importOpen()"
+        (closed)="importOpen.set(false)"
+        (imported)="load()"
+      />
     </div>
 
     <style>
@@ -200,6 +215,7 @@ export class RunningListComponent implements OnInit {
   readonly Math = Math;
 
   activeTab = signal<RunningTab>('events');
+  importOpen = signal(false);
 
   tabs = [
     { id: 'runs', label: 'Previous Runs' },
@@ -208,6 +224,7 @@ export class RunningListComponent implements OnInit {
     { id: 'goals', label: 'Goals' },
     { id: 'shoes', label: 'Shoes Stats' },
     { id: 'stats', label: 'Running Stats' },
+    { id: 'sync', label: 'Imports' },
   ] as const;
 
   runs: RunListItem[] = [];
@@ -229,7 +246,7 @@ export class RunningListComponent implements OnInit {
 
   ngOnInit(): void {
     const tab = this.route.snapshot.queryParamMap.get('tab');
-    if (tab === 'events' || tab === 'runs' || tab === 'bests' || tab === 'goals' || tab === 'shoes' || tab === 'stats') {
+    if (tab === 'events' || tab === 'runs' || tab === 'bests' || tab === 'goals' || tab === 'shoes' || tab === 'stats' || tab === 'sync') {
       this.activeTab.set(tab);
     }
     this.load();

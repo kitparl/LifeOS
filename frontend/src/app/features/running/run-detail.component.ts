@@ -3,13 +3,15 @@ import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { RunReadinessComponent } from '../health/components/run-readiness.component';
+import { ActivitySectionsComponent } from './components/activity-sections.component';
 import { Run, formatDuration, formatPace } from './models/running.models';
 import { RunningService } from './services/running.service';
 
 @Component({
   selector: 'app-run-detail',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, ActivitySectionsComponent, RunReadinessComponent],
   template: `
     @if (run; as r) {
       <div class="space-y-3">
@@ -17,6 +19,14 @@ import { RunningService } from './services/running.service';
           <div>
             <h1 class="text-lg font-semibold">{{ r.run_date | date: 'fullDate' }}</h1>
             <p class="text-xs" style="color: var(--text-muted)">{{ r.distance_km }} km · {{ formatDuration(r.duration_seconds) }}</p>
+            <div class="flex flex-wrap gap-2 mt-1">
+              @if (r.activity_id) {
+                <span class="badge badge--default" data-testid="run-detail-synced-badge">Synced from {{ r.origin && r.origin !== 'manual' ? 'Garmin' : 'your watch' }}</span>
+              }
+              @if (r.race_id) {
+                <a [routerLink]="['/running/races', r.race_id]" class="chip no-underline" data-testid="run-detail-race-link">This was a race</a>
+              }
+            </div>
           </div>
           <div class="flex gap-2">
             <a [routerLink]="['/running', r.id, 'edit']" class="btn-primary text-xs no-underline">Edit</a>
@@ -58,6 +68,12 @@ import { RunningService } from './services/running.service';
             <p class="font-medium mb-1">Notes</p>
             <p class="whitespace-pre-wrap" style="color: var(--text)">{{ r.notes }}</p>
           </div>
+        }
+
+        <app-run-readiness [date]="r.run_date" />
+
+        @if (r.activity_id) {
+          <app-activity-sections [activityId]="r.activity_id" />
         }
 
         <a routerLink="/running" class="link text-sm">Back to running</a>

@@ -10,12 +10,14 @@ import {
   raceStatusLabel,
 } from './models/running.models';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { ActivitySectionsComponent } from './components/activity-sections.component';
+import { RaceAttachDialogComponent } from './components/race-attach-dialog.component';
 import { RunningService } from './services/running.service';
 
 @Component({
   selector: 'app-race-event-detail',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, ActivitySectionsComponent, RaceAttachDialogComponent],
   template: `
     @if (race; as r) {
       <div class="space-y-3">
@@ -129,6 +131,29 @@ import { RunningService } from './services/running.service';
           }
         </div>
 
+        <div class="panel space-y-1" data-testid="race-recorded-activity">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-semibold" style="color: var(--text-muted)">Recorded activity</p>
+            @if (r.run_id) {
+              <div class="flex gap-2">
+                <a [routerLink]="['/running', r.run_id]" class="link text-xs">Open run</a>
+                <button type="button" class="btn-secondary text-xs" data-testid="race-detach-button" (click)="detach()">Detach</button>
+              </div>
+            } @else {
+              <button type="button" class="btn-secondary text-xs" data-testid="race-attach-button" (click)="attachOpen = true">Attach activity</button>
+            }
+          </div>
+          @if (!r.run_id) {
+            <p class="text-xs" style="color: var(--text-muted)">
+              Attach a synced run to fill in your finish time, route and splits.
+            </p>
+          }
+        </div>
+
+        @if (r.activity_id) {
+          <app-activity-sections [activityId]="r.activity_id" />
+        }
+
         @if (r.notes) {
           <div class="panel">
             <p class="text-xs font-semibold mb-1" style="color: var(--text-muted)">Notes</p>
@@ -138,6 +163,12 @@ import { RunningService } from './services/running.service';
 
         <a routerLink="/running" class="link text-sm">← Back to Running</a>
       </div>
+      <app-race-attach-dialog
+        [open]="attachOpen"
+        [raceId]="r.id"
+        (closed)="attachOpen = false"
+        (attached)="onAttached($event)"
+      />
     } @else if (loading) {
       <div class="empty-state">
         <span class="skeleton" style="width: 200px; height: 20px; display: block"></span>
@@ -158,6 +189,7 @@ export class RaceEventDetailComponent implements OnInit {
   readonly raceStatusLabel = raceStatusLabel;
 
   race: RaceEvent | null = null;
+  attachOpen = false;
   loading = true;
   eventImageSrcs: string[] = [];
   certificateImageSrc = '';
@@ -233,6 +265,22 @@ export class RaceEventDetailComponent implements OnInit {
   private extractFileId(url: string): string | null {
     const match = url.match(/\/files\/([0-9a-f-]{36})\/content/i);
     return match?.[1] ?? null;
+  }
+
+  onAttached(race: RaceEvent): void {
+    this.attachOpen = false;
+    this.load(race.id);
+  }
+
+  async detach(): Promise<void> {
+    if (!this.race) return;
+    const ok = await this.confirm.confirm(
+      'Detach the recorded activity from this race? The finish time you had before is restored.',
+      'Detach activity',
+      { acceptLabel: 'Detach', danger: false },
+    );
+    if (!ok) return;
+    this.runningService.detachRun(this.race.id).subscribe({ next: (race) => this.load(race.id) });
   }
 
   async remove(): Promise<void> {

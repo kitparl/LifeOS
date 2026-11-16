@@ -155,6 +155,11 @@ export const routes: Routes = [
           import('./features/running/running-list.component').then((m) => m.RunningListComponent),
       },
       {
+        path: 'health',
+        loadComponent: () =>
+          import('./features/health/health-page.component').then((m) => m.HealthPageComponent),
+      },
+      {
         path: 'calendar',
         loadComponent: () =>
           import('./features/calendar/calendar-list.component').then((m) => m.CalendarListComponent),

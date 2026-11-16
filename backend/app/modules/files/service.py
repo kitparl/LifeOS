@@ -79,6 +79,7 @@ class FileService:
         content_type: str,
         module: str | None = None,
         entity_id: str | None = None,
+        enforce_rate_limit: bool = True,
     ) -> FileRecordResponse:
         """Bytes-based upload kept for OCR / Telegram callers."""
 
@@ -92,6 +93,7 @@ class FileService:
             content_type,
             module,
             entity_id,
+            enforce_rate_limit=enforce_rate_limit,
         )
 
     async def upload_stream(
@@ -102,12 +104,14 @@ class FileService:
         content_type: str,
         module: str | None = None,
         entity_id: str | None = None,
+        enforce_rate_limit: bool = True,
     ) -> FileRecordResponse:
         if not filename:
             raise BadRequestError("Filename required")
 
         module = validate_module(module)
-        await self._enforce_rate_limit(user_id)
+        if enforce_rate_limit:
+            await self._enforce_rate_limit(user_id)
         await self._enforce_quota(user_id, additional=0)
 
         # Read first chunk: size check before type validation (existing 413 test).

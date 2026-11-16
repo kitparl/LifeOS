@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.logging_config import configure_logging
+from app.modules.activities.api import router as activities_router
 from app.modules.ai.api import router as ai_router
 from app.modules.analytics_dashboard.api import router as analytics_dashboard_router
 from app.modules.auth.api import router as auth_router
@@ -20,7 +21,9 @@ from app.modules.files.api import router as files_router
 from app.modules.finance.api import router as finance_router
 from app.modules.finance.split.api import router as split_router
 from app.modules.habits.api import router as habits_router
+from app.modules.health.api import router as health_router
 from app.modules.integrations.api import router as integrations_router
+from app.modules.integrations.garmin.api import router as garmin_router
 from app.modules.journal.api import router as journal_router
 from app.modules.knowledge_notes.api import router as knowledge_notes_router
 from app.modules.memory.api import router as memory_router
@@ -53,6 +56,11 @@ async def lifespan(app: FastAPI):
     register_subscribers()
     # Serialised across workers — see schema_bootstrap module docstring.
     await apply_schema()
+
+    from app.core.database import async_session_factory
+    from app.modules.integrations.garmin.import_service import mark_interrupted_jobs
+
+    await mark_interrupted_jobs(async_session_factory)
 
     from app.modules.integrations.scheduling.scheduler import (
         load_all_scheduled_jobs,
@@ -130,6 +138,9 @@ app.include_router(analytics_dashboard_router, prefix="/api/v1")
 app.include_router(memory_router, prefix="/api/v1")
 app.include_router(ocr_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")
+app.include_router(garmin_router, prefix="/api/v1")
+app.include_router(activities_router, prefix="/api/v1")
+app.include_router(health_router, prefix="/api/v1")
 app.include_router(sticky_notes_router, prefix="/api/v1")
 app.include_router(news_router, prefix="/api/v1")
 app.include_router(dsa_router, prefix="/api/v1")

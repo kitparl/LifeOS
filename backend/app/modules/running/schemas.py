@@ -49,6 +49,10 @@ class RunListItem(BaseModel):
     updated_at: datetime
     source: Literal["run", "race"] = "run"
     event_name: str | None = None
+    # Who created the run ("manual" or an import source); activity_id set means synced detail exists.
+    origin: str = "manual"
+    activity_id: str | None = None
+    race_id: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -65,6 +69,11 @@ class RunResponse(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
+    origin: str = "manual"
+    activity_id: str | None = None
+    race_id: str | None = None
+    start_time_utc: datetime | None = None
+    elapsed_seconds: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -136,8 +145,15 @@ class RaceResponse(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
+    # Attached synced run and its activity (activity_id is filled on single-race responses only).
+    run_id: str | None = None
+    activity_id: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class RaceAttachRequest(BaseModel):
+    run_id: str = Field(min_length=1, max_length=36)
 
 
 class RunningSettingsUpdate(BaseModel):

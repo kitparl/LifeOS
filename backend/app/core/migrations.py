@@ -54,6 +54,17 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("race_events", "shoe", "VARCHAR(80)"),
     # Running: race accreditations (JSON list of names stored as TEXT)
     ("race_events", "accreditations", "TEXT"),
+    # Running: synced runs (activity link, original manual values) and race attachment
+    ("runs", "origin", "VARCHAR(16) DEFAULT 'manual'"),
+    ("runs", "activity_id", "VARCHAR(36)"),
+    ("runs", "start_time_utc", "TIMESTAMP"),
+    ("runs", "elapsed_seconds", "INTEGER"),
+    ("runs", "manual_distance_km", "FLOAT"),
+    ("runs", "manual_duration_seconds", "INTEGER"),
+    ("runs", "synced_at", "TIMESTAMP"),
+    ("race_events", "run_id", "VARCHAR(36)"),
+    ("race_events", "finish_time_before_attach", "INTEGER"),
+    ("race_events", "attended_before_attach", "BOOLEAN"),
     # Routines: period window + skip dates
     ("routines", "start_date", "DATE"),
     ("routines", "end_date", "DATE"),

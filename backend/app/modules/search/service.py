@@ -8,7 +8,7 @@ from app.modules.communication.vocabulary.models import UserVocabulary, Vocabula
 from app.modules.habits.models import Habit
 from app.modules.journal.models import JournalEntry
 from app.modules.qa.models import QAEntry
-from app.modules.running.models import Run
+from app.modules.running.models import Run, manual_origin_clause, user_entered_distance_km
 from app.modules.search.schemas import SearchResponse, SearchResultItem
 from app.modules.tasks.models import Task
 from app.modules.wishlist.models import WishlistItem
@@ -68,7 +68,8 @@ class SearchService:
 
         async def add_run_rows():
             rows = await self.db.execute(
-                select(Run).where(Run.user_id == user_id, Run.notes.ilike(pattern))
+                # Only runs the user logged by hand: synced data stays out of search.
+                select(Run).where(Run.user_id == user_id, Run.notes.ilike(pattern), manual_origin_clause())
             )
             for r in rows.scalars().all():
                 results.append(
@@ -76,7 +77,7 @@ class SearchService:
                         module="running",
                         entity_type="run",
                         id=r.id,
-                        title=f"{r.distance_km} km run",
+                        title=f"{user_entered_distance_km(r)} km run",
                         subtitle=str(r.run_date),
                         route=f"/running/{r.id}",
                     )

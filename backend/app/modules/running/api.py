@@ -6,6 +6,7 @@ from app.core.deps import get_current_user
 from app.modules.auth.models import User
 from app.modules.running.schemas import (
     AccreditationCreate,
+    RaceAttachRequest,
     RaceCreate,
     RaceResponse,
     RaceUpdate,
@@ -163,6 +164,34 @@ async def delete_race(
     db: AsyncSession = Depends(get_db),
 ):
     await RunningService(db).delete_race(user.id, race_id)
+
+
+@router.get("/races/{race_id}/candidates", response_model=list[RunListItem])
+async def list_race_candidates(
+    race_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RunningService(db).list_race_candidates(user.id, race_id)
+
+
+@router.put("/races/{race_id}/attachment", response_model=RaceResponse)
+async def attach_run_to_race(
+    race_id: str,
+    data: RaceAttachRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RunningService(db).attach_run_to_race(user.id, race_id, data.run_id)
+
+
+@router.delete("/races/{race_id}/attachment", response_model=RaceResponse)
+async def detach_run_from_race(
+    race_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RunningService(db).detach_run_from_race(user.id, race_id)
 
 
 @router.get("/settings", response_model=RunningSettingsResponse)

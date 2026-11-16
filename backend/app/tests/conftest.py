@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import app.modules.activities.models  # noqa: F401
 import app.modules.ai.models  # noqa: F401
 import app.modules.communication.models  # noqa: F401
 import app.modules.files.preview_models  # noqa: F401
@@ -7,6 +8,8 @@ import app.modules.files.preview_models  # noqa: F401
 # Register Cycle 8 tables on Base before create_all (must run before importing FastAPI app,
 # because `import app.modules...` would rebind the name `app` if done after `from app.main import app`).
 import app.modules.habits.models  # noqa: F401
+import app.modules.health.models  # noqa: F401
+import app.modules.integrations.garmin.models  # noqa: F401
 import app.modules.integrations.github.sync_models  # noqa: F401
 import app.modules.integrations.models  # noqa: F401
 import app.modules.integrations.reports.models  # noqa: F401
