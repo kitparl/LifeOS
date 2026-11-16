@@ -1,7 +1,8 @@
 from datetime import date, datetime
-from typing import Literal, Self
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from typing_extensions import Self
 
 from app.modules.health.metrics import validate_measurement, validate_values
 
