@@ -35,6 +35,7 @@ from app.modules.running.api import router as running_router
 from app.modules.search.api import router as search_router
 from app.modules.sticky_notes.api import router as sticky_notes_router
 from app.modules.tasks.api import router as tasks_router
+from app.modules.timeline.api import router as timeline_router
 from app.modules.travel.api import router as travel_router
 from app.modules.travel.share_page import router as shared_plan_page_router
 from app.modules.users.api import router as users_router
@@ -109,6 +110,7 @@ app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(habits_router, prefix="/api/v1")
 app.include_router(running_router, prefix="/api/v1")
 app.include_router(calendar_router, prefix="/api/v1")
+app.include_router(timeline_router, prefix="/api/v1")
 app.include_router(routines_router, prefix="/api/v1")
 app.include_router(preferences_router, prefix="/api/v1")
 app.include_router(journal_router, prefix="/api/v1")

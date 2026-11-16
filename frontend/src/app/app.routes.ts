@@ -175,6 +175,11 @@ export const routes: Routes = [
           import('./features/calendar/event-detail.component').then((m) => m.EventDetailComponent),
       },
       {
+        path: 'timeline',
+        loadComponent: () =>
+          import('./features/timeline/timeline-page.component').then((m) => m.TimelinePageComponent),
+      },
+      {
         path: 'routines',
         loadComponent: () =>
           import('./features/routines/routines-list.component').then((m) => m.RoutinesListComponent),

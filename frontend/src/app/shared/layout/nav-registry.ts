@@ -18,6 +18,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'analytics', label: 'Analytics', route: '/analytics/dashboard', icon: 'chart-line', shortLabel: 'Home', category: 'Core' },
   { id: 'tasks', label: 'Tasks', route: '/tasks', icon: 'list-todo', category: 'Core' },
   { id: 'calendar', label: 'Calendar', route: '/calendar', icon: 'calendar-days', category: 'Core' },
+  { id: 'timeline', label: 'Timeline', route: '/timeline', icon: 'chart-gantt', category: 'Core' },
   { id: 'routines', label: 'Routines', route: '/routines', icon: 'refresh-cw', category: 'Core' },
   { id: 'running', label: 'Running', route: '/running', icon: 'footprints', category: 'Health' },
   { id: 'habits', label: 'Habits', route: '/habits', icon: 'flame', category: 'Health' },
@@ -48,6 +49,7 @@ export const DEFAULT_HOME_MODULE_ID = 'tasks';
 export const DEFAULT_PINNED_IDS: string[] = [
   'tasks',
   'calendar',
+  'timeline',
   'routines',
   'running',
   'habits',
