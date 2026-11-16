@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
 from app.modules.running.schemas import (
+    AccreditationCreate,
     RaceCreate,
     RaceResponse,
     RaceUpdate,
@@ -38,6 +39,24 @@ async def create_shoe(
 ):
     await RunningService(db).create_shoe(user.id, data.name)
     return await RunningService(db).list_shoes(user.id)
+
+
+@router.get("/accreditations", response_model=list[str])
+async def list_accreditations(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RunningService(db).list_accreditations(user.id)
+
+
+@router.post("/accreditations", response_model=list[str], status_code=status.HTTP_201_CREATED)
+async def create_accreditation(
+    data: AccreditationCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await RunningService(db).create_accreditation(user.id, data.name)
+    return await RunningService(db).list_accreditations(user.id)
 
 
 @router.get("/runs", response_model=list[RunListItem])

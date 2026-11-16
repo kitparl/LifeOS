@@ -69,6 +69,7 @@ export interface RaceEvent {
   attended?: boolean;
   skipped?: boolean;
   shoe: string | null;
+  accreditations: string[];
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -92,6 +93,7 @@ export interface RaceCreate {
   attended?: boolean;
   skipped?: boolean;
   shoe?: string | null;
+  accreditations?: string[];
   notes?: string | null;
 }
 

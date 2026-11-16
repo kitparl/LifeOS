@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -28,6 +28,13 @@ class RunUpdate(BaseModel):
 
 class ShoeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+
+
+class AccreditationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+AccreditationName = Annotated[str, Field(max_length=80)]
 
 
 class RunListItem(BaseModel):
@@ -80,6 +87,7 @@ class RaceCreate(BaseModel):
     attended: bool = False
     skipped: bool = False
     shoe: str | None = Field(default=None, max_length=80)
+    accreditations: list[AccreditationName] = Field(default_factory=list, max_length=20)
     notes: str | None = None
 
 
@@ -101,6 +109,7 @@ class RaceUpdate(BaseModel):
     attended: bool | None = None
     skipped: bool | None = None
     shoe: str | None = Field(default=None, max_length=80)
+    accreditations: list[AccreditationName] | None = Field(default=None, max_length=20)
     notes: str | None = None
 
 
@@ -123,6 +132,7 @@ class RaceResponse(BaseModel):
     attended: bool
     skipped: bool
     shoe: str | None = None
+    accreditations: list[str] = []
     notes: str | None
     created_at: datetime
     updated_at: datetime

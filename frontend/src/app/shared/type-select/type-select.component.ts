@@ -14,12 +14,16 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
  * TypeSelectComponent — reusable "pick an existing value or create a new one"
  * combobox. Backs an extensible taxonomy (e.g. Q&A Type) without hardcoding.
  *
- * Single-select, stores a string value (ControlValueAccessor). When the user
+ * Single-select stores a string; with `[multiple]="true"` it stores a string[]
+ * and renders picks as removable tags (ControlValueAccessor). When the user
  * commits a value not already in `options`, `(created)` fires so the parent can
  * persist it and make it reusable.
  *
  *   <app-type-select formControlName="type" [options]="types()" (created)="addType($event)" />
+ *   <app-type-select formControlName="tags" [multiple]="true" [options]="tags()" (created)="addTag($event)" />
  */
+type TypeSelectValue = string | string[];
+
 @Component({
   selector: 'app-type-select',
   standalone: true,
@@ -33,17 +37,35 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
   ],
   template: `
     <div class="type-select">
-      <div class="type-select__control" [class.type-select__control--open]="open()">
+      <div
+        class="type-select__control"
+        [class.type-select__control--open]="open()"
+        [class.type-select__control--multi]="multiple"
+      >
+        @if (multiple) {
+          @for (item of selected(); track item) {
+            <span class="type-select__tag">
+              {{ item }}
+              <button
+                type="button"
+                class="type-select__tag-remove"
+                [title]="'Remove ' + item"
+                [disabled]="disabled()"
+                (click)="toggleSelected(item)"
+              >✕</button>
+            </span>
+          }
+        }
         <input
           class="type-select__input"
-          [attr.placeholder]="placeholder"
+          [attr.placeholder]="multiple && selected().length ? '' : placeholder"
           [value]="query()"
           [disabled]="disabled()"
           (focus)="open.set(true)"
           (input)="onQuery($event)"
           (keydown)="onKeydown($event)"
         />
-        @if (value()) {
+        @if (value() || selected().length) {
           <button type="button" class="type-select__clear" title="Clear" (click)="clear()">✕</button>
         }
         <button type="button" class="type-select__caret" (click)="toggle()" [disabled]="disabled()">▾</button>
@@ -55,7 +77,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
             <button
               type="button"
               class="type-select__option"
-              [class.active]="opt === value()"
+              [class.active]="isActive(opt)"
               (click)="select(opt)"
             >{{ opt }}</button>
           }
@@ -76,10 +98,12 @@ export class TypeSelectComponent implements ControlValueAccessor {
   @Input() options: string[] = [];
   @Input() placeholder = 'Select or create…';
   @Input() allowCreate = true;
+  @Input() multiple = false;
 
   @Output() created = new EventEmitter<string>();
 
   readonly value = signal('');
+  readonly selected = signal<string[]>([]);
   readonly query = signal('');
   readonly open = signal(false);
   readonly disabled = signal(false);
@@ -97,14 +121,20 @@ export class TypeSelectComponent implements ControlValueAccessor {
     return !(this.options ?? []).some((o) => o.toLowerCase() === q.toLowerCase());
   });
 
-  private onChange: (value: string) => void = () => {};
+  private onChange: (value: TypeSelectValue) => void = () => {};
   private onTouched: () => void = () => {};
 
-  writeValue(value: string): void {
-    this.value.set(value || '');
-    this.query.set(value || '');
+  writeValue(value: TypeSelectValue | null): void {
+    if (this.multiple) {
+      this.selected.set(Array.isArray(value) ? [...value] : []);
+      this.query.set('');
+      return;
+    }
+    const single = typeof value === 'string' ? value : '';
+    this.value.set(single);
+    this.query.set(single);
   }
-  registerOnChange(fn: (value: string) => void): void {
+  registerOnChange(fn: (value: TypeSelectValue) => void): void {
     this.onChange = fn;
   }
   registerOnTouched(fn: () => void): void {
@@ -133,6 +163,9 @@ export class TypeSelectComponent implements ControlValueAccessor {
       const match = this.filtered()[0];
       if (match) this.select(match);
       else if (this.allowCreate && this.canCreate()) this.createNew();
+    } else if (event.key === 'Backspace' && this.multiple && !this.query()) {
+      const last = this.selected().at(-1);
+      if (last) this.toggleSelected(last);
     } else if (event.key === 'Escape') {
       this.open.set(false);
       this.syncQueryToValue();
@@ -143,7 +176,16 @@ export class TypeSelectComponent implements ControlValueAccessor {
     this.open.set(!this.open());
   }
 
+  isActive(opt: string): boolean {
+    return this.multiple ? this.selected().includes(opt) : opt === this.value();
+  }
+
   select(opt: string): void {
+    if (this.multiple) {
+      this.toggleSelected(opt);
+      this.query.set('');
+      return;
+    }
     this.value.set(opt);
     this.query.set(opt);
     this.open.set(false);
@@ -158,14 +200,23 @@ export class TypeSelectComponent implements ControlValueAccessor {
     this.select(label);
   }
 
+  toggleSelected(opt: string): void {
+    const current = this.selected();
+    const next = current.includes(opt) ? current.filter((o) => o !== opt) : [...current, opt];
+    this.selected.set(next);
+    this.onChange(next);
+    this.onTouched();
+  }
+
   clear(): void {
     this.value.set('');
+    this.selected.set([]);
     this.query.set('');
-    this.onChange('');
+    this.onChange(this.multiple ? [] : '');
     this.onTouched();
   }
 
   private syncQueryToValue(): void {
-    this.query.set(this.value());
+    this.query.set(this.multiple ? '' : this.value());
   }
 }

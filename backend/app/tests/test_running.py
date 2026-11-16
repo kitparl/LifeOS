@@ -118,6 +118,50 @@ async def test_race_shoes_in_totals(client):
 
 
 @pytest.mark.asyncio
+async def test_race_accreditations_multi_select(client):
+    token = await _auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    suggested = await client.get("/api/v1/running/accreditations", headers=headers)
+    assert suggested.status_code == 200
+    assert {"AIMS Certified", "AbbottWMM", "SheRACES"} <= set(suggested.json())
+
+    created = await client.post(
+        "/api/v1/running/accreditations", headers=headers, json={"name": "World Athletics Gold"}
+    )
+    assert created.status_code == 201
+    assert "World Athletics Gold" in created.json()
+
+    race = await client.post(
+        "/api/v1/running/races",
+        headers=headers,
+        json={
+            "name": "Mumbai Marathon",
+            "race_date": "2026-01-18",
+            "distance_type": "marathon",
+            "accreditations": ["AIMS Certified", " aims certified ", "Label Race"],
+        },
+    )
+    assert race.status_code == 201
+    assert race.json()["accreditations"] == ["AIMS Certified", "Label Race"]
+
+    listed = await client.get("/api/v1/running/accreditations", headers=headers)
+    assert "Label Race" in listed.json()
+
+    race_id = race.json()["id"]
+    updated = await client.patch(
+        f"/api/v1/running/races/{race_id}", headers=headers, json={"accreditations": ["SheRACES"]}
+    )
+    assert updated.status_code == 200
+    assert updated.json()["accreditations"] == ["SheRACES"]
+
+    cleared = await client.patch(
+        f"/api/v1/running/races/{race_id}", headers=headers, json={"accreditations": []}
+    )
+    assert cleared.json()["accreditations"] == []
+
+
+@pytest.mark.asyncio
 async def test_list_runs_and_race(client):
     token = await _auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}

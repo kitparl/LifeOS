@@ -1419,6 +1419,42 @@ summary::-webkit-details-marker {
   font-family: inherit;
 }
 
+.type-select__control--multi {
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding-left: 0.35rem;
+}
+
+.type-select__control--multi .type-select__input {
+  min-width: 6rem;
+  padding-left: 0.3rem;
+}
+
+.type-select__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.2rem 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
+
+.type-select__tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 0.625rem;
+  color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
 .type-select__input::placeholder {
   color: var(--text-faint);
 }

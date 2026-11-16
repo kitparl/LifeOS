@@ -42,6 +42,14 @@ export class RunningService {
     return this.http.post<string[]>(`${this.api}/shoes`, { name });
   }
 
+  listAccreditations(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.api}/accreditations`);
+  }
+
+  createAccreditation(name: string): Observable<string[]> {
+    return this.http.post<string[]>(`${this.api}/accreditations`, { name });
+  }
+
   getRun(id: string): Observable<Run> {
     return this.http.get<Run>(`${this.api}/runs/${id}`);
   }

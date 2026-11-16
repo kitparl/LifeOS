@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import taxonomy
 from app.core.pagination import Pagination, paginate
 from app.core.timezone import utc_today
-from app.modules.running.models import RaceEvent, Run, RunningSettings, RunningShoe
+from app.modules.running.models import RaceEvent, Run, RunningAccreditation, RunningSettings, RunningShoe
 from app.modules.running.schemas import RaceCreate, RaceUpdate, RunCreate, RunningSettingsUpdate, RunUpdate
 
 
@@ -28,6 +28,16 @@ class RunningRepository:
     async def ensure_shoe(self, user_id: str, name: str) -> None:
         """Register a name for reuse (idempotent, case-insensitive)."""
         await taxonomy.ensure_name(self.db, RunningShoe, user_id, name)
+
+    async def list_accreditation_names(self, user_id: str) -> list[str]:
+        return await taxonomy.list_names(self.db, RunningAccreditation, user_id)
+
+    async def ensure_accreditations(self, user_id: str, names: list[str]) -> list[str]:
+        """Normalize (trim, de-dupe case-insensitively) and register each name for reuse."""
+        clean = taxonomy.merge_names(names)
+        for name in clean:
+            await taxonomy.ensure_name(self.db, RunningAccreditation, user_id, name)
+        return clean
 
     async def get_run(self, user_id: str, run_id: str) -> Run | None:
         result = await self.db.execute(select(Run).where(Run.id == run_id, Run.user_id == user_id))
@@ -100,6 +110,7 @@ class RunningRepository:
         attended = (not skipped) and (data.attended or bool(data.finish_time_seconds))
         if attended:
             skipped = False
+        accreditations = await self.ensure_accreditations(user_id, data.accreditations)
         race = RaceEvent(
             user_id=user_id,
             name=data.name,
@@ -119,6 +130,7 @@ class RunningRepository:
             attended=attended,
             skipped=skipped,
             shoe=shoe,
+            accreditations=accreditations,
             notes=data.notes,
         )
         self.db.add(race)
@@ -137,6 +149,10 @@ class RunningRepository:
             updates["shoe"] = shoe
             if shoe:
                 await self.ensure_shoe(race.user_id, shoe)
+        if "accreditations" in updates:
+            updates["accreditations"] = await self.ensure_accreditations(
+                race.user_id, updates["accreditations"] or []
+            )
 
         skipped = updates.get("skipped", race.skipped)
         attended = updates.get("attended", race.attended)

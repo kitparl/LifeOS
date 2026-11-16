@@ -69,6 +69,9 @@ import { RunningService } from './services/running.service';
           @if (r.shoe) {
             <span class="chip">Shoes: {{ r.shoe }}</span>
           }
+          @for (a of r.accreditations ?? []; track a) {
+            <span class="chip">{{ a }}</span>
+          }
         </div>
 
         <div class="grid gap-3 sm:grid-cols-2">

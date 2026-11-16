@@ -77,6 +77,19 @@ interface EventPhotoItem {
                 />
               </div>
             </div>
+
+            <div>
+              <label class="form-label">Accreditation (optional)</label>
+              <div class="mt-1">
+                <app-type-select
+                  formControlName="accreditations"
+                  placeholder="Select or create accreditations…"
+                  [multiple]="true"
+                  [options]="accreditations()"
+                  (created)="onAccreditationCreated($event)"
+                />
+              </div>
+            </div>
           </section>
 
           <section class="space-y-3 border-t pt-4" style="border-color: var(--xp-border)">
@@ -315,6 +328,7 @@ export class RaceEventFormComponent implements OnInit {
     ...this.customDistances(),
   ]);
   shoes = signal<string[]>([]);
+  accreditations = signal<string[]>([]);
   isEdit = false;
   raceId: string | null = null;
   saving = false;
@@ -331,6 +345,7 @@ export class RaceEventFormComponent implements OnInit {
     organizer: [''],
     location: [''],
     shoe: [''],
+    accreditations: [[] as string[]],
     bib_number: [''],
     finish_hours: [null as number | null, [Validators.min(0)]],
     finish_minutes: [null as number | null, [Validators.min(0), Validators.max(59)]],
@@ -347,6 +362,7 @@ export class RaceEventFormComponent implements OnInit {
 
   ngOnInit(): void {
     this.runningService.listShoes().subscribe({ next: (s) => this.shoes.set(s) });
+    this.runningService.listAccreditations().subscribe({ next: (a) => this.accreditations.set(a) });
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id === 'new' || (!id && url.includes('new'))) {
@@ -385,6 +401,7 @@ export class RaceEventFormComponent implements OnInit {
             organizer: r.organizer ?? '',
             location: r.location ?? '',
             shoe: r.shoe ?? '',
+            accreditations: r.accreditations ?? [],
             bib_number: r.bib_number ?? '',
             finish_hours: fh,
             finish_minutes: fm,
@@ -410,6 +427,11 @@ export class RaceEventFormComponent implements OnInit {
   onShoeCreated(name: string): void {
     this.shoes.update((list) => (list.includes(name) ? list : [...list, name].sort()));
     this.runningService.createShoe(name).subscribe({ next: (s) => this.shoes.set(s) });
+  }
+
+  onAccreditationCreated(name: string): void {
+    this.accreditations.update((list) => (list.includes(name) ? list : [...list, name].sort()));
+    this.runningService.createAccreditation(name).subscribe({ next: (a) => this.accreditations.set(a) });
   }
 
   onEventImageUploaded(url: string): void {
@@ -520,6 +542,7 @@ export class RaceEventFormComponent implements OnInit {
       organizer: raw.organizer || null,
       location: raw.location || null,
       shoe: raw.shoe || null,
+      accreditations: raw.accreditations,
       bib_number: raw.bib_number || null,
       finish_time_seconds,
       position: raw.position ?? null,

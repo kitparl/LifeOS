@@ -13,6 +13,12 @@ SUGGESTED_SHOES: tuple[str, ...] = (
     "Trail",
 )
 
+SUGGESTED_ACCREDITATIONS: tuple[str, ...] = (
+    "AIMS Certified",
+    "AbbottWMM",
+    "SheRACES",
+)
+
 
 class Run(Base):
     __tablename__ = "runs"
@@ -45,6 +51,19 @@ class RunningShoe(Base):
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_running_shoes_user_name"),)
 
 
+class RunningAccreditation(Base):
+    """User-defined, reusable race accreditation registry (e.g. AIMS Certified)."""
+
+    __tablename__ = "running_accreditations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_running_accreditations_user_name"),)
+
+
 class RaceEvent(Base):
     __tablename__ = "race_events"
 
@@ -67,6 +86,7 @@ class RaceEvent(Base):
     attended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     skipped: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     shoe: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    accreditations: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(

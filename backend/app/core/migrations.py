@@ -52,6 +52,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     # Running: optional shoe name on runs and race events
     ("runs", "shoe", "VARCHAR(80)"),
     ("race_events", "shoe", "VARCHAR(80)"),
+    # Running: race accreditations (JSON list of names stored as TEXT)
+    ("race_events", "accreditations", "TEXT"),
     # Routines: period window + skip dates
     ("routines", "start_date", "DATE"),
     ("routines", "end_date", "DATE"),

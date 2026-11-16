@@ -7,7 +7,7 @@ from app.core.exceptions import BadRequestError, get_or_404
 from app.core.taxonomy import merge_names
 from app.core.timezone import start_of_day_utc
 from app.modules.calendar.sync_service import CalendarSyncService
-from app.modules.running.models import SUGGESTED_SHOES, RaceEvent
+from app.modules.running.models import SUGGESTED_ACCREDITATIONS, SUGGESTED_SHOES, RaceEvent
 from app.modules.running.repository import RunningRepository
 from app.modules.running.schemas import (
     ChartPoint,
@@ -59,18 +59,18 @@ class RunningService:
         )
 
     @staticmethod
-    def _normalize_photos(photos) -> list[str]:
-        if photos is None:
+    def _normalize_str_list(values) -> list[str]:
+        if values is None:
             return []
-        if isinstance(photos, list):
-            return [str(p) for p in photos]
-        if isinstance(photos, str):
+        if isinstance(values, list):
+            return [str(v) for v in values]
+        if isinstance(values, str):
             try:
-                parsed = json.loads(photos)
+                parsed = json.loads(values)
             except json.JSONDecodeError:
                 return []
             if isinstance(parsed, list):
-                return [str(p) for p in parsed]
+                return [str(v) for v in parsed]
         return []
 
     @staticmethod
@@ -96,11 +96,12 @@ class RunningService:
             medal=RunningService._bool_field(race, "medal"),
             certificate_url=race.certificate_url,
             event_url=race.event_url,
-            photos=RunningService._normalize_photos(race.photos),
+            photos=RunningService._normalize_str_list(race.photos),
             registered=RunningService._bool_field(race, "registered"),
             attended=RunningService._bool_field(race, "attended"),
             skipped=RunningService._bool_field(race, "skipped"),
             shoe=getattr(race, "shoe", None),
+            accreditations=RunningService._normalize_str_list(getattr(race, "accreditations", None)),
             notes=race.notes,
             created_at=race.created_at,
             updated_at=race.updated_at,
@@ -183,6 +184,17 @@ class RunningService:
         if not clean:
             raise BadRequestError("Shoe name required")
         await self.repo.ensure_shoe(user_id, clean)
+        return clean
+
+    async def list_accreditations(self, user_id: str) -> list[str]:
+        stored = await self.repo.list_accreditation_names(user_id)
+        return merge_names(SUGGESTED_ACCREDITATIONS, stored)
+
+    async def create_accreditation(self, user_id: str, name: str) -> str:
+        clean = name.strip()
+        if not clean:
+            raise BadRequestError("Accreditation name required")
+        await self.repo.ensure_accreditations(user_id, [clean])
         return clean
 
     async def get_run(self, user_id: str, run_id: str) -> RunResponse:
