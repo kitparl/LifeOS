@@ -41,3 +41,5 @@ setup/
 .cursorrules
 .secret_notes
 requirements.txt
+# Superpowers specs/plans (local only)
+docs/superpowers/

@@ -10,6 +10,20 @@
 - `backend/` — FastAPI app
 - `frontend/` — Angular 19 app
 
+## Superpowers
+
+The `superpowers` plugin (`superpowers@claude-plugins-official`) is the workflow
+for planning and building features. Project rules below take precedence over
+anything a Superpowers skill says:
+
+- Never `git commit` or push, even if a skill (plans, TDD, worktrees, finishing a branch)
+  says to commit. Leave changes uncommitted for review.
+- Save specs and plans under `docs/superpowers/` and keep them untracked-by-default
+  (do not commit them).
+- Keep plans and tests proportionate: follow "Code Simplicity" and "Scope Discipline"
+  below. Skip brainstorming/plan ceremony for small fixes.
+- Do not create git worktrees unless asked.
+
 ## UI
 
 Do not redesign the existing UI unless asked. Prefer the project's current
