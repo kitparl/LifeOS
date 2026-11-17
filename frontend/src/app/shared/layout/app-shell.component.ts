@@ -7,6 +7,7 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
+import { CdkDrag, CdkDragDrop, CdkDropList } from '@angular/cdk/drag-drop';
 import { filter } from 'rxjs';
 import { PwaService } from '../../core/services/pwa.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -35,6 +36,8 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
+    CdkDropList,
+    CdkDrag,
     CommandPaletteComponent,
     AiChatPanelComponent,
     LucideDynamicIcon,
@@ -112,44 +115,51 @@ const STORAGE_HIDDEN     = 'lifeos-sidebar-hidden';
             @if (navCategoriesEnabled && !sidebarCollapsed()) {
               <p class="section-heading" style="padding: 0.5rem 0.5rem 0.25rem">{{ group.category }}</p>
             }
-            @for (item of group.items; track item.id) {
-              <div
-                class="nav-row"
-                [class.nav-row--collapsed]="sidebarCollapsed()"
-                [class.nav-row--pinned]="navPrefs.isPinnedTop(item.id)"
-              >
-                <a
-                  [routerLink]="item.route"
-                  routerLinkActive="nav-item--active"
-                  class="nav-item"
-                  [class.nav-item--truncated]="sidebarCollapsed()"
-                  [title]="sidebarCollapsed() ? item.label : ''"
+            <div
+              cdkDropList
+              cdkDropListLockAxis="y"
+              (cdkDropListDropped)="onNavDrop(group.category, $event)"
+            >
+              @for (item of group.items; track item.id) {
+                <div
+                  class="nav-row"
+                  cdkDrag
+                  [class.nav-row--collapsed]="sidebarCollapsed()"
+                  [class.nav-row--pinned]="navPrefs.isPinnedTop(item.id)"
                 >
-                  @if (item.icon) {
-                    <svg class="nav-item__icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
-                  }
-                  @if (!sidebarCollapsed()) {
-                    <span class="nav-item__label">{{ item.label }}</span>
-                  }
-                </a>
-                @if (!sidebarCollapsed()) {
-                  <button
-                    type="button"
-                    class="nav-pin"
-                    [class.nav-pin--active]="navPrefs.isPinnedTop(item.id)"
-                    [title]="navPrefs.isPinnedTop(item.id) ? 'Unpin from top' : 'Pin to top'"
-                    [attr.aria-label]="navPrefs.isPinnedTop(item.id) ? 'Unpin ' + item.label + ' from top' : 'Pin ' + item.label + ' to top'"
-                    (click)="onTogglePinTop($event, item.id)"
+                  <a
+                    [routerLink]="item.route"
+                    routerLinkActive="nav-item--active"
+                    class="nav-item"
+                    [class.nav-item--truncated]="sidebarCollapsed()"
+                    [title]="sidebarCollapsed() ? item.label : ''"
                   >
-                    <svg
-                      class="nav-pin__icon"
-                      [lucideIcon]="navPrefs.isPinnedTop(item.id) ? 'pin' : 'pin-off'"
-                      aria-hidden="true"
-                    ></svg>
-                  </button>
-                }
-              </div>
-            }
+                    @if (item.icon) {
+                      <svg class="nav-item__icon" [lucideIcon]="item.icon" aria-hidden="true"></svg>
+                    }
+                    @if (!sidebarCollapsed()) {
+                      <span class="nav-item__label">{{ item.label }}</span>
+                    }
+                  </a>
+                  @if (!sidebarCollapsed()) {
+                    <button
+                      type="button"
+                      class="nav-pin"
+                      [class.nav-pin--active]="navPrefs.isPinnedTop(item.id)"
+                      [title]="navPrefs.isPinnedTop(item.id) ? 'Unpin from top' : 'Pin to top'"
+                      [attr.aria-label]="navPrefs.isPinnedTop(item.id) ? 'Unpin ' + item.label + ' from top' : 'Pin ' + item.label + ' to top'"
+                      (click)="onTogglePinTop($event, item.id)"
+                    >
+                      <svg
+                        class="nav-pin__icon"
+                        [lucideIcon]="navPrefs.isPinnedTop(item.id) ? 'pin' : 'pin-off'"
+                        aria-hidden="true"
+                      ></svg>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
           }
         </nav>
 
@@ -544,6 +554,11 @@ export class AppShellComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     this.navPrefs.togglePinTop(id);
+  }
+
+  /** Drag-reorder within a sidebar group; persisted via the same prefs Settings uses. */
+  onNavDrop(category: string, event: CdkDragDrop<unknown>): void {
+    this.navPrefs.reorderWithinCategory(category, event.previousIndex, event.currentIndex);
   }
 
   promptInstall(): void {

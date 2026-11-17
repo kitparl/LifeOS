@@ -65,6 +65,7 @@ def _import_models() -> None:
     import app.modules.news.models  # noqa: F401
     import app.modules.notifications.models  # noqa: F401
     import app.modules.ocr.models  # noqa: F401
+    import app.modules.planner.models  # noqa: F401
     import app.modules.preferences.models  # noqa: F401
     import app.modules.qa.models  # noqa: F401
     import app.modules.routines.models  # noqa: F401

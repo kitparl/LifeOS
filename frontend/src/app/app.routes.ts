@@ -332,6 +332,12 @@ export const routes: Routes = [
           import('./features/sticky-notes/sticky-notes-page.component').then((m) => m.StickyNotesPageComponent),
       },
       {
+        path: 'planner',
+        loadComponent: () =>
+          import('./features/planner/planner-workspace.component').then((m) => m.PlannerWorkspaceComponent),
+        canDeactivate: [(page: { canLeave(): Promise<boolean> }) => page.canLeave()],
+      },
+      {
         path: 'news',
         loadChildren: () => import('./features/news/news.routes').then((m) => m.NEWS_ROUTES),
       },

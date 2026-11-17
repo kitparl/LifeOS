@@ -31,6 +31,7 @@ from app.modules.mood.api import router as mood_router
 from app.modules.news.api import router as news_router
 from app.modules.notifications.api import router as notifications_router
 from app.modules.ocr.api import router as ocr_router
+from app.modules.planner.api import router as planner_router
 from app.modules.preferences.api import router as preferences_router
 from app.modules.qa.api import router as qa_router
 from app.modules.routines.api import router as routines_router
@@ -143,6 +144,7 @@ app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(activities_router, prefix="/api/v1")
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(sticky_notes_router, prefix="/api/v1")
+app.include_router(planner_router, prefix="/api/v1")
 app.include_router(news_router, prefix="/api/v1")
 app.include_router(dsa_router, prefix="/api/v1")
 app.include_router(travel_router, prefix="/api/v1")
@@ -180,6 +182,13 @@ IMMUTABLE_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
 def _static_headers(path: Path) -> dict[str, str]:
+    # Self-hosted draw.io lives under a versioned path (drawio/<version>/...), so
+    # every file in it, including index.html, can be cached forever.
+    try:
+        if path.relative_to(STATIC_DIR.resolve()).parts[0] == "drawio":
+            return IMMUTABLE_HEADERS
+    except (ValueError, IndexError):
+        pass
     if path.name in NO_CACHE_FILES:
         return NO_CACHE_HEADERS
     # Angular emits content-hashed bundles (e.g. main-A1B2C3D4.js) under production
@@ -187,6 +196,21 @@ def _static_headers(path: Path) -> dict[str, str]:
     stem_parts = path.stem.rsplit("-", 1)
     is_hashed = len(stem_parts) == 2 and len(stem_parts[1]) >= 8 and stem_parts[1].isalnum()
     return IMMUTABLE_HEADERS if is_hashed else NO_CACHE_HEADERS
+
+
+async def spa_files(full_path: str):
+    if full_path.startswith("api/") or full_path == "health":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    candidate = (STATIC_DIR / full_path).resolve()
+    if candidate.is_relative_to(STATIC_DIR.resolve()) and candidate.is_file():
+        return FileResponse(candidate, headers=_static_headers(candidate))
+    # A missing draw.io file must 404: falling back to the SPA index would load
+    # LifeOS inside the editor iframe (e.g. an old client after a version bump).
+    is_drawio = Path(full_path).parts[:1] == ("drawio",)
+    index = STATIC_DIR / "index.html"
+    if not is_drawio and index.is_file():
+        return FileResponse(index, headers=NO_CACHE_HEADERS)
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
 
 def _register_spa_routes() -> None:
@@ -197,17 +221,7 @@ def _register_spa_routes() -> None:
     async def spa_index():
         return FileResponse(STATIC_DIR / "index.html", headers=NO_CACHE_HEADERS)
 
-    @app.get("/{full_path:path}")
-    async def spa_files(full_path: str):
-        if full_path.startswith("api/") or full_path == "health":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-        candidate = (STATIC_DIR / full_path).resolve()
-        if candidate.is_relative_to(STATIC_DIR.resolve()) and candidate.is_file():
-            return FileResponse(candidate, headers=_static_headers(candidate))
-        index = STATIC_DIR / "index.html"
-        if index.is_file():
-            return FileResponse(index, headers=NO_CACHE_HEADERS)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    app.get("/{full_path:path}")(spa_files)
 
 
 _register_spa_routes()

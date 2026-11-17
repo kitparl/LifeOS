@@ -74,4 +74,8 @@ describe('SyncService', () => {
     expect(service.pendingCount()).toBe(0);
     expect(service.status()).toBe('synced');
   });
+
+  it('bypasses the offline queue for planner requests', () => {
+    expect(service.shouldBypass(`${environment.apiUrl}/planner/nodes/x/content`)).toBeTrue();
+  });
 });

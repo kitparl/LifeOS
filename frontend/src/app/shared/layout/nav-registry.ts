@@ -34,6 +34,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { id: 'wishlist', label: 'Wishlist', route: '/wishlist', icon: 'star', category: 'Growth' },
   { id: 'travel', label: 'Travel', route: '/travel', icon: 'map', category: 'Growth' },
   { id: 'sticky-notes', label: 'Quick Note', route: '/notes', icon: 'sticky-note', shortLabel: 'Note', category: 'Core' },
+  { id: 'planner', label: 'Planner', route: '/planner', icon: 'workflow', category: 'Knowledge' },
   { id: 'news', label: 'News', route: '/news', icon: 'newspaper', category: 'Knowledge' },
   { id: 'dsa', label: 'DSA Practice', route: '/dsa', icon: 'code', shortLabel: 'DSA', category: 'Knowledge' },
   { id: 'qa', label: 'Q&A', route: '/qa', icon: 'circle-help', category: 'Knowledge' },

@@ -27,6 +27,11 @@
                 "input": "public"
               },
               {
+                "glob": "**/*",
+                "input": "drawio-dist",
+                "output": "drawio"
+              },
+              {
                 "glob": "pdf.worker.min.mjs",
                 "input": "node_modules/pdfjs-dist/build",
                 "output": "pdfjs/"
@@ -117,6 +122,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "**/*",
+                "input": "drawio-dist",
+                "output": "drawio"
               }
             ],
             "styles": [

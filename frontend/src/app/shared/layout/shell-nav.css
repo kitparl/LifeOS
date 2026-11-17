@@ -20,6 +20,18 @@
 .nav-row:has(.nav-item--active):hover {
   background: var(--sidebar-active-bg);
 }
+.nav-row.cdk-drag-preview {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.nav-row.cdk-drag-placeholder {
+  opacity: 0.4;
+}
+.nav-row.cdk-drag-animating,
+.cdk-drop-list-dragging .nav-row:not(.cdk-drag-placeholder) {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
 .nav-row--collapsed {
   justify-content: center;
 }

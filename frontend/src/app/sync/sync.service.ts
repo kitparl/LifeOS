@@ -66,6 +66,8 @@ export class SyncService {
       url.includes('/splits/') ||
       // Travel is online-only for now (offline deferred): saves need real server ids and map lookups are live.
       url.includes('/travel/') ||
+      // Planner saves need real server revisions; a queued/faked offline save must never show "Saved".
+      url.includes('/planner/') ||
       url.includes('/files/upload') ||
       (url.includes('/files/') && url.includes('/content')) ||
       (url.includes('/files/') && url.includes('/download-token'))
