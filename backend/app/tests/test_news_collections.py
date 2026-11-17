@@ -94,7 +94,7 @@ async def test_delete_collection_keeps_saved_articles(client):
     assert saved_list["items"][0]["collection_ids"] == []
 
 
-async def test_deleting_saved_article_removes_memberships(client):
+async def test_unsaving_article_hides_it_from_collections(client):
     headers = await _headers(client, "unsave@example.com")
     saved = await _save(client, headers)
     coll = await _collection(client, headers, "India News")

@@ -39,7 +39,7 @@ describe('NewsSaveButtonComponent', () => {
     author: null,
     published_at: null,
     saved_at: '2026-09-25T10:00:00Z',
-    expires_at: '2026-10-25T10:00:00Z',
+    expires_at: null,
     collection_ids: [] as string[],
     already_saved: false,
   };

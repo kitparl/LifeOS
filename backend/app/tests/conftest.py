@@ -159,14 +159,24 @@ class FakeNews:
     def __init__(self) -> None:
         self.requests: list[httpx.Request] = []
         self.status: int | None = None  # force every response to this status
+        # Per-key overrides (bearer key -> (status, headers, json body)), checked before `status`.
+        self.key_responses: dict[str, tuple[int, dict[str, str], object]] = {}
         self.search: object = {"took_ms": 5, "total": 1, "total_is_lower_bound": False, "results": [dict(NEWS_RESULT)]}
         self.article: object | None = {**NEWS_RESULT, "text": "First paragraph.\n\nSecond paragraph."}
 
     def params(self, index: int = -1) -> dict[str, str]:
         return dict(self.requests[index].url.params)
 
+    def keys_used(self) -> list[str]:
+        """Bearer keys of the recorded requests, in order."""
+        return [r.headers["Authorization"].removeprefix("Bearer ") for r in self.requests]
+
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
+        key = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        if key in self.key_responses:
+            status, headers, body = self.key_responses[key]
+            return httpx.Response(status, headers=headers, json=body)
         if self.status is not None:
             return httpx.Response(self.status, json={"detail": "forced"})
         if request.url.path == "/v1/search":

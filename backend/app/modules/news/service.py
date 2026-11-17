@@ -1,4 +1,8 @@
-"""News: FreeNewsAPI proxy (live, never persisted) + the user's saved-article library and collections."""
+"""News: FreeNewsAPI proxy (live, never persisted) + the user's saved-article library and collections.
+
+Saved articles are kept until unsaved. Unsaving archives them; archived articles are deleted
+ARTICLE_RETENTION_DAYS later unless restored.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +31,7 @@ from app.core.rate_limit import SlidingWindowLimiter
 from app.core.text import clean_text
 from app.core.timezone import as_utc, utc_now
 from app.modules.integrations.freenewsapi.service import FreeNewsApiIntegrationService
-from app.modules.news import categories
+from app.modules.news import categories, key_pool
 from app.modules.news.client import (
     FreeNewsClient,
     NewsApiError,
@@ -74,6 +78,7 @@ def reset_vendor_state() -> None:
     """Clear the response cache and proxy limiter (tests; settings changes)."""
     global _proxy_limiter
     _vendor_cache.clear()
+    key_pool.reset()
     _proxy_limiter = None
 
 
@@ -152,8 +157,8 @@ class NewsService:
         self.provider_keys = FreeNewsApiIntegrationService(db)
 
     async def _client(self, user_id: str | None) -> FreeNewsClient:
-        key = await self.provider_keys.api_key_for(user_id, self.settings)
-        return FreeNewsClient(key, self.settings.freenews_api_base_url)
+        keys = await self.provider_keys.api_keys_for(user_id, self.settings)
+        return FreeNewsClient(keys, self.settings.freenews_api_base_url)
 
     # ------------------------------------------------------------------ live news
 
@@ -211,13 +216,13 @@ class NewsService:
 
         if user_id is None:
             return detail
-        saved = await self.repo.saved_ids_for_urls(user_id, [detail.url], utc_now())
+        saved = await self.repo.saved_ids_for_urls(user_id, [detail.url])
         return detail.model_copy(update={"saved_article_id": saved.get(detail.url)})
 
     async def _annotate_saved(self, user_id: str | None, articles: list[NewsArticle]) -> list[NewsArticle]:
         if user_id is None:
             return articles
-        saved = await self.repo.saved_ids_for_urls(user_id, [a.url for a in articles], utc_now())
+        saved = await self.repo.saved_ids_for_urls(user_id, [a.url for a in articles])
         return [a.model_copy(update={"saved_article_id": saved.get(a.url)}) for a in articles]
 
     # ------------------------------------------------------------------ saved articles
@@ -232,10 +237,10 @@ class NewsService:
         collection_ids = (await self.repo.collection_ids_for([saved.id])).get(saved.id, [])
         return self._to_saved_response(saved, collection_ids, already_saved=already_saved)
 
-    @staticmethod
     def _to_saved_response(
-        saved: NewsSavedArticle, collection_ids: list[str], *, already_saved: bool = False
+        self, saved: NewsSavedArticle, collection_ids: list[str], *, already_saved: bool = False
     ) -> SavedArticleResponse:
+        archived_at = as_utc(saved.archived_at) if saved.archived_at else None
         return SavedArticleResponse(
             id=saved.id,
             article_external_id=saved.article_external_id,
@@ -248,27 +253,26 @@ class NewsService:
             author=saved.author,
             published_at=as_utc(saved.published_at) if saved.published_at else None,
             saved_at=as_utc(saved.saved_at),
-            expires_at=as_utc(saved.expires_at),
+            expires_at=archived_at + timedelta(days=self.settings.article_retention_days) if archived_at else None,
             collection_ids=collection_ids,
             already_saved=already_saved,
         )
 
     async def save(self, user_id: str, data: SavedArticleCreate) -> tuple[SavedArticleResponse, bool]:
-        """Save a metadata snapshot. Returns (article, created); an existing live save is returned as is."""
+        """Save a metadata snapshot. Returns (article, created).
+
+        An existing saved article is returned as is; an archived one is restored (reported as created).
+        """
         now = utc_now()
         existing = await self.repo.get_saved_by_url(user_id, data.article_url)
         if existing is not None:
-            if as_utc(existing.expires_at) > now:
+            if existing.archived_at is None:
                 return await self._saved_response(existing, already_saved=True), False
-            await self.repo.delete_saved(existing)
+            await self.repo.set_archived(existing, None)
+            return await self._saved_response(existing), True
 
         await self._enforce_write_limit(user_id, now)
-        saved = NewsSavedArticle(
-            user_id=user_id,
-            **data.model_dump(),
-            saved_at=now,
-            expires_at=now + timedelta(days=self.settings.article_retention_days),
-        )
+        saved = NewsSavedArticle(user_id=user_id, **data.model_dump(), saved_at=now)
         try:
             async with self.repo.db.begin_nested():
                 saved = await self.repo.create_saved(saved)
@@ -282,7 +286,7 @@ class NewsService:
 
     async def list_saved(self, user_id: str, saved_filter: SavedFilter, pagination: Pagination) -> SavedArticlePage:
         now = utc_now()
-        await self.repo.purge_expired(now, user_id)
+        await self._purge_archived(user_id)
         rows, total = await self.repo.list_saved(user_id, saved_filter, now, pagination)
         return await self._saved_page(rows, total)
 
@@ -294,17 +298,31 @@ class NewsService:
 
     async def _get_live_saved(self, user_id: str, saved_id: str) -> NewsSavedArticle:
         saved = get_or_404(await self.repo.get_saved(user_id, saved_id), "Saved article not found")
-        if as_utc(saved.expires_at) <= utc_now():
+        if saved.archived_at is not None:
             raise NotFoundError("Saved article not found")
         return saved
 
-    async def delete_saved(self, user_id: str, saved_id: str) -> None:
+    async def archive_saved(self, user_id: str, saved_id: str) -> None:
+        """Unsave: archive the article (idempotent). It is deleted after the retention window unless restored."""
         saved = get_or_404(await self.repo.get_saved(user_id, saved_id), "Saved article not found")
-        await self.repo.delete_saved(saved)
+        if saved.archived_at is None:
+            await self.repo.set_archived(saved, utc_now())
 
-    async def purge_expired(self) -> int:
+    async def restore_saved(self, user_id: str, saved_id: str) -> SavedArticleResponse:
+        saved = get_or_404(await self.repo.get_saved(user_id, saved_id), "Saved article not found")
+        if saved.archived_at is not None:
+            await self.repo.set_archived(saved, None)
+        return await self._saved_response(saved)
+
+    def _archive_cutoff(self) -> datetime:
+        return utc_now() - timedelta(days=self.settings.article_retention_days)
+
+    async def _purge_archived(self, user_id: str) -> None:
+        await self.repo.purge_archived(self._archive_cutoff(), user_id)
+
+    async def purge_archived(self) -> int:
         """Scheduled cleanup for every user."""
-        return await self.repo.purge_expired(utc_now())
+        return await self.repo.purge_archived(self._archive_cutoff())
 
     # ------------------------------------------------------------------ collections
 
@@ -327,9 +345,8 @@ class NewsService:
             raise ConflictError("A collection with this name already exists")
 
     async def list_collections(self, user_id: str) -> list[CollectionResponse]:
-        now = utc_now()
-        await self.repo.purge_expired(now, user_id)
-        rows = await self.repo.list_collections_with_counts(user_id, now)
+        await self._purge_archived(user_id)
+        rows = await self.repo.list_collections_with_counts(user_id)
         return [self._to_collection_response(c, n) for c, n in rows]
 
     async def create_collection(self, user_id: str, name: str) -> CollectionResponse:
@@ -342,7 +359,7 @@ class NewsService:
         collection = await self._get_collection(user_id, collection_id)
         await self._ensure_unique_name(user_id, name, exclude_id=collection.id)
         collection = await self.repo.rename_collection(collection, name)
-        count = await self.repo.count_members(collection.id, utc_now())
+        count = await self.repo.count_members(collection.id)
         return self._to_collection_response(collection, count)
 
     async def delete_collection(self, user_id: str, collection_id: str) -> None:
@@ -354,9 +371,8 @@ class NewsService:
         self, user_id: str, collection_id: str, pagination: Pagination
     ) -> SavedArticlePage:
         collection = await self._get_collection(user_id, collection_id)
-        now = utc_now()
-        await self.repo.purge_expired(now, user_id)
-        rows, total = await self.repo.list_members(collection.id, now, pagination)
+        await self._purge_archived(user_id)
+        rows, total = await self.repo.list_members(collection.id, pagination)
         return await self._saved_page(rows, total)
 
     async def add_to_collection(self, user_id: str, collection_id: str, saved_id: str) -> SavedArticleResponse:

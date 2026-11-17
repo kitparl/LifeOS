@@ -64,7 +64,8 @@ export interface SavedArticle {
   author: string | null;
   published_at: string | null;
   saved_at: string;
-  expires_at: string;
+  /** When an archived article will be deleted; null while it is saved. */
+  expires_at: string | null;
   collection_ids: string[];
   already_saved: boolean;
 }
@@ -79,7 +80,7 @@ export interface SavedArticlePage {
   total: number;
 }
 
-export type SavedFilter = 'all' | 'recent' | 'expiring';
+export type SavedFilter = 'all' | 'recent' | 'archived';
 
 export interface NewsCollection {
   id: string;
@@ -151,6 +152,7 @@ export type NewsErrorCode =
   | 'provider_unavailable'
   | 'missing_credential'
   | 'invalid_credential'
+  | 'quota_exhausted'
   | 'malformed_response'
   | 'article_unavailable'
   | 'unknown';
@@ -162,6 +164,7 @@ const KNOWN_CODES: readonly NewsErrorCode[] = [
   'provider_unavailable',
   'missing_credential',
   'invalid_credential',
+  'quota_exhausted',
   'malformed_response',
   'article_unavailable',
 ];
@@ -183,6 +186,7 @@ const ERROR_MESSAGES: Record<NewsErrorCode, string> = {
   provider_unavailable: "We couldn't load the latest news. Please try again.",
   missing_credential: 'News needs a FreeNewsAPI key. Add one in Integrations → FreeNewsAPI.',
   invalid_credential: 'The FreeNewsAPI key was rejected. Check it in Integrations → FreeNewsAPI.',
+  quota_exhausted: 'The news quota is used up for now. Add another FreeNewsAPI key in Integrations, or try again later.',
   malformed_response: "We couldn't read the news service's response. Please try again.",
   article_unavailable: 'This article is no longer available.',
   unknown: 'Something went wrong. Please try again.',

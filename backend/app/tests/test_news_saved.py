@@ -1,4 +1,4 @@
-"""News proxy endpoints and saved-article library (save, dedupe, expiry, cleanup, isolation, limits)."""
+"""News proxy endpoints and saved-article library (save, dedupe, archive/restore, cleanup, isolation, limits)."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -40,14 +40,17 @@ def _snapshot(url: str = URL, title: str = "AI centre proposal") -> dict:
     }
 
 
-async def _expire(client, saved_id: str) -> None:
-    async with client.session_factory() as session:
-        await session.execute(
-            update(NewsSavedArticle)
-            .where(NewsSavedArticle.id == saved_id)
-            .values(expires_at=datetime.now(timezone.utc) - timedelta(minutes=1))
-        )
-        await session.commit()
+async def _archive(client, headers, saved_id: str, days_ago: float = 0) -> None:
+    """Unsave via the API, then backdate the archive time by `days_ago`."""
+    assert (await client.delete(f"/api/v1/news/saved/{saved_id}", headers=headers)).status_code == 204
+    if days_ago:
+        async with client.session_factory() as session:
+            await session.execute(
+                update(NewsSavedArticle)
+                .where(NewsSavedArticle.id == saved_id)
+                .values(archived_at=datetime.now(timezone.utc) - timedelta(days=days_ago))
+            )
+            await session.commit()
 
 
 # ------------------------------------------------------------------ live news proxy
@@ -58,6 +61,7 @@ async def test_library_endpoints_require_auth(client):
         assert (await client.get(path)).status_code == 401
     assert (await client.post("/api/v1/news/saved", json=_snapshot())).status_code == 401
     assert (await client.delete("/api/v1/news/saved/s1")).status_code == 401
+    assert (await client.post("/api/v1/news/saved/s1/restore")).status_code == 401
     assert (await client.post("/api/v1/news/collections", json={"name": "AI"})).status_code == 401
 
 
@@ -207,16 +211,13 @@ async def test_article_detail_unavailable_and_url_validation(client, fake_news):
 # ------------------------------------------------------------------ saved articles
 
 
-async def test_save_sets_expiry_from_setting_and_prevents_duplicates(client, monkeypatch):
-    monkeypatch.setattr(get_settings(), "article_retention_days", 10)
+async def test_save_has_no_expiry_and_prevents_duplicates(client):
     headers = await _headers(client, "save@example.com")
     first = await client.post("/api/v1/news/saved", headers=headers, json=_snapshot())
     assert first.status_code == 201
     body = first.json()
-    saved_at = datetime.fromisoformat(body["saved_at"])
-    expires_at = datetime.fromisoformat(body["expires_at"])
-    assert saved_at.tzinfo is not None
-    assert expires_at - saved_at == timedelta(days=10)
+    assert datetime.fromisoformat(body["saved_at"]).tzinfo is not None
+    assert body["expires_at"] is None
     assert body["already_saved"] is False
 
     again = await client.post("/api/v1/news/saved", headers=headers, json=_snapshot(title="Other title"))
@@ -242,58 +243,97 @@ async def test_save_validates_snapshot(client):
     assert res.json()["image"] is None
 
 
-async def test_expired_article_hidden_purged_and_resavable(client):
-    headers = await _headers(client, "expire@example.com")
+async def test_unsave_archives_and_restore_brings_back_collection_membership(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "article_retention_days", 10)
+    headers = await _headers(client, "archive@example.com")
     saved = (await client.post("/api/v1/news/saved", headers=headers, json=_snapshot())).json()
     collection = (await client.post("/api/v1/news/collections", headers=headers, json={"name": "AI"})).json()
-    await client.post(
-        f"/api/v1/news/collections/{collection['id']}/articles", headers=headers, json={"saved_article_id": saved["id"]}
+    members_url = f"/api/v1/news/collections/{collection['id']}/articles"
+    await client.post(members_url, headers=headers, json={"saved_article_id": saved["id"]})
+
+    await _archive(client, headers, saved["id"])
+
+    assert (await client.get("/api/v1/news/saved", headers=headers)).json() == {"items": [], "total": 0}
+    assert (await client.get(members_url, headers=headers)).json() == {"items": [], "total": 0}
+    assert (await client.get("/api/v1/news/collections", headers=headers)).json()[0]["article_count"] == 0
+    archived = (await client.get("/api/v1/news/saved", headers=headers, params={"filter": "archived"})).json()
+    assert [a["id"] for a in archived["items"]] == [saved["id"]]
+    deletes_at = datetime.fromisoformat(archived["items"][0]["expires_at"])
+    assert deletes_at - datetime.now(timezone.utc) > timedelta(days=9)
+    # An archived article cannot be added to a collection.
+    other = (await client.post("/api/v1/news/collections", headers=headers, json={"name": "Other"})).json()
+    blocked = await client.post(
+        f"/api/v1/news/collections/{other['id']}/articles", headers=headers, json={"saved_article_id": saved["id"]}
     )
-    await _expire(client, saved["id"])
+    assert blocked.status_code == 404
 
-    listing = await client.get("/api/v1/news/saved", headers=headers)
-    assert listing.json() == {"items": [], "total": 0}
-    async with client.session_factory() as session:
-        assert (await session.execute(select(NewsSavedArticle))).scalars().all() == []
-        assert (await session.execute(select(NewsCollectionArticle))).scalars().all() == []
-    collections = await client.get("/api/v1/news/collections", headers=headers)
-    assert collections.json()[0]["article_count"] == 0
-
-    again = await client.post("/api/v1/news/saved", headers=headers, json=_snapshot())
-    assert again.status_code == 201
-    assert again.json()["id"] != saved["id"]
+    restored = await client.post(f"/api/v1/news/saved/{saved['id']}/restore", headers=headers)
+    assert restored.status_code == 200
+    assert restored.json()["expires_at"] is None
+    assert restored.json()["collection_ids"] == [collection["id"]]
+    assert (await client.get("/api/v1/news/saved", headers=headers)).json()["total"] == 1
+    assert (await client.get(members_url, headers=headers)).json()["total"] == 1
+    assert (await client.get("/api/v1/news/saved", headers=headers, params={"filter": "archived"})).json()["total"] == 0
 
 
-async def test_resave_after_expiry_without_lazy_cleanup(client):
+async def test_unsave_is_idempotent_and_resaving_an_archived_url_restores_it(client):
     headers = await _headers(client, "resave@example.com")
     saved = (await client.post("/api/v1/news/saved", headers=headers, json=_snapshot())).json()
-    await _expire(client, saved["id"])
+    await _archive(client, headers, saved["id"])
+    assert (await client.delete(f"/api/v1/news/saved/{saved['id']}", headers=headers)).status_code == 204
+
     again = await client.post("/api/v1/news/saved", headers=headers, json=_snapshot())
     assert again.status_code == 201
+    assert again.json()["id"] == saved["id"]
     assert again.json()["already_saved"] is False
+    assert again.json()["expires_at"] is None
+    assert (await client.get("/api/v1/news/saved", headers=headers)).json()["total"] == 1
 
 
-async def test_scheduled_purge_removes_saved_and_memberships_keeps_collection(client):
+async def test_archived_articles_are_purged_after_retention_but_saved_ones_never(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "article_retention_days", 30)
     headers = await _headers(client, "purge@example.com")
-    keep = (await client.post("/api/v1/news/saved", headers=headers, json=_snapshot(url=URL + "?k=1"))).json()
+    old_saved = (await client.post("/api/v1/news/saved", headers=headers, json=_snapshot(url=URL + "?k=1"))).json()
+    fresh_archive = (await client.post("/api/v1/news/saved", headers=headers, json=_snapshot(url=URL + "?k=2"))).json()
     gone = (await client.post("/api/v1/news/saved", headers=headers, json=_snapshot())).json()
     collection = (await client.post("/api/v1/news/collections", headers=headers, json={"name": "Read Later"})).json()
-    for saved in (keep, gone):
+    for saved in (old_saved, gone):
         await client.post(
             f"/api/v1/news/collections/{collection['id']}/articles",
             headers=headers,
             json={"saved_article_id": saved["id"]},
         )
-    await _expire(client, gone["id"])
+    async with client.session_factory() as session:
+        await session.execute(
+            update(NewsSavedArticle)
+            .where(NewsSavedArticle.id == old_saved["id"])
+            .values(saved_at=datetime.now(timezone.utc) - timedelta(days=400))
+        )
+        await session.commit()
+    await _archive(client, headers, fresh_archive["id"], days_ago=29)
+    await _archive(client, headers, gone["id"], days_ago=31)
 
     async with client.session_factory() as session:
-        assert await NewsService(session).purge_expired() == 1
+        assert await NewsService(session).purge_archived() == 1
         await session.commit()
+        rows = (await session.execute(select(NewsSavedArticle.id))).scalars().all()
+        assert set(rows) == {old_saved["id"], fresh_archive["id"]}
         members = (await session.execute(select(NewsCollectionArticle))).scalars().all()
-        assert [m.saved_article_id for m in members] == [keep["id"]]
+        assert [m.saved_article_id for m in members] == [old_saved["id"]]
 
     collections = (await client.get("/api/v1/news/collections", headers=headers)).json()
     assert collections == [{**collections[0], "name": "Read Later", "article_count": 1}]
+    assert (await client.post(f"/api/v1/news/saved/{gone['id']}/restore", headers=headers)).status_code == 404
+
+
+async def test_listing_lazily_purges_the_users_old_archive(client):
+    headers = await _headers(client, "lazy@example.com")
+    saved = (await client.post("/api/v1/news/saved", headers=headers, json=_snapshot())).json()
+    await _archive(client, headers, saved["id"], days_ago=31)
+    archived = await client.get("/api/v1/news/saved", headers=headers, params={"filter": "archived"})
+    assert archived.json() == {"items": [], "total": 0}
+    async with client.session_factory() as session:
+        assert (await session.execute(select(NewsSavedArticle))).scalars().all() == []
 
 
 async def test_saved_filters_and_pagination(client):
@@ -307,32 +347,35 @@ async def test_saved_filters_and_pagination(client):
         await session.execute(
             update(NewsSavedArticle)
             .where(NewsSavedArticle.id == ids[0])
-            .values(saved_at=now - timedelta(days=28), expires_at=now + timedelta(days=2))
+            .values(saved_at=now - timedelta(days=28))
         )
         await session.commit()
+    await _archive(client, headers, ids[1])
 
-    page = await client.get("/api/v1/news/saved", headers=headers, params={"limit": 2, "offset": 0})
-    assert page.json()["total"] == 3
-    assert [a["id"] for a in page.json()["items"]] == [ids[2], ids[1]]
+    page = await client.get("/api/v1/news/saved", headers=headers, params={"limit": 1, "offset": 0})
+    assert page.json()["total"] == 2
+    assert [a["id"] for a in page.json()["items"]] == [ids[2]]
     recent = await client.get("/api/v1/news/saved", headers=headers, params={"filter": "recent"})
-    assert {a["id"] for a in recent.json()["items"]} == {ids[1], ids[2]}
-    expiring = await client.get("/api/v1/news/saved", headers=headers, params={"filter": "expiring"})
-    assert [a["id"] for a in expiring.json()["items"]] == [ids[0]]
+    assert [a["id"] for a in recent.json()["items"]] == [ids[2]]
+    archived = await client.get("/api/v1/news/saved", headers=headers, params={"filter": "archived"})
+    assert [a["id"] for a in archived.json()["items"]] == [ids[1]]
 
 
-async def test_delete_saved_and_user_isolation(client):
+async def test_unsave_restore_and_user_isolation(client):
     owner = await _headers(client, "owner@example.com")
     other = await _headers(client, "other@example.com")
     saved = (await client.post("/api/v1/news/saved", headers=owner, json=_snapshot())).json()
 
     assert (await client.get("/api/v1/news/saved", headers=other)).json()["total"] == 0
     assert (await client.delete(f"/api/v1/news/saved/{saved['id']}", headers=other)).status_code == 404
+    assert (await client.post(f"/api/v1/news/saved/{saved['id']}/restore", headers=other)).status_code == 404
     # Another user saving the same URL gets their own row.
     theirs = await client.post("/api/v1/news/saved", headers=other, json=_snapshot())
     assert theirs.status_code == 201 and theirs.json()["id"] != saved["id"]
 
     assert (await client.delete(f"/api/v1/news/saved/{saved['id']}", headers=owner)).status_code == 204
     assert (await client.get("/api/v1/news/saved", headers=owner)).json()["total"] == 0
+    assert (await client.get("/api/v1/news/saved", headers=other)).json()["total"] == 1
 
 
 async def test_write_limit(client, monkeypatch):

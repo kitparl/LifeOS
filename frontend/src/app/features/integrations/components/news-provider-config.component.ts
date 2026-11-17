@@ -2,9 +2,14 @@ import { Component, Input, OnInit, inject, output, signal } from '@angular/core'
 import { FormsModule } from '@angular/forms';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { SecretInputComponent } from '../../../shared/secret-input/secret-input.component';
-import { IntegrationsService, NewsProviderConfigStatus } from '../services/integrations.service';
+import {
+  IntegrationsService,
+  NewsProviderConfigStatus,
+  NewsProviderConfigUpdate,
+  NewsProviderKey,
+} from '../services/integrations.service';
 
-/** API-key card for a news provider. `provider` is the backend id (e.g. `freenewsapi`), so a new source reuses this card. */
+/** API-key card for a news provider (several keys, tried in order). `provider` is the backend id (e.g. `freenewsapi`), so a new source reuses this card. */
 @Component({
   selector: 'app-news-provider-config',
   standalone: true,
@@ -28,39 +33,48 @@ import { IntegrationsService, NewsProviderConfigStatus } from '../services/integ
         <summary class="cursor-pointer font-medium">How to connect</summary>
         <ol class="mt-2 list-decimal pl-4 space-y-1" style="color: var(--text-muted)">
           <li>Create a free account at <strong>freenewsapi.ai</strong> and generate an API key (free tier: 3,000 requests/month).</li>
-          <li>Paste it below, Save, then Test connection.</li>
-          <li>The News page uses your key for the live feed.</li>
+          <li>Paste it below, Add key, then Test connection.</li>
+          <li>Add more keys as backups: when one runs out of quota or is rate limited, the next one is used automatically.</li>
+          <li>The monthly quota is per FreeNewsAPI <strong>account</strong>, so backup keys only help if they come from different accounts.</li>
         </ol>
       </details>
 
       <details class="mt-3 text-xs" [open]="!config()?.configured">
-        <summary class="cursor-pointer font-medium">API key</summary>
+        <summary class="cursor-pointer font-medium">API keys</summary>
         <div class="mt-3 flex flex-col gap-2">
+          @if (config()?.keys?.length) {
+            <ul class="flex flex-col gap-1" data-testid="news-provider-keys">
+              @for (k of config()!.keys; track k.id; let i = $index) {
+                <li class="flex items-center justify-between gap-2">
+                  <span>
+                    <span style="color: var(--text-muted)">{{ i + 1 }}.</span> {{ k.masked }}
+                    <span [style.color]="k.state === 'ok' ? 'var(--success)' : 'var(--warning)'">· {{ keyStateLabel(k) }}</span>
+                  </span>
+                  <button type="button" class="text-xs" style="color: var(--danger)" [disabled]="busy()" (click)="removeKey(k)">
+                    Remove
+                  </button>
+                </li>
+              }
+            </ul>
+            <p class="text-xs" style="color: var(--text-muted)">Keys are tried in this order.</p>
+          }
           <div class="flex flex-col gap-1">
-            <label class="form-label" [for]="provider + '-key'">{{ displayName }} API key</label>
-            <app-secret-input [inputId]="provider + '-key'" [(ngModel)]="keyInput" [placeholder]="keyPlaceholder()" autocomplete="off" />
-            @if (config()?.api_key_masked) {
-              <p class="text-xs" style="color: var(--text-muted)">Configured: {{ config()!.api_key_masked }} (leave blank to keep)</p>
-            }
+            <label class="form-label" [for]="provider + '-key'">{{ config()?.keys?.length ? 'Add another key' : displayName + ' API key' }}</label>
+            <app-secret-input [inputId]="provider + '-key'" [(ngModel)]="keyInput" [placeholder]="'Paste ' + displayName + ' API key'" autocomplete="off" />
           </div>
           @if (config()?.configured) {
             <label class="flex items-center gap-2 text-xs">
-              <input type="checkbox" [(ngModel)]="enabled" />
+              <input type="checkbox" [(ngModel)]="enabled" (ngModelChange)="saveEnabled()" />
               Enable {{ displayName }}
             </label>
           }
           <div class="flex flex-wrap gap-2 mt-1">
-            <button type="button" class="btn-primary text-xs" [disabled]="busy()" (click)="save()">
-              {{ busy() ? 'Saving…' : 'Save' }}
+            <button type="button" class="btn-primary text-xs" [disabled]="busy()" (click)="addKey()">
+              {{ busy() ? 'Saving…' : 'Add key' }}
             </button>
             <button type="button" class="btn-primary text-xs" [disabled]="busy() || !config()?.configured" (click)="test()">
               Test connection
             </button>
-            @if (config()?.configured) {
-              <button type="button" class="text-xs" style="color: var(--danger)" [disabled]="busy()" (click)="remove()">
-                Remove key
-              </button>
-            }
           </div>
           @if (message()) {
             <p class="text-xs" [style.color]="ok() ? 'var(--success)' : 'var(--danger)'">{{ message() }}</p>
@@ -101,9 +115,18 @@ export class NewsProviderConfigComponent implements OnInit {
     return 'Not configured';
   }
 
-  keyPlaceholder(): string {
-    const masked = this.config()?.api_key_masked;
-    return masked ? `Saved: ${masked}` : `Paste ${this.displayName} API key`;
+  keyStateLabel(key: NewsProviderKey): string {
+    const until = key.retry_at ? ` until ${new Date(key.retry_at).toLocaleString()}` : '';
+    switch (key.state) {
+      case 'ok':
+        return 'Active';
+      case 'rate_limited':
+        return `Rate limited${until}`;
+      case 'quota_exhausted':
+        return `Quota used up${until}`;
+      case 'invalid':
+        return 'Rejected by FreeNewsAPI';
+    }
   }
 
   private apply(status: NewsProviderConfigStatus): void {
@@ -125,25 +148,32 @@ export class NewsProviderConfigComponent implements OnInit {
     });
   }
 
-  save(): void {
+  addKey(): void {
     const key = this.keyInput.trim();
-    if (!key && !this.config()?.configured) {
+    if (!key) {
       this.ok.set(false);
       this.message.set('Paste an API key first');
       return;
     }
+    this.update({ api_key: key }, `${this.displayName} key added`, `Failed to add ${this.displayName} key`);
+  }
+
+  saveEnabled(): void {
+    this.update({ enabled: this.enabled }, `${this.displayName} settings saved`, `Failed to save ${this.displayName} settings`);
+  }
+
+  private update(body: NewsProviderConfigUpdate, success: string, failure: string): void {
     this.busy.set(true);
     this.message.set(null);
-    const body = key ? { api_key: key } : { enabled: this.enabled };
     this.integrations.saveNewsProviderConfig(this.provider, body).subscribe({
       next: (status) => {
         this.apply(status);
         this.ok.set(true);
-        this.message.set(`${this.displayName} settings saved`);
+        this.message.set(success);
         this.busy.set(false);
         this.connectionsChanged.emit();
       },
-      error: (err) => this.fail(err, `Failed to save ${this.displayName} settings`),
+      error: (err) => this.fail(err, failure),
     });
   }
 
@@ -161,17 +191,16 @@ export class NewsProviderConfigComponent implements OnInit {
     });
   }
 
-  remove(): void {
-    const id = this.config()?.connection_id;
-    if (!id) return;
+  removeKey(key: NewsProviderKey): void {
     this.busy.set(true);
-    this.integrations.remove(id).subscribe({
-      next: () => {
+    this.message.set(null);
+    this.integrations.removeNewsProviderKey(this.provider, key.id).subscribe({
+      next: (status) => {
+        this.apply(status);
         this.ok.set(true);
-        this.message.set(`${this.displayName} key removed`);
+        this.message.set(`${key.masked} removed`);
         this.busy.set(false);
         this.connectionsChanged.emit();
-        this.load();
       },
       error: (err) => this.fail(err, `Failed to remove ${this.displayName} key`),
     });

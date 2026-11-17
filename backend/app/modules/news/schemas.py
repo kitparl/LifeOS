@@ -7,7 +7,7 @@ from app.core.text import clean_text, is_http_url
 
 NewsDatePreset = Literal["today", "yesterday", "24h", "48h", "7d", "30d"]
 NewsSort = Literal["date", "relevance"]
-SavedFilter = Literal["all", "recent", "expiring"]
+SavedFilter = Literal["all", "recent", "archived"]
 
 URL_MAX = 2048
 HOST_MAX = 253
@@ -117,7 +117,8 @@ class SavedArticleResponse(BaseModel):
     author: str | None
     published_at: datetime | None
     saved_at: datetime
-    expires_at: datetime
+    # When an archived article will be deleted; None while it is saved.
+    expires_at: datetime | None = None
     collection_ids: list[str] = Field(default_factory=list)
     already_saved: bool = False
 

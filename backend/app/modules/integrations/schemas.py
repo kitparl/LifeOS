@@ -304,20 +304,29 @@ class WordnikTestResponse(BaseModel):
 
 
 class NewsProviderConfigUpdate(BaseModel):
-    """Shared by every news provider's card. Blank/omitted api_key keeps the stored key."""
+    """Shared by every news provider's card. A non-blank api_key is added to the provider's keys."""
 
     api_key: str | None = Field(default=None, max_length=256)
     enabled: bool | None = None
 
 
+class NewsProviderKeyStatus(BaseModel):
+    """One stored key: only ever returned masked. `id` is a non-reversible fingerprint for removal."""
+
+    id: str
+    masked: str
+    state: Literal["ok", "rate_limited", "quota_exhausted", "invalid"]
+    retry_at: datetime | None = None
+
+
 class NewsProviderConfigStatus(BaseModel):
-    """Public status: the API key is only ever returned masked."""
+    """Public status. Keys are tried in the listed order; a failing key is skipped until `retry_at`."""
 
     connection_id: str
     enabled: bool
     status: str
     configured: bool
-    api_key_masked: str | None = None
+    keys: list[NewsProviderKeyStatus] = Field(default_factory=list)
     last_tested_at: datetime | None = None
     last_test_ok: bool | None = None
 

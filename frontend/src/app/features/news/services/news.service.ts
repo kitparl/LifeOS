@@ -66,8 +66,13 @@ export class NewsService {
     return this.http.post<SavedArticle>(`${this.api}/saved`, article);
   }
 
+  /** Unsave: the article is archived and deleted later unless restored. */
   removeSaved(id: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/saved/${encodeURIComponent(id)}`);
+  }
+
+  restoreSaved(id: string): Observable<SavedArticle> {
+    return this.http.post<SavedArticle>(`${this.api}/saved/${encodeURIComponent(id)}/restore`, {});
   }
 
   // ------------------------------------------------------------------ collections

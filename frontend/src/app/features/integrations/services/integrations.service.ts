@@ -191,13 +191,23 @@ export interface WordnikTestResponse {
   detail: string;
 }
 
-/** Shared by every news provider's card (FreeNewsAPI today; the provider id is the URL segment). */
+export type NewsProviderKeyState = 'ok' | 'rate_limited' | 'quota_exhausted' | 'invalid';
+
+export interface NewsProviderKey {
+  id: string;
+  masked: string;
+  state: NewsProviderKeyState;
+  /** When a rate-limited / out-of-quota key may be used again. */
+  retry_at: string | null;
+}
+
+/** Shared by every news provider's card (FreeNewsAPI today; the provider id is the URL segment). Keys are tried in order. */
 export interface NewsProviderConfigStatus {
   connection_id: string;
   enabled: boolean;
   status: string;
   configured: boolean;
-  api_key_masked: string | null;
+  keys: NewsProviderKey[];
   last_tested_at: string | null;
   last_test_ok: boolean | null;
 }
@@ -450,6 +460,10 @@ export class IntegrationsService {
 
   saveNewsProviderConfig(provider: string, body: NewsProviderConfigUpdate): Observable<NewsProviderConfigStatus> {
     return this.http.put<NewsProviderConfigStatus>(`${this.api}/${provider}/config`, body);
+  }
+
+  removeNewsProviderKey(provider: string, keyId: string): Observable<NewsProviderConfigStatus> {
+    return this.http.delete<NewsProviderConfigStatus>(`${this.api}/${provider}/keys/${encodeURIComponent(keyId)}`);
   }
 
   testNewsProvider(provider: string): Observable<NewsProviderTestResponse> {

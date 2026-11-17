@@ -91,7 +91,7 @@ class Settings(BaseSettings):
     # Server-wide fallback for callers without their own key (e.g. anonymous Explore visitors).
     # A key saved in Integrations → FreeNewsAPI takes precedence.
     freenews_api_key: str = Field(default="", validation_alias="FREENEWS_API_KEY")
-    # Saved news articles expire (and are purged) this many days after saving.
+    # Unsaved (archived) news articles are purged this many days after archiving.
     article_retention_days: int = Field(default=30, ge=1, validation_alias="ARTICLE_RETENTION_DAYS")
     news_proxy_per_minute: int = Field(default=60, ge=1, validation_alias="NEWS_PROXY_PER_MINUTE")
     news_writes_per_hour: int = Field(default=300, ge=1, validation_alias="NEWS_WRITES_PER_HOUR")

@@ -14,18 +14,17 @@ from app.modules.news.models import NewsCollection, NewsCollectionArticle, NewsS
 from app.modules.news.schemas import SavedFilter
 
 RECENT_DAYS = 7
-EXPIRING_SOON_DAYS = 3
 
 
 class NewsRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    # ------------------------------------------------------------------ expiry
+    # ------------------------------------------------------------------ archive retention
 
-    async def purge_expired(self, now: datetime, user_id: str | None = None) -> int:
-        """Delete expired saved articles (one user's, or everyone's) and their memberships."""
-        expired = select(NewsSavedArticle.id).where(NewsSavedArticle.expires_at <= now)
+    async def purge_archived(self, archived_before: datetime, user_id: str | None = None) -> int:
+        """Delete saved articles archived before the cutoff (one user's, or everyone's) and their memberships."""
+        expired = select(NewsSavedArticle.id).where(NewsSavedArticle.archived_at < archived_before)
         if user_id is not None:
             expired = expired.where(NewsSavedArticle.user_id == user_id)
         await self.db.execute(
@@ -50,15 +49,15 @@ class NewsRepository:
 
     # ------------------------------------------------------------------ saved articles
 
-    async def saved_ids_for_urls(self, user_id: str, urls: list[str], now: datetime) -> dict[str, str]:
-        """{article_url: saved_article_id} for the user's non-expired saves among `urls`."""
+    async def saved_ids_for_urls(self, user_id: str, urls: list[str]) -> dict[str, str]:
+        """{article_url: saved_article_id} for the user's saved (not archived) articles among `urls`."""
         if not urls:
             return {}
         result = await self.db.execute(
             select(NewsSavedArticle.article_url, NewsSavedArticle.id).where(
                 NewsSavedArticle.user_id == user_id,
                 NewsSavedArticle.article_url.in_(urls),
-                NewsSavedArticle.expires_at > now,
+                NewsSavedArticle.archived_at.is_(None),
             )
         )
         return {url: saved_id for url, saved_id in result.all()}
@@ -81,26 +80,23 @@ class NewsRepository:
         await self.db.refresh(saved)
         return saved
 
-    async def delete_saved(self, saved: NewsSavedArticle) -> None:
-        await self.db.execute(
-            delete(NewsCollectionArticle).where(NewsCollectionArticle.saved_article_id == saved.id)
-        )
-        await self.db.delete(saved)
+    async def set_archived(self, saved: NewsSavedArticle, archived_at: datetime | None) -> None:
+        """Archive (timestamp) or restore (None). Collection memberships are kept so a restore brings them back."""
+        saved.archived_at = archived_at
         await self.db.flush()
 
     async def list_saved(
         self, user_id: str, saved_filter: SavedFilter, now: datetime, pagination: Pagination
     ) -> tuple[list[NewsSavedArticle], int]:
-        stmt: Select = select(NewsSavedArticle).where(
-            NewsSavedArticle.user_id == user_id, NewsSavedArticle.expires_at > now
-        )
-        if saved_filter == "recent":
-            stmt = stmt.where(NewsSavedArticle.saved_at >= now - timedelta(days=RECENT_DAYS))
-        if saved_filter == "expiring":
-            stmt = stmt.where(NewsSavedArticle.expires_at <= now + timedelta(days=EXPIRING_SOON_DAYS)).order_by(
-                NewsSavedArticle.expires_at.asc(), NewsSavedArticle.id
+        stmt: Select = select(NewsSavedArticle).where(NewsSavedArticle.user_id == user_id)
+        if saved_filter == "archived":
+            stmt = stmt.where(NewsSavedArticle.archived_at.is_not(None)).order_by(
+                NewsSavedArticle.archived_at.desc(), NewsSavedArticle.id
             )
         else:
+            stmt = stmt.where(NewsSavedArticle.archived_at.is_(None))
+            if saved_filter == "recent":
+                stmt = stmt.where(NewsSavedArticle.saved_at >= now - timedelta(days=RECENT_DAYS))
             stmt = stmt.order_by(NewsSavedArticle.saved_at.desc(), NewsSavedArticle.id)
         return await paginate(self.db, stmt, pagination)
 
@@ -120,13 +116,11 @@ class NewsRepository:
 
     # ------------------------------------------------------------------ collections
 
-    async def list_collections_with_counts(
-        self, user_id: str, now: datetime
-    ) -> list[tuple[NewsCollection, int]]:
+    async def list_collections_with_counts(self, user_id: str) -> list[tuple[NewsCollection, int]]:
         live_members = (
             select(NewsCollectionArticle.collection_id, func.count().label("n"))
             .join(NewsSavedArticle, NewsSavedArticle.id == NewsCollectionArticle.saved_article_id)
-            .where(NewsSavedArticle.expires_at > now)
+            .where(NewsSavedArticle.archived_at.is_(None))
             .group_by(NewsCollectionArticle.collection_id)
             .subquery()
         )
@@ -138,12 +132,12 @@ class NewsRepository:
         )
         return [(collection, int(count)) for collection, count in result.all()]
 
-    async def count_members(self, collection_id: str, now: datetime) -> int:
+    async def count_members(self, collection_id: str) -> int:
         result = await self.db.execute(
             select(func.count())
             .select_from(NewsCollectionArticle)
             .join(NewsSavedArticle, NewsSavedArticle.id == NewsCollectionArticle.saved_article_id)
-            .where(NewsCollectionArticle.collection_id == collection_id, NewsSavedArticle.expires_at > now)
+            .where(NewsCollectionArticle.collection_id == collection_id, NewsSavedArticle.archived_at.is_(None))
         )
         return int(result.scalar_one())
 
@@ -183,12 +177,12 @@ class NewsRepository:
         await self.db.flush()
 
     async def list_members(
-        self, collection_id: str, now: datetime, pagination: Pagination
+        self, collection_id: str, pagination: Pagination
     ) -> tuple[list[NewsSavedArticle], int]:
         stmt = (
             select(NewsSavedArticle)
             .join(NewsCollectionArticle, NewsCollectionArticle.saved_article_id == NewsSavedArticle.id)
-            .where(NewsCollectionArticle.collection_id == collection_id, NewsSavedArticle.expires_at > now)
+            .where(NewsCollectionArticle.collection_id == collection_id, NewsSavedArticle.archived_at.is_(None))
             .order_by(NewsCollectionArticle.created_at.desc(), NewsSavedArticle.id)
         )
         return await paginate(self.db, stmt, pagination)

@@ -137,9 +137,9 @@ async def _run_sticky_notes_purge() -> None:
 async def _run_news_saved_purge() -> None:
     from app.modules.news.service import NewsService
 
-    n = await _run_in_session("Saved news purge", lambda session: NewsService(session).purge_expired())
+    n = await _run_in_session("Archived news purge", lambda session: NewsService(session).purge_archived())
     if n:
-        logger.info("Purged %s expired saved news articles", n)
+        logger.info("Purged %s archived saved news articles", n)
 
 
 async def _run_split_upi_erase() -> None:

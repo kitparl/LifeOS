@@ -130,12 +130,22 @@ async def save_article(
 
 
 @router.delete("/saved/{saved_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_saved_article(
+async def archive_saved_article(
     saved_id: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await NewsService(db).delete_saved(user.id, saved_id)
+    """Unsave: archives the article; it is deleted after the retention window unless restored."""
+    await NewsService(db).archive_saved(user.id, saved_id)
+
+
+@router.post("/saved/{saved_id}/restore", response_model=SavedArticleResponse)
+async def restore_saved_article(
+    saved_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await NewsService(db).restore_saved(user.id, saved_id)
 
 
 # ------------------------------------------------------------------ collections (account only)

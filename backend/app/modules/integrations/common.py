@@ -23,22 +23,30 @@ def load_json_object(config_json: str | None, *, label: str) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def load_api_key(config_json: str | None, *, label: str) -> str:
-    """The stored API key from ``{"api_key_enc": ...}``, or "" when missing or undecryptable."""
+def load_api_keys(config_json: str | None, *, label: str) -> list[str]:
+    """Decrypted keys from ``{"keys_enc": [...]}``, in saved order.
+
+    A legacy single ``api_key_enc`` reads as one key. Undecryptable entries are skipped.
+    """
     data = load_json_object(config_json, label=label)
-    try:
-        return decrypt(str(data["api_key_enc"])).strip() if data.get("api_key_enc") else ""
-    except ValueError:
-        logger.warning("Failed to decrypt %s config (tampered or wrong key)", label)
-        return ""
+    encrypted = list(data.get("keys_enc") or [])
+    if not encrypted and data.get("api_key_enc"):
+        encrypted = [data["api_key_enc"]]
+    keys: list[str] = []
+    for item in encrypted:
+        try:
+            key = decrypt(str(item)).strip()
+        except ValueError:
+            logger.warning("Failed to decrypt a %s key (tampered or wrong key)", label)
+            continue
+        if key and key not in keys:
+            keys.append(key)
+    return keys
 
 
-def serialize_api_key_config(*, existing_json: str | None, api_key: str | None, label: str) -> str:
-    """``{"api_key_enc": ...}`` JSON. A blank/None ``api_key`` keeps the stored key."""
-    key_enc = str(load_json_object(existing_json, label=label).get("api_key_enc") or "")
-    if api_key is not None and api_key.strip():
-        key_enc = encrypt(api_key.strip())
-    return json.dumps({"api_key_enc": key_enc})
+def serialize_api_keys(keys: list[str]) -> str:
+    """``{"keys_enc": [...]}`` JSON with every key encrypted."""
+    return json.dumps({"keys_enc": [encrypt(k) for k in keys]})
 
 
 def mask_secret(secret: str) -> str:

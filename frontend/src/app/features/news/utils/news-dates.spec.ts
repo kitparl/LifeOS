@@ -23,14 +23,14 @@ describe('news-dates', () => {
 
   describe('expiryLabel', () => {
     it('counts local calendar days', () => {
-      expect(expiryLabel(at(29), now)).toBe('Expires in 29 days');
-      expect(expiryLabel(at(2), now)).toBe('Expires in 2 days');
-      expect(expiryLabel(at(1), now)).toBe('Expires tomorrow');
-      expect(expiryLabel(at(0, 6), now)).toBe('Expires today');
+      expect(expiryLabel(at(29), now)).toBe('Deletes in 29 days');
+      expect(expiryLabel(at(2), now)).toBe('Deletes in 2 days');
+      expect(expiryLabel(at(1), now)).toBe('Deletes tomorrow');
+      expect(expiryLabel(at(0, 6), now)).toBe('Deletes today');
     });
 
     it('never shows negative values', () => {
-      expect(expiryLabel(at(-3), now)).toBe('Expires today');
+      expect(expiryLabel(at(-3), now)).toBe('Deletes today');
     });
   });
 

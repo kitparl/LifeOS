@@ -24,7 +24,7 @@ const PAGE_SIZE = 20;
 const EMPTY_TITLES: Record<SavedFilter, string> = {
   all: 'No saved articles yet',
   recent: 'Nothing saved in the last 7 days',
-  expiring: 'Nothing expiring in the next 3 days',
+  archived: 'No archived articles',
 };
 
 @Component({
@@ -48,29 +48,43 @@ const EMPTY_TITLES: Record<SavedFilter, string> = {
       } @else if (error()) {
         <app-news-state title="We couldn't load your saved articles." [message]="message(error()!)" [retryable]="true" (retry)="load()" />
       } @else if (items().length === 0) {
-        <app-news-state [title]="emptyTitle()" message="Save articles with the star to read them later. Saved articles expire automatically." />
+        <app-news-state [title]="emptyTitle()" [message]="emptyMessage()" />
       } @else {
         <div class="space-y-2">
           @for (s of items(); track s.id) {
             <app-article-row [article]="view(s)">
               <p meta class="text-xs" style="color: var(--text-muted)">
-                {{ savedAgo(s.saved_at) }} ·
-                <span [style.color]="soon(s.expires_at) ? 'var(--warning)' : null">{{ expiry(s.expires_at) }}</span>
+                {{ savedAgo(s.saved_at) }}
+                @if (s.expires_at) {
+                  · <span [style.color]="soon(s.expires_at) ? 'var(--warning)' : null">{{ expiry(s.expires_at) }}</span>
+                }
               </p>
-              <app-collection-menu
-                [savedArticleId]="s.id"
-                [collectionIds]="s.collection_ids"
-                (collectionIdsChange)="setCollections(s, $event)"
-              />
-              <button
-                type="button"
-                class="btn-ghost !min-h-8 !px-2 text-xs"
-                aria-label="Remove saved article"
-                data-testid="news-saved-remove-button"
-                (click)="remove(s)"
-              >
-                Remove
-              </button>
+              @if (s.expires_at) {
+                <button
+                  type="button"
+                  class="btn-ghost !min-h-8 !px-2 text-xs"
+                  aria-label="Restore archived article"
+                  data-testid="news-saved-restore-button"
+                  (click)="restore(s)"
+                >
+                  Restore
+                </button>
+              } @else {
+                <app-collection-menu
+                  [savedArticleId]="s.id"
+                  [collectionIds]="s.collection_ids"
+                  (collectionIdsChange)="setCollections(s, $event)"
+                />
+                <button
+                  type="button"
+                  class="btn-ghost !min-h-8 !px-2 text-xs"
+                  aria-label="Remove saved article"
+                  data-testid="news-saved-remove-button"
+                  (click)="remove(s)"
+                >
+                  Remove
+                </button>
+              }
             </app-article-row>
           }
         </div>
@@ -94,7 +108,7 @@ export class NewsSavedTabComponent implements OnInit {
   readonly filters: readonly NewsOption<SavedFilter>[] = [
     { id: 'all', label: 'All' },
     { id: 'recent', label: 'Recent' },
-    { id: 'expiring', label: 'Expiring Soon' },
+    { id: 'archived', label: 'Archived' },
   ];
   readonly page = new PaginatedListState(PAGE_SIZE);
   readonly filter = signal<SavedFilter>('all');
@@ -115,6 +129,12 @@ export class NewsSavedTabComponent implements OnInit {
 
   emptyTitle(): string {
     return EMPTY_TITLES[this.filter()];
+  }
+
+  emptyMessage(): string {
+    return this.filter() === 'archived'
+      ? 'Articles you remove from Saved are archived here, and can be restored until they are deleted.'
+      : 'Save articles with the star to read them later. Saved articles are kept until you remove them.';
   }
 
   setFilter(id: string): void {
@@ -151,10 +171,24 @@ export class NewsSavedTabComponent implements OnInit {
   }
 
   async remove(saved: SavedArticle): Promise<void> {
-    const ok = await this.confirm.confirm(`Remove "${saved.title}" from saved articles?`, 'Remove saved article');
+    const ok = await this.confirm.confirm(
+      `Remove "${saved.title}" from saved articles? It moves to Archived and is deleted automatically unless you restore it.`,
+      'Remove saved article',
+    );
     if (!ok) return;
     this.actionError.set(null);
     this.news.removeSaved(saved.id).subscribe({
+      next: () => {
+        this.news.invalidateNews();
+        this.load();
+      },
+      error: (err: unknown) => this.actionError.set(newsErrorMessage(newsErrorCode(err))),
+    });
+  }
+
+  restore(saved: SavedArticle): void {
+    this.actionError.set(null);
+    this.news.restoreSaved(saved.id).subscribe({
       next: () => {
         this.news.invalidateNews();
         this.load();

@@ -1,7 +1,8 @@
 """User news library. This is NOT a news database: live news is never stored here.
 
-Only lightweight snapshots of articles a user saved (expiring after ARTICLE_RETENTION_DAYS) and
-the user's collections referencing them.
+Only lightweight snapshots of articles a user saved and the user's collections referencing them.
+Saved articles are kept until the user unsaves them: that archives the row (`archived_at`), and
+it is deleted ARTICLE_RETENTION_DAYS later unless the user restores it first.
 """
 
 from datetime import datetime
@@ -17,7 +18,7 @@ class NewsSavedArticle(Base):
     __tablename__ = "news_saved_articles"
     __table_args__ = (
         UniqueConstraint("user_id", "article_url", name="uq_news_saved_user_url"),
-        Index("ix_news_saved_user_expires", "user_id", "expires_at"),
+        Index("ix_news_saved_user_archived", "user_id", "archived_at"),
         Index("ix_news_saved_user_saved", "user_id", "saved_at"),
     )
 
@@ -35,7 +36,8 @@ class NewsSavedArticle(Base):
     author: Mapped[str | None] = mapped_column(String(200), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Set when the user unsaves the article; None while it is saved.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 

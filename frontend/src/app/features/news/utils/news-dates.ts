@@ -38,12 +38,12 @@ export function fullDateTime(iso: string | null): string | null {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-/** "Expires today" / "Expires tomorrow" / "Expires in 12 days". Never negative. */
+/** Deletion countdown for an archived article: "Deletes today" / "Deletes tomorrow" / "Deletes in 12 days". Never negative. */
 export function expiryLabel(expiresIso: string, now: Date = new Date()): string {
   const days = Math.max(0, calendarDaysBetween(now, new Date(expiresIso)));
-  if (days === 0) return 'Expires today';
-  if (days === 1) return 'Expires tomorrow';
-  return `Expires in ${days} days`;
+  if (days === 0) return 'Deletes today';
+  if (days === 1) return 'Deletes tomorrow';
+  return `Deletes in ${days} days`;
 }
 
 /** "Saved today" / "Saved yesterday" / "Saved 5 days ago". */
@@ -54,7 +54,7 @@ export function savedAgoLabel(savedIso: string, now: Date = new Date()): string 
   return `Saved ${days} days ago`;
 }
 
-/** True when the article expires within `days` local calendar days (drives the "expiring soon" style). */
+/** True when an archived article is deleted within `days` local calendar days (drives the warning style). */
 export function expiresSoon(expiresIso: string, now: Date = new Date(), days = 3): boolean {
   return calendarDaysBetween(now, new Date(expiresIso)) <= days;
 }

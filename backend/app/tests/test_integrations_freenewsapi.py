@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 API = "/api/v1"
 KEY = "freenews-secret-key-1234"
+KEY2 = "freenews-second-key-5678"
 
 
 async def _auth(client, email: str) -> dict[str, str]:
@@ -47,12 +48,48 @@ async def test_save_masks_key_and_enables(client):
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["configured"] is True and body["enabled"] is True
-    assert body["api_key_masked"] == "****1234"
+    assert [(k["masked"], k["state"]) for k in body["keys"]] == [("****1234", "ok")]
     assert KEY not in res.text
 
     stored = await _stored_config(client)
     assert KEY not in stored
-    assert "api_key_enc" in json.loads(stored)
+    assert len(json.loads(stored)["keys_enc"]) == 1
+
+
+async def test_keys_are_added_in_order_deduped_capped_and_removable(client):
+    h = await _auth(client, "fnkeys@example.com")
+    url = f"{API}/integrations/freenewsapi/config"
+    await client.put(url, headers=h, json={"api_key": KEY})
+    await client.put(url, headers=h, json={"api_key": KEY2})
+    dup = await client.put(url, headers=h, json={"api_key": KEY})
+    assert [k["masked"] for k in dup.json()["keys"]] == ["****1234", "****5678"]
+
+    for i in range(3):
+        assert (await client.put(url, headers=h, json={"api_key": f"extra-key-{i}-000{i}"})).status_code == 200
+    over = await client.put(url, headers=h, json={"api_key": "one-key-too-many-9999"})
+    assert over.status_code == 400
+
+    first = (await client.get(f"{API}/integrations/freenewsapi", headers=h)).json()["keys"][0]
+    removed = await client.delete(f"{API}/integrations/freenewsapi/keys/{first['id']}", headers=h)
+    assert removed.status_code == 200
+    assert [k["masked"] for k in removed.json()["keys"]][0] == "****5678"
+    assert len(removed.json()["keys"]) == 4
+    assert (await client.delete(f"{API}/integrations/freenewsapi/keys/nope", headers=h)).status_code == 404
+
+
+async def test_a_legacy_single_key_config_still_works(client, fake_news):
+    from app.core.crypto import encrypt
+
+    h = await _auth(client, "fnlegacy@example.com")
+    await client.put(f"{API}/integrations/freenewsapi/config", headers=h, json={"api_key": "placeholder-0000"})
+    async with client.session_factory() as db:
+        conn = (await db.execute(select(IntegrationConnection))).scalars().one()
+        conn.config_json = json.dumps({"api_key_enc": encrypt(KEY)})
+        await db.commit()
+    status = (await client.get(f"{API}/integrations/freenewsapi", headers=h)).json()
+    assert [k["masked"] for k in status["keys"]] == ["****1234"]
+    await client.get(f"{API}/news/articles?q=legacy", headers=h)
+    assert fake_news.keys_used()[0] == KEY
 
 
 async def test_save_with_no_fields_is_rejected(client):
@@ -81,6 +118,7 @@ async def test_test_connection_with_bad_key_fails_without_leaking(client, fake_n
     body = (await client.post(f"{API}/integrations/freenewsapi/test", headers=h)).json()
     assert body["ok"] is False
     assert KEY not in body["detail"]
+    assert "****1234" in body["detail"]
     status = (await client.get(f"{API}/integrations/freenewsapi", headers=h)).json()
     assert status["last_test_ok"] is False
 
@@ -114,3 +152,48 @@ async def test_news_without_any_key_reports_missing_credential(client, fake_news
     assert res.status_code == 503
     assert res.json()["detail"]["code"] == "missing_credential"
     assert fake_news.requests == []
+
+
+async def test_news_fails_over_to_the_next_key_and_status_shows_the_exhausted_one(client, fake_news):
+    h = await _auth(client, "fnfail@example.com")
+    url = f"{API}/integrations/freenewsapi/config"
+    await client.put(url, headers=h, json={"api_key": KEY})
+    await client.put(url, headers=h, json={"api_key": KEY2})
+    fake_news.key_responses[KEY] = (402, {}, {"detail": "quota used up", "renews_at": "2999-01-01T00:00:00Z"})
+
+    res = await client.get(f"{API}/news/articles?q=failover", headers=h)
+    assert res.status_code == 200
+    assert fake_news.keys_used() == [KEY, KEY2]
+
+    keys = (await client.get(f"{API}/integrations/freenewsapi", headers=h)).json()["keys"]
+    assert [(k["masked"], k["state"]) for k in keys] == [("****1234", "quota_exhausted"), ("****5678", "ok")]
+    assert keys[0]["retry_at"].startswith("2999-01-01")
+
+
+async def test_when_every_key_is_exhausted_news_reports_quota_exhausted(client, fake_news, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "freenews_api_key", "")
+    h = await _auth(client, "fnall@example.com")
+    await client.put(f"{API}/integrations/freenewsapi/config", headers=h, json={"api_key": KEY})
+    fake_news.status = 402
+    res = await client.get(f"{API}/news/articles?q=allout", headers=h)
+    assert res.status_code == 503
+    assert res.json()["detail"]["code"] == "quota_exhausted"
+
+
+async def test_test_connection_checks_every_key_and_reports_the_failing_one(client, fake_news):
+    h = await _auth(client, "fnmulti@example.com")
+    url = f"{API}/integrations/freenewsapi/config"
+    await client.put(url, headers=h, json={"api_key": KEY})
+    await client.put(url, headers=h, json={"api_key": KEY2})
+    fake_news.key_responses[KEY] = (402, {}, {"detail": "quota"})
+
+    body = (await client.post(f"{API}/integrations/freenewsapi/test", headers=h)).json()
+    assert body["ok"] is True
+    assert body["detail"].startswith("1 of 2 keys working.")
+    assert "****1234" in body["detail"]
+
+    del fake_news.key_responses[KEY]  # a re-test re-evaluates keys that were parked
+    body = (await client.post(f"{API}/integrations/freenewsapi/test", headers=h)).json()
+    assert body == {"ok": True, "detail": "All 2 keys verified"}

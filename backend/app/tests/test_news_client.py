@@ -1,10 +1,13 @@
 """FreeNewsAPI client, category mapping, de-duplication, excerpt, cache and limiter (no DB)."""
 
+from datetime import timedelta
+
 import httpx
 import pytest
 from app.core.cache import TtlCache
 from app.core.rate_limit import SlidingWindowLimiter
-from app.modules.news import categories
+from app.core.timezone import utc_now
+from app.modules.news import categories, key_pool
 from app.modules.news.client import FreeNewsClient, NewsApiError, parse_article
 from app.modules.news.dedupe import dedupe_articles, normalize_url
 from app.modules.news.schemas import NewsArticle
@@ -70,7 +73,7 @@ def test_parse_article_rejects_non_http_images_and_bad_fields():
 
 async def test_search_sends_only_given_params_and_ignores_promo(fake_news):
     fake_news.search = {"total": 1, "results": [NEWS_RESULT], "strongly_recommended": {"x": 1}}
-    result = await FreeNewsClient(KEY).search({"q": "ai", "size": 5, "offset": 0, "sort": "date"})
+    result = await FreeNewsClient([KEY]).search({"q": "ai", "size": 5, "offset": 0, "sort": "date"})
     assert fake_news.requests[0].url.host == "freenewsapi.ai"
     assert fake_news.params() == {"q": "ai", "size": "5", "offset": "0", "sort": "date"}
     assert [a.id for a in result.articles] == ["a1"]
@@ -78,33 +81,103 @@ async def test_search_sends_only_given_params_and_ignores_promo(fake_news):
 
 
 async def test_key_is_sent_as_bearer_header_never_in_the_url(fake_news):
-    await FreeNewsClient(KEY).search({"q": "ai"})
+    await FreeNewsClient([KEY]).search({"q": "ai"})
     request = fake_news.requests[0]
     assert request.headers["Authorization"] == f"Bearer {KEY}"
     assert KEY not in str(request.url)
 
 
+KEY2 = "news-second-key-5678"
+KEY3 = "news-third-key-9012"
+
+
+async def test_exhausted_key_fails_over_and_is_skipped_until_it_renews(fake_news):
+    fake_news.key_responses[KEY] = (402, {}, {"detail": "quota used up", "renews_at": "2999-01-01T00:00:00Z"})
+    client = FreeNewsClient([KEY, KEY2])
+
+    assert (await client.search({"q": "a"})).total == 1
+    assert (await client.search({"q": "b"})).total == 1
+    # The exhausted key is tried once, then parked; the second request goes straight to the backup.
+    assert fake_news.keys_used() == [KEY, KEY2, KEY2]
+    parked = key_pool.parked(KEY)
+    assert parked is not None and parked.state == "quota_exhausted" and parked.until.year == 2999
+
+
+async def test_rate_limited_key_is_parked_for_retry_after_then_retried(fake_news):
+    fake_news.key_responses[KEY] = (429, {"Retry-After": "30"}, {"detail": "slow down"})
+    client = FreeNewsClient([KEY, KEY2])
+    await client.search({})
+    parked = key_pool.parked(KEY)
+    assert parked is not None and parked.state == "rate_limited"
+    assert 25 <= (parked.until - utc_now()).total_seconds() <= 30
+
+    del fake_news.key_responses[KEY]
+    key_pool.park(KEY, "rate_limited", utc_now() - timedelta(seconds=1))  # cooldown elapsed
+    await client.search({})
+    assert fake_news.keys_used()[-1] == KEY
+
+
+async def test_invalid_key_fails_over_to_the_next_key(fake_news):
+    fake_news.key_responses[KEY] = (401, {}, {"detail": "bad key"})
+    await FreeNewsClient([KEY, KEY2]).search({})
+    assert fake_news.keys_used() == [KEY, KEY2]
+    parked = key_pool.parked(KEY)
+    assert parked is not None and parked.state == "invalid"
+
+
+async def test_all_keys_unusable_raises_the_last_error_then_stops_calling_the_vendor(fake_news):
+    fake_news.key_responses[KEY] = (401, {}, {"detail": "bad key"})
+    fake_news.key_responses[KEY2] = (402, {}, {"detail": "quota"})
+    fake_news.key_responses[KEY3] = (429, {}, {"detail": "slow"})
+    client = FreeNewsClient([KEY, KEY2, KEY3])
+
+    with pytest.raises(NewsApiError) as info:
+        await client.search({})
+    assert info.value.code == "rate_limit"
+    assert fake_news.keys_used() == [KEY, KEY2, KEY3]
+
+    with pytest.raises(NewsApiError):  # every key is parked: no vendor call at all
+        await client.search({})
+    assert len(fake_news.requests) == 3
+
+
+async def test_server_errors_do_not_rotate_keys(fake_news):
+    fake_news.key_responses[KEY] = (503, {}, {"detail": "down"})
+    with pytest.raises(NewsApiError) as info:
+        await FreeNewsClient([KEY, KEY2]).search({})
+    assert info.value.code == "provider_unavailable"
+    assert fake_news.keys_used() == [KEY]
+    assert key_pool.parked(KEY) is None
+
+
 def test_client_requires_a_key():
     with pytest.raises(NewsApiError) as info:
-        FreeNewsClient("")
+        FreeNewsClient([])
     assert info.value.code == "missing_credential"
 
 
 @pytest.mark.parametrize(
     ("status", "code"),
-    [(401, "invalid_credential"), (403, "invalid_credential"), (429, "rate_limit"), (500, "provider_unavailable"), (503, "provider_unavailable")],
+    [
+        (401, "invalid_credential"),
+        (402, "quota_exhausted"),
+        (403, "invalid_credential"),
+        (429, "rate_limit"),
+        (500, "provider_unavailable"),
+        (503, "provider_unavailable"),
+    ],
 )
 async def test_search_maps_vendor_status_to_codes(fake_news, status, code):
     fake_news.status = status
     with pytest.raises(NewsApiError) as info:
-        await FreeNewsClient(KEY).search({"q": "ai"})
+        await FreeNewsClient([KEY]).search({"q": "ai"})
     assert info.value.code == code
 
 
 async def test_search_malformed_response(fake_news):
     fake_news.search = {"results": "nope"}
     with pytest.raises(NewsApiError) as info:
-        await FreeNewsClient(KEY).search({})
+        await FreeNewsClient([KEY]).search({})
     assert info.value.code == "malformed_response"
 
 
@@ -119,16 +192,16 @@ async def test_timeout_maps_to_timeout_code(monkeypatch):
         news_client, "_http_client", lambda timeout: real(timeout=timeout, transport=httpx.MockTransport(raise_timeout))
     )
     with pytest.raises(NewsApiError) as info:
-        await FreeNewsClient(KEY).search({})
+        await FreeNewsClient([KEY]).search({})
     assert info.value.code == "timeout"
 
 
 async def test_article_404_returns_none_and_body_is_exposed(fake_news):
-    found = await FreeNewsClient(KEY).article(NEWS_RESULT["url"])
+    found = await FreeNewsClient([KEY]).article(NEWS_RESULT["url"])
     assert found is not None and found.text == "First paragraph.\n\nSecond paragraph."
     assert fake_news.params() == {"url": NEWS_RESULT["url"], "full_text": "true"}
     fake_news.article = None
-    assert await FreeNewsClient(KEY).article("https://example.com/missing") is None
+    assert await FreeNewsClient([KEY]).article("https://example.com/missing") is None
 
 
 # ------------------------------------------------------------------ categories

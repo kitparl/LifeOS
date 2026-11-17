@@ -9,8 +9,10 @@ This module provides an idempotent helper that safely adds missing columns.
 import json
 import logging
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import AsyncConnection
+
+from app.core.timezone import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +112,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     # Finance: loan foreclosure tracking (user-entered amount, never calculated)
     ("finance_loans", "foreclosure_amount", "FLOAT"),
     ("finance_loans", "foreclosure_notes", "TEXT"),
+    # News: unsaving archives a saved article (replaces the old fixed expiry)
+    ("news_saved_articles", "archived_at", "TIMESTAMP"),
     # Sticky notes: soft-delete (60-day retention before purge)
     ("sticky_notes", "deleted_at", "TIMESTAMP"),
     # Sticky notes: tags (JSON array stored as TEXT; NULL on pre-existing rows)
@@ -152,6 +156,8 @@ _COLUMNS_TO_DROP: list[tuple[str, str]] = [
     # column stays (unmapped, never written); Postgres drops it.
     ("tasks", "goal_id"),
     ("qa_entries", "linked_goal_id"),
+    # News saved articles no longer expire; see retire_news_saved_expiry.
+    ("news_saved_articles", "expires_at"),
 ]
 
 # Tables of removed modules (Goals, Learning, Career, Voice, Automations, Life timeline).
@@ -221,6 +227,7 @@ async def ensure_columns(conn: AsyncConnection) -> None:
         except Exception as exc:
             logger.warning("Could not backfill column %s.%s: %s", table, column, exc)
 
+    await retire_news_saved_expiry(conn)
     await drop_obsolete_columns(conn, dialect)
     await drop_obsolete_tables(conn, dialect)
     await widen_columns(conn, dialect)
@@ -300,6 +307,30 @@ async def drop_obsolete_columns(conn: AsyncConnection, dialect: str) -> None:
                     logger.warning(
                         "Could not relax obsolete column %s.%s: %s", table, column, inner
                     )
+
+
+async def retire_news_saved_expiry(conn: AsyncConnection) -> None:
+    """Prepare `news_saved_articles.expires_at` for removal (no-op once the column is gone).
+
+    Articles already past their expiry are deleted first, otherwise dropping the column would
+    bring them back as saved. The old index on the column is dropped too, since SQLite cannot
+    drop an indexed column.
+    """
+    try:
+        columns = await conn.run_sync(
+            lambda sync_conn: [c["name"] for c in inspect(sync_conn).get_columns("news_saved_articles")]
+        )
+        if "expires_at" not in columns:
+            return
+        now = {"now": utc_now()}
+        expired = "SELECT id FROM news_saved_articles WHERE expires_at <= :now"
+        await conn.execute(
+            text(f"DELETE FROM news_collection_articles WHERE saved_article_id IN ({expired})"), now
+        )
+        await conn.execute(text(f"DELETE FROM news_saved_articles WHERE id IN ({expired})"), now)
+        await conn.execute(text("DROP INDEX IF EXISTS ix_news_saved_user_expires"))
+    except Exception as exc:
+        logger.warning("Could not retire news saved-article expiry: %s", exc)
 
 
 async def drop_obsolete_tables(conn: AsyncConnection, dialect: str) -> None:

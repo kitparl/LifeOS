@@ -16,7 +16,7 @@ import {
   savedToArticleView,
 } from '../models/news.models';
 import { NewsService } from '../services/news.service';
-import { expiresSoon, expiryLabel, savedAgoLabel } from '../utils/news-dates';
+import { savedAgoLabel } from '../utils/news-dates';
 
 const PAGE_SIZE = 20;
 
@@ -59,10 +59,7 @@ const PAGE_SIZE = 20;
           <div class="space-y-2">
             @for (s of items(); track s.id) {
               <app-article-row [article]="view(s)">
-                <p meta class="text-xs" style="color: var(--text-muted)">
-                  {{ savedAgo(s.saved_at) }} ·
-                  <span [style.color]="soon(s.expires_at) ? 'var(--warning)' : null">{{ expiry(s.expires_at) }}</span>
-                </p>
+                <p meta class="text-xs" style="color: var(--text-muted)">{{ savedAgo(s.saved_at) }}</p>
                 <app-collection-menu mode="move" [savedArticleId]="s.id" [sourceCollectionId]="collectionId" (moved)="load()" />
                 <button
                   type="button"
@@ -98,8 +95,6 @@ export class NewsCollectionPageComponent implements OnInit {
 
   readonly view = savedToArticleView;
   readonly savedAgo = (iso: string) => savedAgoLabel(iso);
-  readonly expiry = (iso: string) => expiryLabel(iso);
-  readonly soon = (iso: string) => expiresSoon(iso);
   readonly message = newsErrorMessage;
 
   ngOnInit(): void {
