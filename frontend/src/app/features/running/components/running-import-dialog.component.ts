@@ -2,6 +2,7 @@ import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleCha
 import { Subscription, switchMap, takeWhile, timer } from 'rxjs';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { ModalComponent } from '../../../shared/modal/modal.component';
+import { GarminSyncComponent } from '../../integrations/components/garmin-sync.component';
 import { isJobActive, jobSummary } from '../activity.utils';
 import { ImportJob, ImportRange } from '../models/activity.models';
 import { ActivityService } from '../services/activity.service';
@@ -12,7 +13,7 @@ const POLL_MS = 1500;
 @Component({
   selector: 'app-running-import-dialog',
   standalone: true,
-  imports: [ModalComponent],
+  imports: [ModalComponent, GarminSyncComponent],
   template: `
     <app-modal [open]="open" title="Import from Garmin" [maxWidth]="'560px'" (closed)="close()">
       <div body class="space-y-3 text-sm">
@@ -59,6 +60,10 @@ const POLL_MS = 1500;
               }
             </div>
         } @else {
+          <app-garmin-sync #garminSync scope="activities" (finished)="imported.emit()" />
+          @if (garminSync.status()?.connected) {
+            <p class="text-xs font-medium pt-2" style="border-top: 1px solid var(--border)">Or upload files</p>
+          }
           <p style="color: var(--text-muted)">
             Upload activity files (.fit) or the .zip from Garmin's account data export. Activities you have
             already imported are skipped, so it is safe to upload the same files again.

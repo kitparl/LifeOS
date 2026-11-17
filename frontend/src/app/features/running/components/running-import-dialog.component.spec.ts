@@ -1,6 +1,7 @@
 import { fakeAsync, tick, discardPeriodicTasks } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
+import { GarminConnectionStatus, IntegrationsService } from '../../integrations/services/integrations.service';
 import { ImportJob } from '../models/activity.models';
 import { ActivityService } from '../services/activity.service';
 import { RunningImportDialogComponent } from './running-import-dialog.component';
@@ -27,8 +28,20 @@ const job = (status: ImportJob['status'], over: Partial<ImportJob> = {}): Import
   ...over,
 });
 
+const garminConnected: GarminConnectionStatus = {
+  connected: true,
+  key_masked: '****1234',
+  status: 'synced',
+  last_sync_at: null,
+  last_sync_message: null,
+  last_sync_ok: null,
+  synced_through: '2026-11-16',
+  activities_synced_through: '2026-11-16',
+};
+
 describe('RunningImportDialogComponent', () => {
   let activities: jasmine.SpyObj<ActivityService>;
+  let integrations: jasmine.SpyObj<IntegrationsService>;
 
   function create() {
     const fixture = TestBed.createComponent(RunningImportDialogComponent);
@@ -40,11 +53,34 @@ describe('RunningImportDialogComponent', () => {
   }
 
   beforeEach(() => {
-    activities = jasmine.createSpyObj<ActivityService>('ActivityService', ['startImport', 'getImport']);
+    activities = jasmine.createSpyObj<ActivityService>('ActivityService', ['startImport', 'getImport', 'listImports']);
+    integrations = jasmine.createSpyObj<IntegrationsService>('IntegrationsService', ['getGarmin', 'syncGarmin']);
+    activities.listImports.and.returnValue(of({ items: [], total: 0 }));
+    integrations.getGarmin.and.returnValue(of({ ...garminConnected, connected: false }));
     TestBed.configureTestingModule({
       imports: [RunningImportDialogComponent],
-      providers: [{ provide: ActivityService, useValue: activities }],
+      providers: [
+        { provide: ActivityService, useValue: activities },
+        { provide: IntegrationsService, useValue: integrations },
+      ],
     });
+  });
+
+  it('offers a Garmin sync of activities only when Garmin is connected', () => {
+    const hidden = create().fixture.nativeElement as HTMLElement;
+    expect(hidden.querySelector('[data-testid="garmin-sync-button"]')).toBeNull();
+    expect(hidden.textContent).not.toContain('Or upload files');
+  });
+
+  it('syncs only activities from inside the dialog', () => {
+    integrations.getGarmin.and.returnValue(of(garminConnected));
+    integrations.syncGarmin.and.returnValue(of(job('running', { origin: 'sync' })));
+    const el = create().fixture.nativeElement as HTMLElement;
+
+    (el.querySelector('[data-testid="garmin-sync-button"]') as HTMLButtonElement).click();
+
+    expect(el.textContent).toContain('Or upload files');
+    expect(integrations.syncGarmin).toHaveBeenCalledWith(null, 'activities');
   });
 
   it('cannot start without files', () => {
