@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import BadRequestError, ConflictError, get_or_404
 from app.core.timezone import utc_now
 from app.modules.ai.adapters.registry import AI_PROVIDERS
+from app.modules.integrations.garmin.connection_config import parse_config as parse_garmin_config
 from app.modules.integrations.google_calendar.config import parse_config as parse_google_calendar_config
 from app.modules.integrations.models import INTEGRATION_PROVIDERS
 from app.modules.integrations.repository import IntegrationRepository
@@ -23,7 +24,7 @@ PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
     IntegrationProviderInfo(provider="google_calendar", display_name="Google Calendar", description="Import Google Calendar events (optional two-way)", oauth_required=True),
     IntegrationProviderInfo(provider="google_fit", display_name="Google Fit", description="Activity and health metrics", oauth_required=True),
     IntegrationProviderInfo(provider="apple_health", display_name="Apple Health", description="Health data import", oauth_required=True),
-    IntegrationProviderInfo(provider="garmin", display_name="Garmin", description="Runs and workouts", oauth_required=True),
+    IntegrationProviderInfo(provider="garmin", display_name="Garmin", description="Runs, activities and health data from your Garmin account", oauth_required=False),
     IntegrationProviderInfo(provider="strava", display_name="Strava", description="Running activities", oauth_required=True),
     IntegrationProviderInfo(provider="telegram", display_name="Telegram", description="Notifications and bot commands", oauth_required=False),
     IntegrationProviderInfo(provider="email", display_name="Email", description="Digest and reminders", oauth_required=False),
@@ -43,7 +44,9 @@ PROVIDER_CATALOG: list[IntegrationProviderInfo] = [
 ]
 
 # Providers whose config_json holds encrypted secrets and is managed only by dedicated endpoints.
-_SECRET_CONFIG_PROVIDERS = frozenset({"telegram", "github", "google_calendar", "wordnik", "google_maps", *AI_PROVIDERS})
+_SECRET_CONFIG_PROVIDERS = frozenset(
+    {"telegram", "github", "google_calendar", "garmin", "wordnik", "google_maps", *AI_PROVIDERS}
+)
 
 def list_integration_providers() -> list[IntegrationProviderInfo]:
     return PROVIDER_CATALOG
@@ -78,9 +81,9 @@ class IntegrationService:
         create_data = data
         if data.provider in _SECRET_CONFIG_PROVIDERS and data.config_json:
             create_data = data.model_copy(update={"config_json": None})
-        if data.provider == "google_calendar":
-            # Tokens only arrive via the OAuth callback; never accept raw config,
-            # and never enable before OAuth has produced a refresh token.
+        if data.provider in ("google_calendar", "garmin"):
+            # Credentials only arrive through the provider's own endpoints; never accept raw config,
+            # and never enable before a credential exists.
             create_data = data.model_copy(update={"config_json": None, "enabled": False})
         conn = await self.repo.create(user_id, create_data, display_name)
         return _safe_response(conn)
@@ -101,6 +104,8 @@ class IntegrationService:
             and not parse_google_calendar_config(conn.config_json).connected
         ):
             raise BadRequestError("Connect Google Calendar from Integrations before enabling it")
+        if conn.provider == "garmin" and data.enabled and not parse_garmin_config(conn.config_json).connected:
+            raise BadRequestError("Add a Garmin key from Integrations before enabling it")
         updated = await self.repo.update(conn, update_data)
         return _safe_response(updated)
 
@@ -118,6 +123,11 @@ class IntegrationService:
 
             await GoogleCalendarSyncService(self.repo.db).disconnect(user_id)
             return
+        if conn.provider == "garmin":
+            from app.modules.integrations.garmin.sync_service import GarminSyncService
+
+            await GarminSyncService(self.repo.db).disconnect(user_id)
+            return
         await self.repo.delete(conn)
 
     async def sync_connection(self, user_id: str, conn_id: str) -> IntegrationSyncResponse:
@@ -130,6 +140,8 @@ class IntegrationService:
             from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
 
             return await GoogleCalendarSyncService(self.repo.db).sync(user_id)
+        if conn.provider == "garmin":
+            raise BadRequestError("Use POST /integrations/garmin/sync to sync Garmin")
         now = utc_now()
         conn.last_sync_at = now
         conn.status = "synced"

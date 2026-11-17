@@ -1,4 +1,4 @@
-"""Garmin import: stage uploads, run the background job, delete imported data.
+"""Garmin import: stage uploads, run background jobs (uploads and API syncs), delete imported data.
 
 The job row doubles as the sync log. Progress lives in a plain dataclass and is written with UPDATE
 statements, so nothing depends on ORM objects surviving a per-file rollback.
@@ -12,7 +12,7 @@ import logging
 import shutil
 import tempfile
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -41,7 +41,13 @@ from app.modules.integrations.garmin.fit_parser import (
     NotAnActivityError,
     parse_fit,
 )
-from app.modules.integrations.garmin.models import JOB_FAILED, JOB_FINISHED, JOB_RUNNING, GarminImportJob
+from app.modules.integrations.garmin.models import (
+    JOB_FAILED,
+    JOB_FINISHED,
+    JOB_RUNNING,
+    ORIGIN_UPLOAD,
+    GarminImportJob,
+)
 from app.modules.integrations.garmin.repository import GarminImportRepository
 from app.modules.integrations.garmin.schemas import (
     DeleteImportedResult,
@@ -98,6 +104,7 @@ class Progress:
     failed: int = 0
     runs_created: int = 0
     runs_matched: int = 0
+    health_days: int = 0
     errors: list[dict[str, str]] = field(default_factory=list)
     new_run_summaries: list[tuple[str, str]] = field(default_factory=list)  # (run id, summary line)
 
@@ -116,6 +123,7 @@ class Progress:
             "failed": self.failed,
             "runs_created": self.runs_created,
             "runs_matched": self.runs_matched,
+            "health_days": self.health_days,
             "errors_json": json.dumps(self.errors),
         }
 
@@ -135,6 +143,7 @@ def to_response(job: GarminImportJob) -> ImportJobResponse:
         id=job.id,
         status=job.status,
         range_mode=job.range_mode,
+        origin=job.origin,
         files_found=job.files_found,
         created=job.created,
         duplicates=job.duplicates,
@@ -143,6 +152,7 @@ def to_response(job: GarminImportJob) -> ImportJobResponse:
         failed=job.failed,
         runs_created=job.runs_created,
         runs_matched=job.runs_matched,
+        health_days=job.health_days,
         errors=[ImportFileError(**e) for e in json.loads(job.errors_json or "[]")],
         error=job.error,
         created_at=job.created_at,
@@ -191,7 +201,7 @@ async def stage_uploads(uploads: list[UploadFile], settings: Settings | None = N
     return staged
 
 
-async def _threaded(iterator: Iterator) -> AsyncIterator:
+async def threaded(iterator: Iterator) -> AsyncIterator:
     """Advance a blocking iterator in a worker thread so zip reading never blocks the event loop."""
     sentinel = object()
     while True:
@@ -213,14 +223,12 @@ class GarminImportService:
         try:
             if await self.repo.has_active(user_id):
                 raise ConflictError("An import is already running")
-            job = await self.repo.create(user_id, range_mode)
+            job = await self.repo.create(user_id, range_mode, ORIGIN_UPLOAD)
             await self.db.commit()  # the background task must be able to see the row
         except BaseException:
             staged.cleanup()
             raise
-        task = asyncio.create_task(run_import(factory, job.id, user_id, staged), name=f"garmin-import-{job.id}")
-        _tasks.add(task)
-        task.add_done_callback(_tasks.discard)
+        start_background(run_import(factory, job.id, user_id, staged), f"garmin-import-{job.id}")
         return job
 
     async def get_job(self, user_id: str, job_id: str) -> ImportJobResponse:
@@ -261,9 +269,33 @@ async def mark_interrupted_jobs(factory: async_sessionmaker) -> int:
     return count
 
 
-async def run_import(factory: async_sessionmaker, job_id: str, user_id: str, staged: StagedUploads) -> None:
-    """Background entry point: own session, own failure handling, always cleans up."""
-    settings = get_settings()
+def start_background(work: Awaitable[None], name: str) -> None:
+    """Run a job without awaiting it, keeping a strong reference until it ends."""
+    task = asyncio.create_task(work, name=name)
+    _tasks.add(task)
+    task.add_done_callback(_tasks.discard)
+
+
+class JobStopped(Exception):
+    """A job ends early for a known reason; the reason is shown to the user on the job."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+JobWork = Callable[[AsyncSession, GarminImportRepository, Progress], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class JobOutcome:
+    status: str
+    error: str | None
+    progress: Progress
+
+
+async def run_job(factory: async_sessionmaker, job_id: str, user_id: str, work: JobWork, *, label: str) -> JobOutcome:
+    """Background entry point shared by uploads and syncs: own session, own failure handling, one notification."""
     progress = Progress()
     started = time.monotonic()
     status, job_error = JOB_FINISHED, None
@@ -273,23 +305,26 @@ async def run_import(factory: async_sessionmaker, job_id: str, user_id: str, sta
             await repo.update_fields(job_id, status=JOB_RUNNING, started_at=utc_now())
             await db.commit()
             try:
-                await _process_job(db, repo, job_id, user_id, staged, progress, settings)
+                await work(db, repo, progress)
+            except JobStopped as exc:
+                await db.rollback()
+                status, job_error = JOB_FAILED, exc.reason
             except Exception:
-                logger.exception("Garmin import job %s failed", job_id)
+                logger.exception("Garmin %s job %s failed", label, job_id)
                 await db.rollback()
                 status, job_error = JOB_FAILED, REASON_JOB_FAILED
             await repo.update_fields(
                 job_id, status=status, error=job_error, finished_at=utc_now(), **progress.as_values()
             )
             await db.commit()
-            if status == JOB_FINISHED:
-                await _notify(db, user_id, progress)
+            await notify_runs(db, user_id, progress)
     except Exception:
-        logger.exception("Garmin import job %s could not be finalised", job_id)
+        logger.exception("Garmin %s job %s could not be finalised", label, job_id)
     finally:
-        staged.cleanup()
         logger.info(
-            "Garmin import finished job=%s user=%s status=%s files=%s created=%s duplicates=%s failed=%s seconds=%.1f",
+            "Garmin %s finished job=%s user=%s status=%s files=%s created=%s duplicates=%s failed=%s "
+            "health_days=%s seconds=%.1f",
+            label,
             job_id,
             user_id,
             status,
@@ -297,8 +332,25 @@ async def run_import(factory: async_sessionmaker, job_id: str, user_id: str, sta
             progress.created,
             progress.duplicates,
             progress.failed,
+            progress.health_days,
             time.monotonic() - started,
         )
+    return JobOutcome(status, job_error, progress)
+
+
+async def run_import(factory: async_sessionmaker, job_id: str, user_id: str, staged: StagedUploads) -> None:
+    """Background entry point for uploaded files; always removes the staged uploads."""
+    settings = get_settings()
+    try:
+        await run_job(
+            factory,
+            job_id,
+            user_id,
+            lambda db, repo, progress: _process_job(db, repo, job_id, user_id, staged, progress, settings),
+            label="import",
+        )
+    finally:
+        staged.cleanup()
 
 
 async def _process_job(
@@ -323,7 +375,7 @@ async def _process_job(
         if data is None:
             progress.fail(name, problem or REASON_NOT_SAVED)
         else:
-            await _process_fit(db, user_id, name, data, cutoff, progress, settings)
+            await process_fit(db, user_id, name, data, cutoff, progress, settings)
         await repo.update_fields(job_id, **progress.as_values())
         await db.commit()
 
@@ -333,7 +385,7 @@ async def _process_job(
             continue
         try:
             entries = iter_fit_entries(item.path, limits, ArchiveBudget())
-            async for entry in _threaded(entries):
+            async for entry in threaded(entries):
                 await handle(entry.name, entry.data, entry.problem)
         except ArchiveError as exc:
             progress.fail(item.name, exc.reason)
@@ -341,7 +393,7 @@ async def _process_job(
             await db.commit()
 
 
-async def _process_fit(
+async def process_fit(
     db: AsyncSession,
     user_id: str,
     name: str,
@@ -395,7 +447,7 @@ async def _process_fit(
         progress.runs_matched += 1
 
 
-async def _notify(db: AsyncSession, user_id: str, progress: Progress) -> None:
+async def notify_runs(db: AsyncSession, user_id: str, progress: Progress) -> None:
     """One message per import: the run itself when exactly one was created, a count when several were."""
     created = progress.runs_created
     if created == 0:

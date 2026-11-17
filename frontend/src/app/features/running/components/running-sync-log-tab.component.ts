@@ -37,7 +37,7 @@ const REFRESH_MS = 3000;
         type="button"
         class="btn-danger text-xs"
         data-testid="sync-log-delete-button"
-        [disabled]="busy() || !summary()?.activities"
+        [disabled]="busy() || !(summary()?.activities || summary()?.health_days)"
         (click)="deleteImported()"
       >Delete imported data</button>
     </div>
@@ -48,7 +48,9 @@ const REFRESH_MS = 3000;
       } @else if (total() === 0) {
         <div class="empty-state">
           <p class="empty-state__title">No imports yet</p>
-          <p class="empty-state__desc">Use Import to add Garmin activity files. Each import is listed here.</p>
+          <p class="empty-state__desc">
+            Use Import to add Garmin activity files, or connect Garmin in Integrations. Each import and sync is listed here.
+          </p>
         </div>
       } @else {
         <div class="overflow-x-auto">
@@ -56,6 +58,7 @@ const REFRESH_MS = 3000;
             <thead>
               <tr>
                 <th class="px-3 py-2 text-left">When</th>
+                <th class="px-3 py-2 text-left">Source</th>
                 <th class="px-3 py-2 text-left">Status</th>
                 <th class="px-3 py-2 text-left">Result</th>
               </tr>
@@ -64,6 +67,7 @@ const REFRESH_MS = 3000;
               @for (job of jobs(); track job.id) {
                 <tr style="border-bottom: 1px solid var(--border)">
                   <td class="px-3 py-2 align-top">{{ job.created_at | date: 'medium' }}</td>
+                  <td class="px-3 py-2 align-top">{{ job.origin === 'sync' ? 'Garmin sync' : 'Upload' }}</td>
                   <td class="px-3 py-2 align-top">
                     <span
                       class="badge"
@@ -157,7 +161,7 @@ export class RunningSyncLogTabComponent implements OnInit, OnDestroy {
 
   async deleteImported(): Promise<void> {
     const s = this.summary();
-    if (!s || s.activities === 0) return;
+    if (!s || (s.activities === 0 && s.health_days === 0)) return;
     const ok = await this.confirm.confirm(
       `Delete ${s.activities} imported ${s.activities === 1 ? 'activity' : 'activities'}? ` +
         'Runs created by imports are removed. Runs you logged by hand keep your notes, shoes and weather ' +

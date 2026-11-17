@@ -7,12 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import BadRequestError, get_or_404
 from app.core.timezone import safe_zone, utc_now
 from app.modules.health import baselines
-from app.modules.health.contracts import SOURCE_MANUAL, ParsedHealthDay, UpsertCounts
+from app.modules.health.contracts import SOURCE_MANUAL, ParsedHealthDay, ParsedMeasurement, UpsertCounts
 from app.modules.health.metrics import (
     METRIC_BY_KEY,
     METRICS,
     SLEEP_KEYS,
     TODAY_KEYS,
+    validate_measurement,
     validate_values,
 )
 from app.modules.health.models import HealthDay, HealthMeasurement
@@ -224,6 +225,34 @@ class HealthService:
                 setattr(row, metric.key, clean.get(metric.key))
             await (self.repo.add_day(row) if is_new else self.repo.save(row))
             created, updated = created + is_new, updated + (not is_new)
+        return UpsertCounts(created=created, updated=updated)
+
+    async def upsert_measurements(
+        self, user_id: str, source: str, items: list[ParsedMeasurement]
+    ) -> UpsertCounts:
+        """Insert or update readings from an import source by external id; invalid readings are skipped."""
+        if source == SOURCE_MANUAL:
+            raise BadRequestError("Manual data is entered through the health screens")
+        created = updated = 0
+        for item in items:
+            try:
+                values = validate_measurement(item.kind, dict(item.values))
+            except ValueError:
+                continue
+            values_json = json.dumps(values)
+            row = await self.repo.get_measurement_by_external_id(user_id, source, item.external_id)
+            if row is None:
+                await self.repo.add_measurement(
+                    HealthMeasurement(
+                        user_id=user_id, measured_at=item.measured_at, kind=item.kind,
+                        values_json=values_json, source=source, external_id=item.external_id,
+                    )
+                )
+                created += 1
+            elif row.values_json != values_json or row.kind != item.kind:
+                row.kind, row.values_json, row.measured_at = item.kind, values_json, item.measured_at
+                await self.db.flush()
+                updated += 1
         return UpsertCounts(created=created, updated=updated)
 
     async def count_by_source(self, user_id: str, source: str) -> int:

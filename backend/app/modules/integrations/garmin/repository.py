@@ -12,8 +12,8 @@ class GarminImportRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, user_id: str, range_mode: str) -> GarminImportJob:
-        job = GarminImportJob(user_id=user_id, range_mode=range_mode)
+    async def create(self, user_id: str, range_mode: str, origin: str) -> GarminImportJob:
+        job = GarminImportJob(user_id=user_id, range_mode=range_mode, origin=origin)
         self.db.add(job)
         await self.db.flush()
         await self.db.refresh(job)

@@ -27,6 +27,7 @@ TASK_COMPLETED = "task_completed"
 RACE_ADDED = "race_added"
 RUN_SYNCED = "run_synced"
 RUNS_IMPORTED = "runs_imported"
+GARMIN_SYNC_STOPPED = "garmin_sync_stopped"
 CALENDAR_EVENT_CREATED = "calendar_event_created"
 HABIT_CREATED = "habit_created"
 
@@ -42,6 +43,7 @@ ALL_EVENT_TYPES: tuple[str, ...] = (
     RACE_ADDED,
     RUN_SYNCED,
     RUNS_IMPORTED,
+    GARMIN_SYNC_STOPPED,
     CALENDAR_EVENT_CREATED,
     HABIT_CREATED,
 )

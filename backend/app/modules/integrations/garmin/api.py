@@ -3,20 +3,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.database import async_session_factory, get_db
 from app.core.deps import get_current_user
+from app.core.exceptions import ConflictError
 from app.modules.auth.models import User
 from app.modules.integrations.garmin.import_service import GarminImportService, stage_uploads, to_response
 from app.modules.integrations.garmin.schemas import (
     DeleteImportedResult,
+    GarminConnectionStatus,
+    GarminKeyUpdate,
     ImportedSummary,
     ImportJobResponse,
     ImportRange,
 )
+from app.modules.integrations.garmin.sync_service import GarminSyncService
 
 router = APIRouter(prefix="/integrations/garmin", tags=["garmin"])
 
 
 def get_session_factory() -> async_sessionmaker:
-    """The factory the background import opens its own sessions from (overridden in tests)."""
+    """The factory background imports and syncs open their own sessions from (overridden in tests)."""
     return async_session_factory
 
 
@@ -71,3 +75,46 @@ async def delete_imported_data(
     db: AsyncSession = Depends(get_db),
 ):
     return await GarminImportService(db).delete_imported_data(user.id, include_health)
+
+
+@router.get("/connection", response_model=GarminConnectionStatus)
+async def get_connection(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await GarminSyncService(db).get_status(user.id)
+
+
+@router.put("/connection", response_model=GarminConnectionStatus)
+async def save_connection_key(
+    data: GarminKeyUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    factory: async_sessionmaker = Depends(get_session_factory),
+):
+    """Check and store a personal API key, then start the first sync right away."""
+    service = GarminSyncService(db)
+    await service.save_key(user.id, data.api_key)
+    try:
+        await service.start_sync(user.id, factory)
+    except ConflictError:
+        await db.commit()  # an upload is running; the key is kept and the next sync pulls everything
+    return await service.get_status(user.id)
+
+
+@router.delete("/connection", status_code=status.HTTP_204_NO_CONTENT)
+async def disconnect(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await GarminSyncService(db).disconnect(user.id)
+
+
+@router.post("/sync", response_model=ImportJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def sync_now(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    factory: async_sessionmaker = Depends(get_session_factory),
+):
+    job = await GarminSyncService(db).start_sync(user.id, factory)
+    return to_response(job)

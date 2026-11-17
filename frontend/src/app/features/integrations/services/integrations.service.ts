@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { ImportJob } from '../../running/models/activity.models';
 
 export interface IntegrationProvider {
   provider: string;
@@ -282,6 +283,18 @@ export interface AiModelsResponse {
   refreshed_at: string | null;
 }
 
+/** Garmin Personal API connection. Never carries the key or a token. */
+export interface GarminConnectionStatus {
+  connected: boolean;
+  key_masked: string;
+  status: string;
+  last_sync_at: string | null;
+  last_sync_message: string | null;
+  last_sync_ok: boolean | null;
+  /** Last date whose data is fully pulled; null before the first sync. */
+  synced_through: string | null;
+}
+
 export type GoogleCalendarSyncDirection = 'google_to_lifeos' | 'two_way';
 
 export interface GoogleCalendarConfigStatus {
@@ -411,6 +424,23 @@ export class IntegrationsService {
 
   testWordnik(): Observable<WordnikTestResponse> {
     return this.http.post<WordnikTestResponse>(`${this.api}/wordnik/test`, {});
+  }
+
+  getGarmin(): Observable<GarminConnectionStatus> {
+    return this.http.get<GarminConnectionStatus>(`${this.api}/garmin/connection`);
+  }
+
+  /** Checks the key with Garmin, stores it encrypted and starts the first sync. */
+  saveGarminKey(apiKey: string): Observable<GarminConnectionStatus> {
+    return this.http.put<GarminConnectionStatus>(`${this.api}/garmin/connection`, { api_key: apiKey });
+  }
+
+  disconnectGarmin(): Observable<void> {
+    return this.http.delete<void>(`${this.api}/garmin/connection`);
+  }
+
+  syncGarmin(): Observable<ImportJob> {
+    return this.http.post<ImportJob>(`${this.api}/garmin/sync`, {});
   }
 
   getGoogleMaps(): Observable<GoogleMapsConfigStatus> {

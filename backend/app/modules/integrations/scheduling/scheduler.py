@@ -159,6 +159,15 @@ async def _run_google_calendar_sync() -> None:
         logger.exception("Google Calendar sync job failed")
 
 
+async def _run_garmin_sync() -> None:
+    from app.modules.integrations.garmin.sync_service import sync_all_enabled as sync_all_garmin
+
+    try:
+        await sync_all_garmin()
+    except Exception:
+        logger.exception("Garmin sync job failed")
+
+
 async def _run_routines_expire() -> None:
     from app.modules.routines.service import RoutineService
 
@@ -344,11 +353,20 @@ def start_scheduler() -> AsyncIOScheduler:
         max_instances=1,
         misfire_grace_time=600,
     )
+    # Once a day, late morning: by then last night's sleep has usually reached Garmin.
+    _scheduler.add_job(
+        _run_garmin_sync,
+        trigger=CronTrigger(hour=10, minute=30, timezone=IST),
+        id="garmin_sync",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=3600,
+    )
     _scheduler.start()
     _install_after_commit_hook()
     logger.info(
         "APScheduler started (outbox 30s, reminders 10m, routines expire 00:01 IST, "
-        "qa purge 00:05 IST, sticky notes purge 00:06 IST, news saved purge 00:07 IST, split UPI erase 10m, google calendar 30m)"
+        "qa purge 00:05 IST, sticky notes purge 00:06 IST, news saved purge 00:07 IST, split UPI erase 10m, google calendar 30m, garmin 10:30 IST)"
     )
     return _scheduler
 

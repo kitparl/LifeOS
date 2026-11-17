@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import (
     CALENDAR_EVENT_CREATED,
+    GARMIN_SYNC_STOPPED,
     HABIT_CREATED,
     RACE_ADDED,
     RUN_SYNCED,
@@ -51,7 +52,7 @@ _TASK_EVENTS = {
 
 # Synced-run events: notified in-app, and on Telegram whenever race notifications are enabled
 # (they were added after users saved their notify_on lists).
-_RUN_SYNC_EVENTS = {RUN_SYNCED, RUNS_IMPORTED}
+_RUN_SYNC_EVENTS = {RUN_SYNCED, RUNS_IMPORTED, GARMIN_SYNC_STOPPED}
 
 
 def format_entity_message(event: EntityCreated) -> str:
@@ -84,6 +85,8 @@ def format_entity_message(event: EntityCreated) -> str:
         return f"New run synced: {title}"
     if event.event_type == RUNS_IMPORTED:
         return f"Runs imported: {title}"
+    if event.event_type == GARMIN_SYNC_STOPPED:
+        return f"Garmin sync stopped: {title}"
     if event.event_type == CALENDAR_EVENT_CREATED:
         on = f" at {when}" if when else ""
         return f"New calendar event: {title}{on}"
@@ -129,6 +132,8 @@ def _assignment_keyboard(entity_id: str, assignment_id: str | None) -> dict[str,
 def _in_app_route(event: EntityCreated) -> str:
     if event.event_type == RUN_SYNCED and event.entity_id:
         return f"/running/{event.entity_id}"
+    if event.event_type == GARMIN_SYNC_STOPPED:
+        return "/integrations"
     if event.event_type in _RUN_SYNC_EVENTS:
         return "/running"
     return f"/tasks/{event.entity_id}" if event.entity_id else "/tasks"

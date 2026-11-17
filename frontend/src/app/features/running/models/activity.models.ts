@@ -1,5 +1,8 @@
 export type ImportRange = '12m' | 'all';
 
+/** How a sync-log entry started: files the user uploaded, or a pull from the Garmin Personal API. */
+export type ImportOrigin = 'upload' | 'sync';
+
 export type ImportStatus = 'queued' | 'running' | 'finished' | 'failed' | 'interrupted';
 
 export interface ImportFileError {
@@ -10,7 +13,9 @@ export interface ImportFileError {
 export interface ImportJob {
   id: string;
   status: ImportStatus;
-  range_mode: ImportRange;
+  /** 'recent' for a later API sync that only re-reads the last few days. */
+  range_mode: ImportRange | 'recent';
+  origin: ImportOrigin;
   files_found: number;
   created: number;
   duplicates: number;
@@ -19,6 +24,8 @@ export interface ImportJob {
   failed: number;
   runs_created: number;
   runs_matched: number;
+  /** Days of health data an API sync stored. */
+  health_days: number;
   errors: ImportFileError[];
   error: string | null;
   created_at: string;

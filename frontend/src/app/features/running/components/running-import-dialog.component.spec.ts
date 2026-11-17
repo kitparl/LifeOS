@@ -9,6 +9,8 @@ const job = (status: ImportJob['status'], over: Partial<ImportJob> = {}): Import
   id: 'j1',
   status,
   range_mode: '12m',
+  origin: 'upload',
+  health_days: 0,
   files_found: 0,
   created: 0,
   duplicates: 0,

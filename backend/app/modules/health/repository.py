@@ -77,6 +77,18 @@ class HealthRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_measurement_by_external_id(
+        self, user_id: str, source: str, external_id: str
+    ) -> HealthMeasurement | None:
+        result = await self.db.execute(
+            select(HealthMeasurement).where(
+                HealthMeasurement.user_id == user_id,
+                HealthMeasurement.source == source,
+                HealthMeasurement.external_id == external_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def delete_measurement(self, row: HealthMeasurement) -> None:
         await self.db.delete(row)
         await self.db.flush()

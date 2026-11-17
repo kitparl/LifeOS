@@ -9,6 +9,8 @@ const finished: ImportJob = {
   id: 'j1',
   status: 'finished',
   range_mode: '12m',
+  origin: 'upload',
+  health_days: 0,
   files_found: 3,
   created: 2,
   duplicates: 0,
@@ -61,6 +63,7 @@ describe('RunningSyncLogTabComponent', () => {
     expect(text).toContain('2 imported, 1 failed');
     expect(text).toContain('bad.fit — File is damaged or incomplete');
     expect(text).toContain('2 imported activities');
+    expect(text).toContain('Upload');
   });
 
   it('does nothing when the confirmation is cancelled', async () => {

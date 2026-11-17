@@ -17,6 +17,8 @@ const job = (over: Partial<ImportJob> = {}): ImportJob => ({
   id: 'j1',
   status: 'finished',
   range_mode: '12m',
+  origin: 'upload',
+  health_days: 0,
   files_found: 5,
   created: 3,
   duplicates: 0,
@@ -56,6 +58,7 @@ describe('activity utils', () => {
     expect(jobSummary(job({ created: 0, duplicates: 2, outside_range: 1, not_activity: 4, failed: 1 }))).toBe(
       '0 imported, 2 already imported, 1 outside the range, 4 not activities, 1 failed',
     );
+    expect(jobSummary(job({ created: 1, health_days: 30 }))).toBe('1 imported, 30 health days');
   });
 
   it('plots a channel against distance and skips samples without a value', () => {

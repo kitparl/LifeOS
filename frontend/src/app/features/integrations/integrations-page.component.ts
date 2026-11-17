@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { AiProviderConfigComponent } from './components/ai-provider-config.component';
 import { AiSettingsComponent } from './components/ai-settings.component';
+import { GarminConfigComponent } from './components/garmin-config.component';
 import { GithubConfigComponent } from './components/github-config.component';
 import { GoogleCalendarConfigComponent } from './components/google-calendar-config.component';
 import { TelegramConfigComponent } from './components/telegram-config.component';
@@ -19,6 +20,7 @@ import {
     TelegramConfigComponent,
     GithubConfigComponent,
     GoogleCalendarConfigComponent,
+    GarminConfigComponent,
     AiProviderConfigComponent,
     AiSettingsComponent,
     WordnikConfigComponent,
@@ -42,6 +44,12 @@ import {
             />
           } @else if (p.provider === 'google_calendar') {
             <app-google-calendar-config
+              [displayName]="p.display_name"
+              [description]="p.description"
+              (connectionsChanged)="loadConnections()"
+            />
+          } @else if (p.provider === 'garmin') {
+            <app-garmin-config
               [displayName]="p.display_name"
               [description]="p.description"
               (connectionsChanged)="loadConnections()"

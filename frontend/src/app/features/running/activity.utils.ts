@@ -63,6 +63,7 @@ export function rangeLabel(points: ChartPoint[], digits = 0): string {
 /** One line for a finished (or running) import, e.g. "12 imported, 3 already imported, 1 failed". */
 export function jobSummary(job: ImportJob): string {
   const parts = [`${job.created} imported`];
+  if (job.health_days) parts.push(`${job.health_days} health ${job.health_days === 1 ? 'day' : 'days'}`);
   if (job.duplicates) parts.push(`${job.duplicates} already imported`);
   if (job.outside_range) parts.push(`${job.outside_range} outside the range`);
   if (job.not_activity) parts.push(`${job.not_activity} not activities`);

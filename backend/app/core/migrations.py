@@ -65,6 +65,8 @@ _COLUMNS_TO_ENSURE: list[tuple[str, str, str]] = [
     ("race_events", "run_id", "VARCHAR(36)"),
     ("race_events", "finish_time_before_attach", "INTEGER"),
     ("race_events", "attended_before_attach", "BOOLEAN"),
+    ("garmin_import_jobs", "origin", "VARCHAR(8) DEFAULT 'upload'"),
+    ("garmin_import_jobs", "health_days", "INTEGER DEFAULT 0"),
     # Routines: period window + skip dates
     ("routines", "start_date", "DATE"),
     ("routines", "end_date", "DATE"),
