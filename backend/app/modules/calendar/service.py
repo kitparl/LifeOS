@@ -8,7 +8,7 @@ from app.core.exceptions import get_or_404
 from app.core.timezone import as_utc
 from app.modules.calendar.models import CalendarEvent
 from app.modules.calendar.repository import CalendarRepository
-from app.modules.calendar.schemas import EventCreate, EventListItem, EventResponse, EventUpdate
+from app.modules.calendar.schemas import DEFAULT_CATEGORIES, EventCreate, EventListItem, EventResponse, EventUpdate
 
 # Modules whose calendar events mirror an owning entity. Editing/deleting such an
 # event from the Calendar propagates back to the source (two-way sync).
@@ -125,6 +125,11 @@ class CalendarService:
         if limit is None:
             return items, total
         return items[offset : offset + limit], total
+
+    async def list_categories(self, user_id: str) -> list[str]:
+        """Built-in categories first, then any custom ones the user has created."""
+        used = await self.repo.list_categories(user_id)
+        return [*DEFAULT_CATEGORIES, *(c for c in used if c not in DEFAULT_CATEGORIES)]
 
     async def get_event(self, user_id: str, event_id: str) -> EventResponse:
         event = get_or_404(await self.repo.get_by_id(user_id, event_id), "Event not found")

@@ -32,6 +32,15 @@ class CalendarRepository:
         result = await self.db.execute(q)
         return list(result.scalars().all())
 
+    async def list_categories(self, user_id: str) -> list[str]:
+        result = await self.db.execute(
+            select(CalendarEvent.category)
+            .where(CalendarEvent.user_id == user_id)
+            .distinct()
+            .order_by(CalendarEvent.category)
+        )
+        return [c for c in result.scalars().all() if c]
+
     async def get_by_id(self, user_id: str, event_id: str) -> CalendarEvent | None:
         result = await self.db.execute(
             select(CalendarEvent).where(CalendarEvent.id == event_id, CalendarEvent.user_id == user_id)

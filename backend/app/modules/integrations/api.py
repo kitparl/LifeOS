@@ -302,6 +302,15 @@ async def remove_freenewsapi_key(
     return await FreeNewsApiIntegrationService(db).remove_key(user.id, key_id)
 
 
+@router.post("/freenewsapi/keys/{key_id}/test", response_model=NewsProviderTestResponse)
+async def test_freenewsapi_key(
+    key_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await FreeNewsApiIntegrationService(db).test_key(user.id, key_id)
+
+
 @router.post("/freenewsapi/test", response_model=NewsProviderTestResponse)
 async def test_freenewsapi(
     user: User = Depends(get_current_user),

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from app.core.timezone import utc_now
@@ -24,7 +24,27 @@ class ParkedKey:
     until: datetime
 
 
+@dataclass(frozen=True)
+class KeyQuota:
+    """Last `X-Quota-Remaining` / `X-Quota-Limit` reading the vendor returned for a key."""
+
+    remaining: int
+    limit: int
+    observed_at: datetime
+
+
 _parked: dict[str, ParkedKey] = {}
+_quotas: dict[str, KeyQuota] = {}
+
+
+def month_start(now: datetime) -> datetime:
+    return datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+
+
+def next_quota_renewal(now: datetime) -> datetime:
+    """The monthly allowance renews on the 1st at 00:00 UTC."""
+    year, month = (now.year + 1, 1) if now.month == 12 else (now.year, now.month + 1)
+    return datetime(year, month, 1, tzinfo=timezone.utc)
 
 
 def fingerprint(key: str) -> str:
@@ -51,5 +71,18 @@ def parked(key: str) -> ParkedKey | None:
     return entry
 
 
+def record_quota(key: str, remaining: int, limit: int) -> None:
+    _quotas[fingerprint(key)] = KeyQuota(remaining=remaining, limit=limit, observed_at=utc_now())
+
+
+def quota(key: str) -> KeyQuota | None:
+    """The last quota reading, or None when unknown. A reading from an earlier month is stale (the quota renewed)."""
+    reading = _quotas.get(fingerprint(key))
+    if reading is None or reading.observed_at < month_start(utc_now()):
+        return None
+    return reading
+
+
 def reset() -> None:
     _parked.clear()
+    _quotas.clear()

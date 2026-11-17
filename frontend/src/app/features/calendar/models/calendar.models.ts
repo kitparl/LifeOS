@@ -1,4 +1,5 @@
-export type EventCategory = 'personal' | 'task' | 'running' | 'bill' | 'learning';
+/** Built-in categories plus any user-defined (free-text, lowercase) ones. */
+export type EventCategory = string;
 export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type EventKind = 'normal' | 'birthday' | 'immutable';
 
@@ -84,8 +85,8 @@ export const EVENT_KINDS: { value: EventKind; label: string }[] = [
   { value: 'immutable', label: 'Immutable (long reminder ladder)' },
 ];
 
-/** Category → display color */
-export const CATEGORY_COLORS: Record<EventCategory, string> = {
+/** Category → display color for the built-in categories */
+export const CATEGORY_COLORS: Record<string, string> = {
   personal: '#3b82f6',
   task: '#8b5cf6',
   running: '#22c55e',
@@ -93,6 +94,21 @@ export const CATEGORY_COLORS: Record<EventCategory, string> = {
   learning: '#f59e0b',
 };
 
+/** Palette for custom categories; picked deterministically from the name. */
+const CUSTOM_CATEGORY_PALETTE = ['#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#a855f7', '#0ea5e9'];
+
 export function categoryColor(category: EventCategory): string {
-  return CATEGORY_COLORS[category] ?? '#6b7280';
+  const known = CATEGORY_COLORS[category];
+  if (known) return known;
+  let hash = 0;
+  for (const ch of category) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return CUSTOM_CATEGORY_PALETTE[hash % CUSTOM_CATEGORY_PALETTE.length];
+}
+
+export function categoryLabel(category: EventCategory): string {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
+export function normalizeCategory(raw: string): string {
+  return raw.trim().toLowerCase().slice(0, 32);
 }

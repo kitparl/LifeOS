@@ -16,6 +16,10 @@ export class CalendarService {
     return this.http.get<EventListItem[]>(this.api, { params });
   }
 
+  categories(): Observable<string[]> {
+    return this.http.get<string[]>(`${environment.apiUrl}/calendar/categories`);
+  }
+
   get(id: string): Observable<CalendarEvent> {
     return this.http.get<CalendarEvent>(`${this.api}/${id}`);
   }

@@ -1,9 +1,13 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-EventCategory = Literal["personal", "task", "running", "bill", "learning"]
+# Free-text, normalised to lowercase so "Gym" and "gym" are one category.
+EventCategory = Annotated[
+    str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1, max_length=32)
+]
+DEFAULT_CATEGORIES = ("personal", "task", "running", "bill", "learning")
 EventRecurrence = Literal["none", "daily", "weekly", "monthly", "yearly"]
 EventKind = Literal["normal", "birthday", "immutable"]
 

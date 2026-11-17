@@ -317,6 +317,10 @@ class NewsProviderKeyStatus(BaseModel):
     masked: str
     state: Literal["ok", "rate_limited", "quota_exhausted", "invalid"]
     retry_at: datetime | None = None
+    # Last quota reading from the vendor (None until the key has been used or tested this month).
+    quota_remaining: int | None = None
+    quota_limit: int | None = None
+    quota_renews_at: datetime | None = None
 
 
 class NewsProviderConfigStatus(BaseModel):

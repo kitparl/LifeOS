@@ -60,11 +60,15 @@ class FreeNewsApiIntegrationService:
     @staticmethod
     def _key_status(key: str) -> NewsProviderKeyStatus:
         parked = key_pool.parked(key)
+        quota = key_pool.quota(key)
         return NewsProviderKeyStatus(
             id=key_pool.fingerprint(key),
             masked=mask_secret(key),
             state=parked.state if parked else "ok",
             retry_at=parked.until if parked else None,
+            quota_remaining=quota.remaining if quota else None,
+            quota_limit=quota.limit if quota else None,
+            quota_renews_at=key_pool.next_quota_renewal(utc_now()) if quota else None,
         )
 
     async def save(self, user_id: str, data: NewsProviderConfigUpdate) -> NewsProviderConfigStatus:
@@ -101,19 +105,38 @@ class FreeNewsApiIntegrationService:
         await self.repo.update(conn, IntegrationUpdate(config_json=serialize_api_keys(remaining)))
         return await self.status(user_id)
 
+    @staticmethod
+    async def _check_key(key: str) -> str | None:
+        """One search with this key, ignoring any cooldown. None when it works, else "<masked>: <reason>"."""
+        key_pool.clear(key)
+        try:
+            await FreeNewsClient([key]).search({"size": 1})
+        except NewsApiError as exc:
+            return f"{mask_secret(key)}: {exc}"
+        return None
+
+    async def test_key(self, user_id: str, key_id: str) -> NewsProviderTestResponse:
+        """Check a single stored key (and refresh its quota reading)."""
+        conn = await self._get_or_create(user_id)
+        key = next(
+            (k for k in load_api_keys(conn.config_json, label=PROVIDER) if key_pool.fingerprint(k) == key_id), None
+        )
+        if key is None:
+            raise NotFoundError("Key not found")
+        failure = await self._check_key(key)
+        if failure is not None:
+            return NewsProviderTestResponse(ok=False, detail=failure)
+        quota = key_pool.quota(key)
+        left = f" · {quota.remaining:,} of {quota.limit:,} requests left" if quota else ""
+        return NewsProviderTestResponse(ok=True, detail=f"{mask_secret(key)} is active{left}")
+
     async def test(self, user_id: str) -> NewsProviderTestResponse:
         """Verify every stored key with one search each (this also re-evaluates keys that were parked)."""
         conn = await self._get_or_create(user_id)
         keys = load_api_keys(conn.config_json, label=PROVIDER)
         if not keys:
             return NewsProviderTestResponse(ok=False, detail="FreeNewsAPI key not configured")
-        failures: list[str] = []
-        for key in keys:
-            key_pool.clear(key)
-            try:
-                await FreeNewsClient([key]).search({"size": 1})
-            except NewsApiError as exc:
-                failures.append(f"{mask_secret(key)}: {exc}")
+        failures = [failure for key in keys if (failure := await self._check_key(key)) is not None]
         working = len(keys) - len(failures)
         if working:
             conn.status = "connected"

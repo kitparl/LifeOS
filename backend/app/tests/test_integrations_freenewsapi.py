@@ -4,6 +4,7 @@ Vendor HTTP is mocked (see the `fake_news` fixture in conftest.py)."""
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 
 from app.modules.integrations.models import IntegrationConnection
 from app.tests.conftest import NEWS_SERVER_KEY
@@ -197,3 +198,51 @@ async def test_test_connection_checks_every_key_and_reports_the_failing_one(clie
     del fake_news.key_responses[KEY]  # a re-test re-evaluates keys that were parked
     body = (await client.post(f"{API}/integrations/freenewsapi/test", headers=h)).json()
     assert body == {"ok": True, "detail": "All 2 keys verified"}
+
+
+async def test_status_shows_each_keys_remaining_quota_after_a_test(client, fake_news):
+    h = await _auth(client, "fnquota@example.com")
+    url = f"{API}/integrations/freenewsapi/config"
+    await client.put(url, headers=h, json={"api_key": KEY})
+    await client.put(url, headers=h, json={"api_key": KEY2})
+    before = (await client.get(f"{API}/integrations/freenewsapi", headers=h)).json()["keys"]
+    assert all(k["quota_remaining"] is None for k in before)  # unknown until a key is used
+
+    fake_news.key_responses[KEY2] = (200, {"X-Quota-Limit": "3000", "X-Quota-Remaining": "12"}, fake_news.search)
+    await client.post(f"{API}/integrations/freenewsapi/test", headers=h)
+    keys = (await client.get(f"{API}/integrations/freenewsapi", headers=h)).json()["keys"]
+    assert [(k["quota_remaining"], k["quota_limit"]) for k in keys] == [(2500, 3000), (12, 3000)]
+    renews = datetime.fromisoformat(keys[0]["quota_renews_at"])
+    assert renews.day == 1 and renews.hour == 0 and renews > datetime.now(timezone.utc)
+
+
+async def test_a_single_key_can_be_tested_on_its_own(client, fake_news):
+    h = await _auth(client, "fnone@example.com")
+    url = f"{API}/integrations/freenewsapi/config"
+    await client.put(url, headers=h, json={"api_key": KEY})
+    await client.put(url, headers=h, json={"api_key": KEY2})
+    keys = (await client.get(f"{API}/integrations/freenewsapi", headers=h)).json()["keys"]
+    fake_news.key_responses[KEY] = (402, {}, {"detail": "quota"})
+
+    bad = (await client.post(f"{API}/integrations/freenewsapi/keys/{keys[0]['id']}/test", headers=h)).json()
+    assert bad["ok"] is False and bad["detail"].startswith("****1234:")
+    good = (await client.post(f"{API}/integrations/freenewsapi/keys/{keys[1]['id']}/test", headers=h)).json()
+    assert good == {"ok": True, "detail": "****5678 is active · 2,500 of 3,000 requests left"}
+    assert fake_news.keys_used() == [KEY, KEY2]  # only the tested key is called each time
+
+    missing = await client.post(f"{API}/integrations/freenewsapi/keys/nope/test", headers=h)
+    assert missing.status_code == 404
+    other = await _auth(client, "fnone2@example.com")
+    foreign = await client.post(f"{API}/integrations/freenewsapi/keys/{keys[0]['id']}/test", headers=other)
+    assert foreign.status_code == 404
+
+
+async def test_a_quota_reading_from_an_earlier_month_is_ignored(fake_news):
+    from app.modules.news import key_pool
+
+    key_pool.record_quota(KEY, 5, 3000)
+    assert key_pool.quota(KEY) is not None
+    key_pool._quotas[key_pool.fingerprint(KEY)] = key_pool.KeyQuota(
+        remaining=5, limit=3000, observed_at=key_pool.month_start(datetime.now(timezone.utc)) - timedelta(seconds=1)
+    )
+    assert key_pool.quota(KEY) is None

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
@@ -9,6 +9,7 @@ import {
   EventKind,
   EventRecurrence,
 } from './models/calendar.models';
+import { CategoryPickerComponent } from './category-picker.component';
 import { CalendarService } from './services/calendar.service';
 import { utcIsoMinute } from '../../core/utils/date';
 import { apiErrorMessage } from '../../core/utils/http';
@@ -17,7 +18,7 @@ import { DateInputComponent } from '../../shared/date-input/date-input.component
 @Component({
   selector: 'app-event-form',
   standalone: true,
-  imports: [DateInputComponent, ReactiveFormsModule, RouterLink],
+  imports: [CategoryPickerComponent, DateInputComponent, ReactiveFormsModule, RouterLink],
   template: `
     <div class="max-w-lg">
       <div class="panel !p-0 overflow-hidden">
@@ -30,11 +31,11 @@ import { DateInputComponent } from '../../shared/date-input/date-input.component
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="mb-1 block">Category</label>
-              <select class="input-field" formControlName="category">
-                @for (c of categories; track c.value) {
-                  <option [value]="c.value">{{ c.label }}</option>
-                }
-              </select>
+              <app-category-picker
+                [categories]="categories()"
+                [value]="form.controls.category.value"
+                (valueChange)="form.controls.category.setValue($event)"
+              />
             </div>
             <div>
               <label class="mb-1 block">Recurrence</label>
@@ -100,7 +101,7 @@ export class EventFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  categories = EVENT_CATEGORIES;
+  categories = signal<string[]>(EVENT_CATEGORIES.map((c) => c.value));
   recurrences = EVENT_RECURRENCE;
   kinds = EVENT_KINDS;
   isEdit = false;
@@ -129,6 +130,7 @@ export class EventFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.calendarService.categories().subscribe({ next: (list) => this.categories.set(list) });
     const id = this.route.snapshot.paramMap.get('id');
     const url = this.route.snapshot.url.map((s) => s.path).join('/');
     if (id && url.endsWith('edit')) {

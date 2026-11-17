@@ -9,8 +9,8 @@ const status = (over: Partial<NewsProviderConfigStatus> = {}): NewsProviderConfi
   status: 'connected',
   configured: true,
   keys: [
-    { id: 'k1', masked: '****1234', state: 'quota_exhausted', retry_at: '2999-01-01T00:00:00Z' },
-    { id: 'k2', masked: '****5678', state: 'ok', retry_at: null },
+    { id: 'k1', masked: '****1234', state: 'quota_exhausted', retry_at: '2999-01-01T00:00:00Z', quota_remaining: 0, quota_limit: 3000, quota_renews_at: '2999-01-01T00:00:00Z' },
+    { id: 'k2', masked: '****5678', state: 'ok', retry_at: null, quota_remaining: null, quota_limit: null, quota_renews_at: null },
   ],
   last_tested_at: null,
   last_test_ok: null,
@@ -34,6 +34,7 @@ describe('NewsProviderConfigComponent', () => {
       'getNewsProvider',
       'saveNewsProviderConfig',
       'removeNewsProviderKey',
+      'testNewsProviderKey',
       'testNewsProvider',
     ]);
     integrations.getNewsProvider.and.returnValue(of(status()));
@@ -49,11 +50,13 @@ describe('NewsProviderConfigComponent', () => {
     expect(rows.length).toBe(2);
     expect(rows[0].textContent).toContain('****1234');
     expect(rows[0].textContent).toContain('Quota used up');
+    expect(rows[0].textContent).toContain('0 of 3,000 requests left');
     expect(rows[1].textContent).toContain('Active');
+    expect(rows[1].textContent).not.toContain('requests left'); // quota unknown until the key is used or tested
   });
 
   it('adds a key and shows the updated list', () => {
-    const updated = status({ keys: [...status().keys, { id: 'k3', masked: '****9012', state: 'ok', retry_at: null }] });
+    const updated = status({ keys: [...status().keys, { id: 'k3', masked: '****9012', state: 'ok', retry_at: null, quota_remaining: null, quota_limit: null, quota_renews_at: null }] });
     integrations.saveNewsProviderConfig.and.returnValue(of(updated));
     const fixture = create();
     fixture.componentInstance.keyInput = ' new-key-9012 ';
@@ -69,6 +72,18 @@ describe('NewsProviderConfigComponent', () => {
     fixture.componentInstance.addKey();
     expect(integrations.saveNewsProviderConfig).not.toHaveBeenCalled();
     expect(fixture.componentInstance.message()).toBe('Paste an API key first');
+  });
+
+  it('tests a single key and shows the result', () => {
+    integrations.testNewsProviderKey.and.returnValue(of({ ok: true, detail: '****5678 is active · 2,500 of 3,000 requests left' }));
+    const fixture = create();
+    const buttons = fixture.nativeElement.querySelectorAll('[data-testid="news-provider-key-test"]');
+    expect(buttons.length).toBe(2);
+    buttons[1].click();
+    expect(integrations.testNewsProviderKey).toHaveBeenCalledWith('freenewsapi', 'k2');
+    expect(fixture.componentInstance.message()).toContain('****5678 is active');
+    expect(fixture.componentInstance.ok()).toBeTrue();
+    expect(integrations.getNewsProvider).toHaveBeenCalledTimes(2); // reloaded to show the refreshed quota
   });
 
   it('removes a single key by id', () => {

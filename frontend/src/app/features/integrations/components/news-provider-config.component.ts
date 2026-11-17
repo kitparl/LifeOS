@@ -36,6 +36,7 @@ import {
           <li>Paste it below, Add key, then Test connection.</li>
           <li>Add more keys as backups: when one runs out of quota or is rate limited, the next one is used automatically.</li>
           <li>The monthly quota is per FreeNewsAPI <strong>account</strong>, so backup keys only help if they come from different accounts.</li>
+          <li>Keys have no expiry date; the monthly quota (renews on the 1st, UTC) is what runs out. Test connection refreshes each key's remaining quota.</li>
         </ol>
       </details>
 
@@ -49,10 +50,26 @@ import {
                   <span>
                     <span style="color: var(--text-muted)">{{ i + 1 }}.</span> {{ k.masked }}
                     <span [style.color]="k.state === 'ok' ? 'var(--success)' : 'var(--warning)'">· {{ keyStateLabel(k) }}</span>
+                    @if (quotaLabel(k); as quota) {
+                      <span class="block" style="color: var(--text-muted)">{{ quota }}</span>
+                    }
                   </span>
-                  <button type="button" class="text-xs" style="color: var(--danger)" [disabled]="busy()" (click)="removeKey(k)">
-                    Remove
-                  </button>
+                  <span class="flex shrink-0 gap-3">
+                    <button
+                      type="button"
+                      class="text-xs"
+                      style="color: var(--primary)"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Test key ' + k.masked"
+                      data-testid="news-provider-key-test"
+                      (click)="testKey(k)"
+                    >
+                      Test
+                    </button>
+                    <button type="button" class="text-xs" style="color: var(--danger)" [disabled]="busy()" (click)="removeKey(k)">
+                      Remove
+                    </button>
+                  </span>
                 </li>
               }
             </ul>
@@ -113,6 +130,13 @@ export class NewsProviderConfigComponent implements OnInit {
     if (c.configured && c.enabled) return 'Connected';
     if (c.configured) return 'Configured (disabled)';
     return 'Not configured';
+  }
+
+  /** "2,500 of 3,000 requests left · renews 1 Dec 2026" (keys have no expiry date; the monthly quota is what runs out). */
+  quotaLabel(key: NewsProviderKey): string | null {
+    if (key.quota_remaining === null || key.quota_limit === null) return null;
+    const renews = key.quota_renews_at ? ` · renews ${new Date(key.quota_renews_at).toLocaleDateString()}` : '';
+    return `${key.quota_remaining.toLocaleString()} of ${key.quota_limit.toLocaleString()} requests left${renews}`;
   }
 
   keyStateLabel(key: NewsProviderKey): string {
@@ -188,6 +212,20 @@ export class NewsProviderConfigComponent implements OnInit {
         this.load();
       },
       error: (err) => this.fail(err, `${this.displayName} test failed`),
+    });
+  }
+
+  testKey(key: NewsProviderKey): void {
+    this.busy.set(true);
+    this.message.set(null);
+    this.integrations.testNewsProviderKey(this.provider, key.id).subscribe({
+      next: (res) => {
+        this.ok.set(res.ok);
+        this.message.set(res.detail);
+        this.busy.set(false);
+        this.load();
+      },
+      error: (err) => this.fail(err, `${key.masked} test failed`),
     });
   }
 

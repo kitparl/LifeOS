@@ -29,6 +29,14 @@ async def list_events(
     return items
 
 
+@router.get("/categories", response_model=list[str])
+async def list_categories(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await CalendarService(db).list_categories(user.id)
+
+
 @router.post("/events", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_event(
     data: EventCreate,

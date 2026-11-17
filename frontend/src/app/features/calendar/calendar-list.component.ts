@@ -4,15 +4,17 @@ import {
   ViewChild,
   signal,
   inject,
+  OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { FullCalendarModule, FullCalendarComponent } from '@fullcalendar/angular';
 import { CalendarOptions, EventInput, EventApi, DateSelectArg, EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
+import { CategoryPickerComponent } from './category-picker.component';
 import { CalendarEventModalComponent } from './calendar-event-modal.component';
 import { CalendarService } from './services/calendar.service';
 import {
@@ -20,8 +22,11 @@ import {
   EventCategory,
   EventCreate,
   EventListItem,
+  EventRecurrence,
   EVENT_CATEGORIES,
+  EVENT_RECURRENCE,
   categoryColor,
+  categoryLabel,
 } from './models/calendar.models';
 import { toDatetimeLocalValue } from '../../core/utils/date';
 import { DateInputComponent } from '../../shared/date-input/date-input.component';
@@ -35,12 +40,18 @@ interface QuickCreateState {
 @Component({
   selector: 'app-calendar-list',
   standalone: true,
-  imports: [DateInputComponent, FullCalendarModule, FormsModule, RouterLink, CalendarEventModalComponent],
+  imports: [
+    CategoryPickerComponent,
+    DateInputComponent,
+    FullCalendarModule,
+    FormsModule,
+    CalendarEventModalComponent,
+  ],
   template: `
     <!-- ====== Quick-Create Modal ====== -->
     @if (quickCreate()) {
       <div class="modal-backdrop" (click)="closeQuickCreate()">
-        <div class="modal" (click)="$event.stopPropagation()" style="max-width: 440px">
+        <div class="modal" (click)="$event.stopPropagation()" style="max-width: 440px; max-height: 90vh; overflow-y: auto">
           <div class="modal-header">
             <span>New Event</span>
             <button type="button" class="btn-ghost !px-2 text-xs" (click)="closeQuickCreate()">✕</button>
@@ -98,25 +109,47 @@ interface QuickCreateState {
 
               <div>
                 <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">Category</label>
-                <div class="flex flex-wrap gap-1.5">
-                  @for (cat of categories; track cat.value) {
-                    <button
-                      type="button"
-                      class="rounded-full px-2.5 py-0.5 text-xs font-medium border transition-all"
-                      [style.background]="qcCategory === cat.value ? categoryColor(cat.value) : 'transparent'"
-                      [style.color]="qcCategory === cat.value ? '#fff' : 'var(--text-muted)'"
-                      [style.border-color]="categoryColor(cat.value)"
-                      (click)="qcCategory = cat.value"
-                    >
-                      {{ cat.label }}
-                    </button>
-                  }
-                </div>
+                <app-category-picker
+                  [categories]="categories()"
+                  [value]="qcCategory"
+                  (valueChange)="qcCategory = $event"
+                />
               </div>
+
+              @if (qcMore()) {
+                <div>
+                  <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">Repeat</label>
+                  <select class="input-field w-full text-sm" [(ngModel)]="qcRecurrence" name="recurrence">
+                    @for (r of recurrences; track r.value) {
+                      <option [value]="r.value">{{ r.label }}</option>
+                    }
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">Location</label>
+                  <input
+                    type="text"
+                    class="input-field w-full text-sm"
+                    maxlength="200"
+                    [(ngModel)]="qcLocation"
+                    name="location"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">Description</label>
+                  <textarea
+                    class="input-field w-full text-sm min-h-[70px]"
+                    [(ngModel)]="qcDescription"
+                    name="description"
+                  ></textarea>
+                </div>
+              }
             </div>
             <div class="modal-footer">
               <button type="button" class="btn-secondary text-xs" (click)="closeQuickCreate()">Cancel</button>
-              <a [routerLink]="['/calendar/new']" class="btn-ghost text-xs no-underline">More options</a>
+              <button type="button" class="btn-ghost text-xs" (click)="qcMore.set(!qcMore())">
+                {{ qcMore() ? 'Fewer options' : 'More options' }}
+              </button>
               <button type="submit" class="btn-primary text-xs" [disabled]="!qcTitle.trim() || saving()">
                 {{ saving() ? 'Creating…' : 'Create' }}
               </button>
@@ -140,16 +173,26 @@ interface QuickCreateState {
     <div class="space-y-0">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div class="flex flex-wrap gap-1.5">
-          @for (cat of categories; track cat.value) {
+          @for (cat of categories(); track cat) {
             <span
               class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-              [style.background]="categoryColor(cat.value)"
+              [style.background]="categoryColor(cat)"
             >
-              {{ cat.label }}
+              {{ categoryLabel(cat) }}
             </span>
           }
         </div>
         <div class="flex items-center gap-2">
+          <div class="w-44" title="Jump to date">
+            <app-date-input
+              mode="date"
+              inputClass="input-field text-xs"
+              ariaLabel="Jump to date"
+              [(ngModel)]="jumpDate"
+              (ngModelChange)="jumpTo($event)"
+              [clearable]="false"
+            />
+          </div>
           @if (keyboardHint()) {
             <span class="hidden sm:inline text-xs" style="color: var(--text-faint)">
               <kbd>n</kbd> new · <kbd>t</kbd> today · <kbd>m/w/d/a</kbd> view
@@ -171,13 +214,15 @@ interface QuickCreateState {
     </div>
   `,
 })
-export class CalendarListComponent {
+export class CalendarListComponent implements OnInit {
   @ViewChild('calendar') calendarRef!: FullCalendarComponent;
 
   private readonly calendarService = inject(CalendarService);
   private readonly router = inject(Router);
 
-  readonly categories = EVENT_CATEGORIES;
+  readonly categories = signal<string[]>([...EVENT_CATEGORIES.map((c) => c.value)]);
+  readonly recurrences = EVENT_RECURRENCE;
+  jumpDate = '';
 
   // Quick-create modal state
   readonly quickCreate = signal<QuickCreateState | null>(null);
@@ -186,6 +231,10 @@ export class CalendarListComponent {
   qcEnd = '';
   qcAllDay = false;
   qcCategory: EventCategory = 'personal';
+  qcRecurrence: EventRecurrence = 'none';
+  qcLocation = '';
+  qcDescription = '';
+  readonly qcMore = signal(false);
   readonly saving = signal(false);
 
   // Event detail modal state
@@ -225,6 +274,19 @@ export class CalendarListComponent {
   };
 
   readonly categoryColor = categoryColor;
+  readonly categoryLabel = categoryLabel;
+
+  ngOnInit(): void {
+    this.loadCategories();
+  }
+
+  jumpTo(value: string): void {
+    if (value) this.calendarRef?.getApi().gotoDate(value.slice(0, 10));
+  }
+
+  private loadCategories(): void {
+    this.calendarService.categories().subscribe({ next: (list) => this.categories.set(list) });
+  }
 
   // ── FullCalendar callbacks ──────────────────────────────────────────────────
 
@@ -285,7 +347,7 @@ export class CalendarListComponent {
     this.qcAllDay = selectInfo.allDay;
     this.qcStart = start;
     this.qcEnd = end;
-    this.qcCategory = 'personal';
+    this.resetQuickCreateExtras();
     this.quickCreate.set({ startStr: start, endStr: end, allDay: selectInfo.allDay });
   }
 
@@ -381,6 +443,9 @@ export class CalendarListComponent {
         : null,
       all_day: this.qcAllDay,
       category: this.qcCategory,
+      recurrence: this.qcRecurrence,
+      location: this.qcLocation.trim() || null,
+      description: this.qcDescription.trim() || null,
     };
 
     this.calendarService.create(payload).subscribe({
@@ -388,9 +453,18 @@ export class CalendarListComponent {
         this.saving.set(false);
         this.closeQuickCreate();
         this.calendarRef.getApi().refetchEvents();
+        this.loadCategories();
       },
       error: () => this.saving.set(false),
     });
+  }
+
+  private resetQuickCreateExtras(): void {
+    this.qcCategory = 'personal';
+    this.qcRecurrence = 'none';
+    this.qcLocation = '';
+    this.qcDescription = '';
+    this.qcMore.set(false);
   }
 
   closeQuickCreate(): void {
@@ -417,7 +491,6 @@ export class CalendarListComponent {
   }
 
   openNewEventForm(): void {
-    // Navigate to full form — handled by routerLink, but we can also open quick-create
     const now = new Date();
     const start = toDatetimeLocalValue(now);
     const end = toDatetimeLocalValue(new Date(now.getTime() + 60 * 60 * 1000));
@@ -425,7 +498,7 @@ export class CalendarListComponent {
     this.qcAllDay = false;
     this.qcStart = start;
     this.qcEnd = end;
-    this.qcCategory = 'personal';
+    this.resetQuickCreateExtras();
     this.quickCreate.set({ startStr: start, endStr: end, allDay: false });
   }
 

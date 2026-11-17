@@ -161,6 +161,8 @@ class FakeNews:
         self.status: int | None = None  # force every response to this status
         # Per-key overrides (bearer key -> (status, headers, json body)), checked before `status`.
         self.key_responses: dict[str, tuple[int, dict[str, str], object]] = {}
+        # Quota headers FreeNewsAPI adds to successful keyed calls.
+        self.quota_headers: dict[str, str] = {"X-Quota-Limit": "3000", "X-Quota-Remaining": "2500"}
         self.search: object = {"took_ms": 5, "total": 1, "total_is_lower_bound": False, "results": [dict(NEWS_RESULT)]}
         self.article: object | None = {**NEWS_RESULT, "text": "First paragraph.\n\nSecond paragraph."}
 
@@ -180,9 +182,9 @@ class FakeNews:
         if self.status is not None:
             return httpx.Response(self.status, json={"detail": "forced"})
         if request.url.path == "/v1/search":
-            return httpx.Response(200, json=self.search)
+            return httpx.Response(200, json=self.search, headers=self.quota_headers)
         if request.url.path == "/v1/article" and self.article is not None:
-            return httpx.Response(200, json=self.article)
+            return httpx.Response(200, json=self.article, headers=self.quota_headers)
         return httpx.Response(404, json={"detail": "not found"})
 
 

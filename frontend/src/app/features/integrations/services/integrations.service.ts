@@ -199,6 +199,10 @@ export interface NewsProviderKey {
   state: NewsProviderKeyState;
   /** When a rate-limited / out-of-quota key may be used again. */
   retry_at: string | null;
+  /** Last quota reading from the vendor; null until the key has been used or tested this month. */
+  quota_remaining: number | null;
+  quota_limit: number | null;
+  quota_renews_at: string | null;
 }
 
 /** Shared by every news provider's card (FreeNewsAPI today; the provider id is the URL segment). Keys are tried in order. */
@@ -464,6 +468,10 @@ export class IntegrationsService {
 
   removeNewsProviderKey(provider: string, keyId: string): Observable<NewsProviderConfigStatus> {
     return this.http.delete<NewsProviderConfigStatus>(`${this.api}/${provider}/keys/${encodeURIComponent(keyId)}`);
+  }
+
+  testNewsProviderKey(provider: string, keyId: string): Observable<NewsProviderTestResponse> {
+    return this.http.post<NewsProviderTestResponse>(`${this.api}/${provider}/keys/${encodeURIComponent(keyId)}/test`, {});
   }
 
   testNewsProvider(provider: string): Observable<NewsProviderTestResponse> {

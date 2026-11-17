@@ -114,9 +114,13 @@ def _key_error(state: KeyState, retry_at: datetime | None = None) -> NewsApiKeyE
     return error_type(message, retry_at)
 
 
-def _next_month_start(now: datetime) -> datetime:
-    year, month = (now.year + 1, 1) if now.month == 12 else (now.year, now.month + 1)
-    return datetime(year, month, 1, tzinfo=timezone.utc)
+def _record_quota(key: str, res: httpx.Response) -> None:
+    """Remember the key's `X-Quota-Remaining` / `X-Quota-Limit` headers (sent on every keyed call)."""
+    try:
+        remaining, limit = int(res.headers["X-Quota-Remaining"]), int(res.headers["X-Quota-Limit"])
+    except (KeyError, ValueError):
+        return
+    key_pool.record_quota(key, remaining, limit)
 
 
 def _rate_limit_retry_at(res: httpx.Response) -> datetime:
@@ -137,7 +141,7 @@ def _quota_retry_at(res: httpx.Response) -> datetime:
         renews_at = None
     if renews_at is not None:
         return renews_at if renews_at.tzinfo else renews_at.replace(tzinfo=timezone.utc)
-    return _next_month_start(now)
+    return key_pool.next_quota_renewal(now)
 
 
 def _http_client(timeout: float) -> httpx.AsyncClient:
@@ -229,6 +233,7 @@ class FreeNewsClient:
         except httpx.HTTPError as exc:
             raise NewsApiUnavailableError(f"{_LABEL} is temporarily unavailable.") from exc
 
+        _record_quota(key, res)
         if res.status_code in (httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN):
             raise _key_error("invalid", utc_now() + INVALID_KEY_COOLDOWN)
         if res.status_code == httpx.codes.PAYMENT_REQUIRED:
