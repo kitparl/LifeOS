@@ -58,6 +58,7 @@ REASON_NOT_CONNECTED = "Garmin is not connected"
 REASON_KEY_REFUSED = "Garmin refused the key. It may have expired or been deleted; add a new key."
 REASON_THROTTLED = "Garmin is limiting requests. The rest will be pulled on the next sync."
 REASON_UNREACHABLE = "Could not reach Garmin. The next sync will try again."
+REASON_HTTP = "Garmin returned an error (HTTP {status} on {path}). The next sync will try again."
 REASON_DOWNLOAD = "Could not download this activity from Garmin"
 STATUS_SYNCED = "synced"
 STATUS_ERROR = "error"
@@ -69,6 +70,8 @@ def _reason(exc: GarminApiError) -> str:
         return REASON_KEY_REFUSED
     if exc.throttled:
         return REASON_THROTTLED
+    if exc.status_code is not None:
+        return REASON_HTTP.format(status=exc.status_code, path=exc.path)[:200]
     return REASON_UNREACHABLE
 
 
@@ -203,7 +206,7 @@ async def _sync(
                 await repo.update_fields(job_id, **progress.as_values())
                 await db.commit()
     except GarminApiError as exc:
-        logger.warning("Garmin sync stopped for user=%s status=%s", user_id, exc.status_code)
+        logger.warning("Garmin sync stopped for user=%s status=%s path=%s", user_id, exc.status_code, exc.path)
         raise JobStopped(_reason(exc)) from exc
 
 

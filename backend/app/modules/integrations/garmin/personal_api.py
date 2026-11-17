@@ -29,9 +29,10 @@ JsonValue = dict[str, Any] | list[Any] | None
 class GarminApiError(Exception):
     """A failed call. `auth` means the key or token was refused; `throttled` means Garmin is limiting requests."""
 
-    def __init__(self, message: str, *, status_code: int | None = None):
+    def __init__(self, message: str, *, status_code: int | None = None, path: str = ""):
         super().__init__(message)
         self.status_code = status_code
+        self.path = path  # endpoint path without the query string; never holds a key or token
 
     @property
     def auth(self) -> bool:
@@ -48,12 +49,15 @@ def _http_client(timeout: float) -> httpx.AsyncClient:
 
 
 async def _send(client: httpx.AsyncClient, method: str, path: str, **kwargs: Any) -> httpx.Response:
+    """One call. 204 No Content is a success with an empty body: Garmin's answer for a date without data."""
     try:
         response = await client.request(method, BASE_URL + path, **kwargs)
     except httpx.HTTPError as exc:
-        raise GarminApiError(f"Garmin unreachable: {type(exc).__name__}") from exc
-    if response.status_code != httpx.codes.OK:
-        raise GarminApiError(f"Garmin returned HTTP {response.status_code}", status_code=response.status_code)
+        raise GarminApiError(f"Garmin unreachable: {type(exc).__name__}", path=path) from exc
+    if response.status_code not in (httpx.codes.OK, httpx.codes.NO_CONTENT):
+        raise GarminApiError(
+            f"Garmin returned HTTP {response.status_code}", status_code=response.status_code, path=path
+        )
     return response
 
 

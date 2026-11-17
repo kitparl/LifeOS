@@ -366,3 +366,31 @@ async def test_scheduled_sync_runs_for_every_connected_user(api, garmin, monkeyp
     assert [(j["origin"], j["range_mode"], j["status"]) for j in jobs] == [
         ("sync", "recent", "finished"), ("sync", "12m", "finished"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_dates_without_data_answered_with_no_content_do_not_stop_the_sync(api, garmin):  # noqa: F811
+    headers, _ = await register(api, "gempty")
+    garmin.summaries = {_day(1): summary(_day(1))}
+    garmin.failures = {"/sleep-service/sleep/dailySleep": 204, "/hrv-service/": 204, "/wellness-service/": 204}
+
+    await connect(api, headers)
+
+    [job] = await jobs_of(api, headers)
+    assert (job["status"], job["error"], job["health_days"]) == ("finished", None, 1)
+
+
+@pytest.mark.asyncio
+async def test_an_unexpected_garmin_error_names_the_status_and_endpoint(api, garmin):  # noqa: F811
+    headers, _ = await register(api, "gerror")
+    garmin.failures = {"/sleep-service/sleep/dailySleep": 500}
+
+    await connect(api, headers)
+
+    [job] = await jobs_of(api, headers)
+    assert job["status"] == "failed"
+    assert job["error"] == (
+        "Garmin returned an error (HTTP 500 on /sleep-service/sleep/dailySleep). The next sync will try again."
+    )
+    status = (await api.get(CONNECTION, headers=headers)).json()
+    assert status["last_sync_message"] == job["error"] and status["connected"] is True
