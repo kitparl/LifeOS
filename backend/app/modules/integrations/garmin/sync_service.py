@@ -8,6 +8,7 @@ as a whole.
 
 from __future__ import annotations
 
+import calendar
 import logging
 import shutil
 import tempfile
@@ -48,10 +49,9 @@ from app.modules.integrations.schemas import IntegrationUpdate
 
 logger = logging.getLogger(__name__)
 
-FIRST_SYNC_DAYS = 365
+DEFAULT_SYNC_MONTHS = 1  # a first sync without a chosen range stays short
 OVERLAP_DAYS = 2  # re-read recent days: Garmin fills in the last day or two after the watch syncs
 HEALTH_CHUNK_DAYS = 7
-RANGE_FIRST = "12m"
 RANGE_RECENT = "recent"
 
 REASON_NOT_CONNECTED = "Garmin is not connected"
@@ -73,6 +73,28 @@ def _reason(exc: GarminApiError) -> str:
     if exc.status_code is not None:
         return REASON_HTTP.format(status=exc.status_code, path=exc.path)[:200]
     return REASON_UNREACHABLE
+
+
+def _months_before(day: date, months: int) -> date:
+    """Same day of the month, `months` earlier (clamped to the month's last day)."""
+    year, month_index = divmod(day.year * 12 + day.month - 1 - months, 12)
+    month = month_index + 1
+    return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def _window_start(today: date, synced_through: date | None, months: int | None) -> date:
+    """A chosen range wins; otherwise continue from the last synced day; a first sync defaults to one month."""
+    if months:
+        return _months_before(today, months)
+    if synced_through:
+        return synced_through - timedelta(days=OVERLAP_DAYS)
+    return _months_before(today, DEFAULT_SYNC_MONTHS)
+
+
+def _range_mode(months: int | None, synced_through: date | None) -> str:
+    if months:
+        return f"{months}m"
+    return RANGE_RECENT if synced_through else f"{DEFAULT_SYNC_MONTHS}m"
 
 
 def _chunks(start: date, end: date, size: int) -> Iterator[tuple[date, date]]:
@@ -129,31 +151,36 @@ class GarminSyncService:
         if conn is not None:
             await self.repo.delete(conn)
 
-    async def start_sync(self, user_id: str, factory: async_sessionmaker) -> GarminImportJob:
+    async def start_sync(
+        self, user_id: str, factory: async_sessionmaker, months: int | None = None
+    ) -> GarminImportJob:
         """Create a sync job, commit it, and run it in the background."""
-        job = await self.create_job(user_id)
+        job = await self.create_job(user_id, months)
         await self.db.commit()  # the background task must be able to see the row
-        start_background(run_sync(factory, job.id, user_id), f"garmin-sync-{job.id}")
+        start_background(run_sync(factory, job.id, user_id, months), f"garmin-sync-{job.id}")
         return job
 
-    async def create_job(self, user_id: str) -> GarminImportJob:
+    async def create_job(self, user_id: str, months: int | None = None) -> GarminImportJob:
         conn = await self.repo.get_by_provider(user_id, PROVIDER)
         cfg = parse_config(conn.config_json if conn else None)
         if conn is None or not conn.enabled or not cfg.connected:
             raise BadRequestError("Connect Garmin with a personal API key first")
         if await self.jobs.has_active(user_id):
             raise ConflictError("An import is already running")
-        return await self.jobs.create(user_id, RANGE_RECENT if cfg.synced_through else RANGE_FIRST, ORIGIN_SYNC)
+        return await self.jobs.create(user_id, _range_mode(months, cfg.synced_through), ORIGIN_SYNC)
 
 
-async def run_sync(factory: async_sessionmaker, job_id: str, user_id: str) -> JobOutcome:
-    """Background entry point for one sync; records the outcome on the connection afterwards."""
+async def run_sync(factory: async_sessionmaker, job_id: str, user_id: str, months: int | None = None) -> JobOutcome:
+    """Background entry point for one sync; records the outcome on the connection afterwards.
+
+    `months` re-reads that many months back; without it the sync continues from the last synced day.
+    """
     settings = get_settings()
     outcome = await run_job(
         factory,
         job_id,
         user_id,
-        lambda db, repo, progress: _sync(db, repo, job_id, user_id, progress, settings),
+        lambda db, repo, progress: _sync(db, repo, job_id, user_id, months, progress, settings),
         label="sync",
     )
     try:
@@ -175,6 +202,7 @@ async def _sync(
     repo: GarminImportRepository,
     job_id: str,
     user_id: str,
+    months: int | None,
     progress: Progress,
     settings: Settings,
 ) -> None:
@@ -183,9 +211,7 @@ async def _sync(
     if conn is None or not cfg.connected:
         raise JobStopped(REASON_NOT_CONNECTED)
     today = await _user_today(db, user_id)
-    start = cfg.synced_through - timedelta(days=OVERLAP_DAYS) if cfg.synced_through else today - timedelta(
-        days=FIRST_SYNC_DAYS
-    )
+    start = _window_start(today, cfg.synced_through, months)
     try:
         token = await exchange_key(cfg.api_key)
         async with GarminPersonalApiClient(token) as api:

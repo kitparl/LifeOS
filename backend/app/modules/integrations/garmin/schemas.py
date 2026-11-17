@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 ImportRange = Literal["12m", "all"]
+SyncMonths = Literal[1, 3, 6, 9, 12]
 
 
 class ImportFileError(BaseModel):
@@ -50,6 +51,13 @@ class DeleteImportedResult(BaseModel):
 
 class GarminKeyUpdate(BaseModel):
     api_key: str = Field(min_length=8, max_length=4096)
+    months: SyncMonths = 1  # how far back the first sync reaches
+
+
+class GarminSyncRequest(BaseModel):
+    """`months` re-reads that many months back; without it the sync continues from where the last one stopped."""
+
+    months: SyncMonths | None = None
 
 
 class GarminConnectionStatus(BaseModel):

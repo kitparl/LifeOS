@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { ImportJob } from '../../running/models/activity.models';
+import { GarminSyncMonths, ImportJob } from '../../running/models/activity.models';
 
 export interface IntegrationProvider {
   provider: string;
@@ -482,17 +482,18 @@ export class IntegrationsService {
     return this.http.get<GarminConnectionStatus>(`${this.api}/garmin/connection`);
   }
 
-  /** Checks the key with Garmin, stores it encrypted and starts the first sync. */
-  saveGarminKey(apiKey: string): Observable<GarminConnectionStatus> {
-    return this.http.put<GarminConnectionStatus>(`${this.api}/garmin/connection`, { api_key: apiKey });
+  /** Checks the key with Garmin, stores it encrypted and starts the first sync over the last `months`. */
+  saveGarminKey(apiKey: string, months: GarminSyncMonths): Observable<GarminConnectionStatus> {
+    return this.http.put<GarminConnectionStatus>(`${this.api}/garmin/connection`, { api_key: apiKey, months });
   }
 
   disconnectGarmin(): Observable<void> {
     return this.http.delete<void>(`${this.api}/garmin/connection`);
   }
 
-  syncGarmin(): Observable<ImportJob> {
-    return this.http.post<ImportJob>(`${this.api}/garmin/sync`, {});
+  /** Without `months` the sync continues from the last synced day. */
+  syncGarmin(months: GarminSyncMonths | null = null): Observable<ImportJob> {
+    return this.http.post<ImportJob>(`${this.api}/garmin/sync`, months ? { months } : {});
   }
 
   getGoogleMaps(): Observable<GoogleMapsConfigStatus> {

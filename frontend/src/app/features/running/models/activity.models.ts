@@ -1,5 +1,8 @@
 export type ImportRange = '12m' | 'all';
 
+/** How many months a Garmin API sync reads back. */
+export type GarminSyncMonths = 1 | 3 | 6 | 9 | 12;
+
 /** How a sync-log entry started: files the user uploaded, or a pull from the Garmin Personal API. */
 export type ImportOrigin = 'upload' | 'sync';
 
@@ -13,8 +16,8 @@ export interface ImportFileError {
 export interface ImportJob {
   id: string;
   status: ImportStatus;
-  /** 'recent' for a later API sync that only re-reads the last few days. */
-  range_mode: ImportRange | 'recent';
+  /** API syncs: 'recent' re-reads only the last few days; '1m'…'12m' reads that many months back. */
+  range_mode: ImportRange | 'recent' | `${GarminSyncMonths}m`;
   origin: ImportOrigin;
   files_found: number;
   created: number;

@@ -99,10 +99,46 @@ describe('GarminConfigComponent', () => {
     cmp.save();
     fixture.detectChanges();
 
-    expect(integrations.saveGarminKey).toHaveBeenCalledWith('personal-key-1234');
+    expect(integrations.saveGarminKey).toHaveBeenCalledWith('personal-key-1234', 1);
     expect(cmp.keyInput).toBe('');
     expect(text()).toContain('Key saved. The first sync has started.');
     expect(activities.listImports).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends the chosen first-sync range with the key', () => {
+    integrations.saveGarminKey.and.returnValue(of(connected));
+    const { cmp } = create();
+    cmp.keyInput = 'personal-key-1234';
+    cmp.firstSyncMonths = 6;
+
+    cmp.save();
+
+    expect(integrations.saveGarminKey).toHaveBeenCalledWith('personal-key-1234', 6);
+  });
+
+  it('syncs since the last sync by default, or the chosen months', () => {
+    integrations.getGarmin.and.returnValue(of({ ...connected, synced_through: '2026-11-16' }));
+    integrations.syncGarmin.and.returnValue(of(syncJob({ status: 'finished' })));
+    const { cmp, fixture } = create();
+    const options = Array.from(
+      (fixture.nativeElement.querySelector('[data-testid="garmin-sync-range"]') as HTMLSelectElement).options,
+    ).map((o) => o.textContent?.trim());
+
+    cmp.syncNow();
+    cmp.syncMonths = 3;
+    cmp.syncNow();
+
+    expect(options).toEqual(['Since last sync', 'Last 1 month', 'Last 3 months', 'Last 6 months', 'Last 9 months', 'Last 12 months']);
+    expect(integrations.syncGarmin.calls.allArgs()).toEqual([[null], [3]]);
+  });
+
+  it('offers "Since last sync" only after a sync has stored data', () => {
+    integrations.getGarmin.and.returnValue(of(connected));
+    const { cmp, fixture } = create();
+    const select = fixture.nativeElement.querySelector('[data-testid="garmin-sync-range"]') as HTMLSelectElement;
+
+    expect(Array.from(select.options).map((o) => o.textContent?.trim())).not.toContain('Since last sync');
+    expect(cmp.syncMonths).toBe(1);
   });
 
   it('shows why a key was refused', () => {

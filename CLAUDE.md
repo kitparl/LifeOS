@@ -84,3 +84,30 @@ design system (Ubuntu-style theme where present). See `.claude/rules/ui-style.md
 
 ## 9. Do not commit and push
 - Once development is done after test do not commit any code
+
+
+## 10 Production Environment Awareness
+
+IMPORTANT: Always consider the production VPS configuration when developing, modifying, or optimizing this project.
+
+Before starting any development task, read the `secret_note` file in the project root.
+
+The file contains the actual production server specifications.
+
+### 1 Production VPS Specifications
+Use `.secret_note` as the single source of truth.
+
+### Important
+These rules apply to ALL tasks, including:
+- Frontend development
+- Backend development
+- Database design
+- API development
+- Authentication
+- Package and dependency selection
+- Docker and deployment configuration
+- Performance optimization
+- Testing and debugging
+- Infrastructure architecture
+
+Always keep the production environment in mind, even when working locally.

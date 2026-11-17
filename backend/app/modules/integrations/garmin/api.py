@@ -10,6 +10,7 @@ from app.modules.integrations.garmin.schemas import (
     DeleteImportedResult,
     GarminConnectionStatus,
     GarminKeyUpdate,
+    GarminSyncRequest,
     ImportedSummary,
     ImportJobResponse,
     ImportRange,
@@ -96,7 +97,7 @@ async def save_connection_key(
     service = GarminSyncService(db)
     await service.save_key(user.id, data.api_key)
     try:
-        await service.start_sync(user.id, factory)
+        await service.start_sync(user.id, factory, data.months)
     except ConflictError:
         await db.commit()  # an upload is running; the key is kept and the next sync pulls everything
     return await service.get_status(user.id)
@@ -112,9 +113,11 @@ async def disconnect(
 
 @router.post("/sync", response_model=ImportJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def sync_now(
+    data: GarminSyncRequest | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     factory: async_sessionmaker = Depends(get_session_factory),
 ):
-    job = await GarminSyncService(db).start_sync(user.id, factory)
+    months = data.months if data else None
+    job = await GarminSyncService(db).start_sync(user.id, factory, months)
     return to_response(job)

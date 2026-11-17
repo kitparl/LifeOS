@@ -39,6 +39,9 @@ import {
                   [class.badge--default]="raceStatus(race) === 'upcoming' || raceStatus(race) === 'missed'"
                 >{{ raceStatusLabel(raceStatus(race)) }}</span>
                 @if (race.medal) { <span class="badge badge--warning">🏅 Medal</span> }
+                @for (a of race.accreditations ?? []; track a) {
+                  <span class="badge badge--default">{{ a }}</span>
+                }
               </div>
               <p class="text-xs" style="color: var(--text-muted)">
                 {{ race.race_date | date: 'mediumDate' }}

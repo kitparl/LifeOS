@@ -19,6 +19,7 @@ from app.modules.integrations.garmin.sync_service import (
     OVERLAP_DAYS,
     REASON_KEY_REFUSED,
     REASON_THROTTLED,
+    _months_before,
     sync_all_enabled,
 )
 from app.modules.integrations.models import IntegrationConnection
@@ -35,6 +36,10 @@ TOKEN = "eyJhbGciOiJub25lIn0.eyJleHAiOjB9.sig"  # shape of a JWT; contents are i
 
 def _day(days_ago: int) -> date:
     return utc_now().date() - timedelta(days=days_ago)
+
+
+def _months_ago(months: int) -> date:
+    return _months_before(utc_now().date(), months)
 
 
 def _local_ms(day: date, hour: int, minute: int) -> int:
@@ -141,8 +146,9 @@ def garmin(monkeypatch):
     return fake
 
 
-async def connect(client, headers, key: str = KEY):
-    response = await client.put(CONNECTION, headers=headers, json={"api_key": key})
+async def connect(client, headers, key: str = KEY, months: int | None = None):
+    body: dict = {"api_key": key} if months is None else {"api_key": key, "months": months}
+    response = await client.put(CONNECTION, headers=headers, json=body)
     await wait_for_imports()
     return response
 
@@ -240,7 +246,7 @@ async def test_key_is_stored_encrypted_and_never_returned(api, garmin, caplog): 
 
 
 @pytest.mark.asyncio
-async def test_first_sync_pulls_twelve_months_of_activities_and_health(api, garmin):  # noqa: F811
+async def test_first_sync_pulls_the_chosen_months_of_activities_and_health(api, garmin):  # noqa: F811
     headers, user_id = await register(api, "gfirst")
     garmin.activities = [(9001, _day(3), zip_of({"9001_ACTIVITY.fit": fit(9001, days_ago=3)}))]
     garmin.summaries = {_day(1): summary(_day(1)), _day(200): summary(_day(200), steps=5000)}
@@ -248,13 +254,13 @@ async def test_first_sync_pulls_twelve_months_of_activities_and_health(api, garm
     garmin.hrv = {_day(1): 45.0}
     garmin.weights = [{"samplePk": 77, "date": 1_772_000_000_000, "weight": 74000.0, "bmi": 24.2}]
 
-    await connect(api, headers)
+    await connect(api, headers, months=12)
 
     [job] = await jobs_of(api, headers)
     assert (job["origin"], job["range_mode"], job["status"]) == ("sync", "12m", "finished")
     assert (job["created"], job["runs_created"], job["health_days"]) == (1, 1, 2)
     assert len(await runs_of(api, headers)) == 1
-    assert garmin.summary_starts()[0] == _day(365).isoformat()
+    assert garmin.summary_starts()[0] == _months_ago(12).isoformat()
     assert garmin.sleep_dates() == [_day(200).isoformat(), _day(1).isoformat()]  # only days the watch recorded
     async with api.session_factory() as db:
         day = (await db.execute(select(HealthDay).where(HealthDay.user_id == user_id, HealthDay.date == _day(1)))).scalar_one()
@@ -265,6 +271,43 @@ async def test_first_sync_pulls_twelve_months_of_activities_and_health(api, garm
     status = (await api.get(CONNECTION, headers=headers)).json()
     assert status["last_sync_ok"] is True and status["synced_through"] is not None
     assert status["last_sync_message"] == "Synced 1 new activity, 2 health days."
+
+
+@pytest.mark.asyncio
+async def test_first_sync_without_a_chosen_range_reads_one_month(api, garmin):  # noqa: F811
+    headers, _ = await register(api, "gdefault")
+    garmin.summaries = {_day(3): summary(_day(3)), _day(200): summary(_day(200))}
+
+    await connect(api, headers)
+
+    [job] = await jobs_of(api, headers)
+    assert (job["range_mode"], job["status"], job["health_days"]) == ("1m", "finished", 1)
+    assert garmin.summary_starts()[0] == _months_ago(1).isoformat()
+
+
+@pytest.mark.asyncio
+async def test_sync_now_with_a_range_rereads_those_months_without_duplicates(api, garmin):  # noqa: F811
+    headers, _ = await register(api, "grange")
+    garmin.activities = [(9151, _day(2), zip_of({"r.fit": fit(9151, days_ago=2)}))]
+    garmin.summaries = {_day(2): summary(_day(2)), _day(150): summary(_day(150))}
+    await connect(api, headers)
+    garmin.calls.clear()
+
+    assert (await api.post(SYNC, headers=headers, json={"months": 6})).status_code == 202
+    await wait_for_imports()
+
+    latest = (await jobs_of(api, headers))[0]
+    assert (latest["range_mode"], latest["status"], latest["duplicates"], latest["health_days"]) == ("6m", "finished", 1, 2)
+    assert garmin.summary_starts()[0] == _months_ago(6).isoformat()
+    assert len(await runs_of(api, headers)) == 1
+
+
+@pytest.mark.asyncio
+async def test_only_the_offered_ranges_are_accepted(api, garmin):  # noqa: F811
+    headers, _ = await register(api, "gbadrange")
+    assert (await api.put(CONNECTION, headers=headers, json={"api_key": KEY, "months": 2})).status_code == 422
+    await connect(api, headers)
+    assert (await api.post(SYNC, headers=headers, json={"months": 24})).status_code == 422
 
 
 @pytest.mark.asyncio
@@ -325,12 +368,12 @@ async def test_throttling_keeps_finished_days_and_the_next_sync_resumes(api, gar
     garmin.summaries = {stop_at: summary(stop_at), _day(1): summary(_day(1))}
     garmin.failures = {f"/sleep-service/sleep/dailySleep?date={stop_at.isoformat()}": 429}
 
-    await connect(api, headers)
+    await connect(api, headers, months=12)
 
     [job] = await jobs_of(api, headers)
     assert (job["status"], job["error"]) == ("failed", REASON_THROTTLED)
     cursor = date.fromisoformat((await api.get(CONNECTION, headers=headers)).json()["synced_through"])
-    assert _day(365) <= cursor < stop_at
+    assert _months_ago(12) <= cursor < stop_at
 
     garmin.failures.clear()
     garmin.calls.clear()
@@ -370,7 +413,7 @@ async def test_scheduled_sync_runs_for_every_connected_user(api, garmin, monkeyp
 
     jobs = await jobs_of(api, headers)
     assert [(j["origin"], j["range_mode"], j["status"]) for j in jobs] == [
-        ("sync", "recent", "finished"), ("sync", "12m", "finished"),
+        ("sync", "recent", "finished"), ("sync", "1m", "finished"),
     ]
 
 
