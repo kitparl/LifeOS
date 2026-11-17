@@ -12,7 +12,7 @@ Browser ─► FastAPI /api/v1/dsa ─► JudgeQueue (asyncio, N workers) ─►
 ## Judge setup
 
 The judge is [go-judge](https://github.com/criyle/go-judge). It is the sandbox that Hydro's own judge daemon uses, driven here headlessly through its REST API.
-The Hydro server itself is not used, because `hydrojudge` only pulls tasks from a full Hydro server. See `aidlc-docs/inception/application-design/application-design-dsa.md`.
+The Hydro server itself is not used, because `hydrojudge` only pulls tasks from a full Hydro server.
 
 **Host requirements:**
 - Linux with Docker. cgroup v2 is fine. With kernel 5.19 or newer, memory peaks are exact.

@@ -1,6 +1,6 @@
 """Map Garmin Personal API health responses to the provider-neutral health contracts.
 
-Pure functions. Field names come from real responses (see aidlc-docs/construction/garmin-live-sync).
+Pure functions. Field names come from real responses.
 A missing, malformed or out-of-range value is dropped, never fatal: one odd field must not lose a day.
 """
 

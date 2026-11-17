@@ -1,6 +1,6 @@
 """Property-based tests (Hypothesis) — Property-Based Testing extension, full enforcement.
 
-Properties identified in aidlc-docs/inception/requirements/requirements-19sept-vocabulary.md
+Properties identified for the vocabulary feature
 ("Property-Based Testing" table). Complements (does not replace) the example-based tests in
 test_vocabulary_sequencing.py — PBT-10.
 

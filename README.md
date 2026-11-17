@@ -163,7 +163,6 @@ Known limitations: TIFF previews are unsupported (download-only) rather than con
 backend/           FastAPI application (app/core + app/modules + app/tests)
 frontend/          Angular single-page app
 requirements/      Feature specs and cleanup briefs (local only, gitignored)
-aidlc-docs/        AI-DLC planning artifacts and summaries (local only, gitignored)
 ```
 
 ## Documentation

@@ -378,7 +378,6 @@ This component is part of the LifeOS application.
 
 ## Contributors
 
-- Implementation based on AI-DLC workflow
 - CodeMirror 6: https://codemirror.net/
 - Pyodide: https://pyodide.org/
 - SQL.js: https://github.com/sql-js/sql.js/
