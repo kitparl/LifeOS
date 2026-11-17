@@ -10,6 +10,7 @@ import { PlannerTreeStore } from './services/planner-tree.store';
 import { PlannerWorkspaceComponent } from './planner-workspace.component';
 
 const STORAGE_KEY = 'lifeos.planner.tabs';
+const EXPLORER_KEY = 'lifeos.planner.explorer';
 
 function node(id: string, kind: PlannerNode['kind'], name = id): PlannerNode {
   return { id, parent_id: null, kind, name, order_index: 0, revision: 1, created_at: '', updated_at: '' };
@@ -147,5 +148,67 @@ describe('PlannerWorkspaceComponent', () => {
     await page.closeTab('d1');
     expect(confirm.confirm).not.toHaveBeenCalled();
     expect(page.openTabs()).toEqual([]);
+  });
+
+  describe('explorer sidebar toggle', () => {
+    const pane = () => fixture.nativeElement.querySelector('[data-testid="planner-explorer-pane"]') as HTMLElement;
+
+    beforeEach(() => spyOn(window, 'matchMedia').and.returnValue({ matches: true } as MediaQueryList));
+    afterEach(() => localStorage.removeItem(EXPLORER_KEY));
+
+    it('hides the explorer on desktop and remembers the choice', async () => {
+      const page = await create();
+      expect(page.explorerVisible()).toBeTrue();
+
+      page.toggleExplorer();
+      fixture.detectChanges();
+
+      expect(page.explorerVisible()).toBeFalse();
+      expect(pane().classList).toContain('md:hidden');
+      expect(localStorage.getItem(EXPLORER_KEY)).toBe('hidden');
+    });
+
+    it('restores a hidden explorer after reload', async () => {
+      localStorage.setItem(EXPLORER_KEY, 'hidden');
+      const page = await create();
+      expect(page.explorerVisible()).toBeFalse();
+    });
+
+    it('toggles with Ctrl+B / Cmd+B like VS Code', async () => {
+      const page = await create();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', ctrlKey: true }));
+      expect(page.explorerVisible()).toBeFalse();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', metaKey: true }));
+      expect(page.explorerVisible()).toBeTrue();
+    });
+  });
+
+  describe('full screen', () => {
+    it('enters full screen via the Fullscreen API and exits when the browser leaves it', async () => {
+      const page = await create();
+      const root = fixture.nativeElement.querySelector('[data-testid="planner-root"]') as HTMLElement;
+      // Whole page goes full screen so app dialogs (unsaved-changes confirm) stay visible above the editor.
+      const request = spyOn(document.documentElement, 'requestFullscreen').and.resolveTo();
+
+      await page.toggleFullscreen();
+      fixture.detectChanges();
+      expect(request).toHaveBeenCalled();
+      expect(page.fullscreen()).toBeTrue();
+      expect(root.classList).toContain('fixed');
+
+      document.dispatchEvent(new Event('fullscreenchange'));
+      expect(page.fullscreen()).toBeFalse();
+    });
+
+    it('still fills the window when the Fullscreen API is refused', async () => {
+      const page = await create();
+      spyOn(document.documentElement, 'requestFullscreen').and.rejectWith(new Error('denied'));
+
+      await page.toggleFullscreen();
+      expect(page.fullscreen()).toBeTrue();
+
+      await page.toggleFullscreen();
+      expect(page.fullscreen()).toBeFalse();
+    });
   });
 });

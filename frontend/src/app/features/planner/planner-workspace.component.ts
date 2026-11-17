@@ -19,6 +19,8 @@ import { PlannerNode, SaveStatus } from './models/planner.models';
 import { PlannerTreeStore } from './services/planner-tree.store';
 
 const STORAGE_KEY = 'lifeos.planner.tabs';
+const EXPLORER_KEY = 'lifeos.planner.explorer';
+const DESKTOP_QUERY = '(min-width: 768px)'; // Tailwind `md`
 const SETTLED: SaveStatus[] = ['idle', 'saved'];
 
 interface StoredTabs {
@@ -36,13 +38,22 @@ interface StoredTabs {
   template: `
     <div
       #split
-      class="relative flex h-[calc(100vh-10rem)] min-h-[24rem] overflow-hidden rounded border border-[var(--border)] bg-[var(--surface-1)]"
+      class="flex min-h-[24rem] overflow-hidden border border-[var(--border)] bg-[var(--surface-1)]"
+      [class.relative]="!fullscreen()"
+      [class.rounded]="!fullscreen()"
+      [class.fixed]="fullscreen()"
+      [class.inset-0]="fullscreen()"
+      [style.height]="fullscreen() ? 'auto' : 'calc(100vh - 10rem)'"
+      [style.z-index]="fullscreen() ? 45 : null"
       [style.--planner-explorer-w]="splitRatio() * 100 + '%'"
+      data-testid="planner-root"
     >
       <aside
-        class="z-20 w-72 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-1)] max-md:absolute max-md:inset-y-0 max-md:left-0 md:flex md:w-[var(--planner-explorer-w)]"
+        class="z-20 w-72 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-1)] max-md:absolute max-md:inset-y-0 max-md:left-0 md:w-[var(--planner-explorer-w)]"
         [class.hidden]="!explorerOpen()"
         [class.flex]="explorerOpen()"
+        [class.md:flex]="explorerVisible()"
+        [class.md:hidden]="!explorerVisible()"
         data-testid="planner-explorer-pane"
       >
         <app-planner-explorer
@@ -53,7 +64,8 @@ interface StoredTabs {
         />
       </aside>
       <app-split-divider
-        class="hidden w-1 shrink-0 cursor-col-resize bg-[var(--border)] hover:bg-[var(--primary)] focus-visible:bg-[var(--primary)] data-[resizing=true]:bg-[var(--primary)] md:block"
+        class="hidden w-1 shrink-0 cursor-col-resize bg-[var(--border)] hover:bg-[var(--primary)] focus-visible:bg-[var(--primary)] data-[resizing=true]:bg-[var(--primary)]"
+        [class.md:block]="explorerVisible()"
         [value]="splitRatio()"
         [min]="splitMin"
         [max]="splitMax"
@@ -66,12 +78,17 @@ interface StoredTabs {
         <div class="tab-bar px-2" role="tablist">
           <button
             type="button"
-            class="btn-ghost !min-h-8 !px-2 md:hidden"
-            aria-label="Toggle explorer"
+            class="btn-ghost !min-h-8 !px-2"
+            [attr.aria-label]="explorerVisible() ? 'Hide explorer (Ctrl+B)' : 'Show explorer (Ctrl+B)'"
+            [title]="explorerVisible() ? 'Hide explorer (Ctrl+B)' : 'Show explorer (Ctrl+B)'"
             data-testid="planner-explorer-toggle"
-            (click)="explorerOpen.set(!explorerOpen())"
+            (click)="toggleExplorer()"
           >
-            <svg class="h-4 w-4" lucideIcon="folder-open" aria-hidden="true"></svg>
+            <svg
+              class="h-4 w-4"
+              [lucideIcon]="explorerVisible() ? 'panel-left-close' : 'panel-left-open'"
+              aria-hidden="true"
+            ></svg>
           </button>
           @for (id of openTabs(); track id) {
             <div class="flex items-center" (auxclick)="onTabAuxClick($event, id)">
@@ -103,6 +120,16 @@ interface StoredTabs {
               </button>
             </div>
           }
+          <button
+            type="button"
+            class="btn-ghost !min-h-8 !px-2 ml-auto"
+            [attr.aria-label]="fullscreen() ? 'Exit full screen' : 'Full screen'"
+            [title]="fullscreen() ? 'Exit full screen' : 'Full screen'"
+            data-testid="planner-fullscreen-toggle"
+            (click)="toggleFullscreen()"
+          >
+            <svg class="h-4 w-4" [lucideIcon]="fullscreen() ? 'minimize-2' : 'maximize-2'" aria-hidden="true"></svg>
+          </button>
         </div>
         <div class="relative min-h-0 flex-1">
           @for (id of openTabs(); track id) {
@@ -128,7 +155,11 @@ export class PlannerWorkspaceComponent implements OnInit {
   readonly openTabs = signal<string[]>([]);
   readonly activeTab = signal<string | null>(null);
   readonly statuses = signal<Record<string, SaveStatus>>({});
+  /** Mobile slide-over explorer. */
   readonly explorerOpen = signal(false);
+  /** Desktop explorer column (VS Code-style sidebar toggle), remembered across visits. */
+  readonly explorerVisible = signal(this.readExplorerVisible());
+  readonly fullscreen = signal(false);
 
   readonly splitMin = 0.15;
   readonly splitMax = 0.5;
@@ -158,6 +189,53 @@ export class PlannerWorkspaceComponent implements OnInit {
     if (Object.values(this.statuses()).some((s) => this.isUnsettled(s))) {
       event.preventDefault();
     }
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent): void {
+    const isToggleShortcut =
+      (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b';
+    if (isToggleShortcut) {
+      event.preventDefault();
+      this.toggleExplorer();
+    } else if (event.key === 'Escape' && this.fullscreen() && !document.fullscreenElement) {
+      this.fullscreen.set(false);
+    }
+  }
+
+  /** Browser left full screen (Esc / F11 / system UI): drop our full-window layout too. */
+  @HostListener('document:fullscreenchange')
+  onFullscreenChange(): void {
+    if (!document.fullscreenElement) this.fullscreen.set(false);
+  }
+
+  toggleExplorer(): void {
+    if (!window.matchMedia(DESKTOP_QUERY).matches) {
+      this.explorerOpen.update((open) => !open);
+      return;
+    }
+    const visible = !this.explorerVisible();
+    this.explorerVisible.set(visible);
+    try {
+      localStorage.setItem(EXPLORER_KEY, visible ? 'visible' : 'hidden');
+    } catch {
+      /* storage unavailable: choice just won't be remembered */
+    }
+  }
+
+  /**
+   * Fill the window with the planner, and ask the browser for real full screen on the whole page
+   * (not just the planner) so app dialogs such as the unsaved-changes confirm stay visible.
+   * If the browser refuses (e.g. iOS Safari), the full-window layout still applies.
+   */
+  async toggleFullscreen(): Promise<void> {
+    if (this.fullscreen()) {
+      this.fullscreen.set(false);
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
+      return;
+    }
+    this.fullscreen.set(true);
+    await document.documentElement.requestFullscreen?.().catch(() => undefined);
   }
 
   isUnsettled(status: SaveStatus | undefined): boolean {
@@ -233,6 +311,14 @@ export class PlannerWorkspaceComponent implements OnInit {
       this.activeTab.set(next[Math.min(index, next.length - 1)] ?? null);
     }
     this.persist();
+  }
+
+  private readExplorerVisible(): boolean {
+    try {
+      return localStorage.getItem(EXPLORER_KEY) !== 'hidden';
+    } catch {
+      return true;
+    }
   }
 
   private readStored(): StoredTabs {
