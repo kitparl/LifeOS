@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.modules.auth.models import User
 from app.modules.integrations.ai.service import AiProviderIntegrationService
+from app.modules.integrations.freenewsapi.service import FreeNewsApiIntegrationService
 from app.modules.integrations.github.config_service import GitHubConfigService
 from app.modules.integrations.github.sync_service import GitHubSyncService
 from app.modules.integrations.google_calendar.sync_service import GoogleCalendarSyncService
@@ -42,6 +43,9 @@ from app.modules.integrations.schemas import (
     IntegrationResponse,
     IntegrationSyncResponse,
     IntegrationUpdate,
+    NewsProviderConfigStatus,
+    NewsProviderConfigUpdate,
+    NewsProviderTestResponse,
     ReportRunResponse,
     SectionSyncStatus,
     SubjectSectionSyncStatusResponse,
@@ -270,6 +274,31 @@ async def test_wordnik(
     db: AsyncSession = Depends(get_db),
 ):
     return await WordnikIntegrationService(db).test(user.id)
+
+
+@router.get("/freenewsapi", response_model=NewsProviderConfigStatus)
+async def get_freenewsapi_config(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await FreeNewsApiIntegrationService(db).status(user.id)
+
+
+@router.put("/freenewsapi/config", response_model=NewsProviderConfigStatus)
+async def save_freenewsapi_config(
+    data: NewsProviderConfigUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await FreeNewsApiIntegrationService(db).save(user.id, data)
+
+
+@router.post("/freenewsapi/test", response_model=NewsProviderTestResponse)
+async def test_freenewsapi(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await FreeNewsApiIntegrationService(db).test(user.id)
 
 
 @router.get("/google-maps", response_model=GoogleMapsConfigStatus)

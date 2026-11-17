@@ -149,6 +149,8 @@ export type NewsErrorCode =
   | 'rate_limit'
   | 'write_limit'
   | 'provider_unavailable'
+  | 'missing_credential'
+  | 'invalid_credential'
   | 'malformed_response'
   | 'article_unavailable'
   | 'unknown';
@@ -158,6 +160,8 @@ const KNOWN_CODES: readonly NewsErrorCode[] = [
   'rate_limit',
   'write_limit',
   'provider_unavailable',
+  'missing_credential',
+  'invalid_credential',
   'malformed_response',
   'article_unavailable',
 ];
@@ -177,6 +181,8 @@ const ERROR_MESSAGES: Record<NewsErrorCode, string> = {
   rate_limit: 'Too many requests right now. Please wait a moment and try again.',
   write_limit: 'You have saved a lot this hour. Please try again later.',
   provider_unavailable: "We couldn't load the latest news. Please try again.",
+  missing_credential: 'News needs a FreeNewsAPI key. Add one in Integrations → FreeNewsAPI.',
+  invalid_credential: 'The FreeNewsAPI key was rejected. Check it in Integrations → FreeNewsAPI.',
   malformed_response: "We couldn't read the news service's response. Please try again.",
   article_unavailable: 'This article is no longer available.',
   unknown: 'Something went wrong. Please try again.',

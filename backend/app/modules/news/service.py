@@ -26,6 +26,7 @@ from app.core.pagination import Pagination
 from app.core.rate_limit import SlidingWindowLimiter
 from app.core.text import clean_text
 from app.core.timezone import as_utc, utc_now
+from app.modules.integrations.freenewsapi.service import FreeNewsApiIntegrationService
 from app.modules.news import categories
 from app.modules.news.client import (
     FreeNewsClient,
@@ -148,6 +149,11 @@ class NewsService:
     def __init__(self, db: AsyncSession, settings: Settings | None = None):
         self.repo = NewsRepository(db)
         self.settings = settings or get_settings()
+        self.provider_keys = FreeNewsApiIntegrationService(db)
+
+    async def _client(self, user_id: str | None) -> FreeNewsClient:
+        key = await self.provider_keys.api_key_for(user_id, self.settings)
+        return FreeNewsClient(key, self.settings.freenews_api_base_url)
 
     # ------------------------------------------------------------------ live news
 
@@ -171,7 +177,7 @@ class NewsService:
         result = _vendor_cache.get(key)
         if not isinstance(result, NewsSearchResult):
             try:
-                result = await FreeNewsClient(self.settings.freenews_api_base_url).search(params)
+                result = await (await self._client(user_id)).search(params)
             except NewsApiError as exc:
                 logger.warning("FreeNewsAPI search failed: %s", exc.code)
                 raise _to_app_error(exc) from exc
@@ -194,7 +200,7 @@ class NewsService:
         detail = _vendor_cache.get(key)
         if not isinstance(detail, NewsArticleDetail):
             try:
-                found = await FreeNewsClient(self.settings.freenews_api_base_url).article(url)
+                found = await (await self._client(user_id)).article(url)
             except NewsApiError as exc:
                 logger.warning("FreeNewsAPI article failed: %s", exc.code)
                 raise _to_app_error(exc) from exc

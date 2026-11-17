@@ -1,4 +1,6 @@
-"""Thin FreeNewsAPI client (https://freenewsapi.ai, no API key). The only code that knows vendor URLs.
+"""Thin FreeNewsAPI client (https://freenewsapi.ai, free API key required). The only code that knows vendor URLs.
+
+The key is sent as a bearer token, never in the URL, so it cannot leak through request logging.
 
 Only documented `/v1/search` and `/v1/article` parameters are sent. Responses are parsed
 defensively: every field except id/url/title may be missing, and text arrives with HTML
@@ -26,6 +28,14 @@ class NewsApiError(Exception):
     """Base error for every FreeNewsAPI call. `code` is a stable, client-facing identifier."""
 
     code: str = "provider_unavailable"
+
+
+class NewsApiMissingCredentialError(NewsApiError):
+    code = "missing_credential"
+
+
+class NewsApiInvalidCredentialError(NewsApiError):
+    code = "invalid_credential"
 
 
 class NewsApiRateLimitError(NewsApiError):
@@ -110,19 +120,26 @@ def parse_article(raw: Any) -> NewsArticle | None:
 
 
 class FreeNewsClient:
-    def __init__(self, base_url: str | None = None):
+    def __init__(self, api_key: str, base_url: str | None = None):
+        if not api_key:
+            raise NewsApiMissingCredentialError("Add a FreeNewsAPI key in Integrations first.")
+        self._api_key = api_key
         self._base_url = (base_url or get_settings().freenews_api_base_url).rstrip("/")
 
     async def _get(self, path: str, params: dict[str, Any]) -> Any:
         """GET a vendor path. Returns decoded JSON, or None when the vendor has no entry (404)."""
         try:
             async with _http_client(TIMEOUT_SECONDS) as client:
-                res = await client.get(f"{self._base_url}{path}", params=params)
+                res = await client.get(
+                    f"{self._base_url}{path}", params=params, headers={"Authorization": f"Bearer {self._api_key}"}
+                )
         except httpx.TimeoutException as exc:
             raise NewsApiTimeoutError(f"{_LABEL} request timed out.") from exc
         except httpx.HTTPError as exc:
             raise NewsApiUnavailableError(f"{_LABEL} is temporarily unavailable.") from exc
 
+        if res.status_code in (httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN):
+            raise NewsApiInvalidCredentialError(f"Invalid or revoked {_LABEL} API key. Check Integrations.")
         if res.status_code == httpx.codes.TOO_MANY_REQUESTS:
             raise NewsApiRateLimitError(f"{_LABEL} rate limit reached. Try again shortly.")
         if res.status_code == httpx.codes.NOT_FOUND:

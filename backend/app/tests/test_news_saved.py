@@ -151,7 +151,8 @@ async def test_vendor_errors_are_coded(client, fake_news, status, http, code):
     assert res.json()["detail"]["code"] == code
 
 
-async def test_vendor_offline_by_default_returns_503(client):
+async def test_vendor_offline_by_default_returns_503(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "freenews_api_key", "server-key-for-offline-test")
     headers = await _headers(client, "offline@example.com")
     news_service.reset_vendor_state()
     res = await client.get("/api/v1/news/articles", headers=headers, params={"q": "anything"})

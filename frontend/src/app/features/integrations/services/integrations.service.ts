@@ -9,7 +9,7 @@ export interface IntegrationProvider {
   display_name: string;
   description: string;
   oauth_required: boolean;
-  group: 'general' | 'ai' | 'language';
+  group: 'general' | 'ai' | 'language' | 'news';
 }
 
 export interface IntegrationConnection {
@@ -190,6 +190,24 @@ export interface WordnikTestResponse {
   ok: boolean;
   detail: string;
 }
+
+/** Shared by every news provider's card (FreeNewsAPI today; the provider id is the URL segment). */
+export interface NewsProviderConfigStatus {
+  connection_id: string;
+  enabled: boolean;
+  status: string;
+  configured: boolean;
+  api_key_masked: string | null;
+  last_tested_at: string | null;
+  last_test_ok: boolean | null;
+}
+
+export interface NewsProviderConfigUpdate {
+  api_key?: string | null;
+  enabled?: boolean | null;
+}
+
+export type NewsProviderTestResponse = WordnikTestResponse;
 
 export interface GoogleMapsConfigStatus {
   connection_id: string;
@@ -424,6 +442,18 @@ export class IntegrationsService {
 
   testWordnik(): Observable<WordnikTestResponse> {
     return this.http.post<WordnikTestResponse>(`${this.api}/wordnik/test`, {});
+  }
+
+  getNewsProvider(provider: string): Observable<NewsProviderConfigStatus> {
+    return this.http.get<NewsProviderConfigStatus>(`${this.api}/${provider}`);
+  }
+
+  saveNewsProviderConfig(provider: string, body: NewsProviderConfigUpdate): Observable<NewsProviderConfigStatus> {
+    return this.http.put<NewsProviderConfigStatus>(`${this.api}/${provider}/config`, body);
+  }
+
+  testNewsProvider(provider: string): Observable<NewsProviderTestResponse> {
+    return this.http.post<NewsProviderTestResponse>(`${this.api}/${provider}/test`, {});
   }
 
   getGarmin(): Observable<GarminConnectionStatus> {

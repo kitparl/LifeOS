@@ -19,6 +19,7 @@ import app.modules.wishlist.models  # noqa: F401
 import httpx
 import pytest
 import pytest_asyncio
+from app.core.config import get_settings
 from app.core.database import Base, get_db
 from app.main import app
 from app.modules.ai.adapters import base as ai_adapter_base
@@ -131,6 +132,8 @@ def wordnik():
         yield fake
 
 
+NEWS_SERVER_KEY = "server-fallback-key-0000"
+
 NEWS_RESULT = {
     "id": "a1",
     "url": "https://www.thehindu.com/news/article1.ece",
@@ -183,7 +186,10 @@ def fake_news():
         return real_client(timeout=timeout, transport=httpx.MockTransport(fake))
 
     news_service.reset_vendor_state()
-    with patch.object(news_client, "_http_client", side_effect=factory):
+    with (
+        patch.object(news_client, "_http_client", side_effect=factory),
+        patch.object(get_settings(), "freenews_api_key", NEWS_SERVER_KEY),
+    ):
         yield fake
     news_service.reset_vendor_state()
 

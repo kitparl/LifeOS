@@ -11,6 +11,8 @@ from app.modules.news.schemas import NewsArticle
 from app.modules.news.service import EXCERPT_MAX_CHARS, build_excerpt
 from app.tests.conftest import NEWS_RESULT
 
+KEY = "news-secret-key-1234"
+
 
 def _article(id_: str, url: str, title: str = "Title", host: str | None = None) -> NewsArticle:
     return NewsArticle(id=id_, url=url, title=title, host=host)
@@ -68,28 +70,41 @@ def test_parse_article_rejects_non_http_images_and_bad_fields():
 
 async def test_search_sends_only_given_params_and_ignores_promo(fake_news):
     fake_news.search = {"total": 1, "results": [NEWS_RESULT], "strongly_recommended": {"x": 1}}
-    result = await FreeNewsClient().search({"q": "ai", "size": 5, "offset": 0, "sort": "date"})
+    result = await FreeNewsClient(KEY).search({"q": "ai", "size": 5, "offset": 0, "sort": "date"})
     assert fake_news.requests[0].url.host == "freenewsapi.ai"
     assert fake_news.params() == {"q": "ai", "size": "5", "offset": "0", "sort": "date"}
     assert [a.id for a in result.articles] == ["a1"]
     assert result.total == 1
 
 
+async def test_key_is_sent_as_bearer_header_never_in_the_url(fake_news):
+    await FreeNewsClient(KEY).search({"q": "ai"})
+    request = fake_news.requests[0]
+    assert request.headers["Authorization"] == f"Bearer {KEY}"
+    assert KEY not in str(request.url)
+
+
+def test_client_requires_a_key():
+    with pytest.raises(NewsApiError) as info:
+        FreeNewsClient("")
+    assert info.value.code == "missing_credential"
+
+
 @pytest.mark.parametrize(
     ("status", "code"),
-    [(429, "rate_limit"), (500, "provider_unavailable"), (503, "provider_unavailable")],
+    [(401, "invalid_credential"), (403, "invalid_credential"), (429, "rate_limit"), (500, "provider_unavailable"), (503, "provider_unavailable")],
 )
 async def test_search_maps_vendor_status_to_codes(fake_news, status, code):
     fake_news.status = status
     with pytest.raises(NewsApiError) as info:
-        await FreeNewsClient().search({"q": "ai"})
+        await FreeNewsClient(KEY).search({"q": "ai"})
     assert info.value.code == code
 
 
 async def test_search_malformed_response(fake_news):
     fake_news.search = {"results": "nope"}
     with pytest.raises(NewsApiError) as info:
-        await FreeNewsClient().search({})
+        await FreeNewsClient(KEY).search({})
     assert info.value.code == "malformed_response"
 
 
@@ -104,16 +119,16 @@ async def test_timeout_maps_to_timeout_code(monkeypatch):
         news_client, "_http_client", lambda timeout: real(timeout=timeout, transport=httpx.MockTransport(raise_timeout))
     )
     with pytest.raises(NewsApiError) as info:
-        await FreeNewsClient().search({})
+        await FreeNewsClient(KEY).search({})
     assert info.value.code == "timeout"
 
 
 async def test_article_404_returns_none_and_body_is_exposed(fake_news):
-    found = await FreeNewsClient().article(NEWS_RESULT["url"])
+    found = await FreeNewsClient(KEY).article(NEWS_RESULT["url"])
     assert found is not None and found.text == "First paragraph.\n\nSecond paragraph."
     assert fake_news.params() == {"url": NEWS_RESULT["url"], "full_text": "true"}
     fake_news.article = None
-    assert await FreeNewsClient().article("https://example.com/missing") is None
+    assert await FreeNewsClient(KEY).article("https://example.com/missing") is None
 
 
 # ------------------------------------------------------------------ categories

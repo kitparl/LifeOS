@@ -28,6 +28,7 @@ INTEGRATION_PROVIDERS = (
     "perplexity",
     "wordnik",
     "google_maps",
+    "freenewsapi",
 )
 
 

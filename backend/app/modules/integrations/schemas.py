@@ -13,7 +13,7 @@ class IntegrationProviderInfo(BaseModel):
     description: str
     oauth_required: bool
     # "ai" providers render in the Integrations page's AI Integration section.
-    group: Literal["general", "ai", "language"] = "general"
+    group: Literal["general", "ai", "language", "news"] = "general"
 
 
 class IntegrationCreate(BaseModel):
@@ -299,6 +299,30 @@ class WordnikConfigStatus(BaseModel):
 
 
 class WordnikTestResponse(BaseModel):
+    ok: bool
+    detail: str
+
+
+class NewsProviderConfigUpdate(BaseModel):
+    """Shared by every news provider's card. Blank/omitted api_key keeps the stored key."""
+
+    api_key: str | None = Field(default=None, max_length=256)
+    enabled: bool | None = None
+
+
+class NewsProviderConfigStatus(BaseModel):
+    """Public status: the API key is only ever returned masked."""
+
+    connection_id: str
+    enabled: bool
+    status: str
+    configured: bool
+    api_key_masked: str | None = None
+    last_tested_at: datetime | None = None
+    last_test_ok: bool | None = None
+
+
+class NewsProviderTestResponse(BaseModel):
     ok: bool
     detail: str
 

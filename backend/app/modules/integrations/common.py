@@ -1,10 +1,12 @@
-"""Helpers shared by the per-provider integration configs (AI, Wordnik, GitHub, Google Calendar, Telegram)."""
+"""Helpers shared by the per-provider integration configs (AI, Wordnik, news, GitHub, Google Calendar, Telegram)."""
 
 from __future__ import annotations
 
 import json
 import logging
 from typing import Any
+
+from app.core.crypto import decrypt, encrypt
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,24 @@ def load_json_object(config_json: str | None, *, label: str) -> dict[str, Any]:
         logger.warning("Invalid %s config_json (not JSON)", label)
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def load_api_key(config_json: str | None, *, label: str) -> str:
+    """The stored API key from ``{"api_key_enc": ...}``, or "" when missing or undecryptable."""
+    data = load_json_object(config_json, label=label)
+    try:
+        return decrypt(str(data["api_key_enc"])).strip() if data.get("api_key_enc") else ""
+    except ValueError:
+        logger.warning("Failed to decrypt %s config (tampered or wrong key)", label)
+        return ""
+
+
+def serialize_api_key_config(*, existing_json: str | None, api_key: str | None, label: str) -> str:
+    """``{"api_key_enc": ...}`` JSON. A blank/None ``api_key`` keeps the stored key."""
+    key_enc = str(load_json_object(existing_json, label=label).get("api_key_enc") or "")
+    if api_key is not None and api_key.strip():
+        key_enc = encrypt(api_key.strip())
+    return json.dumps({"api_key_enc": key_enc})
 
 
 def mask_secret(secret: str) -> str:

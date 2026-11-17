@@ -86,8 +86,11 @@ class Settings(BaseSettings):
     #   python -c "import bcrypt; print(bcrypt.hashpw(b'YOUR_PASSWORD', bcrypt.gensalt()).decode())"
     admin_gate_email: str = Field(default="", validation_alias="ADMIN_GATE_EMAIL")
     admin_gate_password_hash: str = Field(default="", validation_alias="ADMIN_GATE_PASSWORD_HASH")
-    # --- News (FreeNewsAPI proxy; no key required) ---
+    # --- News (FreeNewsAPI proxy; needs an API key since 2026-11-01) ---
     freenews_api_base_url: str = Field(default="https://freenewsapi.ai", validation_alias="FREENEWS_API_BASE_URL")
+    # Server-wide fallback for callers without their own key (e.g. anonymous Explore visitors).
+    # A key saved in Integrations → FreeNewsAPI takes precedence.
+    freenews_api_key: str = Field(default="", validation_alias="FREENEWS_API_KEY")
     # Saved news articles expire (and are purged) this many days after saving.
     article_retention_days: int = Field(default=30, ge=1, validation_alias="ARTICLE_RETENTION_DAYS")
     news_proxy_per_minute: int = Field(default=60, ge=1, validation_alias="NEWS_PROXY_PER_MINUTE")

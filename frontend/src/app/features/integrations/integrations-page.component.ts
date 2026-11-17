@@ -5,6 +5,7 @@ import { GarminConfigComponent } from './components/garmin-config.component';
 import { GithubConfigComponent } from './components/github-config.component';
 import { GoogleCalendarConfigComponent } from './components/google-calendar-config.component';
 import { TelegramConfigComponent } from './components/telegram-config.component';
+import { NewsProviderConfigComponent } from './components/news-provider-config.component';
 import { WordnikConfigComponent } from './components/wordnik-config.component';
 import { GoogleMapsConfigComponent } from './components/google-maps-config.component';
 import {
@@ -24,6 +25,7 @@ import {
     AiProviderConfigComponent,
     AiSettingsComponent,
     WordnikConfigComponent,
+    NewsProviderConfigComponent,
     GoogleMapsConfigComponent,
   ],
   template: `
@@ -56,6 +58,13 @@ import {
             />
           } @else if (p.provider === 'wordnik') {
             <app-wordnik-config
+              [displayName]="p.display_name"
+              [description]="p.description"
+              (connectionsChanged)="loadConnections()"
+            />
+          } @else if (p.group === 'news') {
+            <app-news-provider-config
+              [provider]="p.provider"
               [displayName]="p.display_name"
               [description]="p.description"
               (connectionsChanged)="loadConnections()"
