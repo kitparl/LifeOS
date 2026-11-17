@@ -119,8 +119,10 @@ describe('GarminConfigComponent', () => {
     expect(cmp.busy()).toBeFalse();
   });
 
-  it('shows progress while a sync runs', () => {
-    integrations.getGarmin.and.returnValue(of(connected));
+  it('shows progress while a sync runs and hides the previous result', () => {
+    integrations.getGarmin.and.returnValue(
+      of({ ...connected, last_sync_message: 'Could not reach Garmin.', last_sync_ok: false, synced_through: '2026-03-01' }),
+    );
     activities.listImports.and.returnValue(of({ items: [syncJob()], total: 1 }));
     const { cmp, text, fixture } = create();
     fixture.detectChanges();
@@ -128,6 +130,8 @@ describe('GarminConfigComponent', () => {
     expect(cmp.syncing()).toBeTrue();
     expect(text()).toContain('Syncing…');
     expect(text()).toContain('1 imported, 7 health days');
+    expect(text()).toContain('checked up to Mar 1, 2026');
+    expect(text()).not.toContain('Could not reach Garmin.');
     cmp.ngOnDestroy();
   });
 

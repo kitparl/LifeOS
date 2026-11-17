@@ -33,7 +33,7 @@ export const GARMIN_TOKEN_PAGE = 'https://connect.garmin.com/app/settings/person
       </div>
 
       @if (config(); as c) {
-        @if (c.last_sync_message) {
+        @if (c.last_sync_message && !syncing()) {
           <p class="text-xs mt-2" [style.color]="c.last_sync_ok === false ? 'var(--danger)' : 'var(--text-muted)'" data-testid="garmin-last-sync">
             {{ c.last_sync_message }}
             @if (c.last_sync_at) {
@@ -50,7 +50,12 @@ export const GARMIN_TOKEN_PAGE = 'https://connect.garmin.com/app/settings/person
           </div>
           @if (job(); as j) {
             @if (syncing()) {
-              <p class="text-xs mt-1" style="color: var(--text-muted)" data-testid="garmin-progress">{{ summaryOf(j) }}</p>
+              <p class="text-xs mt-1" style="color: var(--text-muted)" data-testid="garmin-progress">
+                {{ summaryOf(j) }}
+                @if (c.synced_through) {
+                  <span> · checked up to {{ c.synced_through | date: 'mediumDate' }}</span>
+                }
+              </p>
             }
           }
         }
@@ -219,6 +224,7 @@ export class GarminConfigComponent implements OnInit, OnDestroy {
         this.job.set(latest);
         if (running) {
           this.syncing.set(true);
+          this.load(); // the connection's "synced through" date shows how far the sync has got
           this.timer = setTimeout(() => this.watchLatestJob(), REFRESH_MS);
         } else if (this.syncing()) {
           this.syncing.set(false);

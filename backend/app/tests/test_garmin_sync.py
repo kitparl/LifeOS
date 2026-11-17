@@ -125,6 +125,10 @@ class FakeGarmin:
     def sleep_dates(self) -> list[str]:
         return [c.split("date=")[1] for c in self.calls if c.startswith("/sleep-service/sleep/dailySleep")]
 
+    def summary_starts(self) -> list[str]:
+        prefix = "/usersummary-service/v2/dailysummaries?"
+        return [parse_qs(c[len(prefix) :])["startDate"][0] for c in self.calls if c.startswith(prefix)]
+
 
 @pytest.fixture
 def garmin(monkeypatch):
@@ -250,7 +254,8 @@ async def test_first_sync_pulls_twelve_months_of_activities_and_health(api, garm
     assert (job["origin"], job["range_mode"], job["status"]) == ("sync", "12m", "finished")
     assert (job["created"], job["runs_created"], job["health_days"]) == (1, 1, 2)
     assert len(await runs_of(api, headers)) == 1
-    assert garmin.sleep_dates()[0] == (_day(365)).isoformat()
+    assert garmin.summary_starts()[0] == _day(365).isoformat()
+    assert garmin.sleep_dates() == [_day(200).isoformat(), _day(1).isoformat()]  # only days the watch recorded
     async with api.session_factory() as db:
         day = (await db.execute(select(HealthDay).where(HealthDay.user_id == user_id, HealthDay.date == _day(1)))).scalar_one()
         weights = (await db.execute(select(func.count()).select_from(HealthMeasurement).where(
@@ -277,7 +282,7 @@ async def test_later_syncs_read_only_recent_days_and_never_duplicate(api, garmin
 
     latest = (await jobs_of(api, headers))[0]
     assert (latest["range_mode"], latest["status"], latest["created"], latest["duplicates"]) == ("recent", "finished", 0, 1)
-    assert garmin.sleep_dates()[0] == (synced_through - timedelta(days=OVERLAP_DAYS)).isoformat()
+    assert garmin.summary_starts()[0] == (synced_through - timedelta(days=OVERLAP_DAYS)).isoformat()
     assert len(await runs_of(api, headers)) == 1
 
 
@@ -317,6 +322,7 @@ async def test_a_refused_key_stops_the_sync_pauses_it_and_notifies_once(api, gar
 async def test_throttling_keeps_finished_days_and_the_next_sync_resumes(api, garmin):  # noqa: F811
     headers, _ = await register(api, "gthrottle")
     stop_at = _day(300)
+    garmin.summaries = {stop_at: summary(stop_at), _day(1): summary(_day(1))}
     garmin.failures = {f"/sleep-service/sleep/dailySleep?date={stop_at.isoformat()}": 429}
 
     await connect(api, headers)
@@ -331,7 +337,7 @@ async def test_throttling_keeps_finished_days_and_the_next_sync_resumes(api, gar
     await api.post(SYNC, headers=headers)
     await wait_for_imports()
     assert (await jobs_of(api, headers))[0]["status"] == "finished"
-    assert garmin.sleep_dates()[0] == (cursor - timedelta(days=OVERLAP_DAYS)).isoformat()
+    assert garmin.summary_starts()[0] == (cursor - timedelta(days=OVERLAP_DAYS)).isoformat()
 
 
 @pytest.mark.asyncio
@@ -383,6 +389,7 @@ async def test_dates_without_data_answered_with_no_content_do_not_stop_the_sync(
 @pytest.mark.asyncio
 async def test_an_unexpected_garmin_error_names_the_status_and_endpoint(api, garmin):  # noqa: F811
     headers, _ = await register(api, "gerror")
+    garmin.summaries = {_day(1): summary(_day(1))}
     garmin.failures = {"/sleep-service/sleep/dailySleep": 500}
 
     await connect(api, headers)

@@ -21,7 +21,7 @@ TIMEOUT_SECONDS = 30.0
 ACTIVITY_PAGE_SIZE = 50
 MAX_ACTIVITY_PAGES = 40  # hard stop: 2000 activities in one sync window is far beyond normal use
 # Garmin publishes no limits and may throttle without notice, so data calls are spaced out.
-REQUEST_PAUSE_SECONDS = 0.25
+REQUEST_PAUSE_SECONDS = 0.5
 
 JsonValue = dict[str, Any] | list[Any] | None
 

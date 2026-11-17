@@ -82,12 +82,6 @@ def _chunks(start: date, end: date, size: int) -> Iterator[tuple[date, date]]:
         start = chunk_end + timedelta(days=1)
 
 
-def _days(start: date, end: date) -> Iterator[date]:
-    while start <= end:
-        yield start
-        start += timedelta(days=1)
-
-
 class GarminSyncService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -291,12 +285,16 @@ async def _sync_weight(db: AsyncSession, user_id: str, api: GarminPersonalApiCli
 
 
 async def _fetch_health(api: GarminPersonalApiClient, start: date, end: date) -> list[ParsedHealthDay]:
-    """Every health value Garmin has for the dates, merged into one day per date."""
+    """Every health value Garmin has for the dates, merged into one day per date.
+
+    Sleep and SpO2 cost one call per day, so they are read only for dates that have a daily summary:
+    a day the watch recorded nothing has no sleep either. This keeps a first sync for a new watch short.
+    """
     summaries = health_mapping.summary_days(await api.daily_summaries(start, end))
     hrv = health_mapping.hrv_days(await api.daily_hrv(start, end))
     sleep: dict[date, health_mapping.DayValues] = {}
     spo2: dict[date, health_mapping.DayValues] = {}
-    for day in _days(start, end):
+    for day in sorted(d for d, values in summaries.items() if values and start <= d <= end):
         sleep[day] = health_mapping.sleep_values(await api.daily_sleep(day))
         spo2[day] = health_mapping.spo2_values(await api.daily_spo2(day))
     return health_mapping.merge_days(summaries, hrv, sleep, spo2)
