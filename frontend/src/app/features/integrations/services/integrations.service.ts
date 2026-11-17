@@ -323,9 +323,14 @@ export interface GarminConnectionStatus {
   last_sync_at: string | null;
   last_sync_message: string | null;
   last_sync_ok: boolean | null;
-  /** Last date whose data is fully pulled; null before the first sync. */
+  /** Last date whose health data is fully pulled; null before the first sync. */
   synced_through: string | null;
+  /** Same for activities; Health and Running can each sync only their own part. */
+  activities_synced_through: string | null;
 }
+
+/** What a Garmin sync pulls: everything (Integrations), health data (Health) or activities (Running). */
+export type GarminSyncScope = 'all' | 'health' | 'activities';
 
 export type GoogleCalendarSyncDirection = 'google_to_lifeos' | 'two_way';
 
@@ -492,8 +497,8 @@ export class IntegrationsService {
   }
 
   /** Without `months` the sync continues from the last synced day. */
-  syncGarmin(months: GarminSyncMonths | null = null): Observable<ImportJob> {
-    return this.http.post<ImportJob>(`${this.api}/garmin/sync`, months ? { months } : {});
+  syncGarmin(months: GarminSyncMonths | null = null, scope: GarminSyncScope = 'all'): Observable<ImportJob> {
+    return this.http.post<ImportJob>(`${this.api}/garmin/sync`, months ? { months, scope } : { scope });
   }
 
   getGoogleMaps(): Observable<GoogleMapsConfigStatus> {

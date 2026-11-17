@@ -15,6 +15,7 @@ import tempfile
 from collections.abc import Iterator
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -28,7 +29,13 @@ from app.modules.health.repository import HealthRepository
 from app.modules.health.service import HealthService
 from app.modules.integrations.garmin import health_mapping
 from app.modules.integrations.garmin.archive import ArchiveBudget, ArchiveError, ArchiveLimits, iter_fit_entries
-from app.modules.integrations.garmin.connection_config import DISPLAY_NAME, PROVIDER, parse_config, serialize_config
+from app.modules.integrations.garmin.connection_config import (
+    DISPLAY_NAME,
+    PROVIDER,
+    GarminConfig,
+    parse_config,
+    serialize_config,
+)
 from app.modules.integrations.garmin.import_service import (
     REASON_NOT_SAVED,
     JobOutcome,
@@ -42,7 +49,7 @@ from app.modules.integrations.garmin.import_service import (
 from app.modules.integrations.garmin.models import JOB_FINISHED, ORIGIN_SYNC, GarminImportJob
 from app.modules.integrations.garmin.personal_api import GarminApiError, GarminPersonalApiClient, exchange_key
 from app.modules.integrations.garmin.repository import GarminImportRepository
-from app.modules.integrations.garmin.schemas import GarminConnectionStatus
+from app.modules.integrations.garmin.schemas import GarminConnectionStatus, SyncScope
 from app.modules.integrations.garmin.upload_validation import classify_upload
 from app.modules.integrations.repository import IntegrationRepository
 from app.modules.integrations.schemas import IntegrationUpdate
@@ -53,6 +60,9 @@ DEFAULT_SYNC_MONTHS = 1  # a first sync without a chosen range stays short
 OVERLAP_DAYS = 2  # re-read recent days: Garmin fills in the last day or two after the watch syncs
 HEALTH_CHUNK_DAYS = 7
 RANGE_RECENT = "recent"
+SCOPE_ALL: SyncScope = "all"
+SCOPE_HEALTH: SyncScope = "health"
+SCOPE_ACTIVITIES: SyncScope = "activities"
 
 REASON_NOT_CONNECTED = "Garmin is not connected"
 REASON_KEY_REFUSED = "Garmin refused the key. It may have expired or been deleted; add a new key."
@@ -91,6 +101,11 @@ def _window_start(today: date, synced_through: date | None, months: int | None) 
     return _months_before(today, DEFAULT_SYNC_MONTHS)
 
 
+def _cursor(cfg: GarminConfig, scope: SyncScope) -> date | None:
+    """The day the scope's data is synced through; a full sync follows the health cursor."""
+    return cfg.activities_synced_through if scope == SCOPE_ACTIVITIES else cfg.synced_through
+
+
 def _range_mode(months: int | None, synced_through: date | None) -> str:
     if months:
         return f"{months}m"
@@ -123,6 +138,7 @@ class GarminSyncService:
             last_sync_message=cfg.last_sync_message,
             last_sync_ok=cfg.last_sync_ok,
             synced_through=cfg.synced_through,
+            activities_synced_through=cfg.activities_synced_through,
         )
 
     async def save_key(self, user_id: str, api_key: str) -> GarminConnectionStatus:
@@ -152,40 +168,53 @@ class GarminSyncService:
             await self.repo.delete(conn)
 
     async def start_sync(
-        self, user_id: str, factory: async_sessionmaker, months: int | None = None
+        self,
+        user_id: str,
+        factory: async_sessionmaker,
+        months: int | None = None,
+        scope: SyncScope = SCOPE_ALL,
     ) -> GarminImportJob:
         """Create a sync job, commit it, and run it in the background."""
-        job = await self.create_job(user_id, months)
+        job = await self.create_job(user_id, months, scope)
         await self.db.commit()  # the background task must be able to see the row
-        start_background(run_sync(factory, job.id, user_id, months), f"garmin-sync-{job.id}")
+        start_background(run_sync(factory, job.id, user_id, months, scope), f"garmin-sync-{job.id}")
         return job
 
-    async def create_job(self, user_id: str, months: int | None = None) -> GarminImportJob:
+    async def create_job(
+        self, user_id: str, months: int | None = None, scope: SyncScope = SCOPE_ALL
+    ) -> GarminImportJob:
         conn = await self.repo.get_by_provider(user_id, PROVIDER)
         cfg = parse_config(conn.config_json if conn else None)
         if conn is None or not conn.enabled or not cfg.connected:
             raise BadRequestError("Connect Garmin with a personal API key first")
         if await self.jobs.has_active(user_id):
             raise ConflictError("An import is already running")
-        return await self.jobs.create(user_id, _range_mode(months, cfg.synced_through), ORIGIN_SYNC)
+        return await self.jobs.create(user_id, _range_mode(months, _cursor(cfg, scope)), ORIGIN_SYNC)
 
 
-async def run_sync(factory: async_sessionmaker, job_id: str, user_id: str, months: int | None = None) -> JobOutcome:
+async def run_sync(
+    factory: async_sessionmaker,
+    job_id: str,
+    user_id: str,
+    months: int | None = None,
+    scope: SyncScope = SCOPE_ALL,
+) -> JobOutcome:
     """Background entry point for one sync; records the outcome on the connection afterwards.
 
-    `months` re-reads that many months back; without it the sync continues from the last synced day.
+    `months` re-reads that many months back; without it each part continues from its last synced day.
+    `scope` limits the sync to health data or to activities.
     """
     settings = get_settings()
     outcome = await run_job(
         factory,
         job_id,
         user_id,
-        lambda db, repo, progress: _sync(db, repo, job_id, user_id, months, progress, settings),
+        lambda db, repo, progress: _sync(db, repo, job_id, user_id, months, scope, progress, settings),
         label="sync",
     )
     try:
         async with factory() as db:
-            await _record_outcome(db, user_id, outcome)
+            await _record_outcome(db, user_id, outcome, scope)
             await db.commit()
     except Exception:
         logger.exception("Could not record the Garmin sync outcome for user=%s", user_id)
@@ -203,6 +232,7 @@ async def _sync(
     job_id: str,
     user_id: str,
     months: int | None,
+    scope: SyncScope,
     progress: Progress,
     settings: Settings,
 ) -> None:
@@ -211,30 +241,50 @@ async def _sync(
     if conn is None or not cfg.connected:
         raise JobStopped(REASON_NOT_CONNECTED)
     today = await _user_today(db, user_id)
-    start = _window_start(today, cfg.synced_through, months)
     try:
         token = await exchange_key(cfg.api_key)
         async with GarminPersonalApiClient(token) as api:
-            await _sync_activities(db, repo, job_id, user_id, api, start, today, progress, settings)
-            await _sync_weight(db, user_id, api, start, today)
-            await db.commit()
-            for chunk_start, chunk_end in _chunks(start, today, HEALTH_CHUNK_DAYS):
-                days = await _fetch_health(api, chunk_start, chunk_end)
-                await HealthService(db).bulk_upsert_days(user_id, SOURCE_GARMIN, days)
-                progress.health_days += len(days)
-                await _save_cursor(db, user_id, chunk_end)
-                await repo.update_fields(job_id, **progress.as_values())
+            if scope != SCOPE_HEALTH:
+                start = _window_start(today, cfg.activities_synced_through, months)
+                await _sync_activities(db, repo, job_id, user_id, api, start, today, progress, settings)
+                await _save_cursor(db, user_id, activities_synced_through=today)
                 await db.commit()
+            if scope != SCOPE_ACTIVITIES:
+                start = _window_start(today, cfg.synced_through, months)
+                await _sync_health(db, repo, job_id, user_id, api, start, today, progress)
     except GarminApiError as exc:
         logger.warning("Garmin sync stopped for user=%s status=%s path=%s", user_id, exc.status_code, exc.path)
         raise JobStopped(_reason(exc)) from exc
 
 
-async def _save_cursor(db: AsyncSession, user_id: str, synced_through: date) -> None:
+async def _save_cursor(db: AsyncSession, user_id: str, **cursor: Any) -> None:
+    """`synced_through=` (health) or `activities_synced_through=`."""
     conn = await IntegrationRepository(db).get_by_provider(user_id, PROVIDER)
     if conn is not None:
-        conn.config_json = serialize_config(conn.config_json, synced_through=synced_through)
+        conn.config_json = serialize_config(conn.config_json, **cursor)
         await db.flush()
+
+
+async def _sync_health(
+    db: AsyncSession,
+    repo: GarminImportRepository,
+    job_id: str,
+    user_id: str,
+    api: GarminPersonalApiClient,
+    start: date,
+    end: date,
+    progress: Progress,
+) -> None:
+    """Weight, then health days a week at a time; the cursor moves after each stored week."""
+    await _sync_weight(db, user_id, api, start, end)
+    await db.commit()
+    for chunk_start, chunk_end in _chunks(start, end, HEALTH_CHUNK_DAYS):
+        days = await _fetch_health(api, chunk_start, chunk_end)
+        await HealthService(db).bulk_upsert_days(user_id, SOURCE_GARMIN, days)
+        progress.health_days += len(days)
+        await _save_cursor(db, user_id, synced_through=chunk_end)
+        await repo.update_fields(job_id, **progress.as_values())
+        await db.commit()
 
 
 async def _sync_activities(
@@ -326,17 +376,21 @@ async def _fetch_health(api: GarminPersonalApiClient, start: date, end: date) ->
     return health_mapping.merge_days(summaries, hrv, sleep, spo2)
 
 
-def _outcome_message(outcome: JobOutcome) -> str:
+def _outcome_message(outcome: JobOutcome, scope: SyncScope) -> str:
     if outcome.status != JOB_FINISHED:
         return outcome.error or "The sync stopped unexpectedly"
     p = outcome.progress
-    parts = [f"{p.created} new activit{'y' if p.created == 1 else 'ies'}", f"{p.health_days} health days"]
+    parts = []
+    if scope != SCOPE_HEALTH:
+        parts.append(f"{p.created} new activit{'y' if p.created == 1 else 'ies'}")
+    if scope != SCOPE_ACTIVITIES:
+        parts.append(f"{p.health_days} health days")
     if p.failed:
         parts.append(f"{p.failed} failed")
     return "Synced " + ", ".join(parts) + "."
 
 
-async def _record_outcome(db: AsyncSession, user_id: str, outcome: JobOutcome) -> None:
+async def _record_outcome(db: AsyncSession, user_id: str, outcome: JobOutcome, scope: SyncScope) -> None:
     """Show the result on the connection. A refused key also pauses the daily sync and notifies once."""
     repo = IntegrationRepository(db)
     conn = await repo.get_by_provider(user_id, PROVIDER)
@@ -345,7 +399,7 @@ async def _record_outcome(db: AsyncSession, user_id: str, outcome: JobOutcome) -
     ok = outcome.status == JOB_FINISHED
     key_refused = outcome.error == REASON_KEY_REFUSED
     conn.config_json = serialize_config(
-        conn.config_json, last_sync_message=_outcome_message(outcome), last_sync_ok=ok
+        conn.config_json, last_sync_message=_outcome_message(outcome, scope), last_sync_ok=ok
     )
     conn.status = STATUS_SYNCED if ok else STATUS_ERROR
     if ok:

@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { GarminSyncComponent } from '../integrations/components/garmin-sync.component';
 import { HealthBodyTabComponent } from './components/health-body-tab.component';
 import { HealthDayFormComponent } from './components/health-day-form.component';
 import { HealthSleepTabComponent } from './components/health-sleep-tab.component';
@@ -26,6 +27,7 @@ const TABS: { id: HealthTab; label: string }[] = [
     HealthSleepTabComponent,
     HealthBodyTabComponent,
     HealthDayFormComponent,
+    GarminSyncComponent,
   ],
   template: `
     <div class="space-y-4">
@@ -41,7 +43,8 @@ const TABS: { id: HealthTab; label: string }[] = [
             >{{ tab.label }}</button>
           }
         </div>
-        <div class="flex shrink-0 gap-2 pb-1">
+        <div class="flex flex-wrap justify-end items-start gap-2 pb-1">
+          <app-garmin-sync scope="health" [alignEnd]="true" (finished)="refresh.update(bump)" />
           <button type="button" class="btn-primary text-xs" data-testid="health-log-day-button" (click)="dayFormOpen.set(true)">Log a day</button>
         </div>
       </div>
@@ -99,8 +102,9 @@ export class HealthPageComponent implements OnInit {
   readonly catalogue = signal<MetricInfo[]>([]);
   readonly catalogueError = signal('');
   readonly dayFormOpen = signal(false);
-  /** Bumped after a day is saved so the visible tab reloads. */
+  /** Bumped after a day is saved or a Garmin sync ends so the visible tab reloads. */
   readonly refresh = signal(0);
+  readonly bump = (n: number): number => n + 1;
 
   ngOnInit(): void {
     const tab = this.route.snapshot.queryParamMap.get('tab');
@@ -123,6 +127,6 @@ export class HealthPageComponent implements OnInit {
 
   onSaved(): void {
     this.dayFormOpen.set(false);
-    this.refresh.update((n) => n + 1);
+    this.refresh.update(this.bump);
   }
 }

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 ImportRange = Literal["12m", "all"]
 SyncMonths = Literal[1, 3, 6, 9, 12]
+SyncScope = Literal["all", "health", "activities"]
 
 
 class ImportFileError(BaseModel):
@@ -55,9 +56,13 @@ class GarminKeyUpdate(BaseModel):
 
 
 class GarminSyncRequest(BaseModel):
-    """`months` re-reads that many months back; without it the sync continues from where the last one stopped."""
+    """`months` re-reads that many months back; without it the sync continues from where the last one stopped.
+
+    `scope` limits the sync to health data (Health page) or activities (Running page).
+    """
 
     months: SyncMonths | None = None
+    scope: SyncScope = "all"
 
 
 class GarminConnectionStatus(BaseModel):
@@ -70,3 +75,4 @@ class GarminConnectionStatus(BaseModel):
     last_sync_message: str | None = None
     last_sync_ok: bool | None = None
     synced_through: date | None = None
+    activities_synced_through: date | None = None

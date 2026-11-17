@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ConfirmService } from '../../shared/confirm/confirm.service';
+import { GarminSyncComponent } from '../integrations/components/garmin-sync.component';
 import { RunningBestsTabComponent } from './components/running-bests-tab.component';
 import { RunningEventsTabComponent } from './components/running-events-tab.component';
 import { RunningGoalsTabComponent } from './components/running-goals-tab.component';
@@ -35,6 +36,7 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats' | 's
     RunningStatsTabComponent,
     RunningImportDialogComponent,
     RunningSyncLogTabComponent,
+    GarminSyncComponent,
   ],
   template: `
     <div class="space-y-4">
@@ -93,7 +95,8 @@ type RunningTab = 'runs' | 'events' | 'bests' | 'goals' | 'shoes' | 'stats' | 's
             >{{ tab.label }}</button>
           }
         </div>
-        <div class="flex shrink-0 gap-2 pb-1">
+        <div class="flex flex-wrap justify-end items-start gap-2 pb-1">
+          <app-garmin-sync scope="activities" [alignEnd]="true" (finished)="load()" />
           <button type="button" class="btn-secondary text-xs" data-testid="running-import-button" (click)="importOpen.set(true)">Import</button>
           <a routerLink="/running/races/new" class="btn-secondary text-xs no-underline">Add Event</a>
           <a routerLink="/running/new" class="btn-primary text-xs no-underline">Log Run</a>

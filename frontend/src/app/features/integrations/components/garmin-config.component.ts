@@ -1,23 +1,21 @@
 import { DatePipe } from '@angular/common';
-import { Component, Input, OnDestroy, OnInit, inject, output, signal } from '@angular/core';
+import { Component, Input, OnInit, inject, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { apiErrorMessage } from '../../../core/utils/http';
 import { ConfirmService } from '../../../shared/confirm/confirm.service';
 import { SecretInputComponent } from '../../../shared/secret-input/secret-input.component';
-import { isJobActive, jobSummary } from '../../running/activity.utils';
-import { GarminSyncMonths, ImportJob } from '../../running/models/activity.models';
+import { GarminSyncMonths } from '../../running/models/activity.models';
 import { ActivityService } from '../../running/services/activity.service';
 import { GarminConnectionStatus, IntegrationsService } from '../services/integrations.service';
+import { GARMIN_SYNC_MONTHS, GarminSyncComponent, garminMonthsLabel } from './garmin-sync.component';
 
-const REFRESH_MS = 3000;
-const SYNC_MONTHS: readonly GarminSyncMonths[] = [1, 3, 6, 9, 12];
 export const GARMIN_TOKEN_PAGE = 'https://connect.garmin.com/app/settings/personalApiToken';
 
 /** Garmin Personal API: add the key, see the last sync, sync now, or remove the key. */
 @Component({
   selector: 'app-garmin-config',
   standalone: true,
-  imports: [DatePipe, FormsModule, SecretInputComponent],
+  imports: [DatePipe, FormsModule, SecretInputComponent, GarminSyncComponent],
   host: { class: 'contents' },
   template: `
     <div id="garmin" class="panel text-sm" data-testid="garmin-card">
@@ -43,36 +41,12 @@ export const GARMIN_TOKEN_PAGE = 'https://connect.garmin.com/app/settings/person
           </p>
         }
         @if (c.connected) {
-          <div class="flex flex-wrap items-center gap-2 mt-2">
-            <select
-              class="input-field text-xs !w-auto"
-              aria-label="What to sync"
-              data-testid="garmin-sync-range"
-              [(ngModel)]="syncMonths"
-              [disabled]="busy() || syncing()"
-            >
-              @if (c.synced_through) {
-                <option [ngValue]="null">Since last sync</option>
-              }
-              @for (m of monthOptions; track m) {
-                <option [ngValue]="m">{{ monthsLabel(m) }}</option>
-              }
-            </select>
-            <button type="button" class="btn-primary text-xs" data-testid="garmin-sync-button" [disabled]="busy() || syncing()" (click)="syncNow()">
-              {{ syncing() ? 'Syncing…' : 'Sync now' }}
+          <div class="flex flex-wrap items-start gap-2 mt-2">
+            <app-garmin-sync [showResult]="false" (syncingChange)="syncing.set($event)" (finished)="load()" />
+            <button type="button" class="text-xs mt-1" style="color: var(--danger)" [disabled]="busy() || syncing()" (click)="remove()">
+              Remove key
             </button>
-            <button type="button" class="text-xs" style="color: var(--danger)" [disabled]="busy()" (click)="remove()">Remove key</button>
           </div>
-          @if (job(); as j) {
-            @if (syncing()) {
-              <p class="text-xs mt-1" style="color: var(--text-muted)" data-testid="garmin-progress">
-                {{ summaryOf(j) }}
-                @if (c.synced_through) {
-                  <span> · checked up to {{ c.synced_through | date: 'mediumDate' }}</span>
-                }
-              </p>
-            }
-          }
         }
       }
 
@@ -86,7 +60,7 @@ export const GARMIN_TOKEN_PAGE = 'https://connect.garmin.com/app/settings/person
           <li>Paste it below, choose how far back to pull (1 to 12 months) and choose Save and sync. More months take longer.</li>
           <li>
             After that LifeOS syncs new days once a day (late morning). Sync now does the same, or re-reads 1 to 12 months
-            if you pick a range.
+            if you pick a range. Health and Running have their own Sync Garmin button for just their data.
           </li>
           <li>Runs appear in Running, health data in Health. Synced data is not used by AI features.</li>
         </ol>
@@ -120,7 +94,7 @@ export const GARMIN_TOKEN_PAGE = 'https://connect.garmin.com/app/settings/person
     </div>
   `,
 })
-export class GarminConfigComponent implements OnInit, OnDestroy {
+export class GarminConfigComponent implements OnInit {
   private readonly integrations = inject(IntegrationsService);
   private readonly activities = inject(ActivityService);
   private readonly confirm = inject(ConfirmService);
@@ -131,28 +105,19 @@ export class GarminConfigComponent implements OnInit, OnDestroy {
   readonly connectionsChanged = output<void>();
 
   readonly tokenPage = GARMIN_TOKEN_PAGE;
-  readonly monthOptions = SYNC_MONTHS;
+  readonly monthOptions = GARMIN_SYNC_MONTHS;
+  readonly monthsLabel = garminMonthsLabel;
+  private readonly syncControl = viewChild(GarminSyncComponent);
   readonly config = signal<GarminConnectionStatus | null>(null);
-  readonly job = signal<ImportJob | null>(null);
   readonly syncing = signal(false);
   readonly busy = signal(false);
   readonly message = signal<string | null>(null);
   readonly ok = signal(false);
   keyInput = '';
   firstSyncMonths: GarminSyncMonths = 1;
-  /** null: continue from the last synced day. */
-  syncMonths: GarminSyncMonths | null = null;
-
-  summaryOf = jobSummary;
-  private timer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit(): void {
     this.load();
-    this.watchLatestJob();
-  }
-
-  ngOnDestroy(): void {
-    this.clearTimer();
   }
 
   statusLabel(): string {
@@ -163,10 +128,6 @@ export class GarminConfigComponent implements OnInit, OnDestroy {
     return 'Not connected';
   }
 
-  monthsLabel(months: GarminSyncMonths): string {
-    return months === 1 ? 'Last 1 month' : `Last ${months} months`;
-  }
-
   keyPlaceholder(): string {
     const masked = this.config()?.key_masked;
     return masked ? `Saved: ${masked} (paste a new key to replace it)` : 'Paste your Garmin personal API key';
@@ -174,11 +135,7 @@ export class GarminConfigComponent implements OnInit, OnDestroy {
 
   load(): void {
     this.integrations.getGarmin().subscribe({
-      next: (status) => {
-        this.config.set(status);
-        // "Since last sync" is offered only after a sync has stored data
-        if (!status.synced_through && this.syncMonths === null) this.syncMonths = 1;
-      },
+      next: (status) => this.config.set(status),
       error: (err) => this.fail(err, 'Failed to load the Garmin connection'),
     });
   }
@@ -200,21 +157,9 @@ export class GarminConfigComponent implements OnInit, OnDestroy {
         this.message.set('Key saved. The first sync has started.');
         this.busy.set(false);
         this.connectionsChanged.emit();
-        this.watchLatestJob();
+        this.syncControl()?.watchLatestJob(); // a control created by this save follows the sync on its own
       },
       error: (err) => this.fail(err, 'Garmin did not accept this key'),
-    });
-  }
-
-  syncNow(): void {
-    this.message.set(null);
-    this.integrations.syncGarmin(this.syncMonths).subscribe({
-      next: (job) => {
-        this.job.set(job);
-        this.syncing.set(true);
-        this.watchLatestJob();
-      },
-      error: (err) => this.fail(err, 'The sync could not start'),
     });
   }
 
@@ -252,34 +197,9 @@ export class GarminConfigComponent implements OnInit, OnDestroy {
     this.load();
   }
 
-  /** Follow the newest sync-log entry while it runs, then refresh the connection status once. */
-  private watchLatestJob(): void {
-    this.clearTimer();
-    this.activities.listImports({ limit: 1 }).subscribe({
-      next: ({ items }) => {
-        const latest = items[0] ?? null;
-        const running = latest?.origin === 'sync' && isJobActive(latest);
-        this.job.set(latest);
-        if (running) {
-          this.syncing.set(true);
-          this.load(); // the connection's "synced through" date shows how far the sync has got
-          this.timer = setTimeout(() => this.watchLatestJob(), REFRESH_MS);
-        } else if (this.syncing()) {
-          this.syncing.set(false);
-          this.load();
-        }
-      },
-    });
-  }
-
   private fail(err: unknown, fallback: string): void {
     this.ok.set(false);
     this.message.set(apiErrorMessage(err, fallback));
     this.busy.set(false);
-  }
-
-  private clearTimer(): void {
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = null;
   }
 }

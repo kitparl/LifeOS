@@ -118,6 +118,6 @@ async def sync_now(
     db: AsyncSession = Depends(get_db),
     factory: async_sessionmaker = Depends(get_session_factory),
 ):
-    months = data.months if data else None
-    job = await GarminSyncService(db).start_sync(user.id, factory, months)
+    request = data or GarminSyncRequest()
+    job = await GarminSyncService(db).start_sync(user.id, factory, request.months, request.scope)
     return to_response(job)

@@ -15,6 +15,7 @@ const disconnected: GarminConnectionStatus = {
   last_sync_message: null,
   last_sync_ok: null,
   synced_through: null,
+  activities_synced_through: null,
 };
 
 const connected: GarminConnectionStatus = {
@@ -102,7 +103,7 @@ describe('GarminConfigComponent', () => {
     expect(integrations.saveGarminKey).toHaveBeenCalledWith('personal-key-1234', 1);
     expect(cmp.keyInput).toBe('');
     expect(text()).toContain('Key saved. The first sync has started.');
-    expect(activities.listImports).toHaveBeenCalledTimes(2);
+    expect(activities.listImports).toHaveBeenCalledTimes(1); // the sync control appears and follows the first sync
   });
 
   it('sends the chosen first-sync range with the key', () => {
@@ -114,31 +115,6 @@ describe('GarminConfigComponent', () => {
     cmp.save();
 
     expect(integrations.saveGarminKey).toHaveBeenCalledWith('personal-key-1234', 6);
-  });
-
-  it('syncs since the last sync by default, or the chosen months', () => {
-    integrations.getGarmin.and.returnValue(of({ ...connected, synced_through: '2026-11-16' }));
-    integrations.syncGarmin.and.returnValue(of(syncJob({ status: 'finished' })));
-    const { cmp, fixture } = create();
-    const options = Array.from(
-      (fixture.nativeElement.querySelector('[data-testid="garmin-sync-range"]') as HTMLSelectElement).options,
-    ).map((o) => o.textContent?.trim());
-
-    cmp.syncNow();
-    cmp.syncMonths = 3;
-    cmp.syncNow();
-
-    expect(options).toEqual(['Since last sync', 'Last 1 month', 'Last 3 months', 'Last 6 months', 'Last 9 months', 'Last 12 months']);
-    expect(integrations.syncGarmin.calls.allArgs()).toEqual([[null], [3]]);
-  });
-
-  it('offers "Since last sync" only after a sync has stored data', () => {
-    integrations.getGarmin.and.returnValue(of(connected));
-    const { cmp, fixture } = create();
-    const select = fixture.nativeElement.querySelector('[data-testid="garmin-sync-range"]') as HTMLSelectElement;
-
-    expect(Array.from(select.options).map((o) => o.textContent?.trim())).not.toContain('Since last sync');
-    expect(cmp.syncMonths).toBe(1);
   });
 
   it('shows why a key was refused', () => {
@@ -155,20 +131,16 @@ describe('GarminConfigComponent', () => {
     expect(cmp.busy()).toBeFalse();
   });
 
-  it('shows progress while a sync runs and hides the previous result', () => {
-    integrations.getGarmin.and.returnValue(
-      of({ ...connected, last_sync_message: 'Could not reach Garmin.', last_sync_ok: false, synced_through: '2026-03-01' }),
-    );
+  it('hides the previous result while a sync runs', () => {
+    integrations.getGarmin.and.returnValue(of({ ...connected, last_sync_message: 'Could not reach Garmin.', last_sync_ok: false }));
     activities.listImports.and.returnValue(of({ items: [syncJob()], total: 1 }));
     const { cmp, text, fixture } = create();
     fixture.detectChanges();
 
     expect(cmp.syncing()).toBeTrue();
     expect(text()).toContain('Syncing…');
-    expect(text()).toContain('1 imported, 7 health days');
-    expect(text()).toContain('checked up to Mar 1, 2026');
     expect(text()).not.toContain('Could not reach Garmin.');
-    cmp.ngOnDestroy();
+    fixture.destroy();
   });
 
   it('removes the key and keeps the data when the second question is declined', async () => {

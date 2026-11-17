@@ -14,6 +14,7 @@ from app.core.timezone import utc_now
 from app.modules.health.contracts import SOURCE_GARMIN
 from app.modules.health.models import HealthDay, HealthMeasurement
 from app.modules.integrations.garmin import health_mapping, personal_api
+from app.modules.integrations.garmin.connection_config import parse_config, serialize_config
 from app.modules.integrations.garmin.import_service import wait_for_imports
 from app.modules.integrations.garmin.sync_service import (
     OVERLAP_DAYS,
@@ -130,6 +131,10 @@ class FakeGarmin:
     def sleep_dates(self) -> list[str]:
         return [c.split("date=")[1] for c in self.calls if c.startswith("/sleep-service/sleep/dailySleep")]
 
+    def activity_search_starts(self) -> list[str]:
+        prefix = "/activitylist-service/activities/search/activities?"
+        return [parse_qs(c[len(prefix) :])["startDate"][0] for c in self.calls if c.startswith(prefix)]
+
     def summary_starts(self) -> list[str]:
         prefix = "/usersummary-service/v2/dailysummaries?"
         return [parse_qs(c[len(prefix) :])["startDate"][0] for c in self.calls if c.startswith(prefix)]
@@ -155,6 +160,21 @@ async def connect(client, headers, key: str = KEY, months: int | None = None):
 
 async def jobs_of(client, headers) -> list[dict]:
     return (await client.get(IMPORTS, headers=headers)).json()
+
+
+async def sync(client, headers, **body) -> dict:
+    response = await client.post(SYNC, headers=headers, json=body)
+    assert response.status_code == 202, response.text
+    await wait_for_imports()
+    return (await jobs_of(client, headers))[0]
+
+
+async def set_cursors(client, user_id: str, **cursors: date) -> None:
+    async with client.session_factory() as db:
+        conn = (await db.execute(select(IntegrationConnection).where(
+            IntegrationConnection.user_id == user_id, IntegrationConnection.provider == "garmin"))).scalar_one()
+        conn.config_json = serialize_config(conn.config_json, **cursors)
+        await db.commit()
 
 
 # --- Mapping (pure) ---------------------------------------------------------------------------
@@ -308,6 +328,56 @@ async def test_only_the_offered_ranges_are_accepted(api, garmin):  # noqa: F811
     assert (await api.put(CONNECTION, headers=headers, json={"api_key": KEY, "months": 2})).status_code == 422
     await connect(api, headers)
     assert (await api.post(SYNC, headers=headers, json={"months": 24})).status_code == 422
+    assert (await api.post(SYNC, headers=headers, json={"scope": "runs"})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_a_health_sync_pulls_only_health_data_and_keeps_the_activity_cursor(api, garmin):  # noqa: F811
+    headers, user_id = await register(api, "ghealthonly")
+    await connect(api, headers)
+    await set_cursors(api, user_id, synced_through=_day(10), activities_synced_through=_day(10))
+    garmin.activities = [(9401, _day(2), zip_of({"h.fit": fit(9401, days_ago=2)}))]
+    garmin.summaries = {_day(2): summary(_day(2))}
+    garmin.calls.clear()
+
+    job = await sync(api, headers, scope="health")
+
+    assert (job["status"], job["files_found"], job["health_days"]) == ("finished", 0, 1)
+    assert garmin.activity_search_starts() == [] and await runs_of(api, headers) == []
+    assert garmin.summary_starts()[0] == _day(10 + OVERLAP_DAYS).isoformat()
+    status = (await api.get(CONNECTION, headers=headers)).json()
+    assert status["activities_synced_through"] == _day(10).isoformat()
+    assert status["last_sync_message"] == "Synced 1 health days."
+
+    garmin.calls.clear()
+    job = await sync(api, headers, scope="activities")  # Running resumes where it stopped, not where Health did
+
+    assert (job["status"], job["created"], job["health_days"]) == ("finished", 1, 0)
+    assert garmin.activity_search_starts() == [_day(10 + OVERLAP_DAYS).isoformat()]
+    assert garmin.summary_starts() == [] and garmin.sleep_dates() == []
+    status = (await api.get(CONNECTION, headers=headers)).json()
+    assert status["synced_through"] == utc_now().date().isoformat()
+    assert status["last_sync_message"] == "Synced 1 new activity."
+
+
+@pytest.mark.asyncio
+async def test_an_activity_sync_with_a_range_leaves_health_alone(api, garmin):  # noqa: F811
+    headers, user_id = await register(api, "gactrange")
+    await connect(api, headers)
+    await set_cursors(api, user_id, synced_through=_day(5))
+    garmin.calls.clear()
+
+    job = await sync(api, headers, scope="activities", months=3)
+
+    assert (job["range_mode"], job["status"]) == ("3m", "finished")
+    assert garmin.activity_search_starts() == [_months_ago(3).isoformat()]
+    assert garmin.summary_starts() == []
+    assert (await api.get(CONNECTION, headers=headers)).json()["synced_through"] == _day(5).isoformat()
+
+
+def test_a_config_stored_before_the_split_uses_one_cursor_for_both():
+    cfg = parse_config(json.dumps({"synced_through": "2026-10-01"}))
+    assert (cfg.synced_through, cfg.activities_synced_through) == (date(2026, 10, 1), date(2026, 10, 1))
 
 
 @pytest.mark.asyncio
