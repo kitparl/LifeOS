@@ -118,6 +118,8 @@ export interface RunCaseResult {
   ms: number | null;
   error: string | null;
   is_custom: boolean;
+  /** Why a custom case wasn't checked against the reference solution (null when it was, or for examples). */
+  unchecked_reason: string | null;
 }
 
 export interface RunResult {

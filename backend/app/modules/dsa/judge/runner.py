@@ -59,6 +59,12 @@ class Runner:
             if artifact_id is not None:
                 await self._client.delete_file(artifact_id)
 
+    async def run_reference(self, files: dict[str, str], inputs: list[object], limits: Limits) -> RunOutcome:
+        """Run a ready-made Python program (the reference solution) over `inputs`."""
+        lang = LANGUAGES["python"]
+        copy_in: dict[str, str | CachedFile] = {**files, "tests.json": json.dumps(inputs, separators=(",", ":"))}
+        return _run_outcome(await self._client.run(self._run_command(lang, limits, len(inputs), copy_in)))
+
     async def _compile(self, lang: LanguageSpec, files: dict[str, str]) -> tuple[CompileOutcome, str | None]:
         assert lang.compile_args is not None and lang.artifact is not None
         result = await self._client.run(

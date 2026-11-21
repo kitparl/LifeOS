@@ -208,7 +208,10 @@ def fake_news():
 
 @pytest_asyncio.fixture
 async def client():
-    engine = create_async_engine(TEST_DB, echo=False)
+    # In-memory SQLite uses one connection shared by every session (StaticPool). Its default
+    # rollback-on-return would let any session that closes wipe another session's flushed but
+    # uncommitted writes (e.g. concurrent DSA judge workers); real databases isolate sessions.
+    engine = create_async_engine(TEST_DB, echo=False, pool_reset_on_return=None)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

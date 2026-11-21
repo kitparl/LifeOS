@@ -231,7 +231,7 @@ export function actionErrorMessage(err: unknown): string {
                     <p class="text-xs" style="color: var(--text-muted)">Queued…</p>
                   } @else if (!actionError()) {
                     <p class="text-xs" style="color: var(--text-faint)">
-                      Run executes your test cases and checks the ones that match an example. Submit checks every test.
+                      Run executes your test cases and checks them against the examples or our reference solution. Submit checks every test.
                     </p>
                   }
                 </div>

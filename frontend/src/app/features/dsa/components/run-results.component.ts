@@ -19,7 +19,7 @@ import { VerdictBadgeComponent } from './verdict-badge.component';
           <app-dsa-verdict-badge [verdict]="verdict()" />
           @if (checked().total > 0) {
             <span class="text-xs" style="color: var(--text-muted)" data-testid="dsa-run-summary">
-              {{ checked().passed }}/{{ checked().total }} example cases passed
+              {{ checked().passed }}/{{ checked().total }} cases passed
             </span>
           }
         }
@@ -42,7 +42,7 @@ import { VerdictBadgeComponent } from './verdict-badge.component';
               <span class="badge badge--danger">Failed</span>
             }
             @if (c.is_custom) {
-              <span class="chip !py-0 text-[0.6875rem]" title="Not one of the examples, so there's no expected output to check against">Custom</span>
+              <span class="chip !py-0 text-[0.6875rem]" [attr.title]="c.passed !== null ? 'Expected output from our reference solution' : null">Custom</span>
             }
             @if (c.ms !== null) {
               <span style="color: var(--text-muted)">{{ c.ms.toFixed(1) }} ms</span>
@@ -50,8 +50,11 @@ import { VerdictBadgeComponent } from './verdict-badge.component';
           </div>
           <div style="color: var(--text-muted)">Input</div>
           <app-dsa-test-input class="block pl-3" [signature]="signature()" [value]="c.input" />
-          @if (!c.is_custom) {
+          @if (c.passed !== null) {
             <div><span style="color: var(--text-muted)">Expected</span> <code class="break-all">{{ json(c.expected) }}</code></div>
+          }
+          @if (c.unchecked_reason) {
+            <div style="color: var(--text-muted)" [attr.data-testid]="'dsa-run-case-unchecked-' + c.index">{{ c.unchecked_reason }}</div>
           }
           @if (c.error) {
             <div class="whitespace-pre-wrap" style="color: var(--danger)">{{ c.error }}</div>
@@ -80,7 +83,7 @@ export class RunResultsComponent {
   readonly signature = input<SignatureSpec | null>(null);
   readonly json = formatJson;
 
-  /** Cases that had an expected output (the examples), and how many of them passed. */
+  /** Cases that were compared (examples, and custom cases checked by the reference), and how many passed. */
   readonly checked = computed(() => {
     const compared = this.result().cases.filter((c) => c.passed !== null);
     return { passed: compared.filter((c) => c.passed).length, total: compared.length };

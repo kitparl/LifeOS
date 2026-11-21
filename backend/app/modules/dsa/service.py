@@ -400,13 +400,14 @@ class DsaJudgeService:
         limits = Limits(problem.time_limit_ms, problem.memory_limit_mb)
         grading = Grading(
             inputs=list(req.inputs),
-            # Only example outputs are known; any other case is run without comparing.
+            # Example outputs are known here; the worker fills custom cases (None) from the reference solution.
             expected=[sample_outputs.get(_json_key(value)) for value in req.inputs],
             per_test_limit_ms=per_test_limit_ms(req.language, limits),
             compare_mode=problem.compare_mode,
             checker=problem.checker,
         )
-        job = RunJob(user_id, req.language, req.code, problem.signature, grading, limits)
+        custom = [value is None for value in grading.expected]
+        job = RunJob(user_id, req.language, req.code, problem.signature, grading, limits, slug=problem.slug, custom=custom)
         queue.enqueue_run(job)
         return schemas.JobAccepted(id=job.id, status=job.status)
 
@@ -430,7 +431,8 @@ class DsaJudgeService:
                     passed=report.passed,
                     ms=report.ms,
                     error=report.error,
-                    is_custom=g.expected[report.index] is None,
+                    is_custom=job.custom[report.index],
+                    unchecked_reason=job.unchecked.get(report.index),
                 )
             )
         return result.model_copy(

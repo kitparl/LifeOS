@@ -35,6 +35,11 @@ class RunJob:
     status: Literal["pending", "running", "done", "error"] = "pending"
     outcome: JudgeOutcome | None = None
     created_at: float = field(default_factory=time.monotonic)
+    slug: str = ""
+    # Per case: True when the input is not an example (its expected output comes from the reference).
+    custom: list[bool] = field(default_factory=list)
+    # Case index -> why a custom case could not be checked.
+    unchecked: dict[int, str] = field(default_factory=dict)
 
     @property
     def finished(self) -> bool:

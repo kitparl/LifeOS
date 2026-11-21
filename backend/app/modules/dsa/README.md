@@ -127,7 +127,9 @@ The sandbox receives test **inputs only**, never expected outputs.
 - If the judge is unreachable or misbehaves, the verdict is **Internal Error**, never Accepted. Progress is left untouched.
 
 **Run** executes exactly the test cases the user sends. The page seeds them from the examples, and the user can edit, add (copying the current case) or delete them. They are saved per problem in the browser.
-A case whose input equals an example input (canonical JSON) is compared with that example's output; any other case is only executed.
+A case whose input equals an example input (canonical JSON) is compared with that example's output.
+Any other (custom) case is compared with the output of the problem's reference solution (`content/references.py`), which runs in the sandbox alongside the user's program.
+That happens only when the problem has a reference in `content/sources` and its signature is unchanged since the seed. Otherwise, or if the reference fails on that input (e.g. one outside the constraints), the case is only executed and the result says why (`unchecked_reason`).
 
 **What a Submit reveals:**
 - The first failing test, sample or hidden: its input, expected output, and the user's output or error. This is a deliberate trade-off for a practice tool: it makes debugging possible, at the cost of letting someone collect hidden tests one failure at a time.

@@ -273,14 +273,14 @@ describe('ProblemDetailPageComponent', () => {
       verdict: 'Accepted',
       message: null,
       failed_case: null,
-      cases: [{ index: 0, input: [[2, 7], 9], expected: [0, 1], actual: [0, 1], passed: true, ms: 1.5, error: null, is_custom: false }],
+      cases: [{ index: 0, input: [[2, 7], 9], expected: [0, 1], actual: [0, 1], passed: true, ms: 1.5, error: null, is_custom: false, unchecked_reason: null }],
       stdout: 'hello',
       stderr: '',
     });
     fixture.detectChanges();
     expect(fixture.componentInstance.consoleTab()).toBe('result');
     expect(el().querySelector('[data-testid="dsa-run-results"]')?.textContent).toContain('hello');
-    expect(el().querySelector('[data-testid="dsa-run-summary"]')?.textContent).toContain('1/1 example cases passed');
+    expect(el().querySelector('[data-testid="dsa-run-summary"]')?.textContent).toContain('1/1 cases passed');
     expect(el().querySelector('[data-testid="dsa-run-case-0"]')?.textContent).toContain('target =');
     expect(fixture.componentInstance.busy()).toBeNull();
     tick(1000);
@@ -292,7 +292,9 @@ describe('ProblemDetailPageComponent', () => {
     fixture.componentInstance.setCases([['[1,2]', '3'], ['[4,5]', '9']]);
     click('dsa-detail-run-button');
     http.expectOne(`${api}/problems/two-sum/run`).flush({ id: 'r1', status: 'pending' });
-    const custom = { input: [[1, 2], 3], expected: null, actual: [0, 1], passed: null, ms: 1, error: null, is_custom: true };
+    const custom = {
+      input: [[1, 2], 3], expected: null, actual: [0, 1], passed: null, ms: 1, error: null, is_custom: true, unchecked_reason: null,
+    };
     http.expectOne(`${api}/runs/r1`).flush({
       id: 'r1', status: 'done', verdict: 'Accepted', message: null, failed_case: null,
       cases: [{ index: 0, ...custom }, { index: 1, ...custom }], stdout: '', stderr: '',
@@ -310,6 +312,30 @@ describe('ProblemDetailPageComponent', () => {
     });
     fixture.detectChanges();
     expect(el().querySelector('[data-testid="dsa-run-stopped-case"]')?.textContent).toContain('stopped on case 2');
+    tick(1000);
+    http.verify();
+  }));
+
+  it('shows a custom case checked by the reference as passed or failed, and why one was not checked', fakeAsync(() => {
+    create();
+    fixture.componentInstance.setCases([['[1,2]', '3'], ['[4,5]', '9']]);
+    click('dsa-detail-run-button');
+    http.expectOne(`${api}/problems/two-sum/run`).flush({ id: 'r1', status: 'pending' });
+    const noReference = "No reference solution for this problem, so this case isn't checked.";
+    http.expectOne(`${api}/runs/r1`).flush({
+      id: 'r1', status: 'done', verdict: 'Wrong Answer', message: null, failed_case: 1, stdout: '', stderr: '',
+      cases: [
+        { index: 0, input: [[1, 2], 3], expected: [0, 1], actual: [1, 0], passed: false, ms: 1, error: null, is_custom: true, unchecked_reason: null },
+        { index: 1, input: [[4, 5], 9], expected: null, actual: [0, 1], passed: null, ms: 1, error: null, is_custom: true, unchecked_reason: noReference },
+      ],
+    });
+    fixture.detectChanges();
+    const case0 = el().querySelector('[data-testid="dsa-run-case-0"]')!;
+    expect(case0.textContent).toContain('Failed');
+    expect(case0.textContent).toContain('Expected');
+    expect(case0.querySelector('[title="Expected output from our reference solution"]')).toBeTruthy();
+    expect(el().querySelector('[data-testid="dsa-run-case-unchecked-1"]')?.textContent).toContain('No reference solution');
+    expect(el().querySelector('[data-testid="dsa-run-summary"]')?.textContent).toContain('0/1 cases passed');
     tick(1000);
     http.verify();
   }));

@@ -124,6 +124,8 @@ class RunCaseResult(BaseModel):
     ms: float | None
     error: str | None
     is_custom: bool
+    # Set when a custom case could not be checked against the reference solution.
+    unchecked_reason: str | None = None
 
 
 class RunResult(BaseModel):

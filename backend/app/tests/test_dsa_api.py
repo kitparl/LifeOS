@@ -18,12 +18,14 @@ from app.modules.dsa import cli as dsa_cli
 from app.modules.dsa import service as dsa_service
 from app.modules.dsa.content.build import PatternSource, build_pattern, render
 from app.modules.dsa.content.model import Example, ProblemSource, function
+from app.modules.dsa.content.sources.p01_two_pointers_b import SUM_OF_SQUARES
 from app.modules.dsa.judge.client import JudgeUnavailableError, SandboxCommand, SandboxResult
 from app.modules.dsa.judge.runner import Runner
+from app.modules.dsa.judge.verdict import CaseResult, RunOutcome
 from app.modules.dsa.models import DsaProblem, DsaSubmission, DsaUserProgress
 from app.modules.dsa.runtime import build_queue, install_queue
 from app.modules.dsa.seeder import seed
-from app.modules.dsa.worker import JudgeWorker
+from app.modules.dsa.worker import NO_REFERENCE, REFERENCE_FAILED, JudgeWorker
 from sqlalchemy import select
 
 CATALOG = {
@@ -104,6 +106,48 @@ async def dsa(client, tmp_path):
         await queue.stop()
     install_queue(None)
     dsa_service.reset_limiters()
+
+
+SQUARES_CATALOG = {
+    "patterns": [
+        *CATALOG["patterns"],
+        {"number": 2, "slug": "extra", "name": "Extra", "week": 1, "description": "Real sources."},
+    ],
+    "problems": [
+        *CATALOG["problems"],
+        {
+            "pattern": 2,
+            "slug": "sum-of-square-numbers",
+            "title": "Sum of Square Numbers",
+            "difficulty": "medium",
+            "tags": [],
+            "order": 0,
+        },
+    ],
+}
+SQUARES = (
+    "import math\nclass Solution:\n    def judgeSquareSum(self, c):\n"
+    "        return any(math.isqrt(c - a * a) ** 2 == c - a * a for a in range(math.isqrt(c) + 1))\n"
+)
+ALWAYS_FALSE = "class Solution:\n    def judgeSquareSum(self, c):\n        return False\n"
+
+
+@pytest.fixture
+async def squares(client, dsa, tmp_path):
+    """Adds the real "Sum of Square Numbers" (it has a reference solution) as pattern 2."""
+    seeds = tmp_path / "squares"
+    seeds.mkdir()
+    (seeds / "catalog.json").write_text(json.dumps(SQUARES_CATALOG))
+    (seeds / "p01-two-pointers.json").write_text(
+        render(build_pattern(PatternSource(1, [SOURCE], "t"), SQUARES_CATALOG))
+    )
+    (seeds / "p02-extra.json").write_text(
+        render(build_pattern(PatternSource(2, [SUM_OF_SQUARES], "t"), SQUARES_CATALOG))
+    )
+    async with client.session_factory() as db:
+        await seed(db, seeds_dir=seeds)
+        await db.commit()
+    return dsa
 
 
 async def _user(client, name: str) -> dict[str, str]:
@@ -262,6 +306,88 @@ async def test_run_wrong_answer_on_example_case(client, dsa):
     result = await _wait(client, f"{BASE}/runs/{started.json()['id']}", h)
     assert result["verdict"] == "Wrong Answer"
     assert [(c["expected"], c["actual"], c["passed"]) for c in result["cases"]] == [(6, 0, False)]
+
+
+async def _run(client, slug: str, code: str, inputs: list, headers) -> dict:
+    started = await client.post(
+        f"{BASE}/problems/{slug}/run", json={"language": "python", "code": code, "inputs": inputs}, headers=headers
+    )
+    assert started.status_code == 202, started.text
+    return await _wait(client, f"{BASE}/runs/{started.json()['id']}", headers)
+
+
+async def test_run_checks_custom_cases_against_the_reference(client, squares):
+    await squares()
+    result = await _run(client, "sum-of-square-numbers", SQUARES, [[5], [2]], await _user(client, "rhea"))
+    assert result["verdict"] == "Accepted"
+    assert [(c["expected"], c["passed"], c["is_custom"], c["unchecked_reason"]) for c in result["cases"]] == [
+        (True, True, False, None),
+        (True, True, True, None),
+    ]
+
+
+async def test_custom_case_failing_the_reference_is_wrong_answer(client, squares):
+    await squares()
+    result = await _run(client, "sum-of-square-numbers", ALWAYS_FALSE, [[2]], await _user(client, "remy"))
+    assert result["verdict"] == "Wrong Answer"
+    assert (result["cases"][0]["expected"], result["cases"][0]["passed"]) == (True, False)
+
+
+async def test_custom_case_the_reference_cannot_handle_stays_unchecked(client, squares):
+    await squares()
+    # math.isqrt(-5) raises inside the reference: the input is outside the constraints.
+    result = await _run(client, "sum-of-square-numbers", ALWAYS_FALSE, [[-5]], await _user(client, "rosa"))
+    assert result["verdict"] == "Accepted"
+    case = result["cases"][0]
+    assert (case["expected"], case["passed"], case["actual"], case["unchecked_reason"]) == (
+        None,
+        None,
+        False,
+        REFERENCE_FAILED,
+    )
+
+
+async def test_custom_cases_without_reference_say_why(client, dsa):
+    await dsa()
+    result = await _run(client, "array-sum", GOOD, [[[10, 20]]], await _user(client, "ruth"))
+    assert result["cases"][0]["unchecked_reason"] == NO_REFERENCE
+
+
+async def test_reference_failure_never_fails_the_run(client, squares, monkeypatch):
+    async def broken(self, files, inputs, limits):
+        raise RuntimeError("reference run blew up")
+
+    monkeypatch.setattr(Runner, "run_reference", broken)
+    await squares()
+    result = await _run(client, "sum-of-square-numbers", SQUARES, [[5], [2]], await _user(client, "rory"))
+    assert result["status"] == "done" and result["verdict"] == "Accepted"
+    assert result["cases"][1]["unchecked_reason"] == REFERENCE_FAILED
+
+
+async def test_reference_output_outside_the_return_type_stays_unchecked(client, squares, monkeypatch):
+    # e.g. Climbing Stairs with n = 90: the reference returns a number no int can hold.
+    async def out_of_type(self, files, inputs, limits):
+        return RunOutcome("Accepted", cases=[CaseResult(0, ok=True, out=4660046610375530309)])
+
+    monkeypatch.setattr(Runner, "run_reference", out_of_type)
+    await squares()
+    result = await _run(client, "sum-of-square-numbers", SQUARES, [[2]], await _user(client, "rene"))
+    assert result["verdict"] == "Accepted"
+    case = result["cases"][0]
+    assert (case["expected"], case["passed"], case["unchecked_reason"]) == (None, None, REFERENCE_FAILED)
+
+
+async def test_example_only_run_skips_the_reference(client, squares, monkeypatch):
+    calls = []
+
+    async def counting(self, files, inputs, limits):
+        calls.append(inputs)
+        raise AssertionError("no reference run expected")
+
+    monkeypatch.setattr(Runner, "run_reference", counting, raising=False)
+    await squares()
+    result = await _run(client, "sum-of-square-numbers", SQUARES, [[5], [3]], await _user(client, "rubi"))
+    assert calls == [] and result["verdict"] == "Accepted"
 
 
 async def test_run_reports_the_case_the_program_stopped_on(client, dsa):

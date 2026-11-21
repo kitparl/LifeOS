@@ -10,13 +10,24 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from dataclasses import replace
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.dsa.content.references import find_reference, reference_program
 from app.modules.dsa.judge.client import JudgeUnavailableError
 from app.modules.dsa.judge.queue import RunJob
 from app.modules.dsa.judge.runner import Limits, Runner, per_test_limit_ms
-from app.modules.dsa.judge.verdict import Grading, JudgeOutcome, Verdict, decide, internal_error
+from app.modules.dsa.judge.signature import ClassSpec, FunctionSpec, SignatureError, parse_spec, validate_expected
+from app.modules.dsa.judge.verdict import (
+    CompileOutcome,
+    Grading,
+    JudgeOutcome,
+    RunOutcome,
+    Verdict,
+    decide,
+    internal_error,
+)
 from app.modules.dsa.models import DsaSubmission, DsaTestCase
 from app.modules.dsa.progress import ProgressState, SubmissionFacts, apply_verdict
 from app.modules.dsa.repository import UNFINISHED, CatalogRepository, SubmissionRepository
@@ -24,6 +35,8 @@ from app.modules.dsa.repository import UNFINISHED, CatalogRepository, Submission
 logger = logging.getLogger(__name__)
 
 MAX_STORED_OUTPUT_BYTES = 64 * 1024
+NO_REFERENCE = "No reference solution for this problem, so this case isn't checked."
+REFERENCE_FAILED = "Couldn't compute the expected output for this input (it may be outside the constraints)."
 
 
 class JudgeWorker:
@@ -45,7 +58,13 @@ class JudgeWorker:
 
     async def judge_run(self, job: RunJob) -> None:
         job.status = "running"
-        job.outcome = await self._grade(job.language, job.spec, job.code, job.grading, job.limits)
+        raw, (expected, unchecked) = await asyncio.gather(
+            self._execute(job.language, job.spec, job.code, job.grading.inputs, job.limits),
+            self._reference_expected(job),
+        )
+        job.grading = replace(job.grading, expected=[expected.get(i, e) for i, e in enumerate(job.grading.expected)])
+        job.unchecked = unchecked
+        job.outcome = raw if isinstance(raw, JudgeOutcome) else self._decide(raw, job.grading)
         job.status = "error" if job.outcome.verdict == Verdict.INTERNAL_ERROR else "done"
 
     async def judge_submission(self, submission_id: str) -> None:
@@ -84,14 +103,54 @@ class JudgeWorker:
             await self._update_progress(submissions, submission, outcome)
             await db.commit()
 
+    async def _reference_expected(self, job: RunJob) -> tuple[dict[int, object], dict[int, str]]:
+        """Expected outputs for the Run's custom cases from the reference solution, and why any are missing.
+
+        Never raises: a reference that can't run leaves those cases unchecked, it never fails the Run.
+        """
+        indices = [i for i, custom in enumerate(job.custom) if custom]
+        if not indices:
+            return {}, {}
+        try:
+            # The first lookup imports every content source; keep it off the event loop.
+            reference = await asyncio.to_thread(find_reference, job.slug, job.spec)
+            if reference is None:
+                return {}, dict.fromkeys(indices, NO_REFERENCE)
+            inputs = [job.grading.inputs[i] for i in indices]
+            run = await self._runner.run_reference(reference_program(reference, job.spec), inputs, job.limits)
+        except Exception:
+            logger.exception("dsa: reference run failed")
+            return {}, dict.fromkeys(indices, REFERENCE_FAILED)
+        outputs = {c.index: c.out for c in run.cases if c.ok}
+        spec = parse_spec(job.spec)
+        expected: dict[int, object] = {}
+        for k, i in enumerate(indices):
+            if k in outputs and _fits_signature(spec, outputs[k], job.grading.inputs[i]):
+                expected[i] = outputs[k]
+        return expected, {i: REFERENCE_FAILED for i in indices if i not in expected}
+
     async def _grade(self, language: str, spec: dict, code: str, grading: Grading, limits: Limits) -> JudgeOutcome:
-        # decide() is inside the try too: an escaping error would leave the job "running" forever
+        raw = await self._execute(language, spec, code, grading.inputs, limits)
+        return raw if isinstance(raw, JudgeOutcome) else self._decide(raw, grading)
+
+    async def _execute(
+        self, language: str, spec: dict, code: str, inputs: list[object], limits: Limits
+    ) -> tuple[CompileOutcome | None, RunOutcome | None] | JudgeOutcome:
+        """Run the user's program; a judge failure comes back as an Internal Error outcome."""
+        try:
+            return await self._runner.run(language, spec, code, inputs, limits)
+        except JudgeUnavailableError:
+            return internal_error(len(inputs), "The judge is unavailable. Please try again shortly.")
+        except Exception:
+            logger.exception("dsa: unexpected judge failure")
+            return internal_error(len(inputs), "Unexpected judge failure.")
+
+    @staticmethod
+    def _decide(raw: tuple[CompileOutcome | None, RunOutcome | None], grading: Grading) -> JudgeOutcome:
+        # Guarded: an escaping error would leave the job "running" forever
         # (a Run would then block the user's next Run until restart).
         try:
-            compiled, run = await self._runner.run(language, spec, code, grading.inputs, limits)
-            return decide(compiled, run, grading)
-        except JudgeUnavailableError:
-            return internal_error(len(grading.inputs), "The judge is unavailable. Please try again shortly.")
+            return decide(*raw, grading)
         except Exception:
             logger.exception("dsa: unexpected judge failure")
             return internal_error(len(grading.inputs), "Unexpected judge failure.")
@@ -115,6 +174,18 @@ class JudgeWorker:
         new_state = apply_verdict(current, facts, best)
         if new_state is not None and new_state != current:
             await submissions.save_progress(submission.user_id, submission.problem_id, new_state)
+
+
+def _fits_signature(spec: FunctionSpec | ClassSpec, output: object, test_input: object) -> bool:
+    """The build's rule for trusting a reference output: it must be a valid expected output.
+
+    Outside the constraints a reference can return what the type can't hold (e.g. an int past 2^31).
+    """
+    try:
+        validate_expected(spec, output, test_input)
+    except SignatureError:
+        return False
+    return True
 
 
 def failed_test(outcome: JudgeOutcome, tests: list[DsaTestCase]) -> dict | None:
