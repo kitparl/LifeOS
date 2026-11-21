@@ -218,6 +218,9 @@ export function problemChanges(p: AdminProblemDetail, f: ProblemForm): ProblemUp
           @if (!p.signature) {
             <p class="text-xs" style="color: var(--text-muted)">Save a signature before adding tests.</p>
           }
+          @if (caseError() && !caseForm()) {
+            <p class="text-sm" role="alert" style="color: var(--danger)" data-testid="dsa-admin-tests-error">{{ caseError() }}</p>
+          }
 
           @if (caseForm(); as c) {
             <form class="panel--flat space-y-2" (ngSubmit)="saveCase()" data-testid="dsa-admin-case-form">
@@ -306,6 +309,14 @@ export class AdminProblemEditorPageComponent implements OnInit {
     });
   }
 
+  /** After a test change: refresh the problem (tests) but keep any unsaved edits in the problem form. */
+  private reloadTests(): void {
+    this.dsa.adminProblem(this.slug).subscribe({
+      next: (p) => this.problem.set(p),
+      error: (err: unknown) => this.caseError.set(serverMessage(err)),
+    });
+  }
+
   private setProblem(p: AdminProblemDetail): void {
     this.form = toForm(p);
     this.problem.set(p);
@@ -370,7 +381,8 @@ export class AdminProblemEditorPageComponent implements OnInit {
     request.subscribe({
       next: () => {
         this.caseForm.set(null);
-        this.load();
+        this.caseError.set(null);
+        this.reloadTests();
       },
       error: (err: unknown) => this.caseError.set(serverMessage(err)),
     });
@@ -379,9 +391,10 @@ export class AdminProblemEditorPageComponent implements OnInit {
   async deleteCase(test: AdminTestCase): Promise<void> {
     const ok = await this.confirm.confirm(`Delete test #${test.position}?`, 'Delete test');
     if (!ok) return;
+    this.caseError.set(null);
     this.dsa.adminDeleteTest(test.id).subscribe({
-      next: () => this.load(),
-      error: (err: unknown) => this.saveError.set(serverMessage(err)),
+      next: () => this.reloadTests(),
+      error: (err: unknown) => this.caseError.set(serverMessage(err)),
     });
   }
 }

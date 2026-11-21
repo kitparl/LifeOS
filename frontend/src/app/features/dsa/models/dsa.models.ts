@@ -125,6 +125,8 @@ export interface RunResult {
   status: JobStatus;
   verdict: string | null;
   message: string | null;
+  /** 1-based; may point at a case missing from `cases` (the program was stopped on it). */
+  failed_case: number | null;
   cases: RunCaseResult[];
   stdout: string;
   stderr: string;

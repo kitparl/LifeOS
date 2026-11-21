@@ -172,6 +172,22 @@ async def test_submit_accepted_updates_progress(client, dsa):
     assert history["total"] == 1 and "code" not in history["items"][0]
 
 
+async def test_parallel_first_submissions_all_finish_and_count(client, dsa):
+    await dsa()  # 2 workers
+    h = await _user(client, "pat")
+    ids = []
+    for _ in range(3):
+        resp = await client.post(
+            f"{BASE}/problems/array-sum/submissions", json={"language": "python", "code": GOOD}, headers=h
+        )
+        ids.append(resp.json()["id"])
+    results = [await _wait(client, f"{BASE}/submissions/{i}", h) for i in ids]
+    assert [r["verdict"] for r in results] == ["Accepted"] * 3
+    async with client.session_factory() as db:
+        progress = (await db.execute(select(DsaUserProgress))).scalar_one()
+    assert progress.attempt_count == 3 and progress.status == "solved"
+
+
 async def test_submit_shows_first_failing_test(client, dsa):
     await dsa()
     h = await _user(client, "carol")
@@ -246,6 +262,24 @@ async def test_run_wrong_answer_on_example_case(client, dsa):
     result = await _wait(client, f"{BASE}/runs/{started.json()['id']}", h)
     assert result["verdict"] == "Wrong Answer"
     assert [(c["expected"], c["actual"], c["passed"]) for c in result["cases"]] == [(6, 0, False)]
+
+
+async def test_run_reports_the_case_the_program_stopped_on(client, dsa):
+    await dsa()
+    h = await _user(client, "dora")
+    crash_on_custom = (
+        "import os\nclass Solution:\n    def arraySum(self, nums):\n"
+        "        if nums == [9]:\n            os._exit(3)\n        return sum(nums)\n"
+    )
+    started = await client.post(
+        f"{BASE}/problems/array-sum/run",
+        json={"language": "python", "code": crash_on_custom, "inputs": [[[5]], [[9]], [[1]]]},
+        headers=h,
+    )
+    result = await _wait(client, f"{BASE}/runs/{started.json()['id']}", h)
+    # The custom case killed the process: it has no result line, but the run still says which case it was.
+    assert result["verdict"] == "Runtime Error" and result["failed_case"] == 2
+    assert [c["index"] for c in result["cases"]] == [0]
 
 
 async def test_run_rejects_bad_cases_and_draft(client, dsa):
@@ -402,6 +436,33 @@ async def test_admin_endpoints(client, dsa):
 
     publish_draft = await client.put(f"{BASE}/admin/problems/coming-later", json={"status": "published"}, headers=user)
     assert publish_draft.status_code == 400  # no signature / samples yet
+
+
+async def test_admin_keeps_a_sample_on_published_problems(client, dsa):
+    user = await _user(client, "pia")
+    async with client.session_factory() as db:
+        await dsa_cli.set_admin(db, "pia", True)
+        await db.commit()
+    tests = (await client.get(f"{BASE}/admin/problems/array-sum", headers=user)).json()["tests"]
+    first, second = [t for t in tests if t["is_sample"]]
+    hidden = next(t for t in tests if not t["is_sample"])
+
+    assert (await client.delete(f"{BASE}/admin/tests/{first['id']}", headers=user)).status_code == 204
+    last_delete = await client.delete(f"{BASE}/admin/tests/{second['id']}", headers=user)
+    assert last_delete.status_code == 400 and "sample" in last_delete.json()["detail"]
+    unsample = await client.put(
+        f"{BASE}/admin/tests/{second['id']}",
+        json={"input": second["input"], "expected": second["expected"], "is_sample": False},
+        headers=user,
+    )
+    assert unsample.status_code == 400
+
+    moved = await client.put(
+        f"{BASE}/admin/tests/{hidden['id']}",
+        json={"input": hidden["input"], "expected": hidden["expected"], "position": second["position"]},
+        headers=user,
+    )
+    assert moved.status_code == 409  # position taken: a clean conflict, not a 500
 
 
 async def test_notes_per_pattern_and_problem(client, dsa):

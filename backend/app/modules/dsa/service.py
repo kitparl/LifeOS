@@ -229,11 +229,17 @@ class DsaCatalogService:
         problem = await self.catalog.get_problem_by_id(test.problem_id)
         assert problem is not None
         self._validate_case(problem, data)
+        if test.is_sample and not data.is_sample:
+            await self._keep_a_sample(problem, test)
         before = {"is_sample": test.is_sample, "position": test.position}
         test.input, test.expected, test.is_sample = data.input, data.expected, data.is_sample
         test.explanation = data.explanation if data.is_sample else None
         if data.position is not None:
             test.position = data.position
+        try:
+            await self.catalog.flush()
+        except IntegrityError as exc:  # unique (problem_id, position)
+            raise ConflictError("A test already exists at that position") from exc
         self._mark_edited(problem, actor)
         _audit(actor, "update_test", problem.slug, before, {"is_sample": test.is_sample, "position": test.position})
         return _admin_test(test)
@@ -244,9 +250,19 @@ class DsaCatalogService:
             raise NotFoundError("Test case not found")
         problem = await self.catalog.get_problem_by_id(test.problem_id)
         assert problem is not None
+        if test.is_sample:
+            await self._keep_a_sample(problem, test)
         await self.catalog.delete_test(test)
         self._mark_edited(problem, actor)
         _audit(actor, "delete_test", problem.slug, {"position": test.position}, {})
+
+    async def _keep_a_sample(self, problem: DsaProblem, leaving: DsaTestCase) -> None:
+        """A published problem must keep at least one sample (the same rule `admin_update_problem` applies)."""
+        if problem.status != "published":
+            return
+        samples = await self.catalog.list_tests(problem.id, samples_only=True)
+        if all(t.id == leaving.id for t in samples):
+            raise BadRequestError("A published problem needs at least one sample test")
 
     @staticmethod
     def _validate_case(problem: DsaProblem, data: schemas.CaseWrite) -> None:
@@ -373,12 +389,13 @@ class DsaJudgeService:
                 validate_input(spec, value)
             except SignatureError as exc:
                 raise BadRequestError(f"Case {i + 1}: {exc}") from exc
+        samples = await self.catalog.list_tests(problem.id, samples_only=True)
+        # No awaits from here to enqueue_run, so two concurrent requests can't both pass this check.
         if queue.has_active_run(user_id):
             raise ConflictError("A run is already in progress")
         run_limiter, _ = _limiters(self.settings)
         if not run_limiter.hit(user_id):
             raise TooManyRequestsError("Too many runs; wait a moment")
-        samples = await self.catalog.list_tests(problem.id, samples_only=True)
         sample_outputs = {_json_key(t.input): t.expected for t in samples}
         limits = Limits(problem.time_limit_ms, problem.memory_limit_mb)
         grading = Grading(
@@ -420,6 +437,7 @@ class DsaJudgeService:
             update={
                 "verdict": outcome.verdict.value,
                 "message": outcome.message,
+                "failed_case": outcome.failed_case,
                 "cases": cases,
                 "stdout": outcome.stdout,
                 "stderr": outcome.stderr,

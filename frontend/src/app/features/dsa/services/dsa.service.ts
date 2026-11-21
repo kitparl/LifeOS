@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { EMPTY, Observable, expand, shareReplay, switchMap, tap, throwError, timer } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/services/auth.service';
 import {
   AdminProblemDetail,
   AdminTestCase,
@@ -37,7 +38,9 @@ export class DsaPollTimeoutError extends Error {
 export class DsaService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiUrl}/dsa`;
+  private readonly auth = inject(AuthService);
   private me$?: Observable<DsaMe>;
+  private meUserId: string | null = null;
 
   /** Whether the current user may edit the catalog (loaded once from /dsa/me). */
   readonly canEdit = signal(false);
@@ -46,6 +49,13 @@ export class DsaService {
   now: () => number = () => Date.now();
 
   me(): Observable<DsaMe> {
+    // The service outlives logout/login in the same tab: don't reuse another user's admin flag.
+    const userId = this.auth.user()?.id ?? null;
+    if (userId !== this.meUserId) {
+      this.me$ = undefined;
+      this.canEdit.set(false);
+      this.meUserId = userId;
+    }
     this.me$ ??= this.http.get<DsaMe>(`${this.api}/me`).pipe(
       tap((me) => this.canEdit.set(me.can_edit)),
       shareReplay({ bufferSize: 1, refCount: false }),

@@ -131,6 +131,8 @@ class RunResult(BaseModel):
     status: JobStatus
     verdict: str | None = None
     message: str | None = None
+    # 1-based; may point at a case with no entry in `cases` (the program was stopped on it).
+    failed_case: int | None = None
     cases: list[RunCaseResult] = Field(default_factory=list)
     stdout: str = ""
     stderr: str = ""

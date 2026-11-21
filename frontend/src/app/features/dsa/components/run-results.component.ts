@@ -16,7 +16,7 @@ import { VerdictBadgeComponent } from './verdict-badge.component';
         @if (r.status === 'pending' || r.status === 'running') {
           <span class="text-xs" style="color: var(--text-muted)">{{ r.status === 'pending' ? 'Queued…' : 'Running…' }}</span>
         } @else {
-          <app-dsa-verdict-badge [verdict]="r.verdict" />
+          <app-dsa-verdict-badge [verdict]="verdict()" />
           @if (checked().total > 0) {
             <span class="text-xs" style="color: var(--text-muted)" data-testid="dsa-run-summary">
               {{ checked().passed }}/{{ checked().total }} example cases passed
@@ -24,6 +24,11 @@ import { VerdictBadgeComponent } from './verdict-badge.component';
           }
         }
       </div>
+      @if (stoppedOn(); as n) {
+        <p class="text-xs" style="color: var(--danger)" data-testid="dsa-run-stopped-case">
+          Your program was stopped on case {{ n }}, so it has no output and later cases didn't run.
+        </p>
+      }
       @if (r.message) {
         <pre class="max-h-48 overflow-auto whitespace-pre-wrap rounded p-2 text-xs" style="background: var(--surface-2)">{{ r.message }}</pre>
       }
@@ -79,5 +84,17 @@ export class RunResultsComponent {
   readonly checked = computed(() => {
     const compared = this.result().cases.filter((c) => c.passed !== null);
     return { passed: compared.filter((c) => c.passed).length, total: compared.length };
+  });
+
+  /** "Accepted" would claim correctness when only custom cases ran and nothing was compared. */
+  readonly verdict = computed(() => {
+    const verdict = this.result().verdict;
+    return verdict === 'Accepted' && this.checked().total === 0 ? 'Finished' : verdict;
+  });
+
+  /** The 1-based case the program died on without writing a result (TLE, MLE, crash), if any. */
+  readonly stoppedOn = computed(() => {
+    const { failed_case, cases } = this.result();
+    return failed_case !== null && !cases.some((c) => c.index === failed_case - 1) ? failed_case : null;
   });
 }

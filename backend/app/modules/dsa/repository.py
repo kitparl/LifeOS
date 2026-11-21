@@ -81,6 +81,10 @@ class CatalogRepository:
         await self.db.delete(test)
         await self.db.flush()
 
+    async def flush(self) -> None:
+        """Write pending test edits now, so constraint errors surface in the service."""
+        await self.db.flush()
+
     async def replace_tests(self, problem_id: str, tests: list[DsaTestCase]) -> None:
         await self.db.execute(delete(DsaTestCase).where(DsaTestCase.problem_id == problem_id))
         self.db.add_all(tests)

@@ -7,6 +7,7 @@ nothing fails open (an unreachable judge is Internal Error, never Accepted).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
@@ -29,6 +30,10 @@ class JudgeWorker:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession], runner: Runner):
         self._sessions = session_factory
         self._runner = runner
+        # Recording a verdict reads then writes the user's progress row. Two workers finishing submissions
+        # for the same user and problem would both insert it (unique violation: the verdict is rolled back
+        # and the submission stays "running") or lose an attempt count. These writes are short; serialize them.
+        self._finish_lock = asyncio.Lock()
 
     async def load_unfinished(self) -> list[str]:
         async with self._sessions() as db:
@@ -69,7 +74,7 @@ class JudgeWorker:
             )
             outcome = await self._grade(language, problem.signature, code, grading, limits)
 
-        async with self._sessions() as db:
+        async with self._finish_lock, self._sessions() as db:
             submissions = SubmissionRepository(db)
             submission = await submissions.get_for_judging(submission_id)
             if submission is None:
@@ -80,14 +85,16 @@ class JudgeWorker:
             await db.commit()
 
     async def _grade(self, language: str, spec: dict, code: str, grading: Grading, limits: Limits) -> JudgeOutcome:
+        # decide() is inside the try too: an escaping error would leave the job "running" forever
+        # (a Run would then block the user's next Run until restart).
         try:
             compiled, run = await self._runner.run(language, spec, code, grading.inputs, limits)
+            return decide(compiled, run, grading)
         except JudgeUnavailableError:
             return internal_error(len(grading.inputs), "The judge is unavailable. Please try again shortly.")
         except Exception:
             logger.exception("dsa: unexpected judge failure")
             return internal_error(len(grading.inputs), "Unexpected judge failure.")
-        return decide(compiled, run, grading)
 
     @staticmethod
     async def _update_progress(

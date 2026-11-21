@@ -272,6 +272,7 @@ describe('ProblemDetailPageComponent', () => {
       status: 'done',
       verdict: 'Accepted',
       message: null,
+      failed_case: null,
       cases: [{ index: 0, input: [[2, 7], 9], expected: [0, 1], actual: [0, 1], passed: true, ms: 1.5, error: null, is_custom: false }],
       stdout: 'hello',
       stderr: '',
@@ -285,6 +286,44 @@ describe('ProblemDetailPageComponent', () => {
     tick(1000);
     http.verify();
   }));
+
+  it('does not call a run of only custom cases Accepted, and names the case the program stopped on', fakeAsync(() => {
+    create();
+    fixture.componentInstance.setCases([['[1,2]', '3'], ['[4,5]', '9']]);
+    click('dsa-detail-run-button');
+    http.expectOne(`${api}/problems/two-sum/run`).flush({ id: 'r1', status: 'pending' });
+    const custom = { input: [[1, 2], 3], expected: null, actual: [0, 1], passed: null, ms: 1, error: null, is_custom: true };
+    http.expectOne(`${api}/runs/r1`).flush({
+      id: 'r1', status: 'done', verdict: 'Accepted', message: null, failed_case: null,
+      cases: [{ index: 0, ...custom }, { index: 1, ...custom }], stdout: '', stderr: '',
+    });
+    fixture.detectChanges();
+    const results = () => el().querySelector('[data-testid="dsa-run-results"]')?.textContent ?? '';
+    expect(results()).toContain('Finished');
+    expect(results()).not.toContain('Accepted');
+
+    click('dsa-detail-run-button');
+    http.expectOne(`${api}/problems/two-sum/run`).flush({ id: 'r2', status: 'pending' });
+    http.expectOne(`${api}/runs/r2`).flush({
+      id: 'r2', status: 'done', verdict: 'Time Limit Exceeded', message: 'Time Limit Exceeded', failed_case: 2,
+      cases: [{ index: 0, ...custom }], stdout: '', stderr: '',
+    });
+    fixture.detectChanges();
+    expect(el().querySelector('[data-testid="dsa-run-stopped-case"]')?.textContent).toContain('stopped on case 2');
+    tick(1000);
+    http.verify();
+  }));
+
+  it('rejects a case too large to run without calling the API', () => {
+    create();
+    const big = JSON.stringify(Array.from({ length: 20_000 }, (_, i) => i));
+    fixture.componentInstance.setCases([['[2,7]', '9'], [big, '3']]);
+    fixture.componentInstance.run();
+    fixture.detectChanges();
+    expect(el().querySelector('[data-testid="dsa-detail-action-error"]')?.textContent).toContain('Case 2 is too large');
+    expect(fixture.componentInstance.selectedCase()).toBe(1);
+    http.verify();
+  });
 
   it('rejects invalid JSON without calling the API and shows the bad case', () => {
     create();

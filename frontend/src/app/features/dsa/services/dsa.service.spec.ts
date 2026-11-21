@@ -2,6 +2,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/services/auth.service';
 import { SubmissionDetail } from '../models/dsa.models';
 import { DsaPollTimeoutError, DsaService, POLL_TIMEOUT_MS } from './dsa.service';
 
@@ -43,6 +44,20 @@ describe('DsaService', () => {
     service.me().subscribe();
     http.expectOne(`${api}/me`).flush({ can_edit: true });
     expect(service.canEdit()).toBeTrue();
+  });
+
+  it('reloads /me for a different user instead of reusing the admin flag', () => {
+    const auth = TestBed.inject(AuthService);
+    auth.user.set({ id: 'admin' } as never);
+    service.me().subscribe();
+    http.expectOne(`${api}/me`).flush({ can_edit: true });
+    expect(service.canEdit()).toBeTrue();
+
+    auth.user.set({ id: 'someone-else' } as never);
+    service.me().subscribe();
+    expect(service.canEdit()).toBeFalse();
+    http.expectOne(`${api}/me`).flush({ can_edit: false });
+    expect(service.canEdit()).toBeFalse();
   });
 
   it('url-encodes slugs', () => {

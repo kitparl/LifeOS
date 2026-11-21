@@ -461,16 +461,25 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
       for (const [f, text] of texts.entries()) {
         const value = parseJson(text);
         if (value === undefined) {
-          this.actionError.set(`Case ${i + 1}: ${fields[f]?.name ?? 'input'} is not valid JSON.`);
-          this.selectedCase.set(i);
-          this.consoleTab.set('cases');
+          this.showCaseError(i, `Case ${i + 1}: ${fields[f]?.name ?? 'input'} is not valid JSON.`);
           return null;
         }
         values.push(value);
       }
-      inputs.push(joinInput(p.signature, values));
+      const input = joinInput(p.signature, values);
+      if (formatJson(input).length > MAX_RUN_INPUT_BYTES) {
+        this.showCaseError(i, `Case ${i + 1} is too large to run (at most ${MAX_RUN_INPUT_BYTES / 1024} KB of JSON).`);
+        return null;
+      }
+      inputs.push(input);
     }
     return inputs;
+  }
+
+  private showCaseError(index: number, message: string): void {
+    this.actionError.set(message);
+    this.selectedCase.set(index);
+    this.consoleTab.set('cases');
   }
 
   run(): void {

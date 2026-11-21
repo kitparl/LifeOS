@@ -58,7 +58,11 @@ def outputs_match(
         fn = CHECKERS.get(checker_name or "")
         if fn is None:
             raise ValueError(f"unknown checker {checker_name!r}")
-        return bool(fn(test_input, expected, actual))
+        try:
+            return bool(fn(test_input, expected, actual))
+        except (TypeError, ValueError, KeyError, IndexError, AttributeError):
+            # Checkers trust the shape of `actual`, but user code may return anything (e.g. [[1]] for int[]).
+            return False
     raise ValueError(f"unknown compare mode {mode!r}")
 
 

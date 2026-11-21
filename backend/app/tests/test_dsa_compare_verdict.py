@@ -57,6 +57,18 @@ def test_checker_registry(monkeypatch):
         outputs_match("checker", None, [], checker_name="missing")
 
 
+@pytest.mark.parametrize(
+    ("name", "test_input", "expected", "actual"),
+    [
+        ("compilation_order", [[[1, 0]]], [0, 1], [[1]]),  # unhashable items
+        ("course_order", [2, [[1, 0]]], [0, 1], ["a", 1]),  # unorderable items
+        ("parity_ii", [[1, 2]], [2, 1], ["x", 1]),
+    ],
+)
+def test_checker_treats_malformed_user_output_as_wrong(name, test_input, expected, actual):
+    assert outputs_match("checker", expected, actual, checker_name=name, test_input=test_input) is False
+
+
 def test_unknown_mode():
     with pytest.raises(ValueError):
         outputs_match("fuzzy", 1, 1)
