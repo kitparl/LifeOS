@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { Subscription } from 'rxjs';
 import { ThemeService } from '../../../core/services/theme.service';
+import { SplitOrientation } from '../../../shared/code-workspace/components/editor-toolbar/editor-toolbar.component';
 import { MarkdownEditorComponent } from '../../../shared/code-workspace/components/markdown-editor/markdown-editor.component';
 import { MarkdownPreviewComponent } from '../../../shared/code-workspace/components/markdown-preview/markdown-preview.component';
 import { SplitBounds, SplitDividerComponent } from '../../../shared/split-divider/split-divider.component';
@@ -20,6 +21,9 @@ import { TestCasesComponent } from '../components/test-cases.component';
 import { TestInputComponent } from '../components/test-input.component';
 import {
   DsaLanguage,
+  EDITOR_POSITIONS,
+  EDITOR_POSITION_LABELS,
+  EditorPosition,
   JsonValue,
   LANGUAGE_LABELS,
   MAX_RUN_CASES,
@@ -98,9 +102,12 @@ export function actionErrorMessage(err: unknown): string {
           }
         </div>
 
-        <div class="grid gap-3 lg:gap-0 lg:[grid-template-columns:var(--dsa-cols)]" [style.--dsa-cols]="splitColumns()" #splitGrid>
+        <div class="grid gap-3 lg:gap-0 lg:[grid-template-columns:var(--dsa-cols)] lg:[grid-template-rows:var(--dsa-rows)]"
+          [class.dsa-stacked]="stacked()" [style.--dsa-cols]="stacked() ? null : splitTemplate()"
+          [style.--dsa-rows]="stacked() ? splitTemplate() : null" data-testid="dsa-detail-layout" #splitGrid>
           <!-- Left: description / submissions -->
-          <section class="panel !p-0 flex min-h-0 flex-col lg:h-[calc(100vh-10rem)]">
+          <section class="panel !p-0 flex min-h-0 flex-col lg:h-[calc(100vh-10rem)]" [style.order]="editorFirst() ? 3 : 1"
+            data-testid="dsa-detail-description-pane">
             <div class="tab-bar px-2" role="tablist">
               <button type="button" role="tab" class="tab-bar__btn" [class.active]="tab() === 'description'"
                 [attr.aria-selected]="tab() === 'description'" data-testid="dsa-detail-tab-description" (click)="tab.set('description')">
@@ -165,14 +172,16 @@ export function actionErrorMessage(err: unknown): string {
           <!-- Resizable divider (desktop only) -->
           <app-split-divider
             class="relative mx-1 hidden w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--primary)] focus-visible:bg-[var(--primary)] data-[resizing=true]:bg-[var(--primary)] lg:block"
-            [value]="splitRatio()" [min]="splitMin" [max]="splitMax" [bounds]="splitBounds"
+            [orientation]="stacked() ? 'vertical' : 'horizontal'" [style.order]="2"
+            [value]="firstShare()" [min]="splitMin" [max]="splitMax" [bounds]="splitBounds"
             label="Resize description and editor" data-testid="dsa-detail-divider"
             (valueChange)="setSplit($event)" />
 
           <!-- Right: editor + results -->
-          <section class="flex min-h-0 flex-col gap-3 lg:h-[calc(100vh-10rem)]">
+          <section class="flex min-h-0 flex-col gap-3 lg:h-[calc(100vh-10rem)]" [style.order]="editorFirst() ? 1 : 3"
+            data-testid="dsa-detail-editor-pane">
             @if (p.status === 'published') {
-              <div class="panel !p-0 flex min-h-[22rem] flex-1 flex-col overflow-hidden">
+              <div class="dsa-editor-panel panel !p-0 flex min-h-[22rem] flex-1 flex-col overflow-hidden">
                 <div class="toolbar flex flex-wrap items-center gap-2 px-2 py-1.5" style="border-bottom: 1px solid var(--border)">
                   <label class="sr-only" for="dsa-language">Language</label>
                   <select id="dsa-language" class="input-field !w-auto !py-1 text-xs" data-testid="dsa-detail-language-select"
@@ -186,6 +195,14 @@ export function actionErrorMessage(err: unknown): string {
                     <svg class="h-3.5 w-3.5" lucideIcon="rotate-ccw" aria-hidden="true"></svg>
                     Reset
                   </button>
+                  <label class="sr-only" for="dsa-position">Editor position</label>
+                  <select id="dsa-position" class="input-field !w-auto !py-1 text-xs" title="Editor position"
+                    data-testid="dsa-detail-position-select" [ngModel]="editorPosition()"
+                    (ngModelChange)="setEditorPosition($event)" [disabled]="busy() !== null">
+                    @for (position of positions; track position) {
+                      <option [value]="position">{{ positionLabels[position] }}</option>
+                    }
+                  </select>
                   <div class="ml-auto flex items-center gap-2">
                     <button type="button" class="btn-secondary !min-h-8 !px-3 text-xs" data-testid="dsa-detail-run-button"
                       [disabled]="busy() !== null" (click)="run()">
@@ -246,6 +263,27 @@ export function actionErrorMessage(err: unknown): string {
       }
     </div>
   `,
+  styles: `
+    /* Stacked (editor top/bottom) on desktop: the grid takes the page height and the panes share it by rows. */
+    @media (min-width: 1024px) {
+      .dsa-stacked {
+        height: calc(100vh - 10rem);
+      }
+      .dsa-stacked > section {
+        height: auto;
+        min-height: 0;
+      }
+      .dsa-stacked .dsa-editor-panel {
+        min-height: 0;
+      }
+      .dsa-stacked > app-split-divider {
+        width: auto;
+        height: 0.25rem;
+        margin: 0.25rem 0;
+        cursor: row-resize;
+      }
+    }
+  `,
 })
 export class ProblemDetailPageComponent implements OnInit, OnDestroy {
   readonly dsa = inject(DsaService);
@@ -282,8 +320,17 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
   readonly splitMin = 0.25;
   readonly splitMax = 0.75;
   /** Description column's share of the desktop split. */
-  readonly splitRatio = signal(this.clampSplit(this.drafts.splitRatio()));
-  readonly splitColumns = computed(() => `minmax(0,${this.splitRatio()}fr) auto minmax(0,${1 - this.splitRatio()}fr)`);
+  readonly positions = EDITOR_POSITIONS;
+  readonly positionLabels = EDITOR_POSITION_LABELS;
+  readonly editorPosition = signal<EditorPosition>(this.drafts.editorPosition() ?? 'right');
+  /** Editor above/below the description instead of beside it. */
+  readonly stacked = computed(() => this.editorPosition() === 'top' || this.editorPosition() === 'bottom');
+  readonly editorFirst = computed(() => this.editorPosition() === 'left' || this.editorPosition() === 'top');
+  /** The description's share of the split, remembered separately for side-by-side and stacked layouts. */
+  readonly splitRatio = signal(this.clampSplit(this.drafts.splitRatio(this.orientation())));
+  /** Share of the first pane (the divider's value). */
+  readonly firstShare = computed(() => (this.editorFirst() ? 1 - this.splitRatio() : this.splitRatio()));
+  readonly splitTemplate = computed(() => `minmax(0,${this.firstShare()}fr) auto minmax(0,${1 - this.firstShare()}fr)`);
 
   /** Content the editor is created with; later changes go through the editor API. */
   initialCode = '';
@@ -295,15 +342,28 @@ export class ProblemDetailPageComponent implements OnInit, OnDestroy {
     effect(() => this.editor?.setTheme(this.theme()));
   }
 
-  setSplit(ratio: number): void {
+  /** `share` is the first pane's share, as the divider reports it. */
+  setSplit(share: number): void {
+    const ratio = this.editorFirst() ? 1 - share : share;
     this.splitRatio.set(ratio);
-    this.drafts.rememberSplitRatio(ratio);
+    this.drafts.rememberSplitRatio(ratio, this.orientation());
+  }
+
+  setEditorPosition(position: EditorPosition): void {
+    this.editorPosition.set(position);
+    this.drafts.rememberEditorPosition(position);
+    this.splitRatio.set(this.clampSplit(this.drafts.splitRatio(this.orientation())));
+  }
+
+  private orientation(): SplitOrientation {
+    return this.stacked() ? 'vertical' : 'horizontal';
   }
 
   /** Extent of the whole two-column grid, read while dragging the divider. */
   readonly splitBounds = (): SplitBounds | null => {
     const rect = this.splitGrid?.nativeElement.getBoundingClientRect();
-    return rect ? { start: rect.left, end: rect.right } : null;
+    if (!rect) return null;
+    return this.stacked() ? { start: rect.top, end: rect.bottom } : { start: rect.left, end: rect.right };
   };
 
   private clampSplit(ratio: number | null): number {

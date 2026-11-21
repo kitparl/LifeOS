@@ -52,6 +52,22 @@ describe('DsaDraftStore', () => {
     expect(store.splitRatio()).toBeNull();
   });
 
+  it('keeps the stacked split ratio apart from the side-by-side one', () => {
+    data.set('dsa:split', '0.3'); // saved before stacked layouts existed
+    store.rememberSplitRatio(0.6, 'vertical');
+    expect(store.splitRatio()).toBe(0.3);
+    expect(store.splitRatio('horizontal')).toBe(0.3);
+    expect(store.splitRatio('vertical')).toBe(0.6);
+  });
+
+  it('remembers the editor position and ignores unknown values', () => {
+    expect(store.editorPosition()).toBeNull();
+    store.rememberEditorPosition('bottom');
+    expect(store.editorPosition()).toBe('bottom');
+    data.set('dsa:editor-position', 'diagonal');
+    expect(store.editorPosition()).toBeNull();
+  });
+
   it('degrades silently when storage throws', () => {
     store.storage = () => {
       throw new Error('blocked');

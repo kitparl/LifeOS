@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, flushMicrotasks, tick } from '@angular/core/testing';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
@@ -334,8 +334,39 @@ describe('ProblemDetailPageComponent', () => {
     expect(case0.textContent).toContain('Failed');
     expect(case0.textContent).toContain('Expected');
     expect(case0.querySelector('[title="Expected output from our reference solution"]')).toBeTruthy();
+    click('dsa-run-tab-1');
+    fixture.detectChanges();
     expect(el().querySelector('[data-testid="dsa-run-case-unchecked-1"]')?.textContent).toContain('No reference solution');
     expect(el().querySelector('[data-testid="dsa-run-summary"]')?.textContent).toContain('0/1 cases passed');
+    tick(1000);
+    http.verify();
+  }));
+
+  it('shows run results as case tabs, opening the first failed case', fakeAsync(() => {
+    create();
+    fixture.componentInstance.setCases([['[2,7]', '9'], ['[1,2]', '3']]);
+    click('dsa-detail-run-button');
+    http.expectOne(`${api}/problems/two-sum/run`).flush({ id: 'r1', status: 'pending' });
+    const base = { ms: 1, error: null, is_custom: false, unchecked_reason: null };
+    http.expectOne(`${api}/runs/r1`).flush({
+      id: 'r1', status: 'done', verdict: 'Wrong Answer', message: null, failed_case: 2, stdout: '', stderr: '',
+      cases: [
+        { ...base, index: 0, input: [[2, 7], 9], expected: [0, 1], actual: [0, 1], passed: true },
+        { ...base, index: 1, input: [[1, 2], 3], expected: [0, 1], actual: [1, 1], passed: false },
+      ],
+    });
+    fixture.detectChanges();
+    const q = (id: string) => el().querySelector(`[data-testid="${id}"]`);
+    expect(q('dsa-run-tab-0')?.textContent).toContain('Case 1');
+    expect(q('dsa-run-tab-1')?.textContent).toContain('Case 2');
+    expect(q('dsa-run-tab-1')?.getAttribute('aria-pressed')).toBe('true');
+    expect(q('dsa-run-case-0')).toBeNull();
+    expect(q('dsa-run-case-1')?.textContent).toContain('Failed');
+
+    click('dsa-run-tab-0');
+    fixture.detectChanges();
+    expect(q('dsa-run-case-1')).toBeNull();
+    expect(q('dsa-run-case-0')?.textContent).toContain('Passed');
     tick(1000);
     http.verify();
   }));
@@ -349,6 +380,45 @@ describe('ProblemDetailPageComponent', () => {
     expect(el().querySelector('[data-testid="dsa-detail-action-error"]')?.textContent).toContain('Case 2 is too large');
     expect(fixture.componentInstance.selectedCase()).toBe(1);
     http.verify();
+  });
+
+  describe('editor position', () => {
+    const pane = (id: string) => el().querySelector(`[data-testid="${id}"]`) as HTMLElement;
+    const order = (id: string) => Number(pane(id).style.order);
+    const layout = () => pane('dsa-detail-layout').style;
+
+    it('puts the editor on the right by default', fakeAsync(() => {
+      create();
+      flushMicrotasks(); // ngModel writes the select's value in a microtask
+      expect((pane('dsa-detail-position-select') as HTMLSelectElement).value).toBe('right');
+      expect(layout().getPropertyValue('--dsa-cols')).not.toBe('');
+      expect(layout().getPropertyValue('--dsa-rows')).toBe('');
+      expect(order('dsa-detail-description-pane')).toBeLessThan(order('dsa-detail-editor-pane'));
+      http.verify();
+    }));
+
+    it('stacks the editor on top when chosen, and remembers it', () => {
+      create();
+      const select = pane('dsa-detail-position-select') as HTMLSelectElement;
+      select.value = 'top';
+      select.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      expect(store.get('dsa:editor-position')).toBe('top');
+      expect(layout().getPropertyValue('--dsa-rows')).not.toBe('');
+      expect(layout().getPropertyValue('--dsa-cols')).toBe('');
+      expect(order('dsa-detail-editor-pane')).toBeLessThan(order('dsa-detail-description-pane'));
+      expect(pane('dsa-detail-divider').getAttribute('aria-orientation')).toBe('horizontal');
+      http.verify();
+    });
+
+    it('restores a remembered position', fakeAsync(() => {
+      create({ 'dsa:editor-position': 'left' });
+      flushMicrotasks();
+      expect((pane('dsa-detail-position-select') as HTMLSelectElement).value).toBe('left');
+      expect(layout().getPropertyValue('--dsa-cols')).not.toBe('');
+      expect(order('dsa-detail-editor-pane')).toBeLessThan(order('dsa-detail-description-pane'));
+      http.verify();
+    }));
   });
 
   it('rejects invalid JSON without calling the API and shows the bad case', () => {

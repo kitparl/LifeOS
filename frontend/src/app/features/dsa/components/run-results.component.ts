@@ -1,9 +1,9 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, signal } from '@angular/core';
 import { RunResult, SignatureSpec, formatJson } from '../models/dsa.models';
 import { TestInputComponent } from './test-input.component';
 import { VerdictBadgeComponent } from './verdict-badge.component';
 
-/** Run output: per-case input / expected / actual, plus stdout and stderr. */
+/** Run output: one tab per case (like the Test cases panel) showing input / expected / actual, plus stdout and stderr. */
 @Component({
   selector: 'app-dsa-run-results',
   standalone: true,
@@ -32,7 +32,24 @@ import { VerdictBadgeComponent } from './verdict-badge.component';
       @if (r.message) {
         <pre class="max-h-48 overflow-auto whitespace-pre-wrap rounded p-2 text-xs" style="background: var(--surface-2)">{{ r.message }}</pre>
       }
-      @for (c of r.cases; track c.index) {
+      @if (r.cases.length > 0) {
+        <div class="flex flex-wrap items-center gap-1.5" aria-label="Run cases">
+          @for (c of r.cases; track c.index) {
+            <button type="button" class="chip" [attr.aria-pressed]="c.index === current()" [attr.data-testid]="'dsa-run-tab-' + c.index"
+              [style.border-color]="c.index === current() ? 'var(--primary)' : null"
+              [style.color]="c.index === current() ? 'var(--primary-hover)' : null"
+              (click)="pick(c.index)">
+              Case {{ c.index + 1 }}
+              @if (c.passed === true) {
+                <span style="color: var(--success)" title="Passed">•</span>
+              } @else if (c.passed === false || c.error) {
+                <span style="color: var(--danger)" title="Failed">•</span>
+              }
+            </button>
+          }
+        </div>
+      }
+      @if (selectedCase(); as c) {
         <div class="panel--flat space-y-1 !p-3 text-xs" [attr.data-testid]="'dsa-run-case-' + c.index">
           <div class="flex flex-wrap items-center gap-2 font-medium">
             <span>Case {{ c.index + 1 }}</span>
@@ -94,6 +111,24 @@ export class RunResultsComponent {
     const verdict = this.result().verdict;
     return verdict === 'Accepted' && this.checked().total === 0 ? 'Finished' : verdict;
   });
+
+  /** The case tab the user picked, tied to the result it was picked on (a new Run starts fresh). */
+  private readonly picked = signal<{ run: RunResult; index: number } | null>(null);
+
+  /** Index of the case shown: the user's pick, else the first failed case, else the first case. */
+  readonly current = computed(() => {
+    const run = this.result();
+    const picked = this.picked();
+    if (picked?.run === run) return picked.index;
+    const failed = run.cases.find((c) => c.passed === false || c.error);
+    return (failed ?? run.cases[0])?.index ?? null;
+  });
+
+  readonly selectedCase = computed(() => this.result().cases.find((c) => c.index === this.current()) ?? null);
+
+  pick(index: number): void {
+    this.picked.set({ run: this.result(), index });
+  }
 
   /** The 1-based case the program died on without writing a result (TLE, MLE, crash), if any. */
   readonly stoppedOn = computed(() => {

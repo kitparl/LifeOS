@@ -20,6 +20,16 @@ export const LANGUAGE_LABELS: Record<DsaLanguage, string> = {
 };
 
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+/** Where the editor (with its console) sits on the problem page. */
+export type EditorPosition = 'right' | 'left' | 'top' | 'bottom';
+export const EDITOR_POSITIONS: EditorPosition[] = ['right', 'left', 'top', 'bottom'];
+export const EDITOR_POSITION_LABELS: Record<EditorPosition, string> = {
+  right: 'Right',
+  left: 'Left',
+  top: 'Top',
+  bottom: 'Bottom',
+};
+
 /** Mirrors MAX_RUN_CASES / MAX_RUN_INPUT_BYTES in schemas.py. */
 export const MAX_RUN_CASES = 6;
 export const MAX_RUN_INPUT_BYTES = 64 * 1024;

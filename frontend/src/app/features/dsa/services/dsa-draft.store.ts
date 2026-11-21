@@ -1,10 +1,13 @@
 import { Injectable } from '@angular/core';
-import { DsaLanguage } from '../models/dsa.models';
+import { SplitOrientation } from '../../../shared/code-workspace/components/editor-toolbar/editor-toolbar.component';
+import { DsaLanguage, EDITOR_POSITIONS, EditorPosition } from '../models/dsa.models';
 
 const PREFIX = 'dsa:draft:';
 const CASES_PREFIX = 'dsa:cases:';
 const LANGUAGE_KEY = 'dsa:language';
-const SPLIT_KEY = 'dsa:split';
+/** Description's share per layout: side by side (key kept from before stacked layouts) or stacked. */
+const SPLIT_KEYS: Record<SplitOrientation, string> = { horizontal: 'dsa:split', vertical: 'dsa:split-v' };
+const POSITION_KEY = 'dsa:editor-position';
 
 /**
  * Per-browser code drafts (per problem and language), Run test cases (per problem) and the last language used.
@@ -55,14 +58,24 @@ export class DsaDraftStore {
     this.write(LANGUAGE_KEY, language);
   }
 
-  /** Description column's share of the problem page split (0–1), or null if unset/invalid. */
-  splitRatio(): number | null {
-    const value = Number(this.read(SPLIT_KEY));
+  /** Description's share of the problem page split (0–1) for that layout, or null if unset/invalid. */
+  splitRatio(orientation: SplitOrientation = 'horizontal'): number | null {
+    const value = Number(this.read(SPLIT_KEYS[orientation]));
     return Number.isFinite(value) && value > 0 && value < 1 ? value : null;
   }
 
-  rememberSplitRatio(ratio: number): void {
-    this.write(SPLIT_KEY, String(ratio));
+  rememberSplitRatio(ratio: number, orientation: SplitOrientation = 'horizontal'): void {
+    this.write(SPLIT_KEYS[orientation], String(ratio));
+  }
+
+  /** Where the editor sits on the problem page, or null if unset/unknown. */
+  editorPosition(): EditorPosition | null {
+    const value = this.read(POSITION_KEY);
+    return EDITOR_POSITIONS.find((p) => p === value) ?? null;
+  }
+
+  rememberEditorPosition(position: EditorPosition): void {
+    this.write(POSITION_KEY, position);
   }
 
   private read(key: string): string | null {
